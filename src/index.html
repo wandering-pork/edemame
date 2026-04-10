@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edamame Legal Flow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sniglet: ['Sniglet', 'cursive'],
+              fredoka: ['Fredoka', 'sans-serif'],
+              sans: ['ui-sans-serif', 'system-ui', 'sans-serif'],
+            },
+            colors: {
+              slate: {
+                950: '#020617',
+              },
+              // Professional brand colors from the new logo
+              'edamame': {
+                DEFAULT: '#29B767',
+                50: '#f1fcf4',
+                100: '#def9e6',
+                200: '#bef1cf',
+                300: '#8ee4ae',
+                400: '#56ce85',
+                500: '#29B767', // Brand Primary Green
+                600: '#2db067',
+                700: '#1d814c',
+                800: '#1b663f',
+                900: '#175435',
+                dark: '#22201D', // Brand Deep Charcoal
+                sidebar: '#2DB067', // Sidebar color
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Sniglet:wght@400;800&display=swap" rel="stylesheet">
+    <style>
+      /* Global brand overrides */
+      .text-green-600 { color: #29B767 !important; }
+      .bg-green-600 { background-color: #29B767 !important; }
+      .bg-green-500 { background-color: #29B767 !important; }
+      .border-green-500 { border-color: #29B767 !important; }
+      .hover\:bg-green-500:hover { background-color: #2db067 !important; }
+      .dark .text-green-400 { color: #56ce85 !important; }
+      .bg-green-50 { background-color: #f1fcf4 !important; }
+      .dark .bg-green-900\/20 { background-color: rgba(23, 84, 53, 0.2) !important; }
+
+      /* Page layout */
+      body { overflow-x: hidden; }
+
+      /* Sidebar slide-in transition */
+      .sidebar-drawer {
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .sidebar-drawer-closed {
+        transform: translateX(-100%);
+      }
+      .sidebar-drawer-open {
+        transform: translateX(0);
+      }
+
+      /* Nav item hover fill animation */
+      .nav-item-hover {
+        position: relative;
+        overflow: hidden;
+      }
+      .nav-item-hover::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0.08);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.2s ease;
+        border-radius: inherit;
+      }
+      .nav-item-hover:hover::before {
+        transform: scaleX(1);
+      }
+
+      /* Card lift effect */
+      .card-lift {
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+      }
+      .card-lift:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px -4px rgba(0,0,0,0.10), 0 4px 8px -2px rgba(0,0,0,0.06);
+      }
+      .dark .card-lift:hover {
+        box-shadow: 0 8px 24px -4px rgba(0,0,0,0.4), 0 4px 8px -2px rgba(0,0,0,0.25);
+      }
+
+      /* Stat card shimmer on hover */
+      .stat-card {
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+      }
+      .stat-card::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; bottom: 0;
+        width: 3px;
+        border-radius: 0 8px 8px 0;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+      .stat-card:hover {
+        transform: translateY(-2px);
+      }
+
+      /* Task card */
+      .task-card {
+        transition: box-shadow 0.15s ease, border-color 0.15s ease;
+      }
+      .task-card:hover {
+        box-shadow: 0 4px 14px -3px rgba(41, 183, 103, 0.15);
+        border-color: rgba(41, 183, 103, 0.3);
+      }
+      .dark .task-card:hover {
+        box-shadow: 0 4px 14px -3px rgba(41, 183, 103, 0.25);
+        border-color: rgba(41, 183, 103, 0.35);
+      }
+
+      /* Table row hover */
+      .table-row-hover {
+        transition: background-color 0.12s ease;
+        cursor: pointer;
+      }
+
+      /* Smooth checkbox */
+      .check-btn {
+        transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+      }
+      .check-btn:active { transform: scale(0.9); }
+
+      /* Modal backdrop blur */
+      .modal-backdrop {
+        animation: backdropFadeIn 0.18s ease forwards;
+      }
+      @keyframes backdropFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .modal-content {
+        animation: modalSlideUp 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+      @keyframes modalSlideUp {
+        from { opacity: 0; transform: scale(0.94) translateY(8px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
+
+      /* Progress bar fill animation */
+      .progress-fill {
+        transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      /* Button press */
+      .btn-press:active { transform: scale(0.97); }
+
+      /* Scrollbar styling */
+      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,0.12);
+        border-radius: 4px;
+      }
+      .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.08);
+      }
+
+      /* Page content fade in */
+      .page-enter {
+        animation: pageFadeIn 0.25s ease forwards;
+      }
+      @keyframes pageFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Focus ring standardization */
+      .focus-ring:focus-within {
+        ring-color: #29B767;
+        box-shadow: 0 0 0 3px rgba(41,183,103,0.18);
+      }
+
+      /* Sidebar active pill glow */
+      .nav-active-glow {
+        box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+      }
+
+      /* Mobile overlay */
+      .mobile-overlay {
+        animation: overlayIn 0.25s ease forwards;
+      }
+      @keyframes overlayIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      /* Badge pulse for notifications */
+      @keyframes badgePulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.15); }
+      }
+      .badge-pulse { animation: badgePulse 2s ease-in-out infinite; }
+
+      /* Divider gradient */
+      .divider-gradient {
+        background: linear-gradient(to right, transparent, rgba(0,0,0,0.06), transparent);
+        height: 1px;
+      }
+      .dark .divider-gradient {
+        background: linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "date-fns": "https://aistudiocdn.com/date-fns@^4.1.0",
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
