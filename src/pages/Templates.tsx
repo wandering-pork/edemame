@@ -81,24 +81,27 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
 
   return (
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200 page-enter">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-fredoka tracking-tight">
-            Workflow Templates
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
-            Define standard procedures for different visa types.
-          </p>
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-fredoka tracking-tight">
+              Workflow Templates
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+              Define standard procedures for different visa types.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="btn-press flex items-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm whitespace-nowrap"
+            >
+              <Plus size={16} />
+              New Template
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="btn-press flex items-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm"
-        >
-          <Plus size={16} />
-          New Template
-        </button>
-      </div>
 
       {/* Create form */}
       {isEditing && (
@@ -196,14 +199,15 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
         </div>
       )}
 
-      {templates.length === 0 && (
-        <div className="text-center py-20">
-          <div className="flex flex-col items-center gap-3 text-gray-400 dark:text-slate-600">
-            <FileText size={36} className="opacity-25" />
-            <p className="text-sm">No templates yet. Create your first template to get started.</p>
+        {templates.length === 0 && (
+          <div className="text-center py-20">
+            <div className="flex flex-col items-center gap-3 text-gray-400 dark:text-slate-600">
+              <FileText size={36} className="opacity-25" />
+              <p className="text-sm">No templates yet. Create your first template to get started.</p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

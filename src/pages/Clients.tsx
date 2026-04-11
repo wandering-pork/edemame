@@ -94,49 +94,52 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
 
   return (
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200 page-enter">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-fredoka tracking-tight">
-            Clients
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
-            Manage client profiles and case history.
-          </p>
-        </div>
-
-        <div className="flex w-full sm:w-auto items-center gap-2.5 flex-wrap">
-          <div className="relative flex-1 sm:w-56">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" size={16} />
-            <input
-              type="text"
-              placeholder="Search clients..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl text-sm outline-none focus:border-edamame/50 dark:focus:border-edamame/30 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-600 transition-colors"
-            />
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-fredoka tracking-tight">
+              Clients
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+              Manage client profiles and case history.
+            </p>
           </div>
-          <button
-            onClick={() => setIsCsvModalOpen(true)}
-            className="btn-press flex items-center gap-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 px-3.5 py-2.5 rounded-xl font-medium transition-colors text-sm whitespace-nowrap"
-          >
-            <Upload size={15} />
-            Import
-          </button>
-          <button
-            onClick={() => handleOpenModal()}
-            className="btn-press flex items-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-4 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm whitespace-nowrap"
-          >
-            <Plus size={16} />
-            Add Client
-          </button>
-        </div>
-      </div>
 
-      {/* Clients list */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        {/* Table header */}
-        <div className="grid grid-cols-12 gap-4 px-5 py-3 border-b border-gray-100 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-800/60">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            <div className="relative flex-1 sm:flex-1 sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" size={16} />
+              <input
+                type="text"
+                placeholder="Search clients..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl text-sm outline-none focus:border-edamame/50 dark:focus:border-edamame/30 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-600 transition-colors"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsCsvModalOpen(true)}
+                className="btn-press flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl font-medium transition-colors text-sm whitespace-nowrap"
+              >
+                <Upload size={15} />
+                Import
+              </button>
+              <button
+                onClick={() => handleOpenModal()}
+                className="btn-press flex items-center justify-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm whitespace-nowrap"
+              >
+                <Plus size={16} />
+                Add Client
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Clients list */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          {/* Table header */}
+          <div className="grid grid-cols-12 gap-4 px-5 py-3 border-b border-gray-100 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-800/60">
           <div className="col-span-5 md:col-span-4 text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest">Name</div>
           <div className="col-span-5 md:col-span-4 text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest">Contact</div>
           <div className="col-span-2 hidden md:block text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest">D.O.B</div>
@@ -409,14 +412,15 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
         </div>
       )}
 
-      {/* CSV Import Modal */}
-      <CsvImport
-        isOpen={isCsvModalOpen}
-        onClose={() => setIsCsvModalOpen(false)}
-        onImport={(importedClients) => {
-          importedClients.forEach((client) => onAddClient(client));
-        }}
-      />
+        {/* CSV Import Modal */}
+        <CsvImport
+          isOpen={isCsvModalOpen}
+          onClose={() => setIsCsvModalOpen(false)}
+          onImport={(importedClients) => {
+            importedClients.forEach((client) => onAddClient(client));
+          }}
+        />
+      </div>
     </div>
   );
 };

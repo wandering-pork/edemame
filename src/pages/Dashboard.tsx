@@ -214,27 +214,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen relative transition-colors duration-200 page-enter">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-fredoka tracking-tight">
-            Task Dashboard
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
-            Manage your daily client follow-ups
-          </p>
-        </div>
+      <div className="max-w-7xl mx-auto">
+        {/* Page header */}
+        <div className="flex flex-col gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-fredoka tracking-tight">
+              Task Dashboard
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+              Manage your daily client follow-ups
+            </p>
+          </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={handleOpenModal}
-            className="btn-press flex items-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-4 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm"
-          >
-            <Plus size={16} />
-            New Task
-          </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <button
+              onClick={handleOpenModal}
+              className="btn-press flex items-center justify-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-4 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm"
+            >
+              <Plus size={16} />
+              New Task
+            </button>
 
-          <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <button
               onClick={() => setSelectedDate(addDays(selectedDate, -1))}
               className="px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors text-sm font-medium border-r border-gray-100 dark:border-slate-800"
@@ -915,6 +916,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

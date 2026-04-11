@@ -79,7 +79,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200 page-enter">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col gap-4 mb-8">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-fredoka tracking-tight">
               Case Manager
@@ -88,13 +88,15 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
               Overview and manage all immigration cases.
             </p>
           </div>
-          <button
-            onClick={() => setShowIntake(true)}
-            className="btn-press flex items-center justify-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm"
-          >
-            <Plus size={18} />
-            New Case
-          </button>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowIntake(true)}
+              className="btn-press flex items-center justify-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm whitespace-nowrap"
+            >
+              <Plus size={18} />
+              New Case
+            </button>
+          </div>
         </div>
 
         {/* Search bar */}

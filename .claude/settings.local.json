@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /e/code/edemame add src/)",
+      "Bash(git -C /e/code/edemame status)",
+      "Bash(git -C /e/code/edemame add .gitattributes)",
+      "Bash(git -C /e/code/edemame status --short)",
+      "Bash(git:*)",
+      "Bash(ssh -T git@github.com)",
+      "Bash(gh repo:*)",
+      "Bash(gh run:*)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
+      "Bash(node:*)",
+      "Bash(gh secret:*)",
+      "Bash(curl:*)",
+      "Bash(vercel whoami:*)",
+      "Bash(vercel tokens:*)",
+      "Bash(vercel --help)",
+      "Bash(vercel deploy:*)",
+      "Bash(npm run:*)"
+    ]
+  }
+}
