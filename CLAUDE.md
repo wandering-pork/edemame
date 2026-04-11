@@ -36,7 +36,10 @@ Requires `GEMINI_API_KEY` in `src/.env.local`.
 ### Dual Runtime Model
 
 - **Frontend:** React 19 + TypeScript SPA, built with Vite 6. Tailwind CSS via CDN (config inline in `src/index.html`).
-- **Backend:** Vercel serverless function at `src/api/generate-tasks.ts` — a POST endpoint that calls Gemini 2.5 Flash with structured JSON output schema. The frontend calls `/api/generate-tasks` via fetch in `src/services/geminiService.ts`.
+- **Backend:** Vercel serverless functions in root `api/` directory (not `src/api/`):
+  - `/api/generate-tasks.ts` — generates task schedules from case descriptions using Gemini 2.5 Flash
+  - `/api/scan-passport-gemini.ts` — extracts passport data from images using Gemini Vision API
+  - `/api/check-eligibility.ts` — assesses visa eligibility using Gemini 2.5 Flash with structured JSON schema
 
 ### State Management
 
@@ -53,12 +56,32 @@ All app state (tasks, cases, clients, templates, theme) lives in `src/App.tsx` a
 3. Vercel function sends prompt to Gemini with structured JSON schema (title, description, daysOffset)
 4. Response parsed into `Task[]` with computed dates and added to app state
 
+### Passport Scanner (OCR) Flow
+
+1. User clicks "Scan Passport" in NewCase/Clients form
+2. `PassportScanner.tsx` component opens modal, accepts drag-drop or file upload
+3. Image converted to base64 and POSTed to `/api/scan-passport-gemini` via `ocrService.ts`
+4. Vercel function calls Gemini Vision API with inline image data
+5. Extracted fields (firstName, lastName, dateOfBirth, nationality, passportNumber, expiryDate, gender) returned
+6. User can edit fields before confirming to populate form
+7. Error state offers "Continue with Manual Entry" fallback
+
+### Visa Eligibility Advisor Flow
+
+1. User navigates to Visa Advisor page (sidebar or "Check Eligibility" button on client card)
+2. 4-step wizard collects: personal info → immigration goal → conditional details → supporting factors
+3. On submit, POSTs collected data to `/api/check-eligibility` via `VisaAdvisor.tsx`
+4. Vercel function calls Gemini 2.5 Flash with visa assessment prompt
+5. Returns JSON with visa verdict cards: 9 Australian visa subclasses (189, 190, 482, 186, 500, 820, 485, 600, 417)
+6. Each card shows verdict (qualifies/possibly/unlikely/needs_more_info), reasons, and gaps
+7. "Open New Case" button on qualified visas navigates to CaseManager with template pre-selected via URL state
+
 ### Key Conventions
 
-- `src/components/` — reusable brand/layout pieces (Logo, Sidebar)
-- `src/pages/` — page-level views (Dashboard, CaseManager, CaseDetails, NewCase, Clients, Templates, Settings)
-- `src/services/` — external API client functions
-- `src/api/` — Vercel serverless functions (server-side, runs on Node)
+- `src/components/` — reusable brand/layout pieces (Logo, Sidebar, PassportScanner)
+- `src/pages/` — page-level views (Dashboard, CaseManager, CaseDetails, NewCase, Clients, VisaAdvisor, Templates, Settings)
+- `src/services/` — external API client functions (geminiService, ocrService)
+- `api/` — **root-level** Vercel serverless functions (not `src/api/`) — server-side, runs on Node
 - `src/types.ts` — all TypeScript type definitions (Task, Case, Client, WorkflowTemplate, ViewMode, Theme)
 - Path alias `@/` resolves to `src/` root
 

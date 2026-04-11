@@ -28,7 +28,9 @@ Originally built with [Google AI Studio](https://ai.studio/apps/1c0e5b8b-4436-4c
 - **Dashboard** — Visual task calendar; mark tasks complete, reorder by priority, browse by date
 - **Case Management** — Create and track immigration cases linked to clients and workflow templates
 - **AI Task Generation** — Google Gemini produces a structured task schedule from a case description and workflow guide
-- **Client Management** — Store and manage client personal information
+- **Passport Scanner (OCR)** — Upload passport images and auto-extract personal details using Gemini Vision API; includes manual entry fallback
+- **Visa Eligibility Advisor** — 4-step wizard collects client profile and assesses eligibility across 9 Australian visa types; suggests recommended pathway and can pre-select template for new cases
+- **Client Management** — Store and manage client personal information; quick visa eligibility check from client card
 - **Workflow Templates** — Predefined procedures for common visa types, fully editable
 - **Dark / Light Mode** — Theme preference persisted in `localStorage`
 
@@ -103,26 +105,34 @@ Originally built with [Google AI Studio](https://ai.studio/apps/1c0e5b8b-4436-4c
 ## Project Structure
 
 ```
-src/
-├── App.tsx                  # Root component — all app state and navigation
-├── index.tsx                # React DOM entry point
-├── index.html               # HTML shell with Tailwind CDN config
-├── types.ts                 # All TypeScript type definitions
-├── vite.config.ts           # Vite config (API key injection, path aliases)
-├── components/
-│   ├── Sidebar.tsx          # Navigation sidebar
-│   ├── Logo.tsx             # Logo variants and brand components
-│   └── ...
-├── pages/
-│   ├── Dashboard.tsx        # Task calendar (main view)
-│   ├── CaseManager.tsx      # Case list
-│   ├── CaseDetails.tsx      # Per-case view + AI task generation
-│   ├── NewCase.tsx          # Case intake form
-│   ├── Clients.tsx          # Client management
-│   ├── Templates.tsx        # Workflow template editor
-│   └── Settings.tsx         # User preferences
-└── services/
-    └── geminiService.ts     # Gemini AI integration
+edemame/
+├── api/                     # Vercel serverless functions
+│   ├── generate-tasks.ts    # Task generation from case descriptions
+│   ├── scan-passport-gemini.ts  # Passport OCR using Gemini Vision
+│   └── check-eligibility.ts # Visa eligibility assessment
+├── src/
+│   ├── App.tsx              # Root component — all app state and navigation
+│   ├── index.tsx            # React DOM entry point
+│   ├── index.html           # HTML shell with Tailwind CDN config
+│   ├── types.ts             # All TypeScript type definitions
+│   ├── vite.config.ts       # Vite config (API key injection, path aliases)
+│   ├── components/
+│   │   ├── Sidebar.tsx      # Navigation sidebar
+│   │   ├── PassportScanner.tsx  # Passport upload & OCR modal
+│   │   ├── Logo.tsx         # Logo variants and brand components
+│   │   └── ...
+│   ├── pages/
+│   │   ├── Dashboard.tsx    # Task calendar (main view)
+│   │   ├── CaseManager.tsx  # Case list + new case form
+│   │   ├── CaseDetails.tsx  # Per-case view + AI task generation
+│   │   ├── NewCase.tsx      # Case intake form
+│   │   ├── Clients.tsx      # Client management
+│   │   ├── VisaAdvisor.tsx  # 4-step visa eligibility wizard
+│   │   ├── Templates.tsx    # Workflow template editor
+│   │   └── Settings.tsx     # User preferences
+│   └── services/
+│       ├── geminiService.ts # AI task generation
+│       └── ocrService.ts    # Passport OCR via Gemini Vision
 ```
 
 ---
@@ -134,6 +144,39 @@ src/
 3. Click **Generate Tasks** — this calls `geminiService.ts` which sends the case description + workflow guide to Gemini
 4. Gemini returns a structured JSON array of tasks with suggested date offsets
 5. Tasks are added to the case and appear on the Dashboard calendar
+
+---
+
+## Passport Scanner (OCR)
+
+The passport scanner streamlines client intake by automatically extracting passport data:
+
+1. Click **Scan Passport** in the NewCase form or Clients page
+2. Upload a photo of a passport biodata page (JPG/PNG)
+3. Image is sent to `/api/scan-passport-gemini` which uses **Gemini Vision API** to extract:
+   - First name, last name, date of birth, nationality
+   - Passport number, expiry date, gender
+4. Extracted fields appear in an editable form for verification
+5. If OCR fails, fall back to **Continue with Manual Entry** to fill fields manually
+
+---
+
+## Visa Eligibility Advisor
+
+Assess visa eligibility across 9 Australian visa types:
+
+1. Click **Visa Advisor** in the sidebar (or **Check Eligibility** on any client card)
+2. Complete a 4-step wizard:
+   - **Step 1:** Personal information (name, DOB, nationality, current AU location)
+   - **Step 2:** Immigration goal (Work / Study / Family / PR / Visit) + intended duration
+   - **Step 3:** Conditional details based on goal (occupation, education, relationship, etc.)
+   - **Step 4:** Supporting factors (English proficiency, health, criminal history)
+3. Click **Submit** → Gemini assesses eligibility for all visa types
+4. View verdict cards for each visa (Qualifies / Possibly / Unlikely / Needs More Info)
+   - Each card shows key reasons and gaps to address
+5. Click **Open New Case** on any qualified visa → creates case with that visa template pre-selected
+
+**Assessed Visa Types:** Skilled Independent (189), Skilled Nominated (190), Temporary Skill Shortage (482), Employer Nominated Scheme (186), Student (500), Partner (820), Temporary Graduate (485), Visitor (600), Working Holiday (417)
 
 ---
 
