@@ -441,7 +441,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* ── Calendar view ───────────────────────────────────────────────────── */}
       {viewMode === 'calendar' && (
         <div className="overflow-x-auto pb-4">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 min-w-[1200px] lg:min-w-0">
+          {/* min-w-[750px] ensures horizontal scroll kicks in on narrow screens
+              rather than letting columns shrink below usability.
+              grid-cols-5 always — columns auto-size to fill available width. */}
+          <div className="grid grid-cols-5 gap-3 min-w-[750px]">
             {weekDays.map((day) => {
               const dateStr = format(day, 'yyyy-MM-dd');
               const isToday = isSameDay(day, new Date());
@@ -453,7 +456,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   key={dateStr}
                   onDrop={(e) => handleDrop(e, dateStr)}
                   onDragOver={allowDrop}
-                  className={`flex-shrink-0 w-full min-w-[230px] rounded-2xl border flex flex-col h-[70vh] transition-all duration-200 ${
+                  className={`min-w-0 rounded-2xl border flex flex-col h-[70vh] transition-all duration-200 ${
                     isToday
                       ? 'bg-white dark:bg-slate-900 border-edamame/40 dark:border-edamame/30 shadow-lg shadow-edamame/8'
                       : 'bg-white/70 dark:bg-slate-900/70 border-slate-200 dark:border-slate-800 shadow-sm'
