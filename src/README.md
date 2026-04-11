@@ -9,6 +9,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)](https://www.typescriptlang.org)
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite)](https://vitejs.dev)
 [![Gemini](https://img.shields.io/badge/Gemini-AI-4285F4?logo=google)](https://ai.google.dev)
+[![CI](https://github.com/wandering-pork/edemame/actions/workflows/ci.yml/badge.svg)](https://github.com/wandering-pork/edemame/actions/workflows/ci.yml)
 
 </div>
 
