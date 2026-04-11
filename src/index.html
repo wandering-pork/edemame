@@ -11,10 +11,11 @@
         theme: {
           extend: {
             fontFamily: {
-              sniglet: ['Sniglet', 'cursive'],
-              'ibm-serif': ['"IBM Plex Serif"', 'Georgia', 'serif'],
-              'ibm-sans': ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
-              sans: ['"IBM Plex Sans"', 'system-ui', 'ui-sans-serif', 'sans-serif'],
+              sniglet: ['"Archivo Black"', 'Archivo', 'system-ui', 'sans-serif'],
+              'ibm-serif': ['Archivo', '"Helvetica Neue"', 'Helvetica', 'Arial', 'system-ui', 'sans-serif'],
+              'ibm-sans': ['Archivo', '"Helvetica Neue"', 'Helvetica', 'Arial', 'system-ui', 'sans-serif'],
+              sans: ['Archivo', '"Helvetica Neue"', 'Helvetica', 'Arial', 'system-ui', 'sans-serif'],
+              display: ['"Archivo Black"', 'Archivo', 'system-ui', 'sans-serif'],
             },
             colors: {
               slate: {
@@ -47,7 +48,7 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Sniglet:wght@400;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700;800;900&family=Archivo+Black&display=swap" rel="stylesheet">
     <style>
       /* Global brand overrides */
       .text-green-600 { color: #29B767 !important; }
@@ -248,23 +249,24 @@
         background: linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent);
       }
 
-      /* Typography: Heading hierarchy with IBM Plex Serif */
+      /* Typography: Archivo — Helvetica-family neo-grotesque */
       h1, h2, h3, h4, h5, h6 {
-        font-family: 'IBM Plex Serif', Georgia, serif;
+        font-family: 'Archivo', 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
+        font-feature-settings: "ss01", "ss02", "kern";
       }
 
-      /* Default body font: IBM Plex Sans */
       body, p, span, li, td, th {
-        font-family: 'IBM Plex Sans', system-ui, sans-serif;
+        font-family: 'Archivo', 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
+        font-feature-settings: "kern", "liga";
       }
 
-      /* Heading font weights */
-      h1 { font-weight: 700; letter-spacing: -0.02em; }
-      h2 { font-weight: 700; letter-spacing: -0.01em; }
-      h3 { font-weight: 600; }
-      h4 { font-weight: 600; }
-      h5 { font-weight: 500; }
-      h6 { font-weight: 500; }
+      /* Heading weights — tight, confident, Helvetica-style */
+      h1 { font-weight: 800; letter-spacing: -0.035em; }
+      h2 { font-weight: 700; letter-spacing: -0.025em; }
+      h3 { font-weight: 700; letter-spacing: -0.015em; }
+      h4 { font-weight: 600; letter-spacing: -0.01em; }
+      h5 { font-weight: 600; letter-spacing: -0.005em; }
+      h6 { font-weight: 600; letter-spacing: 0; }
     </style>
   <script type="importmap">
 {
