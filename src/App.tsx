@@ -450,7 +450,7 @@ const AppShell: React.FC = () => {
             onDelete={handleDeleteNotification}
           />
         </div>
-        <main className="w-full md:ml-64">
+        <main className="md:ml-64 min-w-0">
           <Routes>
             <Route path="/dashboard" element={
               <Dashboard
