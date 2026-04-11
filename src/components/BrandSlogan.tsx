@@ -14,7 +14,7 @@ export const BrandSlogan: React.FC<BrandSloganProps> = ({
   text = "Have a Great Day!" 
 }) => {
   return (
-    <p className={`font-fredoka text-sm text-black/80 dark:text-edamame-300 transition-colors duration-300 ${className}`}>
+    <p className={`font-ibm-sans text-sm text-black/80 dark:text-edamame-300 transition-colors duration-300 ${className}`}>
       {text}
     </p>
   );

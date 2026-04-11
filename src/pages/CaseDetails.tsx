@@ -216,7 +216,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   Created {format(new Date(currentCase.createdAt), 'MMM d, yyyy')}
                 </span>
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-fredoka tracking-tight">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-ibm-serif tracking-tight">
                 {currentCase.title}
               </h1>
             </div>

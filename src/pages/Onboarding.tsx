@@ -20,7 +20,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
         {/* Heading */}
         <div className="text-center mb-10">
-          <h1 className="font-fredoka text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+          <h1 className="font-ibm-sans text-3xl font-semibold text-gray-900 dark:text-white mb-3">
             Welcome to Edamame
           </h1>
           <p className="text-gray-600 dark:text-gray-400 text-lg">
@@ -51,7 +51,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             >
               <HardDrive className="w-7 h-7" />
             </div>
-            <h2 className="font-fredoka text-xl font-medium text-gray-900 dark:text-white mb-2">
+            <h2 className="font-ibm-sans text-xl font-medium text-gray-900 dark:text-white mb-2">
               Local Storage
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
@@ -87,7 +87,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             >
               <Cloud className="w-7 h-7" />
             </div>
-            <h2 className="font-fredoka text-xl font-medium text-gray-900 dark:text-white mb-2">
+            <h2 className="font-ibm-sans text-xl font-medium text-gray-900 dark:text-white mb-2">
               Cloud Storage
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">

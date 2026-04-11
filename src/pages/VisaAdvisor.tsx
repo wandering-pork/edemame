@@ -10,6 +10,9 @@ import {
   AlertCircle,
   HelpCircle,
   ArrowRight,
+  Check,
+  Lock,
+  Target,
 } from 'lucide-react';
 
 interface WizardState {
@@ -180,41 +183,80 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   };
 
   return (
-    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200 page-enter">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white font-fredoka tracking-tight">
-            Visa Eligibility Advisor
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-2">
-            Answer a few questions to discover which Australian visa pathways you may qualify for.
-          </p>
-        </div>
-
+    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-white dark:bg-slate-900 min-h-screen transition-colors duration-200 page-enter">
+      <div className="max-w-3xl mx-auto">
         {/* Input stage */}
         {wizardState.step === 'input' && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden">
-            {/* Progress bar */}
-            <div className="h-1 bg-gray-100 dark:bg-slate-800">
-              <div
-                className="h-full bg-edamame transition-all duration-300"
-                style={{ width: `${(wizardState.currentStep / 4) * 100}%` }}
-              />
+          <>
+            {/* Header */}
+            <div className="mb-10">
+              <h1 className="text-3xl md:text-4xl font-ibm-serif font-bold text-slate-900 dark:text-white mb-2">
+                Visa Eligibility Advisor
+              </h1>
+              <p className="text-base text-slate-600 dark:text-slate-400">
+                Discover which Australian visa pathways you may qualify for
+              </p>
             </div>
 
-            <div className="p-8">
+            {/* Visual progress indicator */}
+            <div className="mb-10 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4].map(step => (
+                    <div key={step} className="relative flex flex-col items-center">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
+                          step < wizardState.currentStep
+                            ? 'bg-edamame-500 text-white'
+                            : step === wizardState.currentStep
+                            ? 'bg-edamame-500/20 border-2 border-edamame-500 text-edamame-600 dark:text-edamame-400'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                        }`}
+                      >
+                        {step < wizardState.currentStep ? <Check size={20} /> : step}
+                      </div>
+                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 mt-2 whitespace-nowrap">
+                        {['Personal', 'Goals', 'Details', 'Support'][step - 1]}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                    Step {wizardState.currentStep} of 4
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                    {Math.round((wizardState.currentStep / 4) * 100)}% complete
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-edamame-500 to-edamame-600 transition-all duration-500 ease-out"
+                  style={{ width: `${(wizardState.currentStep / 4) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Form card */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="p-8">
               {/* Step label */}
-              <div className="mb-6">
-                <p className="text-xs font-semibold text-edamame uppercase tracking-widest">
-                  Step {wizardState.currentStep} of 4
-                </p>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-2">
+              <div className="mb-8">
+                <h2 className="text-2xl font-ibm-serif font-bold text-slate-900 dark:text-white">
                   {wizardState.currentStep === 1 && 'Personal Information'}
                   {wizardState.currentStep === 2 && 'Immigration Goals'}
                   {wizardState.currentStep === 3 && 'Additional Details'}
                   {wizardState.currentStep === 4 && 'Supporting Factors'}
                 </h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+                  {wizardState.currentStep === 1 && 'Tell us about yourself'}
+                  {wizardState.currentStep === 2 && 'What brings you to Australia?'}
+                  {wizardState.currentStep === 3 && 'Let\'s get into the specifics'}
+                  {wizardState.currentStep === 4 && 'Final considerations'}
+                </p>
               </div>
 
               {/* Step 1: Personal Info */}
@@ -233,7 +275,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                           clientInfo: { ...prev.clientInfo, fullName: e.target.value },
                         }))
                       }
-                      className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                       placeholder="e.g. John Doe"
                     />
                   </div>
@@ -251,7 +293,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                           clientInfo: { ...prev.clientInfo, dob: e.target.value },
                         }))
                       }
-                      className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                     />
                   </div>
 
@@ -268,7 +310,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                           clientInfo: { ...prev.clientInfo, nationality: e.target.value },
                         }))
                       }
-                      className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                       placeholder="e.g. Indian, British"
                     />
                   </div>
@@ -319,7 +361,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             },
                           }))
                         }
-                        className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                        className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                       >
                         <option value="">-- Select --</option>
                         <option value="tourist">Tourist/Visitor Visa</option>
@@ -423,7 +465,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             }))
                           }
                           placeholder="e.g. Software Engineer"
-                          className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                         />
                       </div>
                       <div>
@@ -443,7 +485,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             }))
                           }
                           min="0"
-                          className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                         />
                       </div>
                       <div>
@@ -482,7 +524,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               details: { ...prev.details, courseLevel: e.target.value },
                             }))
                           }
-                          className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                         >
                           <option value="">-- Select --</option>
                           <option value="secondary">Secondary/Foundation</option>
@@ -528,7 +570,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               details: { ...prev.details, relationshipType: e.target.value },
                             }))
                           }
-                          className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                         >
                           <option value="">-- Select --</option>
                           <option value="spouse">Spouse / Partner</option>
@@ -550,7 +592,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               details: { ...prev.details, sponsorStatus: e.target.value },
                             }))
                           }
-                          className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                         >
                           <option value="">-- Select --</option>
                           <option value="citizen">Australian Citizen</option>
@@ -575,7 +617,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               details: { ...prev.details, pointsScore: e.target.value },
                             }))
                           }
-                          className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                         >
                           <option value="">-- Select --</option>
                           <option value="under65">Under 65 points</option>
@@ -598,7 +640,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             }))
                           }
                           placeholder="e.g. NSW, VIC"
-                          className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                         />
                       </div>
                     </>
@@ -620,7 +662,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             }))
                           }
                           placeholder="e.g. 2 weeks, 3 months"
-                          className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                         />
                       </div>
                       <div>
@@ -671,7 +713,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                           },
                         }))
                       }
-                      className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-edamame/50"
+                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
                     >
                       <option value="">-- Select --</option>
                       <option value="none">No English proficiency</option>
@@ -726,11 +768,11 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
             </div>
 
             {/* Footer with buttons */}
-            <div className="px-8 py-4 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-200 dark:border-slate-800 flex justify-between">
+            <div className="px-8 py-6 bg-slate-50 dark:bg-slate-700/50 border-t border-slate-200 dark:border-slate-600 flex justify-between gap-3">
               <button
                 onClick={handleBack}
                 disabled={wizardState.currentStep === 1}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft size={16} />
                 Back
@@ -739,69 +781,85 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
               <button
                 onClick={handleNext}
                 disabled={isLoading}
-                className="flex items-center gap-2 px-6 py-2 text-sm font-semibold text-white bg-edamame hover:bg-edamame-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg disabled:bg-slate-400 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-all shadow-lg shadow-edamame-500/30"
               >
                 {isLoading ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    Processing...
+                    Analyzing...
                   </>
                 ) : (
                   <>
-                    {wizardState.currentStep === 4 ? 'Get Assessment' : 'Next'}
+                    {wizardState.currentStep === 4 ? 'Get Assessment' : 'Continue'}
                     <ChevronRight size={16} />
                   </>
                 )}
               </button>
             </div>
           </div>
+          </>
         )}
 
         {/* Report stage */}
         {wizardState.step === 'report' && report && (
-          <div className="space-y-8">
+          <div className="space-y-10">
+            {/* Header */}
+            <div className="text-center mb-12">
+              <h1 className="text-3xl md:text-4xl font-ibm-serif font-bold text-slate-900 dark:text-white mb-3">
+                Your Visa Eligibility Results
+              </h1>
+              <p className="text-base text-slate-600 dark:text-slate-400">
+                Based on your information, here are the visa pathways you may qualify for
+              </p>
+            </div>
+
             {/* Summary section */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 p-8">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                Your Visa Eligibility Assessment
-              </h2>
-              <p className="text-gray-700 dark:text-slate-300 leading-relaxed mb-6">
+            <div className="bg-gradient-to-br from-edamame-50 dark:from-edamame-900/20 to-edamame-100/50 dark:to-edamame-900/10 rounded-2xl border border-edamame-200 dark:border-edamame-800 p-8">
+              <div className="flex items-start gap-3 mb-4">
+                <Target className="w-6 h-6 text-edamame-600 dark:text-edamame-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h2 className="text-xl font-ibm-serif font-bold text-slate-900 dark:text-white">
+                    Our Recommendation
+                  </h2>
+                  <p className="text-base text-slate-700 dark:text-slate-300 mt-2 leading-relaxed">
+                    {report.primaryRecommendation}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 {report.summary}
               </p>
-              <div className="bg-edamame/8 dark:bg-edamame/12 border border-edamame/30 dark:border-edamame/20 rounded-lg p-4">
-                <p className="text-sm font-semibold text-edamame-700 dark:text-edamame-400">
-                  Primary Recommendation
-                </p>
-                <p className="text-gray-900 dark:text-white mt-1">
-                  {report.primaryRecommendation}
-                </p>
-              </div>
             </div>
 
             {/* Visa options */}
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+              <h3 className="text-2xl font-ibm-serif font-bold text-slate-900 dark:text-white mb-6">
                 Visa Eligibility Breakdown
               </h3>
-              <div className="grid gap-4">
+              <div className="grid gap-6">
                 {report.visaOptions.map((visa) => {
                   const colors = verdictColors[visa.verdict];
+                  const isQualified = visa.verdict === 'qualifies' || visa.verdict === 'possibly_qualifies';
                   return (
                     <div
                       key={visa.visaSubclass}
-                      className={`${colors.bg} border border-gray-200 dark:border-slate-800 rounded-xl p-6 transition-all`}
+                      className={`group relative overflow-hidden rounded-2xl p-6 transition-all border ${colors.bg} ${
+                        isQualified
+                          ? 'border-slate-300 dark:border-slate-600 hover:shadow-lg hover:scale-[1.02]'
+                          : 'border-slate-200 dark:border-slate-700'
+                      }`}
                     >
-                      <div className="flex items-start justify-between mb-3 gap-4">
+                      <div className="flex items-start justify-between mb-4 gap-4">
                         <div>
-                          <p className="text-xs font-mono text-gray-500 dark:text-slate-500 mb-1">
+                          <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-widest">
                             {visa.visaSubclass}
                           </p>
-                          <h4 className={`text-lg font-bold ${colors.text}`}>
+                          <h4 className={`text-xl font-ibm-serif font-bold ${colors.text}`}>
                             {visa.visaName}
                           </h4>
                         </div>
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 ${colors.badge}`}
+                          className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap flex-shrink-0 ${colors.badge}`}
                         >
                           {verdictLabels[visa.verdict]}
                         </span>
@@ -863,10 +921,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
             </div>
 
             {/* Footer buttons */}
-            <div className="flex justify-center gap-3">
+            <div className="flex flex-col sm:flex-row justify-center gap-4 pt-8">
               <button
                 onClick={handleStartOver}
-                className="px-6 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                className="px-6 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 Start Over
               </button>

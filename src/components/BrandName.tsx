@@ -10,7 +10,7 @@ export const BrandName: React.FC<BrandNameProps> = ({
   text = "Edamame" 
 }) => {
   return (
-    <h1 className={`font-fredoka text-4xl font-semibold text-black dark:text-white tracking-wide leading-none ${className}`}>
+    <h1 className={`font-ibm-sans text-4xl font-semibold text-black dark:text-white tracking-wide leading-none ${className}`}>
       {text}
     </h1>
   );

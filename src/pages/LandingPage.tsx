@@ -63,7 +63,7 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="py-24 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="font-fredoka text-4xl md:text-5xl lg:text-6xl font-semibold text-gray-900 dark:text-white mb-6 leading-tight">
+          <h1 className="font-ibm-sans text-4xl md:text-5xl lg:text-6xl font-semibold text-gray-900 dark:text-white mb-6 leading-tight">
             AI-Powered Case Management for Immigration Professionals
           </h1>
           <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 mb-10 max-w-2xl mx-auto">
@@ -93,7 +93,7 @@ export default function LandingPage() {
       {/* Problem Statement */}
       <section className="py-20 px-4 bg-gray-50 dark:bg-slate-900">
         <div className="max-w-7xl mx-auto">
-          <h2 className="font-fredoka text-3xl md:text-4xl font-semibold text-center mb-12">The Problem</h2>
+          <h2 className="font-ibm-sans text-3xl md:text-4xl font-semibold text-center mb-12">The Problem</h2>
           <div className="grid md:grid-cols-3 gap-8">
             {[
               { title: 'Fragmented Tools', desc: 'Immigration practitioners juggle multiple disconnected systems with no single source of truth.' },
@@ -101,7 +101,7 @@ export default function LandingPage() {
               { title: 'No Client Self-Service', desc: "Clients can't check their case status or upload documents themselves, creating constant back-and-forth." },
             ].map((item) => (
               <div key={item.title} className="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-sm border border-gray-100 dark:border-slate-700">
-                <h3 className="font-fredoka text-xl font-semibold mb-3 text-gray-900 dark:text-white">{item.title}</h3>
+                <h3 className="font-ibm-sans text-xl font-semibold mb-3 text-gray-900 dark:text-white">{item.title}</h3>
                 <p className="text-gray-600 dark:text-gray-400">{item.desc}</p>
               </div>
             ))}
@@ -112,7 +112,7 @@ export default function LandingPage() {
       {/* Features */}
       <section id="features" className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
-          <h2 className="font-fredoka text-3xl md:text-4xl font-semibold text-center mb-4">Everything You Need</h2>
+          <h2 className="font-ibm-sans text-3xl md:text-4xl font-semibold text-center mb-4">Everything You Need</h2>
           <p className="text-gray-600 dark:text-gray-400 text-center mb-12 max-w-2xl mx-auto">
             A complete platform built specifically for immigration professionals.
           </p>
@@ -122,7 +122,7 @@ export default function LandingPage() {
                 <div className="w-12 h-12 rounded-lg bg-edamame-50 dark:bg-edamame-500/10 flex items-center justify-center mb-5">
                   <f.icon className="w-6 h-6 text-edamame-500" />
                 </div>
-                <h3 className="font-fredoka text-xl font-semibold mb-3 text-gray-900 dark:text-white">{f.title}</h3>
+                <h3 className="font-ibm-sans text-xl font-semibold mb-3 text-gray-900 dark:text-white">{f.title}</h3>
                 <p className="text-gray-600 dark:text-gray-400">{f.desc}</p>
               </div>
             ))}
@@ -133,7 +133,7 @@ export default function LandingPage() {
       {/* How It Works */}
       <section className="py-20 px-4 bg-gray-50 dark:bg-slate-900">
         <div className="max-w-5xl mx-auto">
-          <h2 className="font-fredoka text-3xl md:text-4xl font-semibold text-center mb-16">How It Works</h2>
+          <h2 className="font-ibm-sans text-3xl md:text-4xl font-semibold text-center mb-16">How It Works</h2>
           <div className="grid md:grid-cols-3 gap-8 relative">
             {/* Connecting line (desktop only) */}
             <div className="hidden md:block absolute top-10 left-[calc(16.67%+24px)] right-[calc(16.67%+24px)] h-0.5 bg-edamame-200 dark:bg-edamame-700" />
@@ -142,7 +142,7 @@ export default function LandingPage() {
                 <div className="w-20 h-20 rounded-full bg-edamame-500 text-white text-2xl font-bold flex items-center justify-center mx-auto mb-6 relative z-10">
                   {s.num}
                 </div>
-                <h3 className="font-fredoka text-xl font-semibold mb-3 text-gray-900 dark:text-white">{s.title}</h3>
+                <h3 className="font-ibm-sans text-xl font-semibold mb-3 text-gray-900 dark:text-white">{s.title}</h3>
                 <p className="text-gray-600 dark:text-gray-400">{s.desc}</p>
               </div>
             ))}
@@ -153,7 +153,7 @@ export default function LandingPage() {
       {/* Pricing */}
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto">
-          <h2 className="font-fredoka text-3xl md:text-4xl font-semibold text-center mb-4">Simple, Transparent Pricing</h2>
+          <h2 className="font-ibm-sans text-3xl md:text-4xl font-semibold text-center mb-4">Simple, Transparent Pricing</h2>
           <p className="text-gray-600 dark:text-gray-400 text-center mb-12">No hidden fees. Cancel anytime.</p>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {tiers.map((tier) => (
@@ -170,7 +170,7 @@ export default function LandingPage() {
                     Recommended
                   </div>
                 )}
-                <h3 className="font-fredoka text-2xl font-semibold text-gray-900 dark:text-white">{tier.name}</h3>
+                <h3 className="font-ibm-sans text-2xl font-semibold text-gray-900 dark:text-white">{tier.name}</h3>
                 <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 mb-6">{tier.desc}</p>
                 <div className="mb-6">
                   <span className="text-4xl font-bold text-gray-900 dark:text-white">${tier.price}</span>
@@ -203,7 +203,7 @@ export default function LandingPage() {
       {/* CTA Footer */}
       <section className="py-20 px-4 bg-edamame-500">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="font-fredoka text-3xl md:text-4xl font-semibold text-white mb-6">
+          <h2 className="font-ibm-sans text-3xl md:text-4xl font-semibold text-white mb-6">
             Ready to Transform Your Practice?
           </h2>
           <p className="text-edamame-100 text-lg mb-8">

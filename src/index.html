@@ -12,8 +12,9 @@
           extend: {
             fontFamily: {
               sniglet: ['Sniglet', 'cursive'],
-              fredoka: ['Fredoka', 'sans-serif'],
-              sans: ['ui-sans-serif', 'system-ui', 'sans-serif'],
+              'ibm-serif': ['"IBM Plex Serif"', 'Georgia', 'serif'],
+              'ibm-sans': ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+              sans: ['"IBM Plex Sans"', 'system-ui', 'ui-sans-serif', 'sans-serif'],
             },
             colors: {
               slate: {
@@ -34,7 +35,11 @@
                 900: '#175435',
                 dark: '#22201D', // Brand Deep Charcoal
                 sidebar: '#2DB067', // Sidebar color
-              }
+              },
+              'status-success': '#10B981',
+              'status-warning': '#F59E0B',
+              'status-danger': '#EF4444',
+              'status-info': '#3B82F6',
             }
           }
         }
@@ -42,7 +47,7 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Sniglet:wght@400;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Sniglet:wght@400;800&display=swap" rel="stylesheet">
     <style>
       /* Global brand overrides */
       .text-green-600 { color: #29B767 !important; }
@@ -55,7 +60,27 @@
       .dark .bg-green-900\/20 { background-color: rgba(23, 84, 53, 0.2) !important; }
 
       /* Page layout */
-      body { overflow-x: hidden; }
+      body {
+        overflow-x: hidden;
+        background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+      }
+      body.dark {
+        background: linear-gradient(135deg, #020617 0%, #0F172A 100%);
+      }
+
+      /* Subtle grain texture */
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image:
+          url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' seed='1'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 1;
+      }
 
       /* Sidebar slide-in transition */
       .sidebar-drawer {
@@ -222,6 +247,24 @@
       .dark .divider-gradient {
         background: linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent);
       }
+
+      /* Typography: Heading hierarchy with IBM Plex Serif */
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'IBM Plex Serif', Georgia, serif;
+      }
+
+      /* Default body font: IBM Plex Sans */
+      body, p, span, li, td, th {
+        font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      }
+
+      /* Heading font weights */
+      h1 { font-weight: 700; letter-spacing: -0.02em; }
+      h2 { font-weight: 700; letter-spacing: -0.01em; }
+      h3 { font-weight: 600; }
+      h4 { font-weight: 600; }
+      h5 { font-weight: 500; }
+      h6 { font-weight: 500; }
     </style>
   <script type="importmap">
 {
@@ -236,6 +279,7 @@
   }
 }
 </script>
+<link rel="stylesheet" href="/styles/typography.css">
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
