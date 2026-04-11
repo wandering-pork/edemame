@@ -47,23 +47,45 @@ function mrzDateToISO(yymmdd: string): string {
 
 /**
  * Extract two consecutive 44-character MRZ lines from OCR text.
+ * More lenient approach to handle OCR errors.
  */
 function extractMrzLines(text: string): string[] | null {
-  // Normalize: replace common OCR misreads and strip whitespace within lines
+  // Split into lines and clean up
   const lines = text
     .split('\n')
-    .map((line) => line.replace(/\s/g, '').toUpperCase());
+    .map((line) => line.trim().toUpperCase())
+    .filter((line) => line.length > 0);
 
-  const mrzPattern = /^[A-Z0-9<]{44}$/;
   const candidates: string[] = [];
 
+  // Look for MRZ-like lines (44 chars of valid MRZ characters)
+  // Be lenient: allow lines that are close to 44 chars and contain mostly valid chars
+  const mrzCharset = /[A-Z0-9<]/g;
+
   for (const line of lines) {
-    if (mrzPattern.test(line)) {
-      candidates.push(line);
+    const cleaned = line.replace(/\s/g, ''); // Remove internal whitespace
+
+    // Check if this looks like an MRZ line:
+    // 1. Between 40-48 chars (allows some OCR error margins)
+    // 2. Has mostly MRZ-valid characters (at least 85%)
+    if (cleaned.length >= 40 && cleaned.length <= 48) {
+      const validChars = (cleaned.match(mrzCharset) || []).length;
+      const validRatio = validChars / cleaned.length;
+
+      if (validRatio >= 0.85) {
+        // Normalize to 44 chars: pad or trim as needed
+        let normalized = cleaned;
+        if (normalized.length < 44) {
+          normalized = normalized.padEnd(44, '<'); // Pad with padding char
+        } else if (normalized.length > 44) {
+          normalized = normalized.substring(0, 44); // Trim to 44
+        }
+        candidates.push(normalized);
+      }
     }
   }
 
-  // We need exactly two consecutive MRZ lines (TD3 / passport format)
+  // Return first two valid candidates
   if (candidates.length >= 2) {
     return [candidates[0], candidates[1]];
   }
