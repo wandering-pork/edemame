@@ -38,7 +38,11 @@ body {
 }
 
 body.dark {
-  color: #f3f4f6;
+  /* Warm off-white primary text — not pure white, which reads harsh on dark */
+  color: #ECEEF1;
+  /* Sharper subpixel rendering on dark backgrounds */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ============================================================================
@@ -257,14 +261,20 @@ body.dark .text-caption {
 .leading-relaxed { line-height: 1.625; }
 .leading-loose { line-height: 2; }
 
-/* Text legibility in dark mode */
+/* Text legibility in dark mode — warm off-white, not harsh pure white */
 body.dark h1,
 body.dark h2,
 body.dark h3,
 body.dark h4,
 body.dark h5,
 body.dark h6 {
-  color: #f9fafb;
+  color: #ECEEF1;
+  /* Headings get a micro letter-spacing tightening in dark for density */
+  letter-spacing: calc(var(--heading-tracking, -0.025em) - 0.003em);
+}
+
+body.dark .text-caption {
+  color: rgba(255,255,255,0.38);
 }
 
 /* Legal tech: Authority through weight + negative tracking, not serifs */

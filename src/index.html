@@ -66,10 +66,14 @@
         background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
       }
       body.dark {
-        background: linear-gradient(135deg, #020617 0%, #0F172A 100%);
+        /* Warm near-black with a whisper of brand green bleeding from top-right */
+        background:
+          radial-gradient(ellipse 70% 45% at 105% -10%, rgba(41,183,103,0.09) 0%, transparent 55%),
+          radial-gradient(ellipse 50% 60% at -5% 105%, rgba(41,183,103,0.04) 0%, transparent 50%),
+          linear-gradient(175deg, #0C0D0F 0%, #111315 100%);
       }
 
-      /* Subtle grain texture */
+      /* Subtle grain texture — light mode */
       body::before {
         content: '';
         position: fixed;
@@ -81,6 +85,12 @@
           url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' seed='1'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
         pointer-events: none;
         z-index: 1;
+      }
+      /* Richer grain in dark mode for surface texture */
+      body.dark::before {
+        background-image:
+          url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+        background-size: 256px 256px;
       }
 
       /* Sidebar slide-in transition */
@@ -223,6 +233,9 @@
       .nav-active-glow {
         box-shadow: 0 2px 12px rgba(0,0,0,0.12);
       }
+      .dark .nav-active-glow {
+        box-shadow: 0 2px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(41,183,103,0.15);
+      }
 
       /* Mobile overlay */
       .mobile-overlay {
@@ -258,6 +271,132 @@
       body, p, span, li, td, th {
         font-family: 'Archivo', 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
         font-feature-settings: "kern", "liga";
+      }
+
+      /* ================================================================
+         DARK MODE — "Dark Ink" surface hierarchy
+         Overrides flat Tailwind slate defaults with a warm-dark system.
+         4 depth levels: page → surface → elevated → input
+         ================================================================ */
+
+      /* ---- BACKGROUNDS ---- */
+
+      /* Level 0: page/outermost backgrounds */
+      body.dark .dark\:bg-slate-950 {
+        background-color: #0B0C0E !important;
+      }
+      body.dark .dark\:bg-slate-900 {
+        background-color: #111315 !important;
+      }
+
+      /* Level 1: cards, panels, main content surfaces */
+      body.dark .dark\:bg-slate-800 {
+        background-color: #1A1C20 !important;
+      }
+      /* Cards get a subtle top-edge highlight for depth illusion */
+      body.dark .dark\:bg-slate-800 {
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+      }
+
+      /* Level 2: inputs, badges, segmented controls */
+      body.dark .dark\:bg-slate-700 {
+        background-color: #22252B !important;
+      }
+
+      /* Level 3: hover states, active states */
+      body.dark .dark\:bg-slate-600 {
+        background-color: #2C3038 !important;
+      }
+
+      /* Sidebar: fractionally deeper than page bg for separation */
+      body.dark aside {
+        background-color: #0D0E10 !important;
+        border-right-color: rgba(255,255,255,0.06) !important;
+      }
+
+      /* ---- BORDERS ---- */
+      body.dark .dark\:border-slate-800 {
+        border-color: rgba(255,255,255,0.065) !important;
+      }
+      body.dark .dark\:border-slate-700 {
+        border-color: rgba(255,255,255,0.10) !important;
+      }
+      body.dark .dark\:border-slate-600 {
+        border-color: rgba(255,255,255,0.16) !important;
+      }
+
+      /* ---- TEXT — Warm off-white hierarchy ---- */
+      /* Slightly warm primary text — not pure #FFFFFF */
+      body.dark .dark\:text-white {
+        color: #ECEEF1 !important;
+      }
+      body.dark .dark\:text-slate-100 {
+        color: #DFE2E7 !important;
+      }
+      body.dark .dark\:text-slate-200 {
+        color: #C5CAD3 !important;
+      }
+      body.dark .dark\:text-slate-300 {
+        color: #9EA5B0 !important;
+      }
+      body.dark .dark\:text-slate-400 {
+        color: #7A8290 !important;
+      }
+      body.dark .dark\:text-slate-500 {
+        color: #545C68 !important;
+      }
+      body.dark .dark\:text-slate-600 {
+        color: #3D444F !important;
+      }
+
+      /* ---- CARD & INTERACTION REFINEMENTS ---- */
+      body.dark .card-lift:hover {
+        box-shadow: 0 8px 32px -8px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,255,255,0.07) !important;
+      }
+      body.dark .task-card:hover {
+        box-shadow: 0 4px 20px -4px rgba(41,183,103,0.22), 0 0 0 1px rgba(41,183,103,0.18) !important;
+      }
+      body.dark .stat-card:hover {
+        box-shadow: 0 8px 28px -6px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06) !important;
+      }
+
+      /* ---- MODAL ---- */
+      body.dark .modal-backdrop {
+        background-color: rgba(0,0,0,0.72) !important;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+      }
+
+      /* ---- SCROLLBAR ---- */
+      body.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.10) !important;
+      }
+      body.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255,255,255,0.17) !important;
+      }
+
+      /* ---- DIVIDER ---- */
+      body.dark .divider-gradient {
+        background: linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent) !important;
+      }
+
+      /* ---- GREEN ACCENTS IN DARK ---- */
+      /* Slightly brighter green so it reads on dark surfaces */
+      body.dark .dark\:text-edamame-300 {
+        color: #6EDE9A !important;
+      }
+      body.dark .dark\:text-edamame-400 {
+        color: #3ECB7A !important;
+      }
+
+      /* ---- FOCUS RING ---- */
+      body.dark .focus-ring:focus-within {
+        box-shadow: 0 0 0 3px rgba(41,183,103,0.28) !important;
+      }
+
+      /* ---- NAV ITEM HOVER (dark) ---- */
+      body.dark .nav-item-hover::before {
+        background: rgba(255,255,255,0.05);
       }
 
       /* Heading weights — tight, confident, Helvetica-style */
