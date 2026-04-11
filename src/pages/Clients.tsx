@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Client, Case, Task } from '../types';
-import { Search, Plus, User, Users, Phone, Mail, MapPin, ChevronDown, ChevronUp, Briefcase, Upload, Globe, FileText } from 'lucide-react';
+import { Search, Plus, User, Users, Phone, Mail, MapPin, ChevronDown, ChevronUp, Briefcase, Upload, Globe, FileText, Camera } from 'lucide-react';
 import { CsvImport } from '../components/CsvImport';
+import { PassportScanner } from '../components/PassportScanner';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 
@@ -20,6 +21,7 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
   const [newClient, setNewClient] = useState<Partial<Client>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+  const [isPassportScannerOpen, setIsPassportScannerOpen] = useState(false);
 
   const filteredClients = clients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -90,6 +92,26 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
 
   const toggleExpand = (id: string) => {
     setExpandedClientId(expandedClientId === id ? null : id);
+  };
+
+  const handlePassportScanResult = (data: {
+    name: string;
+    dob: string;
+    nationality: string;
+    passportNumber: string;
+    passportExpiry: string;
+    gender: string;
+  }) => {
+    setNewClient({
+      ...newClient,
+      name: data.name,
+      dob: data.dob,
+      nationality: data.nationality,
+      passportNumber: data.passportNumber,
+      passportExpiry: data.passportExpiry,
+      gender: data.gender,
+    });
+    setIsPassportScannerOpen(false);
   };
 
   return (
@@ -265,6 +287,22 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
             </div>
             
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {!editingId && (
+                <div className="bg-edamame/8 dark:bg-edamame/12 border border-edamame/30 dark:border-edamame/20 rounded-xl p-4 mb-2 flex items-center gap-3">
+                  <Camera size={18} className="text-edamame-600 dark:text-edamame-400 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white mb-0.5">Scan Passport</p>
+                    <p className="text-xs text-gray-600 dark:text-slate-400">Upload a passport photo to auto-fill client details</p>
+                  </div>
+                  <button
+                    onClick={() => setIsPassportScannerOpen(true)}
+                    className="btn-press px-4 py-2 bg-edamame hover:bg-edamame-600 text-white text-xs font-semibold rounded-lg transition-all whitespace-nowrap"
+                  >
+                    Scan
+                  </button>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1 uppercase">Full Name</label>
                 <div className="relative">
@@ -411,6 +449,13 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
           </div>
         </div>
       )}
+
+        {/* Passport Scanner Modal */}
+        <PassportScanner
+          isOpen={isPassportScannerOpen}
+          onClose={() => setIsPassportScannerOpen(false)}
+          onResult={handlePassportScanResult}
+        />
 
         {/* CSV Import Modal */}
         <CsvImport
