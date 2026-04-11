@@ -54,19 +54,32 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
 
   const handleAnalyze = async () => {
     if (!description || !templateId || !clientId) return;
-    
+
     setIsLoading(true);
     const selectedTemplate = templates.find(t => t.id === templateId);
-    
-    const clientContext = selectedClient 
-      ? `Client Info: Name: ${selectedClient.name}, DOB: ${selectedClient.dob}. ` 
+
+    // Build rich client context — the more the LLM knows, the more specific the tasks
+    const clientLines: string[] = [];
+    if (selectedClient) {
+      clientLines.push(`Name: ${selectedClient.name}`);
+      if (selectedClient.dob)         clientLines.push(`Date of Birth: ${selectedClient.dob}`);
+      if (selectedClient.nationality) clientLines.push(`Nationality: ${selectedClient.nationality}`);
+      if (selectedClient.passportNumber) clientLines.push(`Passport Number: ${selectedClient.passportNumber}`);
+      if (selectedClient.passportExpiry)  clientLines.push(`Passport Expiry: ${selectedClient.passportExpiry}`);
+      if (selectedClient.gender)      clientLines.push(`Gender: ${selectedClient.gender}`);
+    }
+    const clientContext = clientLines.length
+      ? `CLIENT PROFILE:\n${clientLines.join('\n')}\n\nCASE NOTES:\n`
       : '';
 
     try {
       const tasks = await generateTasksFromCase(
-        clientContext + description, 
-        selectedTemplate?.description || '', 
-        startDate
+        clientContext + description,
+        selectedTemplate?.description || '',
+        startDate,
+        selectedTemplate?.visaSubclass,
+        selectedTemplate?.title,
+        selectedTemplate?.steps,
       );
       setGeneratedTasks(tasks);
       setStep('review');

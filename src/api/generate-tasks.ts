@@ -39,9 +39,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { caseDescription, workflowDescription, startDate } = req.body;
+  const { caseDescription, workflowDescription, startDate, visaSubclass, workflowTitle, steps } = req.body;
 
-  if (!caseDescription || !workflowDescription || !startDate) {
+  if (!caseDescription || !startDate) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
@@ -52,23 +52,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const ai = new GoogleGenAI({ apiKey });
 
-  const prompt = `
-    You are an expert legal assistant for an immigration lawyer.
-    Analyze the following case and workflow to generate a schedule of tasks.
+  // Build the structured steps section if steps array is provided
+  const stepsSection = Array.isArray(steps) && steps.length > 0
+    ? steps.map((s: { title: string; description: string }, i: number) =>
+        `${i + 1}. ${s.title}${s.description ? `: ${s.description}` : ''}`
+      ).join('\n')
+    : workflowDescription || 'Follow standard immigration workflow procedures';
 
-    Case Description:
-    ${caseDescription}
+  const visaLabel = visaSubclass
+    ? `Australian Subclass ${visaSubclass}${workflowTitle ? ` — ${workflowTitle}` : ''}`
+    : workflowTitle || 'Immigration';
 
-    Standard Workflow Guide:
-    ${workflowDescription}
+  const prompt = `You are a senior Australian immigration case manager at a registered migration agency.
 
-    Start Date: ${startDate}
+VISA APPLICATION TYPE: ${visaLabel}
 
-    Task:
-    Generate a chronological list of tasks based on the workflow applied to this specific case.
-    Determine the relative date for each task (daysOffset) starting from 0 (start date).
-    Be specific to the client's background mentioned in the case description.
-  `;
+CLIENT PROFILE & CASE NOTES:
+${caseDescription}
+
+WORKFLOW STEPS TO FOLLOW:
+${stepsSection}
+
+Application Start Date: ${startDate}
+
+TASK:
+Generate a precise, chronological task list for this ${visaLabel} application.
+
+Each task must:
+- Be a specific, actionable step (not vague)
+- Map clearly to one or more of the workflow steps above
+- Reference relevant Australian immigration systems where applicable:
+  • ImmiAccount (visa lodgement portal)
+  • SkillSelect / EOI (for points-tested visas)
+  • VEVO (Visa Entitlement Verification Online)
+  • TRA / ACS / Engineers Australia / AHPRA (skills assessment bodies, where relevant)
+  • Department of Home Affairs correspondence
+  • State nomination portals (for 190/491 state-sponsored visas)
+- Include realistic daysOffset based on Australian processing timeframes:
+  • Skills assessments: 28–84 days
+  • State nomination: 14–60 days
+  • Police clearances (AFP + overseas): 30–45 days
+  • Medical examinations: 1–3 days (schedule 30–60 days before lodgement)
+  • Document translation (NAATI): 7–14 days
+  • Employer sponsorship approval (TSS/482): 14–28 days
+  • Visa grant after lodgement: 60–360 days depending on subclass
+
+Generate 10–15 specific tasks that realistically schedule this case from start date.
+Tailor the tasks to the client's specific background and circumstances noted above.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -77,7 +107,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       config: {
         responseMimeType: "application/json",
         responseSchema: taskSchema,
-        systemInstruction: "You are a precise legal project manager. Output only JSON.",
+        systemInstruction:
+          "You are a precise Australian immigration case manager. Generate task lists that are specific, actionable, and correctly timed for Australian visa processing. Output only valid JSON.",
       },
     });
 

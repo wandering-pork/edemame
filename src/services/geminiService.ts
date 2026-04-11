@@ -1,14 +1,24 @@
-import { Task } from "../types";
+import { Task, WorkflowStep } from "../types";
 
 export const generateTasksFromCase = async (
   caseDescription: string,
   workflowDescription: string,
-  startDate: string
+  startDate: string,
+  visaSubclass?: string,
+  workflowTitle?: string,
+  steps?: WorkflowStep[]
 ): Promise<Partial<Task>[]> => {
   const response = await fetch("/api/generate-tasks", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ caseDescription, workflowDescription, startDate }),
+    body: JSON.stringify({
+      caseDescription,
+      workflowDescription,
+      startDate,
+      visaSubclass,
+      workflowTitle,
+      steps,
+    }),
   });
 
   if (!response.ok) {
