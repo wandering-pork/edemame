@@ -1,14 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, Settings, LogOut, Users, Menu, X, BookTemplate, Sparkles } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, LogOut, Users, Menu, X, BookTemplate, Sparkles, UsersRound, UserCog } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { SidebarLogoArea } from './SidebarLogoArea';
 
-const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/cases', label: 'Case Manager', icon: FileText },
-  { to: '/clients', label: 'Clients', icon: Users },
-  { to: '/visa-advisor', label: 'Visa Advisor', icon: Sparkles },
-  { to: '/templates', label: 'Templates', icon: BookTemplate },
+interface NavGroup {
+  label?: string;
+  items: { to: string; label: string; icon: React.ElementType }[];
+}
+
+const navGroups: NavGroup[] = [
+  {
+    label: 'Workspace',
+    items: [
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { to: '/cases', label: 'Case Manager', icon: FileText },
+      { to: '/clients', label: 'Clients', icon: Users },
+      { to: '/visa-advisor', label: 'Visa Advisor', icon: Sparkles },
+      { to: '/templates', label: 'Templates', icon: BookTemplate },
+    ],
+  },
+  {
+    label: 'Team',
+    items: [
+      { to: '/team', label: 'Team View', icon: UsersRound },
+      { to: '/team-members', label: 'Team Members', icon: UserCog },
+    ],
+  },
 ];
 
 const NavItem: React.FC<{
@@ -82,18 +99,24 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-1 custom-scrollbar">
-        <p className="px-4 mb-2 text-[10px] font-bold uppercase tracking-widest text-white/30 dark:text-slate-600 select-none">
-          Navigation
-        </p>
-        {navItems.map((item) => (
-          <NavItem
-            key={item.to}
-            to={item.to}
-            label={item.label}
-            icon={item.icon}
-            onClick={() => setMobileOpen(false)}
-          />
+      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-4 custom-scrollbar">
+        {navGroups.map((group, gi) => (
+          <div key={gi} className="space-y-1">
+            {group.label && (
+              <p className="px-4 mb-2 text-[10px] font-bold uppercase tracking-widest text-white/30 dark:text-slate-600 select-none">
+                {group.label}
+              </p>
+            )}
+            {group.items.map((item) => (
+              <NavItem
+                key={item.to}
+                to={item.to}
+                label={item.label}
+                icon={item.icon}
+                onClick={() => setMobileOpen(false)}
+              />
+            ))}
+          </div>
         ))}
       </nav>
 

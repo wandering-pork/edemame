@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Task, Case, Client } from '../types';
+import { Task, Case, Client, TeamMember } from '../types';
 import { format, addDays, isSameDay, differenceInDays, isBefore, startOfDay } from 'date-fns';
 import {
   CheckCircle2,
@@ -21,6 +21,8 @@ interface DashboardProps {
   tasks: Task[];
   cases: Case[];
   clients: Client[];
+  teamMembers?: TeamMember[];
+  currentUserId?: string;
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onMoveTaskOrder: (taskId: string, direction: 'up' | 'down') => void;
@@ -28,12 +30,16 @@ interface DashboardProps {
   onAddTask: (task: Task) => void;
 }
 
+type ScopeFilter = 'mine' | 'team' | 'all';
+
 type TaskGroup = 'overdue' | 'today' | 'upcoming';
 
 export const Dashboard: React.FC<DashboardProps> = ({
   tasks,
   cases,
   clients,
+  teamMembers = [],
+  currentUserId,
   onUpdateTask,
   onDeleteTask,
   onMoveTaskOrder,
@@ -46,6 +52,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isCaseDropdownOpen, setIsCaseDropdownOpen] = useState(false);
   const [caseSearchTerm, setCaseSearchTerm] = useState('');
+  const [scope, setScope] = useState<ScopeFilter>(currentUserId ? 'mine' : 'all');
+
+  const scopedTasks = useMemo(() => {
+    if (scope === 'all' || !currentUserId) return tasks;
+    if (scope === 'mine') return tasks.filter(t => t.assignedTo === currentUserId || !t.assignedTo);
+    return tasks.filter(t => t.assignedTo && t.assignedTo !== currentUserId);
+  }, [tasks, scope, currentUserId]);
 
   const getClientName = (clientId: string) => {
     return clients.find(c => c.id === clientId)?.name || 'Unknown Client';
@@ -77,7 +90,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       upcoming: [],
     };
 
-    tasks.forEach(task => {
+    scopedTasks.forEach(task => {
       if (task.isCompleted) return;
 
       const taskDate = startOfDay(new Date(task.date));
@@ -93,7 +106,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
 
     return groups;
-  }, [tasks]);
+  }, [scopedTasks]);
 
   const handleOpenModal = (task?: Task) => {
     if (task) {
@@ -160,6 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const TaskCard: React.FC<{ task: Task; group: TaskGroup }> = ({ task, group }) => {
     const linkedCase = cases.find(c => c.id === task.caseId);
     const linkedClient = linkedCase ? clients.find(c => c.id === linkedCase.clientId) : null;
+    const assignee = teamMembers.find(m => m.id === task.assignedTo);
     const daysUntil = differenceInDays(startOfDay(new Date(task.date)), startOfDay(new Date()));
     const priority = getPriorityType(daysUntil, false);
 
@@ -174,9 +188,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <h4 className="font-semibold text-slate-900 dark:text-white text-sm group-hover:text-edamame-500 transition-colors">
-            {task.title}
-          </h4>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="font-semibold text-slate-900 dark:text-white text-sm group-hover:text-edamame-500 transition-colors">
+              {task.title}
+            </h4>
+            {assignee && (
+              <span
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300"
+                title={`Assigned to ${assignee.name}`}
+              >
+                <span className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center text-[8px] font-bold">
+                  {assignee.avatar || assignee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                </span>
+                {assignee.name.split(' ')[0]}
+              </span>
+            )}
+          </div>
           {linkedCase && (
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               {linkedCase.title}
@@ -233,6 +260,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <p className="text-base text-slate-600 dark:text-slate-400">
               Stay on top of your immigration workflows
             </p>
+            {teamMembers.length > 0 && (
+              <div className="mt-4 inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                {([
+                  { key: 'mine', label: 'My Tasks' },
+                  { key: 'team', label: 'Team Tasks' },
+                  { key: 'all', label: 'All' },
+                ] as { key: ScopeFilter; label: string }[]).map(opt => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setScope(opt.key)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      scope === opt.key
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button
             onClick={() => {

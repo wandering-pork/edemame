@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Case, Client, Task, WorkflowTemplate } from '../types';
-import { Search, Plus, FileText } from 'lucide-react';
+import { Case, Client, Task, WorkflowTemplate, TeamMember } from '../types';
+import { Search, Plus, FileText, X } from 'lucide-react';
 import { NewCase } from './NewCase';
 import { CaseCard } from '../components/CaseCard';
 
@@ -10,7 +10,9 @@ interface CaseManagerProps {
   clients: Client[];
   tasks: Task[];
   templates: WorkflowTemplate[];
+  teamMembers?: TeamMember[];
   onTasksConfirmed: (tasks: Task[], newCase: Case) => void;
+  onAssignCase?: (caseId: string, newOwnerId: string, note?: string) => void;
 }
 
 export const CaseManager: React.FC<CaseManagerProps> = ({
@@ -18,13 +20,18 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   clients,
   tasks,
   templates,
+  teamMembers = [],
   onTasksConfirmed,
+  onAssignCase,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [showIntake, setShowIntake] = useState(false);
   const [suggestedTemplateKeyword, setSuggestedTemplateKeyword] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [assignModalCaseId, setAssignModalCaseId] = useState<string | null>(null);
+  const [assignTarget, setAssignTarget] = useState<string>('');
+  const [assignNote, setAssignNote] = useState('');
 
   // Auto-open intake form with suggested template if coming from VisaAdvisor
   useEffect(() => {
@@ -130,12 +137,15 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
             {filteredCases.map((c) => {
               const client = clients.find(cl => cl.id === c.clientId);
               const caseTasks = tasks.filter(t => t.caseId === c.id);
+              const owner = teamMembers.find(m => m.id === c.caseOwner);
               return (
                 <CaseCard
                   key={c.id}
                   case={c}
                   client={client || { id: '', name: 'Unknown', email: '', phone: '', dob: '', nationality: '' }}
                   tasks={caseTasks}
+                  owner={owner}
+                  onAssignClick={onAssignCase ? (id) => { setAssignModalCaseId(id); setAssignTarget(c.caseOwner || ''); setAssignNote(''); } : undefined}
                   onViewDetails={handleViewDetails}
                 />
               );
@@ -143,6 +153,72 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
           </div>
         )}
       </div>
+
+      {assignModalCaseId && onAssignCase && (
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full modal-content">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+              <h2 className="text-xl font-ibm-serif font-bold text-slate-900 dark:text-white">Assign Case</h2>
+              <button
+                onClick={() => setAssignModalCaseId(null)}
+                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-3">
+              {teamMembers.length === 0 && (
+                <p className="text-sm text-slate-500 dark:text-slate-400">No team members yet. Add some in Team Members.</p>
+              )}
+              {teamMembers.map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setAssignTarget(m.id)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                    assignTarget === m.id
+                      ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-900/20 ring-2 ring-edamame-500/20'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center font-bold">
+                    {m.avatar || m.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-900 dark:text-white text-sm">{m.name}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{m.role}</p>
+                  </div>
+                </button>
+              ))}
+              <textarea
+                value={assignNote}
+                onChange={e => setAssignNote(e.target.value)}
+                placeholder="Reassignment note (optional)..."
+                rows={2}
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all resize-none text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-3 p-6 border-t border-slate-200 dark:border-slate-700">
+              <button
+                onClick={() => setAssignModalCaseId(null)}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!assignTarget) return;
+                  onAssignCase(assignModalCaseId, assignTarget, assignNote || undefined);
+                  setAssignModalCaseId(null);
+                }}
+                disabled={!assignTarget}
+                className="ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg transition-colors"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

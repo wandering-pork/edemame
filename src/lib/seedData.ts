@@ -1,4 +1,47 @@
-import type { WorkflowTemplate } from '../types';
+import type { WorkflowTemplate, TeamMember } from '../types';
+
+/**
+ * Default team for single-firm installs. Creates 3 collaborators across
+ * partner / lawyer / assistant roles so the Team view has something to
+ * render on first launch.
+ */
+export function seedDefaultTeam(): TeamMember[] {
+  return [
+    {
+      id: 'tm-eliza-chen',
+      name: 'Eliza Chen',
+      email: 'eliza.chen@edamamelegal.com.au',
+      avatar: 'EC',
+      role: 'partner',
+      caseCount: 0,
+      activeTaskCount: 0,
+      status: 'available',
+      joinedAt: '2023-04-02T09:00:00Z',
+    },
+    {
+      id: 'tm-marcus-okafor',
+      name: 'Marcus Okafor',
+      email: 'marcus.okafor@edamamelegal.com.au',
+      avatar: 'MO',
+      role: 'lawyer',
+      caseCount: 0,
+      activeTaskCount: 0,
+      status: 'busy',
+      joinedAt: '2023-09-15T09:00:00Z',
+    },
+    {
+      id: 'tm-priya-singh',
+      name: 'Priya Singh',
+      email: 'priya.singh@edamamelegal.com.au',
+      avatar: 'PS',
+      role: 'assistant',
+      caseCount: 0,
+      activeTaskCount: 0,
+      status: 'available',
+      joinedAt: '2024-02-20T09:00:00Z',
+    },
+  ];
+}
 
 /**
  * MVP visa subclass templates per the pitch deck (Slide 9):

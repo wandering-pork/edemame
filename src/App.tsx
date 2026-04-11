@@ -13,11 +13,42 @@ import { Clients } from './pages/Clients';
 import { VisaAdvisor } from './pages/VisaAdvisor';
 import { Templates } from './pages/Templates';
 import { Settings } from './pages/Settings';
+import { TeamDashboard } from './pages/TeamDashboard';
+import { TeamMembers } from './pages/TeamMembers';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
-import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification } from './types';
+import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent } from './types';
 import { getStorageMode, setStorageMode } from './repositories/factory';
-import { seedDefaultTemplates } from './lib/seedData';
+import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
+
+const TEAM_STORAGE_KEY = 'edamame_team_members';
+const ACTIVITY_STORAGE_KEY = 'edamame_team_activity';
+
+function loadTeamFromStorage(): TeamMember[] | null {
+  try {
+    const raw = localStorage.getItem(TEAM_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveTeamToStorage(members: TeamMember[]) {
+  try { localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(members)); } catch { /* ignore */ }
+}
+
+function loadActivityFromStorage(): ActivityEvent[] {
+  try {
+    const raw = localStorage.getItem(ACTIVITY_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveActivityToStorage(events: ActivityEvent[]) {
+  try { localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(events.slice(-200))); } catch { /* ignore */ }
+}
 
 // ---------------------------------------------------------------------------
 // Inner app — has access to repositories and router
@@ -32,6 +63,58 @@ const AppShell: React.FC = () => {
   const [theme, setTheme] = useState<Theme>('classic');
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() => {
+    const fromStorage = loadTeamFromStorage();
+    if (fromStorage && fromStorage.length > 0) return fromStorage;
+    const seeded = seedDefaultTeam();
+    saveTeamToStorage(seeded);
+    return seeded;
+  });
+  const [activity, setActivity] = useState<ActivityEvent[]>(() => loadActivityFromStorage());
+  // The current-user id — in single-user installs we treat the first partner as "me".
+  const currentUserId = teamMembers[0]?.id;
+
+  const pushActivity = useCallback((ev: Omit<ActivityEvent, 'id' | 'createdAt'> & { createdAt?: string }) => {
+    setActivity(prev => {
+      const next: ActivityEvent[] = [
+        ...prev,
+        {
+          ...ev,
+          id: uuidv4(),
+          createdAt: ev.createdAt || new Date().toISOString(),
+        },
+      ];
+      saveActivityToStorage(next);
+      return next;
+    });
+  }, []);
+
+  // Persist team members whenever they change
+  useEffect(() => {
+    saveTeamToStorage(teamMembers);
+  }, [teamMembers]);
+
+  // First-launch backfill: spread any unowned cases/tasks across the seeded team
+  // so the Team Dashboard has meaningful distribution on first load.
+  useEffect(() => {
+    if (loading || teamMembers.length === 0) return;
+    const unowned = cases.filter(c => !c.caseOwner);
+    if (unowned.length === 0) return;
+    setCases(prev => prev.map((c, idx) => {
+      if (c.caseOwner) return c;
+      const owner = teamMembers[idx % teamMembers.length];
+      return { ...c, caseOwner: owner.id };
+    }));
+    setTasks(prev => prev.map(t => {
+      if (t.assignedTo) return t;
+      const parentCase = cases.find(c => c.id === t.caseId);
+      if (!parentCase) return t;
+      const caseIdx = cases.findIndex(c => c.id === parentCase.id);
+      const owner = teamMembers[caseIdx % teamMembers.length];
+      return { ...t, assignedTo: owner.id };
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, teamMembers.length]);
 
   // Load all data from repositories on mount
   useEffect(() => {
@@ -155,8 +238,14 @@ const AppShell: React.FC = () => {
     setTasks(prevTasks => prevTasks.map(t => t.id === updatedTask.id ? updatedTask : t));
     if (updatedTask.isCompleted && prev && !prev.isCompleted) {
       toast.success(`Task completed: ${updatedTask.title}`);
+      pushActivity({
+        type: 'task_completed',
+        actorId: updatedTask.assignedTo || currentUserId,
+        subjectId: updatedTask.id,
+        summary: `Task completed: "${updatedTask.title}".`,
+      });
     }
-  }, [repos, tasks]);
+  }, [repos, tasks, pushActivity, currentUserId]);
 
   const handleDeleteTask = useCallback(async (id: string) => {
     await repos.tasks.delete(id);
@@ -232,15 +321,30 @@ const AppShell: React.FC = () => {
   }, [repos]);
 
   const handleTasksConfirmed = useCallback(async (newTasks: Task[], newCase: Case) => {
-    await repos.cases.create(newCase);
-    await repos.tasks.createMany(newTasks);
-    setCases(prev => [...prev, newCase]);
-    setTasks(prev => [...prev, ...newTasks]);
-    toast.success(`Case created: ${newCase.title}`);
-    if (newTasks.length > 0) {
-      toast.success(`${newTasks.length} tasks generated`);
+    // Auto-assign to current user (first partner) if no owner provided
+    const caseWithOwner: Case = {
+      ...newCase,
+      caseOwner: newCase.caseOwner || currentUserId,
+    };
+    const tasksWithAssignee = newTasks.map(t => ({
+      ...t,
+      assignedTo: t.assignedTo || caseWithOwner.caseOwner,
+    }));
+    await repos.cases.create(caseWithOwner);
+    await repos.tasks.createMany(tasksWithAssignee);
+    setCases(prev => [...prev, caseWithOwner]);
+    setTasks(prev => [...prev, ...tasksWithAssignee]);
+    toast.success(`Case created: ${caseWithOwner.title}`);
+    if (tasksWithAssignee.length > 0) {
+      toast.success(`${tasksWithAssignee.length} tasks generated`);
     }
-  }, [repos]);
+    pushActivity({
+      type: 'case_created',
+      actorId: currentUserId,
+      subjectId: caseWithOwner.id,
+      summary: `New case created: "${caseWithOwner.title}".`,
+    });
+  }, [repos, currentUserId, pushActivity]);
 
   // --- Template Actions ---
   const handleAddTemplate = useCallback(async (template: WorkflowTemplate) => {
@@ -252,6 +356,64 @@ const AppShell: React.FC = () => {
     await repos.templates.delete(id);
     setTemplates(prev => prev.filter(t => t.id !== id));
   }, [repos]);
+
+  // --- Team Actions ---
+  const handleAddTeamMember = useCallback((member: TeamMember) => {
+    setTeamMembers(prev => [...prev, member]);
+    pushActivity({
+      type: 'member_added',
+      actorId: currentUserId,
+      subjectId: member.id,
+      summary: `${member.name} joined the team as ${member.role}.`,
+    });
+    toast.success(`${member.name} added to the team`);
+  }, [pushActivity, currentUserId]);
+
+  const handleUpdateTeamMember = useCallback((member: TeamMember) => {
+    setTeamMembers(prev => prev.map(m => m.id === member.id ? member : m));
+  }, []);
+
+  const handleDeleteTeamMember = useCallback((id: string) => {
+    const member = teamMembers.find(m => m.id === id);
+    setTeamMembers(prev => prev.filter(m => m.id !== id));
+    // Clear assignments so the UI doesn't orphan-reference the removed id.
+    setCases(prev => prev.map(c => c.caseOwner === id ? { ...c, caseOwner: undefined } : c));
+    setTasks(prev => prev.map(t => t.assignedTo === id ? { ...t, assignedTo: undefined } : t));
+    if (member) toast.info(`${member.name} removed`);
+  }, [teamMembers]);
+
+  const handleAssignCase = useCallback(async (caseId: string, newOwnerId: string, note?: string) => {
+    const caseItem = cases.find(c => c.id === caseId);
+    if (!caseItem) return;
+    const event: CaseAssignmentEvent = {
+      id: uuidv4(),
+      caseId,
+      fromOwnerId: caseItem.caseOwner,
+      toOwnerId: newOwnerId,
+      changedAt: new Date().toISOString(),
+      changedBy: currentUserId,
+      note,
+    };
+    const updated: Case = {
+      ...caseItem,
+      caseOwner: newOwnerId,
+      assignmentHistory: [...(caseItem.assignmentHistory || []), event],
+    };
+    try {
+      await repos.cases.update(updated);
+    } catch {
+      // Repository layer may not persist new optional fields — safe to ignore.
+    }
+    setCases(prev => prev.map(c => c.id === caseId ? updated : c));
+    const newOwner = teamMembers.find(m => m.id === newOwnerId);
+    pushActivity({
+      type: 'case_assigned',
+      actorId: currentUserId,
+      subjectId: caseId,
+      summary: `${caseItem.title} assigned to ${newOwner?.name || 'team member'}.`,
+    });
+    toast.success(`Case assigned to ${newOwner?.name || 'team member'}`);
+  }, [cases, repos, teamMembers, pushActivity, currentUserId]);
 
   // --- Client Actions ---
   const handleAddClient = useCallback(async (client: Client) => {
@@ -295,11 +457,34 @@ const AppShell: React.FC = () => {
                 tasks={tasks}
                 cases={cases}
                 clients={clients}
+                teamMembers={teamMembers}
+                currentUserId={currentUserId}
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
                 onMoveTaskOrder={handleMoveTaskOrder}
                 onMoveTaskDate={handleMoveTaskDate}
                 onAddTask={handleAddTask}
+              />
+            } />
+            <Route path="/team" element={
+              <TeamDashboard
+                teamMembers={teamMembers}
+                cases={cases}
+                clients={clients}
+                tasks={tasks}
+                activity={activity}
+                onAssignCase={handleAssignCase}
+              />
+            } />
+            <Route path="/team-members" element={
+              <TeamMembers
+                teamMembers={teamMembers}
+                cases={cases}
+                clients={clients}
+                tasks={tasks}
+                onAddMember={handleAddTeamMember}
+                onUpdateMember={handleUpdateTeamMember}
+                onDeleteMember={handleDeleteTeamMember}
               />
             } />
             <Route path="/clients" element={
@@ -323,7 +508,9 @@ const AppShell: React.FC = () => {
                 clients={clients}
                 tasks={tasks}
                 templates={templates}
+                teamMembers={teamMembers}
                 onTasksConfirmed={handleTasksConfirmed}
+                onAssignCase={handleAssignCase}
               />
             } />
             <Route path="/cases/:caseId" element={
