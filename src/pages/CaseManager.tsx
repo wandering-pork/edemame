@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Case, Client, Task, WorkflowTemplate } from '../types';
 import { Search, Plus, FileText, User, Mail, Calendar, CheckCircle2, Clock, ChevronRight } from 'lucide-react';
 import { NewCase } from './NewCase';
@@ -20,8 +20,21 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   onTasksConfirmed,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showIntake, setShowIntake] = useState(false);
+  const [suggestedTemplateKeyword, setSuggestedTemplateKeyword] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Auto-open intake form with suggested template if coming from VisaAdvisor
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.suggestedTemplateKeyword) {
+      setSuggestedTemplateKeyword(state.suggestedTemplateKeyword);
+      setShowIntake(true);
+      // Clear the state so we don't keep opening the form
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const handleViewDetails = (caseId: string) => {
     navigate(`/cases/${caseId}`);
@@ -63,14 +76,19 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
 
   if (showIntake) {
     return (
-      <NewCase 
+      <NewCase
         templates={templates}
         clients={clients}
+        suggestedTemplateKeyword={suggestedTemplateKeyword}
         onTasksConfirmed={(newTasks, newCase) => {
           onTasksConfirmed(newTasks, newCase);
           setShowIntake(false);
+          setSuggestedTemplateKeyword(null);
         }}
-        onChangeView={() => setShowIntake(false)}
+        onChangeView={() => {
+          setShowIntake(false);
+          setSuggestedTemplateKeyword(null);
+        }}
       />
     );
   }

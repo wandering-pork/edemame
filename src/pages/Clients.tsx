@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Client, Case, Task } from '../types';
 import { Search, Plus, User, Users, Phone, Mail, MapPin, ChevronDown, ChevronUp, Briefcase, Upload, Globe, FileText, Camera } from 'lucide-react';
 import { CsvImport } from '../components/CsvImport';
@@ -15,6 +16,7 @@ interface ClientsProps {
 }
 
 export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddClient, onUpdateClient }) => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -204,7 +206,13 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
                   {client.dob ? format(new Date(client.dob), 'dd MMM yyyy') : '—'}
                 </div>
 
-                <div className="col-span-2 flex items-center justify-end gap-2">
+                <div className="col-span-2 flex items-center justify-end gap-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); navigate(`/visa-advisor?clientId=${client.id}`); }}
+                    className="text-xs font-semibold text-gray-400 hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors px-2 py-1 hover:bg-edamame/8 rounded-lg"
+                  >
+                    Visa Check
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleOpenModal(client); }}
                     className="text-xs font-semibold text-gray-400 hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors px-2 py-1 hover:bg-edamame/8 rounded-lg"

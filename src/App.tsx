@@ -10,6 +10,7 @@ import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
 import { CaseDetails } from './pages/CaseDetails';
 import { Clients } from './pages/Clients';
+import { VisaAdvisor } from './pages/VisaAdvisor';
 import { Templates } from './pages/Templates';
 import { Settings } from './pages/Settings';
 import Onboarding from './pages/Onboarding';
@@ -310,6 +311,12 @@ const AppShell: React.FC = () => {
                 onUpdateClient={handleUpdateClient}
               />
             } />
+            <Route path="/visa-advisor" element={
+              <VisaAdvisorRoute
+                clients={clients}
+                templates={templates}
+              />
+            } />
             <Route path="/cases" element={
               <CaseManager
                 cases={cases}
@@ -386,6 +393,31 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       onAddTask={props.onAddTask}
       onMoveTaskDate={props.onMoveTaskDate}
       onBack={() => navigate('/cases')}
+    />
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Bridge component for VisaAdvisor — handles navigation to new case
+// ---------------------------------------------------------------------------
+
+interface VisaAdvisorRouteProps {
+  clients: Client[];
+  templates: WorkflowTemplate[];
+}
+
+const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
+  const navigate = useNavigate();
+
+  const handleOpenNewCase = (templateKeyword: string) => {
+    navigate('/cases', { state: { suggestedTemplateKeyword: templateKeyword } });
+  };
+
+  return (
+    <VisaAdvisor
+      clients={props.clients}
+      templates={props.templates}
+      onOpenNewCase={handleOpenNewCase}
     />
   );
 };

@@ -49,13 +49,6 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
   const [statusMsg, setStatusMsg] = useState('');
   const [result, setResult] = useState<PassportOcrResult | null>(null);
   const [editedFields, setEditedFields] = useState<Record<string, string>>({});
-  const [hasUsedBefore] = useState(() => {
-    try {
-      return localStorage.getItem('edamame_ocr_used') === 'true';
-    } catch {
-      return false;
-    }
-  });
 
   const handleProgress = useCallback((p: number) => {
     setProgress(p);
@@ -69,14 +62,6 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
       setStatusMsg('Preparing image...');
 
       const ocrResult = await scanPassport(file, handleProgress);
-
-      // Mark as used for the first-use note
-      try {
-        localStorage.setItem('edamame_ocr_used', 'true');
-      } catch {
-        // ignore storage errors
-      }
-
       setResult(ocrResult);
 
       if (ocrResult.success && ocrResult.fields) {
@@ -180,7 +165,7 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
         <div className="mx-6 mt-4 flex items-center gap-2 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
           <ShieldCheck size={14} />
           <span>
-            Privacy-first: all processing happens in your browser. Passport images are never sent to any server.
+            Secure processing: passport images are encrypted and processed via Gemini Vision AI. Not stored on our servers.
           </span>
         </div>
 
@@ -189,12 +174,6 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
           {/* Upload stage */}
           {stage === 'upload' && (
             <>
-              {!hasUsedBefore && (
-                <div className="mb-4 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-                  First use: the OCR engine (~45MB) will be downloaded and cached in your browser for future use.
-                </div>
-              )}
-
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${

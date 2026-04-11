@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { generateTasksFromCase } from '../services/geminiService';
 import { WorkflowTemplate, Task, Client, Case } from '../types';
@@ -8,11 +8,12 @@ import { v4 as uuidv4 } from 'uuid';
 interface NewCaseProps {
   templates: WorkflowTemplate[];
   clients: Client[];
+  suggestedTemplateKeyword?: string | null;
   onTasksConfirmed: (tasks: Task[], newCase: Case) => void;
   onChangeView: (view: any) => void;
 }
 
-export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, onTasksConfirmed, onChangeView: onGoBack }) => {
+export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedTemplateKeyword, onTasksConfirmed, onChangeView: onGoBack }) => {
   const [step, setStep] = useState<'input' | 'review'>('input');
   const [isLoading, setIsLoading] = useState(false);
   
@@ -27,6 +28,19 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, onTasksCon
   const [clientSearchTerm, setClientSearchTerm] = useState('');
 
   const [generatedTasks, setGeneratedTasks] = useState<Partial<Task>[]>([]);
+
+  // Auto-select suggested template if provided
+  useEffect(() => {
+    if (suggestedTemplateKeyword) {
+      const suggestedTemplate = templates.find(t =>
+        t.visaSubclass?.includes(suggestedTemplateKeyword) ||
+        t.title?.includes(suggestedTemplateKeyword)
+      );
+      if (suggestedTemplate) {
+        setTemplateId(suggestedTemplate.id);
+      }
+    }
+  }, [suggestedTemplateKeyword, templates]);
 
   // Filter clients for dropdown
   const filteredClients = useMemo(() => {

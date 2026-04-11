@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, Settings, LogOut, Users, Menu, X, BookTemplate } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, LogOut, Users, Menu, X, BookTemplate, Sparkles } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { SidebarLogoArea } from './SidebarLogoArea';
 
@@ -7,6 +7,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/cases', label: 'Case Manager', icon: FileText },
   { to: '/clients', label: 'Clients', icon: Users },
+  { to: '/visa-advisor', label: 'Visa Advisor', icon: Sparkles },
   { to: '/templates', label: 'Templates', icon: BookTemplate },
 ];
 

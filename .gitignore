@@ -34,3 +34,5 @@ pnpm-debug.log*
 
 # Migrated prompt history (AI Studio artifacts, not source code)
 src/migrated_prompt_history/
+
+.vercel

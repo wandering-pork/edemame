@@ -3,9 +3,6 @@
   "outputDirectory": "src/dist",
   "framework": "vite",
   "regions": ["syd1"],
-  "env": {
-    "GEMINI_API_KEY": "@gemini_api_key"
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
