@@ -13,10 +13,72 @@ interface NewCaseProps {
   onChangeView: (view: any) => void;
 }
 
+// Contextual placeholder hints keyed by visa subclass.
+// Client bio (name, DOB, nationality, passport) is auto-injected — don't ask for those here.
+const DESCRIPTION_HINTS: Record<string, string> = {
+  '186': `What to include for Subclass 186 (ENS):
+• Current visa status & expiry date (onshore / offshore?)
+• Pathway: Direct Entry or Temporary Residence Transition (TRT)?
+• Employer name, industry, and nominated occupation (ANZSCO code)
+• How long has the applicant worked for this employer?
+• Skills assessment status — body, lodgement date, outcome (if known)
+• English test — type (IELTS/PTE/TOEFL), score, date sat
+• Any prior visa refusals or character issues
+• Dependants to include (names, ages, relationship)`,
+
+  '482': `What to include for Subclass 482 (TSS):
+• Current visa status & expiry date (onshore / offshore?)
+• Stream: Short-term, Medium-term, or Labour Agreement?
+• Employer name and whether they hold an approved sponsorship (SBS)
+• Nominated occupation (ANZSCO code) and job title
+• Labour Market Testing evidence — has employer advertised locally?
+• English test — type (IELTS/PTE), score, date sat
+• Skills assessment required? (occupation-dependent)
+• Preferred visa duration (1–4 years) and pathway to PR intent
+• Dependants to include (names, ages, relationship)`,
+
+  '490': `What to include for Subclass 490 (Skilled Regional):
+• Current visa status & expiry date (onshore / offshore?)
+• Nominated occupation (ANZSCO code) and current points score
+• Skills assessment — body (TRA/ACS/Engineers Australia/etc.), status, outcome
+• English test — type (IELTS/PTE), score (higher = more points)
+• Target state/territory for nomination and reason (family, job offer, etc.)
+• SkillSelect EOI — submitted? Profile ID?
+• Family sponsor in regional Australia? (if taking that pathway)
+• Dependants to include (names, ages, relationship)`,
+
+  '820': `What to include for Subclass 820/801 (Partner — Onshore):
+• Current visa status & expiry (must be onshore at lodgement)
+• Sponsor details: name, Australian citizenship / PR / NZ citizen status
+• How long have applicant and sponsor been in a relationship?
+• De facto or married? Date of marriage / commencement of de facto
+• Cohabitation — living together? Since when? Same address on docs?
+• Evidence ready: joint bank accounts, lease/mortgage, photos, travel together
+• Any prior visa refusals, character issues, or previous relationships (sponsor)
+• Dependants to include on application`,
+
+  // Fallback for custom/unknown subclasses
+  default: `What to include for best AI results:
+• Current visa status & expiry date (onshore or offshore?)
+• Specific immigration goal and why this visa subclass
+• Key prerequisites already completed (skills assessment, English test, EOI, etc.)
+• Any hard deadlines — course start date, job offer expiry, bridging visa expiry
+• Known complications — prior refusals, health issues, character matters
+• Dependants to include (names, ages, relationship)`,
+};
+
+function getDescriptionPlaceholder(template: WorkflowTemplate | undefined): string {
+  if (!template) {
+    return 'Select a workflow template above, then describe the case — current visa status, goals, deadlines, and any complications...';
+  }
+  const key = template.visaSubclass ?? 'default';
+  return DESCRIPTION_HINTS[key] ?? DESCRIPTION_HINTS['default'];
+}
+
 export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedTemplateKeyword, onTasksConfirmed, onChangeView: onGoBack }) => {
   const [step, setStep] = useState<'input' | 'review'>('input');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Form State
   const [clientId, setClientId] = useState('');
   const [description, setDescription] = useState('');
@@ -237,15 +299,22 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                Case Description <span className="text-gray-400 dark:text-slate-500 font-normal">(Max 3000 words)</span>
-              </label>
-              <textarea 
-                rows={8}
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+                  Case Notes
+                </label>
+                <span className="text-xs text-gray-400 dark:text-slate-500">
+                  {templateId
+                    ? 'Placeholder shows what to include for this visa type'
+                    : 'Select a template to see guided prompts'}
+                </span>
+              </div>
+              <textarea
+                rows={10}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 focus:border-green-500 dark:focus:border-green-600 text-gray-900 dark:text-white outline-none transition-all resize-none"
-                placeholder="Describe the case background, specific visa subclass goals, and any constraints..."
+                className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 focus:border-green-500 dark:focus:border-green-600 text-gray-900 dark:text-white outline-none transition-all resize-none text-sm leading-relaxed"
+                placeholder={getDescriptionPlaceholder(templates.find(t => t.id === templateId))}
               />
             </div>
 
