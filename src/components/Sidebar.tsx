@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FileText, Settings, LogOut, Users, Menu, X, BookTemplate, Sparkles, UsersRound, UserCog } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, LogOut, Users, Menu, X, BookTemplate, Sparkles, UsersRound, UserCog, Zap } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { SidebarLogoArea } from './SidebarLogoArea';
 
@@ -17,6 +17,7 @@ const navGroups: NavGroup[] = [
       { to: '/clients', label: 'Clients', icon: Users },
       { to: '/visa-advisor', label: 'Visa Advisor', icon: Sparkles },
       { to: '/templates', label: 'Templates', icon: BookTemplate },
+      { to: '/focus', label: 'Focus Mode', icon: Zap },
     ],
   },
   {
@@ -65,6 +66,7 @@ const NavItem: React.FC<{
 export const Sidebar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const isFocusMode = location.pathname === '/focus';
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -138,17 +140,19 @@ export const Sidebar: React.FC = () => {
 
   return (
     <>
-      {/* Mobile hamburger trigger — fixed top-left, visible only on mobile */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-40 p-2.5 rounded-xl bg-edamame shadow-lg shadow-edamame/30 text-white transition-all active:scale-95"
-        aria-label="Open menu"
-      >
-        <Menu size={20} />
-      </button>
+      {/* Mobile hamburger trigger — fixed top-left, visible only on mobile, hidden in focus mode */}
+      {!isFocusMode && (
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="md:hidden fixed top-4 left-4 z-40 p-2.5 rounded-xl bg-edamame shadow-lg shadow-edamame/30 text-white transition-all active:scale-95"
+          aria-label="Open menu"
+        >
+          <Menu size={20} />
+        </button>
+      )}
 
-      {/* Desktop sidebar — always visible */}
-      <aside className="hidden md:flex flex-col w-64 bg-edamame-sidebar dark:bg-slate-900 border-r border-transparent dark:border-slate-800 h-screen fixed left-0 top-0 z-20 transition-colors duration-200">
+      {/* Desktop sidebar — hidden in focus mode */}
+      <aside className={`${isFocusMode ? 'hidden' : 'hidden md:flex'} flex-col w-64 bg-edamame-sidebar dark:bg-slate-900 border-r border-transparent dark:border-slate-800 h-screen fixed left-0 top-0 z-20 transition-colors duration-200`}>
         {sidebarContent}
       </aside>
 

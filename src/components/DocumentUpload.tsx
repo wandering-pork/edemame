@@ -12,7 +12,7 @@ const ACCEPTED_TYPES: Record<string, string[]> = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
 };
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 interface DocumentUploadProps {
   caseId: string;
@@ -65,7 +65,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, onUpload
     for (const rejection of fileRejections) {
       for (const err of rejection.errors) {
         if (err.code === 'file-too-large') {
-          messages.push(`"${rejection.file.name}" exceeds the 10 MB limit.`);
+          messages.push(`"${rejection.file.name}" exceeds 5 MB. Use the 5MB Crusher in Focus Mode to compress and bundle your documents.`);
         } else if (err.code === 'file-invalid-type') {
           messages.push(`"${rejection.file.name}" is not a supported file type.`);
         } else {
@@ -118,7 +118,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, onUpload
                 Drag & drop files here, or <span className="text-edamame-600 dark:text-edamame-400 underline">browse</span>
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500">
-                PDF, JPG, PNG, DOCX — max 10 MB per file
+                PDF, JPG, PNG, DOCX — max 5 MB per file
               </p>
             </>
           )}

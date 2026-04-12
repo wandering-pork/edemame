@@ -136,6 +136,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {filteredCases.map((c) => {
               const client = clients.find(cl => cl.id === c.clientId);
+              const applicant = c.applicantId ? clients.find(cl => cl.id === c.applicantId) : undefined;
               const caseTasks = tasks.filter(t => t.caseId === c.id);
               const owner = teamMembers.find(m => m.id === c.caseOwner);
               return (
@@ -143,6 +144,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                   key={c.id}
                   case={c}
                   client={client || { id: '', name: 'Unknown', email: '', phone: '', dob: '', nationality: '' }}
+                  applicant={applicant}
                   tasks={caseTasks}
                   owner={owner}
                   onAssignClick={onAssignCase ? (id) => { setAssignModalCaseId(id); setAssignTarget(c.caseOwner || ''); setAssignNote(''); } : undefined}

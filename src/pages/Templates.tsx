@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { WorkflowTemplate } from '../types';
-import { Plus, Trash2, FileText, X, Sparkles } from 'lucide-react';
+import { Plus, Trash2, FileText, X, Sparkles, ChevronDown, ChevronUp, List } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface TemplatesProps {
@@ -37,6 +37,8 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
   const TemplateCard = ({ template, index }: { template: WorkflowTemplate; index: number; key?: string }) => {
     const accent = accentColors[index % accentColors.length];
     const isSystem = template.userId === null || template.userId === undefined;
+    const [stepsOpen, setStepsOpen] = useState(false);
+    const steps = template.steps || [];
     return (
       <div className="card-lift bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden group">
         {/* Accent top bar */}
@@ -74,6 +76,36 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
           <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed line-clamp-3">
             {template.description}
           </p>
+
+          {steps.length > 0 && (
+            <div className="mt-3">
+              <button
+                onClick={() => setStepsOpen(v => !v)}
+                className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 dark:text-slate-500 hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors"
+              >
+                <List size={12} />
+                {steps.length} steps
+                {stepsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              </button>
+              {stepsOpen && (
+                <ol className="mt-2 space-y-1.5">
+                  {steps.map((step, i) => (
+                    <li key={i} className="flex gap-2 text-[11px]">
+                      <span className="flex-shrink-0 w-4 h-4 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 flex items-center justify-center font-bold text-[9px]">
+                        {i + 1}
+                      </span>
+                      <div>
+                        <span className="font-semibold text-gray-700 dark:text-slate-300">{step.title}</span>
+                        {step.description && (
+                          <span className="text-gray-400 dark:text-slate-500"> — {step.description}</span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

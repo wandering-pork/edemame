@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { generateTasksFromCase } from '../services/geminiService';
 import { WorkflowTemplate, Task, Client, Case } from '../types';
-import { Sparkles, Calendar, ArrowRight, Loader2, Save, Search, User, ChevronDown } from 'lucide-react';
+import { Sparkles, Calendar, Loader2, Save, User, ChevronDown, ChevronUp, List, Users } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface NewCaseProps {
@@ -84,7 +84,16 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
   const [description, setDescription] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  
+
+  // Client/applicant split
+  const [splitRoles, setSplitRoles] = useState(false);
+  const [applicantId, setApplicantId] = useState('');
+  const [isApplicantDropdownOpen, setIsApplicantDropdownOpen] = useState(false);
+  const [applicantSearchTerm, setApplicantSearchTerm] = useState('');
+
+  // Steps preview
+  const [stepsExpanded, setStepsExpanded] = useState(false);
+
   // Custom Select State
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [clientSearchTerm, setClientSearchTerm] = useState('');
@@ -106,29 +115,43 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
 
   // Filter clients for dropdown
   const filteredClients = useMemo(() => {
-    return clients.filter(c => 
-      c.name.toLowerCase().includes(clientSearchTerm.toLowerCase()) || 
+    return clients.filter(c =>
+      c.name.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
       c.email.toLowerCase().includes(clientSearchTerm.toLowerCase())
     );
   }, [clients, clientSearchTerm]);
 
+  const filteredApplicants = useMemo(() => {
+    return clients.filter(c =>
+      c.name.toLowerCase().includes(applicantSearchTerm.toLowerCase()) ||
+      c.email.toLowerCase().includes(applicantSearchTerm.toLowerCase())
+    );
+  }, [clients, applicantSearchTerm]);
+
   const selectedClient = clients.find(c => c.id === clientId);
+  const selectedApplicant = clients.find(c => c.id === applicantId);
+  const selectedTemplate = templates.find(t => t.id === templateId);
 
   const handleAnalyze = async () => {
     if (!description || !templateId || !clientId) return;
 
     setIsLoading(true);
-    const selectedTemplate = templates.find(t => t.id === templateId);
 
     // Build rich client context — the more the LLM knows, the more specific the tasks
+    const applicant = splitRoles && selectedApplicant ? selectedApplicant : selectedClient;
     const clientLines: string[] = [];
-    if (selectedClient) {
+    if (selectedClient && splitRoles && selectedApplicant) {
+      clientLines.push(`Engaging Party (Client): ${selectedClient.name}`);
+      clientLines.push(`Visa Applicant: ${applicant?.name}`);
+    } else if (selectedClient) {
       clientLines.push(`Name: ${selectedClient.name}`);
-      if (selectedClient.dob)         clientLines.push(`Date of Birth: ${selectedClient.dob}`);
-      if (selectedClient.nationality) clientLines.push(`Nationality: ${selectedClient.nationality}`);
-      if (selectedClient.passportNumber) clientLines.push(`Passport Number: ${selectedClient.passportNumber}`);
-      if (selectedClient.passportExpiry)  clientLines.push(`Passport Expiry: ${selectedClient.passportExpiry}`);
-      if (selectedClient.gender)      clientLines.push(`Gender: ${selectedClient.gender}`);
+    }
+    if (applicant) {
+      if (applicant.dob)            clientLines.push(`Date of Birth: ${applicant.dob}`);
+      if (applicant.nationality)    clientLines.push(`Nationality: ${applicant.nationality}`);
+      if (applicant.passportNumber) clientLines.push(`Passport Number: ${applicant.passportNumber}`);
+      if (applicant.passportExpiry) clientLines.push(`Passport Expiry: ${applicant.passportExpiry}`);
+      if (applicant.gender)         clientLines.push(`Gender: ${applicant.gender}`);
     }
     const clientContext = clientLines.length
       ? `CLIENT PROFILE:\n${clientLines.join('\n')}\n\nCASE NOTES:\n`
@@ -156,11 +179,11 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
     if (!selectedClient) return;
 
     const newCaseId = uuidv4();
-    const selectedTemplate = templates.find(t => t.id === templateId);
-    
+
     const newCase: Case = {
       id: newCaseId,
       clientId: selectedClient.id,
+      applicantId: splitRoles && applicantId ? applicantId : undefined,
       title: `${selectedTemplate?.title} - ${selectedClient.name}`,
       description: description,
       templateId: templateId,
@@ -194,6 +217,12 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
     setClientId(client.id);
     setClientSearchTerm(client.name);
     setIsClientDropdownOpen(false);
+  };
+
+  const handleSelectApplicant = (client: Client) => {
+    setApplicantId(client.id);
+    setApplicantSearchTerm(client.name);
+    setIsApplicantDropdownOpen(false);
   };
 
   if (step === 'input') {
@@ -284,9 +313,80 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
               </div>
             </div>
 
+            {/* Client/applicant split toggle */}
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <div
+                  onClick={() => { setSplitRoles(v => !v); if (splitRoles) { setApplicantId(''); setApplicantSearchTerm(''); } }}
+                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${splitRoles ? 'bg-green-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${splitRoles ? 'translate-x-4' : ''}`} />
+                </div>
+                <span className="text-sm font-medium text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Users size={14} />
+                  Client and applicant are different people
+                </span>
+              </label>
+              {splitRoles && (
+                <p className="mt-1 ml-11 text-xs text-gray-400 dark:text-slate-500">
+                  Client = the engaging/paying party. Applicant = the person named on the visa.
+                </p>
+              )}
+            </div>
+
+            {/* Applicant picker (when roles split) */}
+            {splitRoles && (
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Applicant (visa applicant)</label>
+                <div className="relative" onClick={() => setIsApplicantDropdownOpen(true)}>
+                  <User className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500" size={18} />
+                  <input
+                    type="text"
+                    value={applicantSearchTerm}
+                    onChange={(e) => {
+                      setApplicantSearchTerm(e.target.value);
+                      setIsApplicantDropdownOpen(true);
+                      if (applicantId && e.target.value !== clients.find(c => c.id === applicantId)?.name) {
+                        setApplicantId('');
+                      }
+                    }}
+                    onFocus={() => setIsApplicantDropdownOpen(true)}
+                    className="w-full pl-10 pr-10 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 focus:border-green-500 dark:focus:border-green-600 text-gray-900 dark:text-white outline-none"
+                    placeholder="Search applicant..."
+                  />
+                  <ChevronDown className="absolute right-3 top-3 text-gray-400 dark:text-slate-500 pointer-events-none" size={16} />
+                </div>
+                {isApplicantDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setIsApplicantDropdownOpen(false)} />
+                    <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredApplicants.length === 0 ? (
+                        <div className="p-3 text-sm text-gray-500 dark:text-slate-500 italic">No clients found.</div>
+                      ) : (
+                        filteredApplicants.map(c => (
+                          <div
+                            key={c.id}
+                            onClick={() => handleSelectApplicant(c)}
+                            className="p-3 hover:bg-green-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-100 dark:border-slate-700 last:border-0"
+                          >
+                            <div className="font-medium text-gray-900 dark:text-white">{c.name}</div>
+                            <div className="flex gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                              <span>DOB: {c.dob || 'N/A'}</span>
+                              <span>•</span>
+                              <span>{c.phone || c.email || 'No Contact Info'}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Select Workflow Template</label>
-              <select 
+              <select
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
                 className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 focus:border-green-500 dark:focus:border-green-600 text-gray-900 dark:text-white outline-none"
@@ -296,6 +396,33 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                   <option key={t.id} value={t.id}>{t.title}</option>
                 ))}
               </select>
+              {/* Steps preview */}
+              {selectedTemplate?.steps && selectedTemplate.steps.length > 0 && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setStepsExpanded(v => !v)}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                  >
+                    <List size={13} />
+                    This template includes {selectedTemplate.steps.length} steps
+                    {stepsExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  </button>
+                  {stepsExpanded && (
+                    <ol className="mt-2 space-y-1 pl-1">
+                      {selectedTemplate.steps.map((step, i) => (
+                        <li key={i} className="flex gap-2 text-xs text-gray-600 dark:text-slate-400">
+                          <span className="flex-shrink-0 font-bold text-gray-400 dark:text-slate-500 w-4">{i + 1}.</span>
+                          <div>
+                            <span className="font-semibold text-gray-700 dark:text-slate-300">{step.title}</span>
+                            {step.description && <span className="text-gray-400 dark:text-slate-500"> — {step.description}</span>}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>

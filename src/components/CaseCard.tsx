@@ -13,6 +13,7 @@ interface CaseCardProps {
   owner?: TeamMember;
   onAssignClick?: (caseId: string) => void;
   className?: string;
+  applicant?: Client;
 }
 
 export const CaseCard: React.FC<CaseCardProps> = ({
@@ -22,7 +23,8 @@ export const CaseCard: React.FC<CaseCardProps> = ({
   onViewDetails,
   owner,
   onAssignClick,
-  className = ''
+  className = '',
+  applicant,
 }) => {
   const completedTasks = tasks.filter(t => t.isCompleted).length;
   const totalTasks = tasks.length;
@@ -68,6 +70,11 @@ export const CaseCard: React.FC<CaseCardProps> = ({
             <p className="text-sm text-slate-600 dark:text-slate-400">
               {client.name} • DOB {client.dob || 'N/A'}
             </p>
+            {applicant && applicant.id !== client.id && (
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                Applicant: {applicant.name}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {owner ? (

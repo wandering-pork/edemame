@@ -1,14 +1,15 @@
-import React, { useState, useMemo } from 'react';
-import { Case, Client, Task, CaseStatus } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { CaseNotes } from '../components/CaseNotes';
 import { DocumentUpload } from '../components/DocumentUpload';
 import { DocumentList } from '../components/DocumentList';
+import { generateChecklist } from '../lib/checklistTemplates';
+import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Calendar,
   CheckCircle2,
-  Circle,
   Clock,
   FileText,
   User,
@@ -16,8 +17,6 @@ import {
   Phone,
   MapPin,
   AlertCircle,
-  ChevronRight,
-  MoreVertical,
   Plus,
   Trash2,
   Edit2,
@@ -25,13 +24,19 @@ import {
   RotateCcw,
   Triangle,
   X,
-  Save
+  Save,
+  Zap,
+  FolderOpen,
+  Users,
+  ClipboardList,
 } from 'lucide-react';
-import { format, isAfter, isBefore, startOfDay } from 'date-fns';
+import { format } from 'date-fns';
 
 interface CaseDetailsProps {
   caseItem: Case;
   client: Client;
+  applicant?: Client;
+  visaSubclass?: string;
   tasks: Task[];
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
@@ -43,6 +48,8 @@ interface CaseDetailsProps {
 export const CaseDetails: React.FC<CaseDetailsProps> = ({
   caseItem,
   client,
+  applicant,
+  visaSubclass,
   tasks,
   onUpdateTask,
   onDeleteTask,
@@ -51,6 +58,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   onBack
 }) => {
   const repos = useRepositories();
+  const navigate = useNavigate();
   const [offsetModal, setOffsetModal] = useState<{ taskId: string, newDate: string } | null>(null);
   const [editingDate, setEditingDate] = useState<{ taskId: string, date: string } | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -64,6 +72,38 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [caseEditForm, setCaseEditForm] = useState({ title: caseItem.title, description: caseItem.description });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [docRefreshKey, setDocRefreshKey] = useState(0);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'tasks' | 'documents' | 'notes'>('tasks');
+
+  // Document checklist state (localStorage-backed)
+  const checklistKey = `edamame_checklist_${caseItem.id}`;
+  const [checklist, setChecklist] = useState<DocumentChecklistItem[]>(() => {
+    try {
+      const raw = localStorage.getItem(`edamame_checklist_${caseItem.id}`);
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return visaSubclass ? generateChecklist(caseItem.id, visaSubclass) : [];
+  });
+
+  // Persist checklist changes
+  useEffect(() => {
+    if (checklist.length > 0) {
+      localStorage.setItem(checklistKey, JSON.stringify(checklist));
+    }
+  }, [checklist, checklistKey]);
+
+  // Generate checklist lazily if none exists and we learn the subclass
+  useEffect(() => {
+    if (checklist.length === 0 && visaSubclass) {
+      const generated = generateChecklist(caseItem.id, visaSubclass);
+      setChecklist(generated);
+    }
+  }, [visaSubclass, caseItem.id, checklist.length]);
+
+  const updateChecklistStatus = (id: string, status: ChecklistItemStatus) => {
+    setChecklist(prev => prev.map(item => item.id === id ? { ...item, status } : item));
+  };
 
   // Keep currentCase in sync if caseItem prop changes
   React.useEffect(() => {
@@ -246,6 +286,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 Delete
               </button>
               <button
+                onClick={() => navigate(`/focus?caseId=${currentCase.id}`)}
+                className="btn-press flex items-center gap-2 px-3.5 py-2 bg-edamame hover:bg-edamame-600 text-white font-semibold rounded-xl shadow-lg shadow-edamame/20 transition-all text-sm"
+                title="Open in Focus Mode"
+              >
+                <Zap size={15} />
+                Focus
+              </button>
+              <button
                 onClick={() => handleOpenTaskModal()}
                 className="btn-press flex items-center gap-2 px-4 py-2 bg-edamame hover:bg-edamame-600 text-white font-semibold rounded-xl shadow-lg shadow-edamame/20 transition-all text-sm"
               >
@@ -256,6 +304,34 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-slate-800">
+          {[
+            { id: 'tasks', label: 'Tasks', icon: ClipboardList },
+            { id: 'documents', label: 'Documents', icon: FolderOpen },
+            { id: 'notes', label: 'Notes', icon: FileText },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                activeTab === tab.id
+                  ? 'border-edamame-500 text-edamame-600 dark:text-edamame-400'
+                  : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
+              }`}
+            >
+              <tab.icon size={15} />
+              {tab.label}
+              {tab.id === 'documents' && checklist.length > 0 && (
+                <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400">
+                  {checklist.filter(c => c.status === 'uploaded' || c.status === 'verified').length}/{checklist.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'tasks' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: Client Info & Case Summary */}
           <div className="space-y-5">
@@ -264,12 +340,29 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               <div className="p-5">
                 <h2 className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-1.5">
                   <User size={13} />
-                  Client Information
+                  {applicant && applicant.id !== client.id ? 'Parties' : 'Client Information'}
                 </h2>
                 <div className="space-y-3.5">
                   <div>
-                    <div className="text-base font-bold text-gray-900 dark:text-white">{client.name}</div>
-                    <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">DOB: {client.dob}</div>
+                    {applicant && applicant.id !== client.id ? (
+                      <div className="space-y-2">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-0.5">Client</div>
+                          <div className="text-base font-bold text-gray-900 dark:text-white">{client.name}</div>
+                          <div className="text-xs text-gray-400 dark:text-slate-500">DOB: {client.dob}</div>
+                        </div>
+                        <div className="pt-2 border-t border-gray-100 dark:border-slate-800">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-edamame-600 dark:text-edamame-400 mb-0.5">Applicant</div>
+                          <div className="text-base font-bold text-gray-900 dark:text-white">{applicant.name}</div>
+                          <div className="text-xs text-gray-400 dark:text-slate-500">DOB: {applicant.dob}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-base font-bold text-gray-900 dark:text-white">{client.name}</div>
+                        <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">DOB: {client.dob}</div>
+                      </>
+                    )}
                   </div>
                   <div className="space-y-2 pt-3 border-t border-gray-50 dark:border-slate-800">
                     <div className="flex items-center gap-2.5 text-sm text-gray-600 dark:text-slate-300">
@@ -492,20 +585,69 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             </section>
           </div>
         </div>
+        )} {/* end tasks tab */}
 
-        {/* Documents */}
-        <div className="mt-8">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Documents</h2>
-          <DocumentUpload caseId={currentCase.id} onUpload={() => setDocRefreshKey(k => k + 1)} />
-          <div className="mt-4">
-            <DocumentList caseId={currentCase.id} refreshKey={docRefreshKey} />
+        {activeTab === 'documents' && (
+        <div className="space-y-6">
+          {/* Document Checklist */}
+          {checklist.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden">
+              <div className="p-5">
+                <h2 className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                  <ClipboardList size={13} />
+                  Document Checklist
+                  <span className="ml-auto font-normal text-gray-500 dark:text-slate-400">
+                    {checklist.filter(c => c.status === 'uploaded' || c.status === 'verified').length} / {checklist.length} done
+                  </span>
+                </h2>
+                {/* Progress bar */}
+                <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-800 rounded-full mb-4">
+                  <div
+                    className="h-1.5 bg-edamame rounded-full transition-all duration-300"
+                    style={{ width: `${checklist.length > 0 ? (checklist.filter(c => c.status === 'uploaded' || c.status === 'verified').length / checklist.length) * 100 : 0}%` }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  {checklist.map(item => (
+                    <div key={item.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-800 dark:text-slate-200">{item.label}</div>
+                        {item.description && <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{item.description}</div>}
+                      </div>
+                      <select
+                        value={item.status}
+                        onChange={(e) => updateChecklistStatus(item.id, e.target.value as ChecklistItemStatus)}
+                        className={`text-xs font-semibold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer flex-shrink-0 ${
+                          item.status === 'verified' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                          item.status === 'uploaded' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
+                          item.status === 'waived' ? 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400' :
+                          'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                        }`}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="uploaded">Uploaded</option>
+                        <option value="verified">Verified</option>
+                        <option value="waived">Waived</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Document upload */}
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Upload Documents</h2>
+            <DocumentUpload caseId={currentCase.id} onUpload={() => setDocRefreshKey(k => k + 1)} />
           </div>
+          <DocumentList caseId={currentCase.id} refreshKey={docRefreshKey} />
         </div>
+        )}
 
-        {/* Case Notes */}
-        <div className="mt-8">
+        {activeTab === 'notes' && (
           <CaseNotes caseId={currentCase.id} />
-        </div>
+        )}
       </div>
 
       {/* Edit Case Modal */}

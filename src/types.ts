@@ -81,6 +81,8 @@ export interface Client {
   gender?: string;
   passportData?: Record<string, string>;
   userId?: string;
+  role?: 'client' | 'applicant' | 'sponsor' | 'employer';
+  notes?: string;
 }
 
 export type CaseStatus = 'open' | 'in_progress' | 'on_hold' | 'closed';
@@ -99,6 +101,8 @@ export interface Case {
   caseOwner?: string;
   /** Ordered list of ownership changes for this case. */
   assignmentHistory?: CaseAssignmentEvent[];
+  /** ID of the visa applicant — falls back to clientId if unset. clientId = engaging/paying party. */
+  applicantId?: string;
 }
 
 export interface CaseNote {
@@ -136,3 +140,50 @@ export type Theme = 'classic' | 'dark';
 
 // Legacy — kept for migration but no longer used for routing
 export type ViewMode = 'dashboard' | 'clients' | 'cases' | 'case-details' | 'templates' | 'settings' | 'team' | 'team-members';
+
+// ---------------------------------------------------------------------------
+// Document Checklist
+// ---------------------------------------------------------------------------
+
+export type ChecklistItemStatus = 'pending' | 'uploaded' | 'verified' | 'waived';
+
+export interface DocumentChecklistItem {
+  id: string;
+  caseId: string;
+  label: string;
+  description?: string;
+  status: ChecklistItemStatus;
+  linkedDocumentId?: string;
+  requiredForSubclass?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Focus Mode Chat
+// ---------------------------------------------------------------------------
+
+export interface FocusChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+}
+
+export interface FocusConversation {
+  id: string;
+  caseId: string;
+  title: string;
+  messages: FocusChatMessage[];
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// File System (Focus Mode workspace)
+// ---------------------------------------------------------------------------
+
+export interface FileTreeNode {
+  name: string;
+  kind: 'file' | 'directory';
+  children?: FileTreeNode[];
+  handle?: FileSystemFileHandle;
+  size?: number;
+}
