@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { Toaster, toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { Sidebar } from './components/Sidebar';
@@ -17,8 +17,7 @@ import { TeamDashboard } from './pages/TeamDashboard';
 import { TeamMembers } from './pages/TeamMembers';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
-import { Focus } from './pages/Focus';
-import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, DocumentChecklistItem } from './types';
+import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent } from './types';
 import { getStorageMode, setStorageMode } from './repositories/factory';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 
@@ -57,8 +56,6 @@ function saveActivityToStorage(events: ActivityEvent[]) {
 
 const AppShell: React.FC = () => {
   const repos = useRepositories();
-  const location = useLocation();
-  const isFocusMode = location.pathname === '/focus';
   const [tasks, setTasks] = useState<Task[]>([]);
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -444,18 +441,16 @@ const AppShell: React.FC = () => {
       <Toaster position="top-right" richColors theme={theme === 'dark' ? 'dark' : 'light'} />
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 font-sans text-gray-900 dark:text-gray-100 transition-colors duration-200">
         <Sidebar />
-        {/* Notification bell — fixed top-right, clear of the 256px sidebar, hidden in focus mode */}
-        {!isFocusMode && (
-          <div className="fixed top-4 right-4 z-30">
-            <NotificationBell
-              notifications={notifications}
-              onMarkAsRead={handleMarkAsRead}
-              onMarkAllAsRead={handleMarkAllAsRead}
-              onDelete={handleDeleteNotification}
-            />
-          </div>
-        )}
-        <main className={`${isFocusMode ? '' : 'md:ml-64'} min-w-0`}>
+        {/* Notification bell — fixed top-right, clear of the 256px sidebar */}
+        <div className="fixed top-4 right-4 z-30">
+          <NotificationBell
+            notifications={notifications}
+            onMarkAsRead={handleMarkAsRead}
+            onMarkAllAsRead={handleMarkAllAsRead}
+            onDelete={handleDeleteNotification}
+          />
+        </div>
+        <main className="md:ml-64 min-w-0">
           <Routes>
             <Route path="/dashboard" element={
               <Dashboard
@@ -541,14 +536,6 @@ const AppShell: React.FC = () => {
               <Settings
                 currentTheme={theme}
                 onThemeChange={handleThemeChange}
-              />
-            } />
-            <Route path="/focus" element={
-              <Focus
-                cases={cases}
-                clients={clients}
-                tasks={tasks}
-                templates={templates}
               />
             } />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
