@@ -34,10 +34,11 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   Brain,
   Package,
-  Sparkles,
   PanelRightClose,
   PanelRightOpen,
   ArrowLeft,
@@ -61,48 +62,6 @@ interface CaseDetailsProps {
 // ---------------------------------------------------------------------------
 // Helper components
 // ---------------------------------------------------------------------------
-
-const ActionCard: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  sublabel: string;
-  color: string;
-  badge?: string;
-  disabled?: boolean;
-  tooltip?: string;
-  onClick: () => void;
-}> = ({ icon, label, sublabel, color, badge, disabled, tooltip, onClick }) => {
-  const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 dark:bg-blue-500/10 text-blue-500 dark:text-blue-400',
-    violet: 'bg-violet-50 dark:bg-violet-500/10 text-violet-500 dark:text-violet-400',
-    amber: 'bg-amber-50 dark:bg-amber-500/10 text-amber-500 dark:text-amber-400',
-    green: 'bg-green-50 dark:bg-green-500/10 text-green-500 dark:text-green-400',
-    gray: 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600',
-  };
-
-  return (
-    <button
-      onClick={!disabled ? onClick : undefined}
-      title={tooltip}
-      className={`group relative flex flex-col items-start p-3 rounded-xl border transition-all duration-150 text-left w-full ${
-        disabled
-          ? 'border-gray-200 dark:border-gray-800 opacity-40 cursor-not-allowed bg-white dark:bg-slate-900'
-          : 'border-gray-200 dark:border-slate-700 hover:border-edamame/50 bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer'
-      }`}
-    >
-      <div className={`w-7 h-7 rounded-lg flex items-center justify-center mb-2 transition-colors ${colorMap[color] || colorMap.gray}`}>
-        {icon}
-      </div>
-      <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 leading-tight">{label}</div>
-      <div className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5 leading-tight">{sublabel}</div>
-      {badge && (
-        <span className="absolute top-2 right-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-500/15 text-green-600 dark:text-green-400">
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-};
 
 const InsightRow: React.FC<{ icon: React.ReactNode; color: string; text: string }> = ({ icon, color, text }) => {
   const colorMap: Record<string, string> = {
@@ -212,6 +171,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- Tab state ----
   const [activeTab, setActiveTab] = useState<'tasks' | 'documents' | 'notes'>('tasks');
+
+  // ---- Left panel collapse state ----
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
 
   // ---- Right panel (chat) state ----
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -577,207 +539,326 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-950">
 
-      {/* ── LEFT PANEL (w-72) ── */}
-      <div className="w-72 flex-shrink-0 bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col overflow-y-auto custom-scrollbar hidden lg:flex">
-        <div className="p-4 space-y-5">
+      {/* ── LEFT PANEL (collapsible) ── */}
+      <div className={`flex-shrink-0 bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out hidden lg:flex ${leftPanelCollapsed ? 'w-14' : 'w-72'}`}>
 
-          {/* Back nav */}
-          <button
-            onClick={onBack}
-            className="group flex items-center gap-2 text-xs text-gray-400 hover:text-edamame dark:hover:text-edamame-400 transition-colors font-medium"
-          >
-            <ArrowLeft size={13} className="group-hover:-translate-x-0.5 transition-transform" />
-            Case Manager
-          </button>
+        {leftPanelCollapsed ? (
+          /* ── Collapsed: icon-only rail ── */
+          <div className="flex flex-col items-center py-3 gap-0.5 h-full">
+            {/* Expand toggle */}
+            <button
+              onClick={() => setLeftPanelCollapsed(false)}
+              title="Expand panel"
+              className="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-800 rounded-lg transition-colors mb-1"
+            >
+              <ChevronRight size={15} />
+            </button>
 
-          {/* Case title + badges */}
-          <div>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              <span className="px-2 py-0.5 bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400 text-[10px] font-bold rounded-md uppercase tracking-wider font-mono">
-                #{currentCase.id.slice(0, 8).toUpperCase()}
+            {/* Back */}
+            <button
+              onClick={onBack}
+              title="Back to Case Manager"
+              className="p-2 text-gray-400 hover:text-edamame dark:hover:text-edamame-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <ArrowLeft size={16} />
+            </button>
+
+            {/* Client */}
+            <button
+              onClick={() => setLeftPanelCollapsed(false)}
+              title={`Client: ${client.name}`}
+              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <User size={16} />
+            </button>
+
+            {/* Progress donut */}
+            <button
+              onClick={() => setLeftPanelCollapsed(false)}
+              title={`Progress: ${progress}% (${completedTasks.length}/${caseTasks.length} tasks done)`}
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors relative"
+            >
+              <svg width="26" height="26" viewBox="0 0 26 26">
+                <circle cx="13" cy="13" r="10" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-200 dark:text-gray-700" />
+                <circle cx="13" cy="13" r="10" fill="none" stroke="#29B767" strokeWidth="2.5" strokeLinecap="round"
+                  strokeDasharray={`${(progress / 100) * 62.8} 62.8`}
+                  transform="rotate(-90 13 13)"
+                  style={{ transition: 'stroke-dasharray 0.5s ease' }}
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-500 dark:text-slate-400 pointer-events-none">
+                {progress}%
               </span>
-              <span className={`px-2 py-0.5 ${statusConfig[currentCase.status].bg} ${statusConfig[currentCase.status].color} text-[10px] font-bold rounded-md uppercase tracking-wider`}>
-                {statusConfig[currentCase.status].label}
-              </span>
-            </div>
-            <h1 className="text-sm font-bold text-gray-900 dark:text-white leading-snug">
-              {currentCase.title}
-            </h1>
-            <div className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">
-              Created {format(new Date(currentCase.createdAt), 'MMM d, yyyy')}
-            </div>
-          </div>
+            </button>
 
-          {/* Client / Applicant */}
-          <div>
-            <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
-              <User size={10} />
-              {applicant && applicant.id !== client.id ? 'Parties' : 'Client'}
-            </div>
-            {applicant && applicant.id !== client.id ? (
-              <div className="space-y-2">
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-0.5">Client</div>
-                  <div className="text-xs font-semibold text-gray-900 dark:text-white">{client.name}</div>
-                  <div className="text-[10px] text-gray-400 dark:text-slate-500">DOB: {client.dob}</div>
-                </div>
-                <div className="pt-2 border-t border-gray-200 dark:border-slate-800">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-edamame-600 dark:text-edamame-400 mb-0.5">Applicant</div>
-                  <div className="text-xs font-semibold text-gray-900 dark:text-white">{applicant.name}</div>
-                  <div className="text-[10px] text-gray-400 dark:text-slate-500">DOB: {applicant.dob}</div>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="text-xs font-semibold text-gray-900 dark:text-white">{client.name}</div>
-                <div className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">DOB: {client.dob}</div>
-                <div className="mt-1.5 space-y-1">
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-slate-400">
-                    <Mail size={10} className="flex-shrink-0" />{client.email}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-slate-400">
-                    <Phone size={10} className="flex-shrink-0" />{client.phone}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+            {/* AI Insights — alert dot if any warnings */}
+            <button
+              onClick={() => setLeftPanelCollapsed(false)}
+              title="AI Insights"
+              className="p-2 relative text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <Brain size={16} />
+              {(hasOverdue || (daysToPassportExpiry !== null && daysToPassportExpiry < 90)) && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-1 ring-gray-50 dark:ring-slate-900" />
+              )}
+            </button>
 
-          {/* Progress bar */}
-          <div>
-            <div className="flex items-center justify-between text-[10px] mb-1.5">
-              <span className="text-gray-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Progress</span>
-              <span className="text-edamame-600 dark:text-edamame-400 font-bold">{progress}%</span>
-            </div>
-            <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full">
-              <div className="h-1.5 bg-edamame rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
-            </div>
-            <div className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">{completedTasks.length}/{caseTasks.length} tasks done</div>
-          </div>
-
-          {/* AI Insights */}
-          <div>
-            <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
-              <Brain size={10} />
-              AI Insights
-            </div>
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3 space-y-2">
-              {daysToPassportExpiry !== null && (
-                <InsightRow
-                  icon={<AlertCircle size={11} />}
-                  color={daysToPassportExpiry < 90 ? 'red' : 'gray'}
-                  text={`Passport expires in ${daysToPassportExpiry} days (${format(passportExpiry!, 'dd MMM yyyy')})`}
-                />
-              )}
-              {hasOverdue && (
-                <InsightRow
-                  icon={<Clock size={11} />}
-                  color="amber"
-                  text={`${pendingTasks.filter(t => new Date(t.date) < new Date()).length} overdue task(s) require attention`}
-                />
-              )}
-              {checklist.length > 0 && uploadedCount < checklist.length && (
-                <InsightRow
-                  icon={<ClipboardList size={11} />}
-                  color="blue"
-                  text={`${checklist.length - uploadedCount} document(s) outstanding`}
-                />
-              )}
-              {pendingTasks.length > 0 && (
-                <InsightRow
-                  icon={<Circle size={11} />}
-                  color="gray"
-                  text={`Next: ${pendingTasks[0].title} — due ${format(new Date(pendingTasks[0].date), 'MMM d')}`}
-                />
-              )}
-              {!hasOverdue && checklist.length === 0 && pendingTasks.length === 0 && (
-                <InsightRow icon={<CheckCircle2 size={11} />} color="green" text="All tasks and documents on track" />
-              )}
-            </div>
-          </div>
-
-          {/* Document checklist compact */}
-          {checklist.length > 0 && (
-            <div>
+            {/* Checklist */}
+            {checklist.length > 0 && (
               <button
-                onClick={() => setChecklistOpen(v => !v)}
-                className="w-full flex items-center justify-between text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+                onClick={() => setLeftPanelCollapsed(false)}
+                title={`Checklist: ${uploadedCount}/${checklist.length} docs collected`}
+                className="p-2 relative text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
               >
-                <span className="flex items-center gap-1">
-                  <ClipboardList size={10} />
-                  Docs {uploadedCount}/{checklist.length}
-                </span>
-                {checklistOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-              </button>
-              <div className="w-full h-1 bg-gray-200 dark:bg-gray-800 rounded-full mb-2">
-                <div
-                  className="h-1 bg-green-500 rounded-full"
-                  style={{ width: `${checklist.length > 0 ? (uploadedCount / checklist.length) * 100 : 0}%` }}
-                />
-              </div>
-              {checklistOpen && (
-                <div className="space-y-1.5">
-                  {checklist.map(item => (
-                    <div key={item.id} className="flex items-center gap-2 text-xs">
-                      <button
-                        onClick={() => cycleChecklistStatus(item.id, item.status)}
-                        className="flex-shrink-0"
-                      >
-                        {item.status === 'uploaded' || item.status === 'verified'
-                          ? <CheckCircle2 size={13} className="text-green-500" />
-                          : <Circle size={13} className="text-gray-300 dark:text-gray-700" />
-                        }
-                      </button>
-                      <span className={`truncate text-[11px] ${item.status === 'uploaded' || item.status === 'verified' ? 'text-gray-400 line-through' : 'text-gray-600 dark:text-slate-400'}`}>
-                        {item.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* File explorer */}
-          <div>
-            <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
-              <FolderOpen size={10} />
-              Workspace
-            </div>
-            {dirTree ? (
-              <FileTreeView nodes={dirTree} />
-            ) : (
-              <button
-                onClick={pickDirectory}
-                className="w-full text-[11px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 transition-colors hover:border-gray-400 dark:hover:border-gray-500"
-              >
-                {('showDirectoryPicker' in window)
-                  ? '+ Link local folder'
-                  : 'File picker not supported in this browser'
-                }
+                <ClipboardList size={16} />
+                {uploadedCount < checklist.length && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 flex items-center justify-center text-[8px] font-bold px-1 rounded-full bg-blue-500 text-white leading-none">
+                    {checklist.length - uploadedCount}
+                  </span>
+                )}
               </button>
             )}
-          </div>
 
-          {/* Edit / Delete buttons */}
-          <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-slate-800">
+            {/* Workspace */}
+            <button
+              onClick={() => setLeftPanelCollapsed(false)}
+              title="Workspace"
+              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <FolderOpen size={16} />
+            </button>
+
+            <div className="flex-1" />
+
+            {/* Edit */}
             <button
               onClick={() => { setCaseEditForm({ title: currentCase.title, description: currentCase.description }); setIsEditingCase(true); }}
-              className="w-full flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all text-xs"
+              title="Edit Case"
+              className="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
-              <Edit2 size={13} />
-              Edit Case
+              <Edit2 size={16} />
             </button>
+
+            {/* Delete */}
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="w-full flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 font-semibold rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-xs"
+              title="Delete Case"
+              className="p-2 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors mb-1"
             >
-              <Trash2 size={13} />
-              Delete Case
+              <Trash2 size={16} />
             </button>
           </div>
+        ) : (
+          /* ── Expanded: full panel ── */
+          <div className="p-4 space-y-5 overflow-y-auto custom-scrollbar flex-1">
 
-        </div>
+            {/* Back nav + collapse toggle */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={onBack}
+                className="group flex items-center gap-2 text-xs text-gray-400 hover:text-edamame dark:hover:text-edamame-400 transition-colors font-medium"
+              >
+                <ArrowLeft size={13} className="group-hover:-translate-x-0.5 transition-transform" />
+                Case Manager
+              </button>
+              <button
+                onClick={() => setLeftPanelCollapsed(true)}
+                title="Collapse panel"
+                className="p-1 text-gray-300 dark:text-slate-600 hover:text-gray-500 dark:hover:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <ChevronLeft size={14} />
+              </button>
+            </div>
+
+            {/* Case title + badges */}
+            <div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className="px-2 py-0.5 bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400 text-[10px] font-bold rounded-md uppercase tracking-wider font-mono">
+                  #{currentCase.id.slice(0, 8).toUpperCase()}
+                </span>
+                <span className={`px-2 py-0.5 ${statusConfig[currentCase.status].bg} ${statusConfig[currentCase.status].color} text-[10px] font-bold rounded-md uppercase tracking-wider`}>
+                  {statusConfig[currentCase.status].label}
+                </span>
+              </div>
+              <h1 className="text-sm font-bold text-gray-900 dark:text-white leading-snug">
+                {currentCase.title}
+              </h1>
+              <div className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">
+                Created {format(new Date(currentCase.createdAt), 'MMM d, yyyy')}
+              </div>
+            </div>
+
+            {/* Client / Applicant */}
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                <User size={10} />
+                {applicant && applicant.id !== client.id ? 'Parties' : 'Client'}
+              </div>
+              {applicant && applicant.id !== client.id ? (
+                <div className="space-y-2">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-0.5">Client</div>
+                    <div className="text-xs font-semibold text-gray-900 dark:text-white">{client.name}</div>
+                    <div className="text-[10px] text-gray-400 dark:text-slate-500">DOB: {client.dob}</div>
+                  </div>
+                  <div className="pt-2 border-t border-gray-200 dark:border-slate-800">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-edamame-600 dark:text-edamame-400 mb-0.5">Applicant</div>
+                    <div className="text-xs font-semibold text-gray-900 dark:text-white">{applicant.name}</div>
+                    <div className="text-[10px] text-gray-400 dark:text-slate-500">DOB: {applicant.dob}</div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="text-xs font-semibold text-gray-900 dark:text-white">{client.name}</div>
+                  <div className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">DOB: {client.dob}</div>
+                  <div className="mt-1.5 space-y-1">
+                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-slate-400">
+                      <Mail size={10} className="flex-shrink-0" />{client.email}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-slate-400">
+                      <Phone size={10} className="flex-shrink-0" />{client.phone}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            <div>
+              <div className="flex items-center justify-between text-[10px] mb-1.5">
+                <span className="text-gray-400 dark:text-slate-500 font-semibold uppercase tracking-wider">Progress</span>
+                <span className="text-edamame-600 dark:text-edamame-400 font-bold">{progress}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full">
+                <div className="h-1.5 bg-edamame rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+              </div>
+              <div className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">{completedTasks.length}/{caseTasks.length} tasks done</div>
+            </div>
+
+            {/* AI Insights */}
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                <Brain size={10} />
+                AI Insights
+              </div>
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-3 space-y-2">
+                {daysToPassportExpiry !== null && (
+                  <InsightRow
+                    icon={<AlertCircle size={11} />}
+                    color={daysToPassportExpiry < 90 ? 'red' : 'gray'}
+                    text={`Passport expires in ${daysToPassportExpiry} days (${format(passportExpiry!, 'dd MMM yyyy')})`}
+                  />
+                )}
+                {hasOverdue && (
+                  <InsightRow
+                    icon={<Clock size={11} />}
+                    color="amber"
+                    text={`${pendingTasks.filter(t => new Date(t.date) < new Date()).length} overdue task(s) require attention`}
+                  />
+                )}
+                {checklist.length > 0 && uploadedCount < checklist.length && (
+                  <InsightRow
+                    icon={<ClipboardList size={11} />}
+                    color="blue"
+                    text={`${checklist.length - uploadedCount} document(s) outstanding`}
+                  />
+                )}
+                {pendingTasks.length > 0 && (
+                  <InsightRow
+                    icon={<Circle size={11} />}
+                    color="gray"
+                    text={`Next: ${pendingTasks[0].title} — due ${format(new Date(pendingTasks[0].date), 'MMM d')}`}
+                  />
+                )}
+                {!hasOverdue && checklist.length === 0 && pendingTasks.length === 0 && (
+                  <InsightRow icon={<CheckCircle2 size={11} />} color="green" text="All tasks and documents on track" />
+                )}
+              </div>
+            </div>
+
+            {/* Document checklist compact */}
+            {checklist.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setChecklistOpen(v => !v)}
+                  className="w-full flex items-center justify-between text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+                >
+                  <span className="flex items-center gap-1">
+                    <ClipboardList size={10} />
+                    Docs {uploadedCount}/{checklist.length}
+                  </span>
+                  {checklistOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                </button>
+                <div className="w-full h-1 bg-gray-200 dark:bg-gray-800 rounded-full mb-2">
+                  <div
+                    className="h-1 bg-green-500 rounded-full"
+                    style={{ width: `${checklist.length > 0 ? (uploadedCount / checklist.length) * 100 : 0}%` }}
+                  />
+                </div>
+                {checklistOpen && (
+                  <div className="space-y-1.5">
+                    {checklist.map(item => (
+                      <div key={item.id} className="flex items-center gap-2 text-xs">
+                        <button
+                          onClick={() => cycleChecklistStatus(item.id, item.status)}
+                          className="flex-shrink-0"
+                        >
+                          {item.status === 'uploaded' || item.status === 'verified'
+                            ? <CheckCircle2 size={13} className="text-green-500" />
+                            : <Circle size={13} className="text-gray-300 dark:text-gray-700" />
+                          }
+                        </button>
+                        <span className={`truncate text-[11px] ${item.status === 'uploaded' || item.status === 'verified' ? 'text-gray-400 line-through' : 'text-gray-600 dark:text-slate-400'}`}>
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* File explorer */}
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                <FolderOpen size={10} />
+                Workspace
+              </div>
+              {dirTree ? (
+                <FileTreeView nodes={dirTree} />
+              ) : (
+                <button
+                  onClick={pickDirectory}
+                  className="w-full text-[11px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 transition-colors hover:border-gray-400 dark:hover:border-gray-500"
+                >
+                  {('showDirectoryPicker' in window)
+                    ? '+ Link local folder'
+                    : 'File picker not supported in this browser'
+                  }
+                </button>
+              )}
+            </div>
+
+            {/* Edit / Delete buttons */}
+            <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-slate-800">
+              <button
+                onClick={() => { setCaseEditForm({ title: currentCase.title, description: currentCase.description }); setIsEditingCase(true); }}
+                className="w-full flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all text-xs"
+              >
+                <Edit2 size={13} />
+                Edit Case
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 font-semibold rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all text-xs"
+              >
+                <Trash2 size={13} />
+                Delete Case
+              </button>
+            </div>
+
+          </div>
+        )}
       </div>
 
       {/* ── CENTER PANEL (flex-1) ── */}
@@ -826,6 +907,38 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               <Plus size={13} />
               Add Task
             </button>
+            {/* Skill actions as compact icon buttons */}
+            <div className="flex items-center gap-0.5 border-l border-gray-200 dark:border-slate-700 pl-2 ml-0.5">
+              <button
+                onClick={() => handleSkillAction('Please help me draft a cover letter for this immigration case.')}
+                title="Draft Document — AI-assisted drafting"
+                className="p-1.5 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
+              >
+                <FileText size={15} />
+              </button>
+              <button
+                onClick={() => handleSkillAction('Please analyse the current eligibility position for this case and flag any risks.')}
+                title="Check Eligibility — Analyse current position"
+                className="p-1.5 text-violet-400 hover:text-violet-600 dark:hover:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-500/10 rounded-lg transition-colors"
+              >
+                <Brain size={15} />
+              </button>
+              <button
+                onClick={() => handleSkillAction(`Which documents are still outstanding for this ${visaSubclass ? `Subclass ${visaSubclass}` : 'visa'} case?`)}
+                title="Verify Documents — Document checklist review"
+                className="p-1.5 text-amber-400 hover:text-amber-600 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition-colors"
+              >
+                <ClipboardList size={15} />
+              </button>
+              <button
+                onClick={() => { if (SUPPORTED_SUBCLASSES.includes(visaSubclass || '')) setShowPackager(true); }}
+                disabled={!SUPPORTED_SUBCLASSES.includes(visaSubclass || '')}
+                title={SUPPORTED_SUBCLASSES.includes(visaSubclass || '') ? '5MB Crusher — Bundle PDFs for ImmiAccount' : '5MB Crusher — Not required for this visa type'}
+                className={`p-1.5 rounded-lg transition-colors ${SUPPORTED_SUBCLASSES.includes(visaSubclass || '') ? 'text-green-400 hover:text-green-600 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-500/10' : 'text-gray-300 dark:text-gray-700 cursor-not-allowed'}`}
+              >
+                <Package size={15} />
+              </button>
+            </div>
             <button
               onClick={() => setRightPanelOpen(v => !v)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400 font-semibold rounded-lg transition-all text-xs"
@@ -837,10 +950,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           </div>
         </div>
 
-        {/* Tab bar + skill actions */}
-        <div className="flex-shrink-0 px-4 lg:px-6 pt-3 bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800">
-          {/* Tabs */}
-          <div className="flex gap-1 border-b border-transparent -mb-px">
+        {/* Tab bar */}
+        <div className="flex-shrink-0 px-4 lg:px-6 bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800">
+          <div className="flex gap-1">
             {[
               { id: 'tasks', label: 'Tasks', icon: ClipboardList },
               { id: 'documents', label: 'Documents', icon: FolderOpen },
@@ -849,7 +961,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? 'border-edamame-500 text-edamame-600 dark:text-edamame-400'
                     : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
@@ -864,47 +976,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 )}
               </button>
             ))}
-          </div>
-
-          {/* Skill Actions row */}
-          <div className="py-3">
-            <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
-              <Sparkles size={10} className="text-edamame-500" />
-              Skill Actions
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <ActionCard
-                icon={<FileText size={14} />}
-                label="Draft Document"
-                sublabel="AI-assisted drafting"
-                color="blue"
-                onClick={() => handleSkillAction('Please help me draft a cover letter for this immigration case.')}
-              />
-              <ActionCard
-                icon={<Brain size={14} />}
-                label="Check Eligibility"
-                sublabel="Analyse current position"
-                color="violet"
-                onClick={() => handleSkillAction('Please analyse the current eligibility position for this case and flag any risks.')}
-              />
-              <ActionCard
-                icon={<ClipboardList size={14} />}
-                label="Verify Documents"
-                sublabel="Document checklist review"
-                color="amber"
-                onClick={() => handleSkillAction(`Which documents are still outstanding for this ${visaSubclass ? `Subclass ${visaSubclass}` : 'visa'} case?`)}
-              />
-              <ActionCard
-                icon={<Package size={14} />}
-                label="5MB Crusher"
-                sublabel="Bundle PDFs for ImmiAccount"
-                color={SUPPORTED_SUBCLASSES.includes(visaSubclass || '') ? 'green' : 'gray'}
-                badge={SUPPORTED_SUBCLASSES.includes(visaSubclass || '') ? 'Ready' : undefined}
-                disabled={!SUPPORTED_SUBCLASSES.includes(visaSubclass || '')}
-                tooltip={!SUPPORTED_SUBCLASSES.includes(visaSubclass || '') ? 'Not required for this visa type' : undefined}
-                onClick={() => setShowPackager(true)}
-              />
-            </div>
           </div>
         </div>
 
