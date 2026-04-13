@@ -544,7 +544,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       ══════════════════════════════════════════ */}
       <header className="flex-shrink-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-10">
         {/* Top row: breadcrumb + title + actions */}
-        <div className="flex items-center gap-3 px-5 py-3">
+        <div className="flex items-center gap-3 pl-5 pr-14 py-3">
           {/* Back */}
           <button
             onClick={onBack}
@@ -576,10 +576,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             value={currentCase.status}
             onChange={(e) => handleStatusChange(e.target.value as CaseStatus)}
             className={`flex-shrink-0 text-xs font-bold px-2.5 py-1.5 rounded-lg border-0 outline-none cursor-pointer transition-colors ${
-              currentCase.status === 'open' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' :
-              currentCase.status === 'in_progress' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' :
-              currentCase.status === 'on_hold' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' :
-              'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+              currentCase.status === 'open' ? 'bg-blue-100 dark:bg-blue-800/70 text-blue-700 dark:text-blue-200' :
+              currentCase.status === 'in_progress' ? 'bg-amber-100 dark:bg-amber-800/70 text-amber-700 dark:text-amber-200' :
+              currentCase.status === 'on_hold' ? 'bg-orange-100 dark:bg-orange-800/70 text-orange-700 dark:text-orange-200' :
+              'bg-green-100 dark:bg-green-800/70 text-green-700 dark:text-green-200'
             }`}
           >
             <option value="open">Open</option>
@@ -589,28 +589,44 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           </select>
 
           {/* AI tool buttons */}
-          <div className="flex items-center gap-0.5 border-l border-gray-100 dark:border-slate-800 pl-2 ml-0.5">
+          <div className="flex items-center gap-1 border-l border-gray-100 dark:border-slate-800 pl-3 ml-0.5">
             <button
               onClick={() => handleSkillAction('Please help me draft a cover letter for this immigration case.')}
               title="Draft Document"
-              className="p-1.5 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
-            ><FileText size={14} /></button>
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-800/60 text-blue-600 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-700/70 transition-colors"
+            >
+              <FileText size={12} />
+              <span className="hidden lg:inline">Draft</span>
+            </button>
             <button
               onClick={() => handleSkillAction('Please analyse the current eligibility position for this case and flag any risks.')}
               title="Check Eligibility"
-              className="p-1.5 text-gray-400 hover:text-violet-500 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10 rounded-lg transition-colors"
-            ><Brain size={14} /></button>
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-50 dark:bg-violet-800/60 text-violet-600 dark:text-violet-200 hover:bg-violet-100 dark:hover:bg-violet-700/70 transition-colors"
+            >
+              <Brain size={12} />
+              <span className="hidden lg:inline">Eligibility</span>
+            </button>
             <button
               onClick={() => handleSkillAction(`Which documents are still outstanding for this ${visaSubclass ? `Subclass ${visaSubclass}` : 'visa'} case?`)}
               title="Check Documents"
-              className="p-1.5 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition-colors"
-            ><ClipboardList size={14} /></button>
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 dark:bg-amber-800/60 text-amber-600 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-700/70 transition-colors"
+            >
+              <ClipboardList size={12} />
+              <span className="hidden lg:inline">Docs</span>
+            </button>
             <button
               onClick={() => { if (SUPPORTED_SUBCLASSES.includes(visaSubclass || '')) setShowPackager(true); }}
               disabled={!SUPPORTED_SUBCLASSES.includes(visaSubclass || '')}
               title="5MB Crusher"
-              className={`p-1.5 rounded-lg transition-colors ${SUPPORTED_SUBCLASSES.includes(visaSubclass || '') ? 'text-gray-400 hover:text-edamame dark:hover:text-edamame-400 hover:bg-edamame/5' : 'text-gray-200 dark:text-slate-800 cursor-not-allowed'}`}
-            ><Package size={14} /></button>
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                SUPPORTED_SUBCLASSES.includes(visaSubclass || '')
+                  ? 'bg-edamame/10 dark:bg-edamame/25 text-edamame-700 dark:text-edamame-200 hover:bg-edamame/20 dark:hover:bg-edamame/35'
+                  : 'bg-gray-50 dark:bg-slate-800/50 text-gray-300 dark:text-slate-700 cursor-not-allowed'
+              }`}
+            >
+              <Package size={12} />
+              {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && <span className="hidden lg:inline">Crusher</span>}
+            </button>
           </div>
 
           {/* Add Task + Agent toggle */}
@@ -1024,10 +1040,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                               value={item.status}
                               onChange={(e) => updateChecklistStatus(item.id, e.target.value as ChecklistItemStatus)}
                               className={`text-xs font-semibold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer flex-shrink-0 ${
-                                item.status === 'verified' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
-                                item.status === 'uploaded' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
-                                item.status === 'waived' ? 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400' :
-                                'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                                item.status === 'verified' ? 'bg-green-100 dark:bg-green-800/70 text-green-700 dark:text-green-200' :
+                                item.status === 'uploaded' ? 'bg-blue-100 dark:bg-blue-800/70 text-blue-700 dark:text-blue-200' :
+                                item.status === 'waived' ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300' :
+                                'bg-amber-100 dark:bg-amber-800/70 text-amber-700 dark:text-amber-200'
                               }`}
                             >
                               <option value="pending">Pending</option>
