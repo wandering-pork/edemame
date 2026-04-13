@@ -20,6 +20,7 @@ import LandingPage from './pages/LandingPage';
 import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent } from './types';
 import { getStorageMode, setStorageMode } from './repositories/factory';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
+import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 
 const TEAM_STORAGE_KEY = 'edamame_team_members';
 const ACTIVITY_STORAGE_KEY = 'edamame_team_activity';
@@ -56,6 +57,7 @@ function saveActivityToStorage(events: ActivityEvent[]) {
 
 const AppShell: React.FC = () => {
   const repos = useRepositories();
+  const { collapsed } = useSidebar();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -450,7 +452,7 @@ const AppShell: React.FC = () => {
             onDelete={handleDeleteNotification}
           />
         </div>
-        <main className="md:ml-64 min-w-0">
+        <main className={`${collapsed ? 'md:ml-16' : 'md:ml-64'} min-w-0 transition-[margin-left] duration-300 ease-in-out`}>
           <Routes>
             <Route path="/dashboard" element={
               <Dashboard
@@ -640,7 +642,9 @@ const App: React.FC = () => {
           <Route path="/*" element={
             storageMode ? (
               <RepositoryProvider storageMode={storageMode}>
-                <AppShell />
+                <SidebarProvider>
+                  <AppShell />
+                </SidebarProvider>
               </RepositoryProvider>
             ) : (
               <Navigate to="/onboarding" replace />
