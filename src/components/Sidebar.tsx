@@ -113,16 +113,27 @@ export const Sidebar: React.FC = () => {
     <div className="flex flex-col h-full select-none">
 
       {/* ── Header: Logo + Collapse Toggle ── */}
-      <div className="flex-shrink-0 relative">
-        {/* Mobile close */}
-        {isDrawer && (
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="absolute top-3 right-3 z-10 p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <X size={16} />
-          </button>
-        )}
+      <div className="flex-shrink-0">
+
+        {/* Top row: toggle (right) or mobile close */}
+        <div className={`flex items-center px-2 pt-2 pb-0 ${collapsed && !isDrawer ? 'justify-center' : 'justify-end'}`}>
+          {isDrawer ? (
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <X size={16} />
+            </button>
+          ) : (
+            <button
+              onClick={toggle}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white/50 hover:text-white transition-all duration-150"
+            >
+              {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+            </button>
+          )}
+        </div>
 
         {/* Logo — links to dashboard */}
         <NavLink
@@ -133,7 +144,7 @@ export const Sidebar: React.FC = () => {
         >
           {collapsed && !isDrawer ? (
             /* Collapsed monogram */
-            <div className="flex items-center justify-center h-16 w-full">
+            <div className="flex items-center justify-center py-3 w-full">
               <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center ring-1 ring-white/10 shadow-inner">
                 <span
                   className="text-white font-black text-base leading-none"
@@ -145,39 +156,14 @@ export const Sidebar: React.FC = () => {
             </div>
           ) : (
             /* Full logo */
-            <div className="flex items-center justify-center pt-5 pb-1 px-4 min-h-[120px]">
+            <div className="flex items-center justify-center pt-2 pb-2 px-4 min-h-[110px]">
               <SidebarLogoArea />
             </div>
           )}
         </NavLink>
 
-        {/* Collapse toggle — desktop only, not in mobile drawer */}
-        {!isDrawer && (
-          <button
-            onClick={toggle}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className={`
-              absolute z-10 flex items-center justify-center
-              w-7 h-7 rounded-lg
-              bg-white/10 hover:bg-white/20
-              text-white/50 hover:text-white
-              transition-all duration-150
-              shadow-sm
-              ${collapsed
-                ? 'bottom-3 left-1/2 -translate-x-1/2'
-                : 'top-4 right-3'
-              }
-            `}
-          >
-            {collapsed
-              ? <PanelLeftOpen size={14} />
-              : <PanelLeftClose size={14} />
-            }
-          </button>
-        )}
-
         {/* Divider */}
-        <div className="mx-4 h-px bg-white/8 dark:bg-white/5 mt-1" />
+        <div className="mx-4 h-px bg-white/8 dark:bg-white/5" />
       </div>
 
       {/* ── Navigation ── */}
