@@ -122,7 +122,24 @@ export interface Document {
   fileSize: number;
   uploadedAt: string;
   userId?: string;
+  /** 820-specific evidence categorisation — drives Submission Bundle Auto-Builder */
+  aspectTag?: Aspect820;
+  /** One-line description shown in the submission index */
+  evidenceNote?: string;
 }
+
+/**
+ * Subclass-820 evidence categories — four "aspects of the relationship"
+ * plus three non-aspect ImmiAccount slots (identity, sponsor, police_health).
+ */
+export type Aspect820 =
+  | 'financial'
+  | 'household'
+  | 'social'
+  | 'commitment'
+  | 'identity'
+  | 'sponsor'
+  | 'police_health';
 
 export interface Notification {
   id: string;

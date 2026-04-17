@@ -201,6 +201,11 @@ class LocalDocumentRepository implements IDocumentRepository {
     return doc;
   }
 
+  async update(doc: Document): Promise<Document> {
+    await db.documents.put(doc);
+    return doc;
+  }
+
   async getFileData(doc: Document): Promise<Blob | null> {
     return readFile(doc.filePath);
   }

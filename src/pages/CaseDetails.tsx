@@ -5,6 +5,7 @@ import { CaseNotes } from '../components/CaseNotes';
 import { DocumentUpload } from '../components/DocumentUpload';
 import { DocumentList } from '../components/DocumentList';
 import { PdfPackager } from '../components/PdfPackager';
+import { BundleBuilder820 } from '../components/BundleBuilder820';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
@@ -39,6 +40,7 @@ import {
   Circle,
   Brain,
   Package,
+  Layers,
   PanelRightClose,
   PanelRightOpen,
   ArrowLeft,
@@ -199,6 +201,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- PdfPackager state ----
   const [showPackager, setShowPackager] = useState(false);
+
+  // ---- 820 Submission Bundle Builder state ----
+  const [showBundleBuilder, setShowBundleBuilder] = useState(false);
 
   // ---- Chat state ----
   const CHAT_STORAGE_KEY = `edamame_chat_${caseItem.id}`;
@@ -627,6 +632,16 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               <Package size={12} />
               {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && <span className="hidden lg:inline">Crusher</span>}
             </button>
+            {visaSubclass === '820' && (
+              <button
+                onClick={() => setShowBundleBuilder(true)}
+                title="Build 820 Submission Bundle — per-slot PDFs for ImmiAccount"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-50 dark:bg-violet-800/60 text-violet-600 dark:text-violet-200 hover:bg-violet-100 dark:hover:bg-violet-700/70 transition-colors"
+              >
+                <Layers size={12} />
+                <span className="hidden lg:inline">820 Bundle</span>
+              </button>
+            )}
           </div>
 
           {/* Add Task + Agent toggle */}
@@ -1059,9 +1074,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 )}
                 <div>
                   <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Upload Documents</h2>
-                  <DocumentUpload caseId={currentCase.id} onUpload={() => setDocRefreshKey(k => k + 1)} />
+                  <DocumentUpload caseId={currentCase.id} visaSubclass={visaSubclass} onUpload={() => setDocRefreshKey(k => k + 1)} />
                 </div>
-                <DocumentList caseId={currentCase.id} refreshKey={docRefreshKey} />
+                <DocumentList caseId={currentCase.id} refreshKey={docRefreshKey} visaSubclass={visaSubclass} />
               </div>
             )}
 
@@ -1364,6 +1379,19 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           documents={documents}
           visaSubclass={visaSubclass || ''}
           onClose={() => setShowPackager(false)}
+        />
+      )}
+
+      {/* 820 Submission Bundle Builder slide-over */}
+      {showBundleBuilder && (
+        <BundleBuilder820
+          caseId={caseItem.id}
+          documents={documents}
+          applicant={applicant ?? client}
+          onClose={() => {
+            setShowBundleBuilder(false);
+            setDocRefreshKey(k => k + 1);
+          }}
         />
       )}
 

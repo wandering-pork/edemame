@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { PDFDocument } from 'pdf-lib';
 import { Package, Download, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Document } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
+import { immiAccountName, loadPdf, mergePdfs, formatBytes, createDownloadUrl, triggerDownload } from '../lib/pdfBundle';
 
 interface PdfPackagerProps {
   caseId: string;
@@ -17,19 +17,6 @@ const TARGET_SIZES = [
   { label: '4 MB (safe margin)', bytes: 4 * 1024 * 1024 },
   { label: '3 MB (maximum safety)', bytes: 3 * 1024 * 1024 },
 ];
-
-/** ImmiAccount file naming convention */
-function immiAccountName(doc: Document): string {
-  const base = doc.fileName.replace(/\.[^.]+$/, '');
-  const dateStr = format(new Date(), 'yyyyMMdd');
-  return `${base.replace(/[^a-zA-Z0-9_-]/g, '_')}_${dateStr}.pdf`;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
 
 export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, visaSubclass, onClose }) => {
   const repos = useRepositories();
@@ -60,55 +47,23 @@ export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, vis
     setResult(null);
 
     try {
-      const targetBytes = TARGET_SIZES[targetIdx].bytes;
       setProgress(`Loading ${selectedDocs.length} PDF(s)...`);
-
-      // Load all selected PDFs
-      const pdfBytes: Uint8Array[] = [];
+      const loaded = [];
       for (const doc of selectedDocs) {
         const blob = await repos.documents.getFileData(doc);
         if (!blob) throw new Error(`Could not load "${doc.fileName}"`);
-        const ab = await blob.arrayBuffer();
-        pdfBytes.push(new Uint8Array(ab));
+        loaded.push(await loadPdf(doc, blob));
       }
 
-      setProgress('Merging PDFs...');
-
-      // Merge all PDFs into one
-      const merged = await PDFDocument.create();
-      for (const bytes of pdfBytes) {
-        const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
-        const pages = await merged.copyPages(src, src.getPageIndices());
-        pages.forEach(p => merged.addPage(p));
-      }
-
-      // Strip metadata
-      merged.setTitle('');
-      merged.setAuthor('');
-      merged.setCreator('Edamame Legal Flow');
-      merged.setProducer('');
-      merged.setSubject('');
-      merged.setKeywords([]);
-
-      setProgress('Applying object-stream compression...');
-
-      // Save with object-stream compression (best lossless option from pdf-lib)
-      let finalBytes = await merged.save({ useObjectStreams: true });
-
-      if (finalBytes.length > targetBytes) {
-        // Try without object streams as a fallback (sometimes slightly smaller)
-        const fallback = await merged.save({ useObjectStreams: false });
-        if (fallback.length < finalBytes.length) finalBytes = fallback;
-      }
+      setProgress('Merging & compressing...');
+      const { bytes } = await mergePdfs(loaded);
 
       const caseIdShort = caseId.slice(0, 8).toUpperCase();
       const dateStr = format(new Date(), 'yyyyMMdd');
       const filename = `${caseIdShort}_ImmiAccount_Bundle_${dateStr}.pdf`;
+      const { url } = createDownloadUrl(bytes, filename);
 
-      const blob = new Blob([finalBytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-
-      setResult({ url, size: finalBytes.length, filename });
+      setResult({ url, size: bytes.length, filename });
       setStatus('done');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Packaging failed. Please try again.');
@@ -118,10 +73,7 @@ export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, vis
 
   const handleDownload = () => {
     if (!result) return;
-    const a = document.createElement('a');
-    a.href = result.url;
-    a.download = result.filename;
-    a.click();
+    triggerDownload(result.url, result.filename);
   };
 
   // Cleanup object URL on unmount

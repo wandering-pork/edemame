@@ -36,6 +36,8 @@ export interface ICaseNoteRepository {
 export interface IDocumentRepository {
   getByCaseId(caseId: string): Promise<Document[]>;
   create(doc: Document, fileData: Blob): Promise<Document>;
+  /** Update document metadata (e.g. aspect tag, evidence note). Does not touch the file blob. */
+  update(doc: Document): Promise<Document>;
   getFileData(doc: Document): Promise<Blob | null>;
   delete(id: string): Promise<void>;
 }
