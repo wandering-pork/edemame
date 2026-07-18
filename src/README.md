@@ -25,6 +25,7 @@ Originally built with [Google AI Studio](https://ai.studio/apps/1c0e5b8b-4436-4c
 
 ## Features
 
+- **Authentication** — Email/password registration and login (Supabase Auth) gates the whole app
 - **Dashboard** — Visual task calendar; mark tasks complete, reorder by priority, browse by date
 - **Case Management** — Create and track immigration cases linked to clients and workflow templates
 - **AI Task Generation** — Google Gemini produces a structured task schedule from a case description and workflow guide
@@ -55,6 +56,9 @@ Originally built with [Google AI Studio](https://ai.studio/apps/1c0e5b8b-4436-4c
 | Build Tool | Vite 6 |
 | Styling | Tailwind CSS (CDN) |
 | AI | Google Gemini (`@google/genai`) |
+| Auth | Supabase Auth (`@supabase/supabase-js`) |
+| Routing | React Router v7 |
+| Local Storage | Dexie.js (IndexedDB) + OPFS |
 | Icons | Lucide React |
 | Date Utilities | date-fns |
 | ID Generation | uuid |
@@ -67,6 +71,7 @@ Originally built with [Google AI Studio](https://ai.studio/apps/1c0e5b8b-4436-4c
 
 - [Node.js](https://nodejs.org) (v18 or later recommended)
 - A [Google Gemini API key](https://aistudio.google.com/app/apikey)
+- A [Supabase project](https://supabase.com/dashboard) (free tier is fine) — required for login/registration, since auth gates the whole app
 
 ### Installation
 
@@ -77,19 +82,25 @@ Originally built with [Google AI Studio](https://ai.studio/apps/1c0e5b8b-4436-4c
    npm install
    ```
 
-2. **Configure your API key:**
+2. **Configure your API keys:**
 
-   Open `.env.local` and set your Gemini API key:
+   Open `.env.local` and set:
    ```
-   GEMINI_API_KEY=your_api_key_here
+   GEMINI_API_KEY=your_gemini_api_key_here
+
+   # From your Supabase project's Settings → API page
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your_anon_key_here
    ```
+
+   Without the Supabase values, the app still loads but registration/login will fail with a network error — nothing past `/login` is reachable.
 
 3. **Start the development server:**
    ```bash
    npm run dev
    ```
 
-   The app will be available at `http://localhost:3000`.
+   The app will be available at `http://localhost:3000`. Register an account, then log in to reach the dashboard.
 
 ### Available Scripts
 
@@ -111,17 +122,30 @@ edemame/
 │   ├── scan-passport-gemini.ts  # Passport OCR using Gemini Vision
 │   └── check-eligibility.ts # Visa eligibility assessment
 ├── src/
-│   ├── App.tsx              # Root component — all app state and navigation
+│   ├── App.tsx              # Root component — all app state, routing, AuthProvider
 │   ├── index.tsx            # React DOM entry point
 │   ├── index.html           # HTML shell with Tailwind CDN config
 │   ├── types.ts             # All TypeScript type definitions
 │   ├── vite.config.ts       # Vite config (API key injection, path aliases)
+│   ├── vite-env.d.ts        # Vite client type reference (import.meta.env typing)
 │   ├── components/
 │   │   ├── Sidebar.tsx      # Navigation sidebar
+│   │   ├── ProtectedRoute.tsx  # Redirects to /login when unauthenticated
 │   │   ├── PassportScanner.tsx  # Passport upload & OCR modal
 │   │   ├── Logo.tsx         # Logo variants and brand components
 │   │   └── ...
+│   ├── contexts/
+│   │   ├── AuthContext.tsx     # useAuth() — Supabase session state, sign up/in/out
+│   │   ├── RepositoryContext.tsx  # Storage-mode repository provider
+│   │   └── SidebarContext.tsx
+│   ├── repositories/        # Storage abstraction (local = Dexie, cloud = Supabase stub)
+│   ├── lib/
+│   │   ├── supabaseClient.ts   # Supabase client singleton
+│   │   ├── dexieDb.ts          # IndexedDB schema (local storage mode)
+│   │   └── opfsStorage.ts      # Local file storage (local storage mode)
 │   ├── pages/
+│   │   ├── Login.tsx        # Email/password login
+│   │   ├── Register.tsx     # Registration + email confirmation state
 │   │   ├── Dashboard.tsx    # Task calendar (main view)
 │   │   ├── CaseManager.tsx  # Case list + new case form
 │   │   ├── CaseDetails.tsx  # Per-case view + AI task generation
@@ -129,11 +153,24 @@ edemame/
 │   │   ├── Clients.tsx      # Client management
 │   │   ├── VisaAdvisor.tsx  # 4-step visa eligibility wizard
 │   │   ├── Templates.tsx    # Workflow template editor
-│   │   └── Settings.tsx     # User preferences
+│   │   └── Settings.tsx     # User preferences + sign-out
 │   └── services/
 │       ├── geminiService.ts # AI task generation
 │       └── ocrService.ts    # Passport OCR via Gemini Vision
 ```
+
+---
+
+## Authentication
+
+Login/registration (Supabase Auth, email/password) gates the entire app — there's no anonymous access, even in local storage mode.
+
+1. Visit `/register` to create an account (name, email, password). If your Supabase project requires email confirmation (default), you'll see a "check your email" screen before you can log in.
+2. Visit `/login` to sign in. "Forgot password?" sends a reset email via Supabase.
+3. Once authenticated, you're routed into the app and asked (once) to choose **Local** or **Cloud** storage at `/onboarding` — this is a separate choice from your account and controls where your case/client/task data lives, not who can log in. Cloud storage mode is not fully implemented yet (falls back to local/IndexedDB).
+4. Sign out from **Settings → Account** (the sidebar's "Sign Out" link is unwired leftover UI — it doesn't do anything).
+
+**Production:** the deployed app at `edemame.vercel.app` uses its own Supabase project (`edamame-legal-flow`), configured with that domain as its Auth Site URL and redirect URL allow-list. The Vercel project's `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` env vars point at the same project as local dev.
 
 ---
 

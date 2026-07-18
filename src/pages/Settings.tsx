@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Theme } from '../types';
-import { Moon, Sun, Monitor, Save, Check, Palette } from 'lucide-react';
+import { Moon, Sun, Monitor, Save, Check, Palette, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SettingsProps {
   currentTheme: Theme;
@@ -11,6 +13,13 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
   const [selectedTheme, setSelectedTheme] = useState<Theme>(currentTheme);
   const [hasChanges, setHasChanges] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
+  };
 
   useEffect(() => {
     setSelectedTheme(currentTheme);
@@ -175,6 +184,24 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
             >
               <Save size={15} />
               Save Changes
+            </button>
+          </div>
+        </div>
+
+        {/* Account section */}
+        <div className="mt-6 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800">
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Account</h2>
+            <p className="text-xs text-gray-400 dark:text-slate-500">{user?.email}</p>
+          </div>
+          <div className="p-6 flex items-center justify-between">
+            <p className="text-sm text-gray-500 dark:text-slate-400">Sign out of your Edamame account on this device.</p>
+            <button
+              onClick={handleSignOut}
+              className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:hover:bg-red-950/70 dark:text-red-400 transition-all"
+            >
+              <LogOut size={15} />
+              Log out
             </button>
           </div>
         </div>

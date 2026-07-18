@@ -31,6 +31,8 @@ npm run lint      # TypeScript type check (tsc --noEmit)
 
 Requires `GEMINI_API_KEY` in `src/.env.local`.
 
+Auth requires `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `src/.env.local` (get these from your Supabase project's Settings → API page). Without them, the app still loads but `signUp`/`signIn` calls fail with a network error — `src/lib/supabaseClient.ts` falls back to a placeholder URL rather than crashing on load, and logs a console error.
+
 ## Architecture
 
 ### Dual Runtime Model
@@ -66,6 +68,24 @@ All app state (tasks, cases, clients, templates, theme) lives in `src/App.tsx` a
 6. User can edit fields before confirming to populate form
 7. Error state offers "Continue with Manual Entry" fallback
 
+### Authentication Flow
+
+Registration/login gates the **entire app** (not just cloud storage mode) via Supabase Auth (email/password).
+
+1. `AuthProvider` (`src/contexts/AuthContext.tsx`) wraps the whole router in `App.tsx`, resolving `supabase.auth.getSession()` on mount and subscribing to `onAuthStateChange`.
+2. `ProtectedRoute` (`src/components/ProtectedRoute.tsx`) reads `useAuth()` — redirects to `/login` if no session, shows a spinner while `loading` is true. It gates `/onboarding` and the `/*` app-shell route; `/`, `/login`, `/register` stay public.
+3. `pages/Register.tsx` calls `signUp(email, password, fullName)` — full name is stored in Supabase's `user_metadata.full_name` (no separate `profiles` table). If Supabase requires email confirmation, the page shows a "check your email" state instead of navigating away.
+4. `pages/Login.tsx` calls `signIn(email, password)`, with a "Forgot password?" link that calls `resetPassword(email)`.
+5. Sign-out lives in `pages/Settings.tsx` (Account section) — calls `signOut()` then navigates to `/login`.
+
+**Important:** Auth (who you are) and `StorageMode` (`'local' | 'cloud'`, where your data lives) are independent axes. Logging in does not imply cloud storage — a logged-in user can still choose "Local" at `/onboarding` and have their case/client/task data stay in IndexedDB. Cloud storage mode itself is still a stub (`repositories/cloud/` falls back to local) — implementing real Supabase Postgres-backed repositories is a separate, not-yet-done piece of work.
+
+`currentUserId` in `App.tsx` (used for `assignedTo`/`actorId` on tasks and activity events) is still sourced from seed `teamMembers[0]`, not from the authenticated Supabase user — team-member identity is not yet unified with auth identity.
+
+The sidebar's static "Sign Out" link (`components/Sidebar.tsx`) is dead UI, not wired to `signOut()` — it's a leftover from before real auth existed. Only Settings → Account → Log out actually signs out.
+
+**Production:** Supabase project `edamame-legal-flow` (wandering-pork's Org) backs both dev and prod. Its Auth → URL Configuration Site URL is `https://edemame.vercel.app`, with `https://edemame.vercel.app/**` and `http://localhost:3000/**` allow-listed as redirect URLs. The Vercel project `edemame` has `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` set for Production + Preview.
+
 ### Visa Eligibility Advisor Flow
 
 1. User navigates to Visa Advisor page (sidebar or "Check Eligibility" button on client card)
@@ -78,11 +98,14 @@ All app state (tasks, cases, clients, templates, theme) lives in `src/App.tsx` a
 
 ### Key Conventions
 
-- `src/components/` — reusable brand/layout pieces (Logo, Sidebar, PassportScanner)
-- `src/pages/` — page-level views (Dashboard, CaseManager, CaseDetails, NewCase, Clients, VisaAdvisor, Templates, Settings)
+- `src/components/` — reusable brand/layout pieces (Logo, Sidebar, PassportScanner, ProtectedRoute)
+- `src/pages/` — page-level views (Dashboard, CaseManager, CaseDetails, NewCase, Clients, VisaAdvisor, Templates, Settings, Login, Register, Onboarding, LandingPage)
 - `src/services/` — external API client functions (geminiService, ocrService)
+- `src/contexts/` — React context providers (`AuthContext`, `RepositoryContext`, `SidebarContext`)
+- `src/repositories/` — storage abstraction (`local/` = Dexie/IndexedDB, `cloud/` = Supabase stub, `factory.ts` picks based on `StorageMode`)
+- `src/lib/supabaseClient.ts` — Supabase client singleton, used by `AuthContext` (and eventually `repositories/cloud/`)
 - `api/` — **root-level** Vercel serverless functions (not `src/api/`) — server-side, runs on Node
-- `src/types.ts` — all TypeScript type definitions (Task, Case, Client, WorkflowTemplate, ViewMode, Theme)
+- `src/types.ts` — all TypeScript type definitions (Task, Case, Client, WorkflowTemplate, ViewMode, Theme, StorageMode)
 - Path alias `@/` resolves to `src/` root
 
 ### Styling

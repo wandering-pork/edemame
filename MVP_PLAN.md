@@ -2,7 +2,9 @@
 
 ## Context
 
-Edamame Legal Flow is currently a **functional prototype** with no data persistence (all state resets on refresh), no authentication, no document handling, and no database. The pitch deck (Slide 9) defines the MVP scope as three layers: **Business Layer**, **Intelligence Layer**, and **Client Layer**. This plan aligns to that scope.
+Edamame Legal Flow started as a **functional prototype** with no data persistence, no authentication, no document handling, and no database. The pitch deck (Slide 9) defines the MVP scope as three layers: **Business Layer**, **Intelligence Layer**, and **Client Layer**. This plan aligns to that scope.
+
+As of this update: local-mode data persistence, routing, and Supabase Auth (registration/login gating the whole app) are implemented. Cloud-mode data storage (Postgres/Supabase repositories) is still a stub that falls back to local storage — see Known Gaps in item 2.
 
 ### Dual Storage Model
 
@@ -180,27 +182,31 @@ A **repository pattern** abstracts the storage layer so all pages use the same i
 
 ---
 
-#### 2. ⏸️ Authentication (Cloud Mode) & App Lock (Local Mode) — DEFERRED
-**Why:** Cloud mode requires multi-user auth. Local mode needs at minimum a PIN/password lock since sensitive immigration data is stored on-device.
+#### 2. ✅ Authentication — Supabase Auth (whole-app gate)
+**Why:** The app had no real accounts — `ProtectedRoute` only checked whether a storage mode was chosen. Registration/login now gates the entire app (not just cloud mode), since accounts are needed regardless of where a given user's data lives.
 
-**Scope:**
-- **Cloud mode:**
-  - Supabase Auth with email/password (Google OAuth as stretch)
-  - Login page and registration page
-  - Auth state management (session context)
-  - Protected routes — redirect unauthenticated users to login
-  - Wire up existing "Sign Out" sidebar button
-  - User profile (name, firm name) in `profiles` table
-- **Local mode:**
-  - Optional PIN or password lock (stored as hash in IndexedDB)
-  - Simple lock screen on app open
-  - No "Sign Out" — replaced with "Lock App" in sidebar
-- **Shared:**
-  - Auth context that abstracts both modes
-  - Protected route wrapper works for both
+**What shipped (differs from original scope below):** Email/password auth via Supabase Auth, applied to **all** routes, not just cloud mode. PIN/password lock for local mode was **not** built — local mode still requires login like everything else, so the local-mode "no account required" pitch on the Onboarding page is now stale copy (see Known Gaps).
 
-**Files to modify:** `App.tsx`, `components/Sidebar.tsx`, `types.ts`
-**Files to create:** `pages/Login.tsx`, `pages/Register.tsx`, `pages/LockScreen.tsx`, `contexts/AuthContext.tsx`
+**Scope (as implemented):**
+- Supabase Auth with email/password. Email confirmation flow handled (shows "check your email" state on registration).
+- `contexts/AuthContext.tsx` — `useAuth()` hook exposing `user`, `session`, `loading`, `signUp`, `signIn`, `signOut`, `resetPassword`.
+- `pages/Login.tsx`, `pages/Register.tsx` — styled to match the existing Onboarding/Landing visual language.
+- `components/ProtectedRoute.tsx` — now checks `useAuth()` instead of `localStorage.edamame_storage_mode`; redirects unauthenticated users to `/login` (preserving intended destination via router state), shows a spinner while the session is resolving.
+- Sign-out control added to `pages/Settings.tsx` → Account section.
+- `lib/supabaseClient.ts` — singleton client; falls back to a placeholder URL (not empty string) so a missing config logs a console error instead of crashing the app on load.
+- Google OAuth, `profiles` table, and a local-mode PIN/app-lock were **not** built — see Known Gaps below.
+
+**Files created:** `src/lib/supabaseClient.ts`, `src/vite-env.d.ts`, `src/contexts/AuthContext.tsx`, `src/pages/Login.tsx`, `src/pages/Register.tsx`
+**Files modified:** `src/App.tsx` (added `AuthProvider`, `/login` + `/register` routes), `src/components/ProtectedRoute.tsx` (auth check replaces storage-mode check), `src/pages/Settings.tsx` (sign-out), `src/.env.local` (added `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, pointed at the `edamame-legal-flow` Supabase project)
+
+**Production config:** Supabase project `edamame-legal-flow` (wandering-pork's Org, Asia-Pacific region) backs both local dev and prod. Its Auth → URL Configuration has Site URL `https://edemame.vercel.app` and redirect URLs allow-listing `https://edemame.vercel.app/**` and `http://localhost:3000/**`. The Vercel project `edemame` has `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` set for Production + Preview environments.
+
+**Known gaps / not done:**
+- No `profiles` table (firm name etc.) — only `full_name` in Supabase Auth's `user_metadata`.
+- No local-mode PIN/app-lock — local storage mode still requires full account login, contradicting the Onboarding page's "No account required" copy for Local Storage.
+- `currentUserId` in `App.tsx` is still sourced from seed `teamMembers[0]`, not the authenticated Supabase user — team-member identity and auth identity are not yet unified.
+- Google OAuth not implemented (stretch goal, skipped).
+- The sidebar's static "Sign Out" link (`components/Sidebar.tsx`) is dead UI — it's not wired to `signOut()`. Only Settings → Account → Log out actually signs out.
 
 ---
 
@@ -402,10 +408,13 @@ Phase D: Dashboard & Polish ✅ COMPLETE
   9. ✅ Dashboard Enhancements — status overview cards, upcoming deadlines, overdue highlighting, activity feed
   10. ✅ Notifications & Deadline Alerts — notification bell, sonner toasts, notification repository integration
 
-Phase A Deferred (not blocking MVP):
-  - ⏸️ Authentication (Cloud Mode) — Supabase Auth, login/register pages, protected routes by auth
-  - ⏸️ App Lock (Local Mode) — PIN/password lock screen
-  - ⏸️ Cloud repository implementations — Supabase Postgres + Storage + RLS policies
+Phase A — Authentication:
+  - ✅ Authentication (whole app) — Supabase Auth, login/register pages, protected routes by auth (see item 2 above for scope notes and gaps)
+
+Phase A Still Deferred (not blocking MVP):
+  - ⏸️ App Lock (Local Mode) — PIN/password lock screen (local mode currently uses the same full account login as cloud mode)
+  - ⏸️ Cloud repository implementations — Supabase Postgres + Storage + RLS policies (cloud storage mode still falls back to local/Dexie; auth and data-storage mode are separate axes)
+  - ⏸️ `profiles` table / firm-level user profile data
 ```
 
 ---
@@ -483,9 +492,27 @@ npm install -D @types/papaparse @tanstack/react-query-devtools
 | `src/services/ocrService.ts` | Tesseract.js OCR → regex MRZ extraction → `mrz` package parsing |
 | `src/components/PassportScanner.tsx` | Modal: upload passport image → OCR → review fields → confirm |
 
+### New Files (Phase A — Authentication)
+| File | Purpose |
+|------|---------|
+| `src/lib/supabaseClient.ts` | Supabase client singleton; warns + falls back to placeholder URL if env vars are unset |
+| `src/vite-env.d.ts` | Vite client type reference (needed for `import.meta.env` typing) |
+| `src/contexts/AuthContext.tsx` | `useAuth()` — session state, `signUp`/`signIn`/`signOut`/`resetPassword` |
+| `src/pages/Login.tsx` | Email/password login, forgot-password flow |
+| `src/pages/Register.tsx` | Registration form, "check your email" confirmation state |
+
+### Modified Files (Phase A — Authentication)
+| File | Changes |
+|------|---------|
+| `src/App.tsx` | Wrapped router in `AuthProvider`; added `/login`, `/register` routes |
+| `src/components/ProtectedRoute.tsx` | Checks `useAuth()` session instead of `localStorage` storage-mode flag |
+| `src/pages/Settings.tsx` | Added Account section with sign-out |
+| `src/.env.local` | Added blank `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` |
+
 ### Build Status
 - `npm run lint` (tsc --noEmit): ✅ Passes
 - `npm run build` (vite build): ✅ Passes (585 KB bundle, chunk size warning only)
+- Auth flow manually verified in-browser end-to-end against the real `edamame-legal-flow` Supabase project: register → confirmation email received and clicked → log in → session-gated routing → sign-out from Settings all work as expected
 
 ---
 
