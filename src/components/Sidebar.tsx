@@ -3,9 +3,10 @@ import {
   LayoutDashboard, FileText, Settings, LogOut, Users, Menu, X,
   BookTemplate, Sparkles, UsersRound, UserCog, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { SidebarLogoArea } from './SidebarLogoArea';
 import { useSidebar } from '../contexts/SidebarContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NavGroup {
   label?: string;
@@ -100,7 +101,15 @@ const NavItem: React.FC<{
 export const Sidebar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { collapsed, toggle } = useSidebar();
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    setMobileOpen(false);
+    await signOut();
+    navigate('/login', { replace: true });
+  };
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
@@ -211,6 +220,7 @@ export const Sidebar: React.FC = () => {
 
           {/* Sign Out */}
           <button
+            onClick={handleSignOut}
             className={`group relative flex items-center rounded-lg text-[13px] font-medium
               text-white/40 hover:bg-red-500/15 hover:text-red-300 transition-all duration-150
               ${collapsed && !isDrawer ? 'w-10 h-10 mx-auto justify-center' : 'w-full px-3 py-2.5 gap-3'}
