@@ -1,12 +1,29 @@
 import type { WorkflowTemplate, TeamMember } from '../types';
 
 /**
- * Default team for single-firm installs. Creates 3 collaborators across
- * partner / lawyer / assistant roles so the Team view has something to
- * render on first launch.
+ * Default team for single-firm installs. Prepends the authenticated user as
+ * "you", followed by 3 synthetic collaborators across partner / lawyer /
+ * assistant roles so the Team view has something to render on first launch.
  */
-export function seedDefaultTeam(): TeamMember[] {
+export function seedDefaultTeam(currentUser: { id: string; name: string; email: string }): TeamMember[] {
   return [
+    {
+      id: currentUser.id,
+      name: currentUser.name,
+      email: currentUser.email,
+      avatar: currentUser.name
+        .split(' ')
+        .map(part => part[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'ME',
+      role: 'partner',
+      caseCount: 0,
+      activeTaskCount: 0,
+      status: 'available',
+      joinedAt: new Date().toISOString(),
+    },
     {
       id: 'tm-eliza-chen',
       name: 'Eliza Chen',

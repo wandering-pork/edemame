@@ -25,33 +25,38 @@ import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-const TEAM_STORAGE_KEY = 'edamame_team_members';
-const ACTIVITY_STORAGE_KEY = 'edamame_team_activity';
+function teamStorageKey(userId: string) {
+  return `edamame_team_members_${userId}`;
+}
 
-function loadTeamFromStorage(): TeamMember[] | null {
+function activityStorageKey(userId: string) {
+  return `edamame_team_activity_${userId}`;
+}
+
+function loadTeamFromStorage(key: string): TeamMember[] | null {
   try {
-    const raw = localStorage.getItem(TEAM_STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
 
-function saveTeamToStorage(members: TeamMember[]) {
-  try { localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(members)); } catch { /* ignore */ }
+function saveTeamToStorage(key: string, members: TeamMember[]) {
+  try { localStorage.setItem(key, JSON.stringify(members)); } catch { /* ignore */ }
 }
 
-function loadActivityFromStorage(): ActivityEvent[] {
+function loadActivityFromStorage(key: string): ActivityEvent[] {
   try {
-    const raw = localStorage.getItem(ACTIVITY_STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function saveActivityToStorage(events: ActivityEvent[]) {
-  try { localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(events.slice(-200))); } catch { /* ignore */ }
+function saveActivityToStorage(key: string, events: ActivityEvent[]) {
+  try { localStorage.setItem(key, JSON.stringify(events.slice(-200))); } catch { /* ignore */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -61,6 +66,11 @@ function saveActivityToStorage(events: ActivityEvent[]) {
 const AppShell: React.FC = () => {
   const repos = useRepositories();
   const { collapsed } = useSidebar();
+  const { user } = useAuth();
+  // Safe: AppShell is only ever rendered inside ProtectedRoute, which guarantees a session.
+  const currentUserId = user!.id;
+  const teamKey = teamStorageKey(currentUserId);
+  const activityKey = activityStorageKey(currentUserId);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -69,15 +79,17 @@ const AppShell: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() => {
-    const fromStorage = loadTeamFromStorage();
+    const fromStorage = loadTeamFromStorage(teamKey);
     if (fromStorage && fromStorage.length > 0) return fromStorage;
-    const seeded = seedDefaultTeam();
-    saveTeamToStorage(seeded);
+    const seeded = seedDefaultTeam({
+      id: currentUserId,
+      name: user!.user_metadata?.full_name || user!.email || 'You',
+      email: user!.email || '',
+    });
+    saveTeamToStorage(teamKey, seeded);
     return seeded;
   });
-  const [activity, setActivity] = useState<ActivityEvent[]>(() => loadActivityFromStorage());
-  // The current-user id — in single-user installs we treat the first partner as "me".
-  const currentUserId = teamMembers[0]?.id;
+  const [activity, setActivity] = useState<ActivityEvent[]>(() => loadActivityFromStorage(activityKey));
 
   const pushActivity = useCallback((ev: Omit<ActivityEvent, 'id' | 'createdAt'> & { createdAt?: string }) => {
     setActivity(prev => {
@@ -89,15 +101,15 @@ const AppShell: React.FC = () => {
           createdAt: ev.createdAt || new Date().toISOString(),
         },
       ];
-      saveActivityToStorage(next);
+      saveActivityToStorage(activityKey, next);
       return next;
     });
-  }, []);
+  }, [activityKey]);
 
   // Persist team members whenever they change
   useEffect(() => {
-    saveTeamToStorage(teamMembers);
-  }, [teamMembers]);
+    saveTeamToStorage(teamKey, teamMembers);
+  }, [teamKey, teamMembers]);
 
   // First-launch backfill: spread any unowned cases/tasks across the seeded team
   // so the Team Dashboard has meaningful distribution on first load.
