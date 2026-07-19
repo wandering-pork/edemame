@@ -17,10 +17,13 @@ import { TeamDashboard } from './pages/TeamDashboard';
 import { TeamMembers } from './pages/TeamMembers';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
+import Login from './pages/Login';
+import Register from './pages/Register';
 import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent } from './types';
 import { getStorageMode, setStorageMode } from './repositories/factory';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const TEAM_STORAGE_KEY = 'edamame_team_members';
 const ACTIVITY_STORAGE_KEY = 'edamame_team_activity';
@@ -621,8 +624,9 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
 // Root App — handles onboarding + storage mode + provides context
 // ---------------------------------------------------------------------------
 
-const App: React.FC = () => {
+const AppRoutes: React.FC = () => {
   const [storageMode, setStorageModeState] = useState<StorageMode | null>(getStorageMode());
+  const { user } = useAuth();
 
   const handleOnboardingComplete = (mode: StorageMode) => {
     setStorageMode(mode);
@@ -630,28 +634,38 @@ const App: React.FC = () => {
   };
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
+      <Route element={<ProtectedRoute />}>
         <Route path="/onboarding" element={
           storageMode
             ? <Navigate to="/dashboard" replace />
             : <Onboarding onComplete={handleOnboardingComplete} />
         } />
-        <Route element={<ProtectedRoute />}>
-          <Route path="/*" element={
-            storageMode ? (
-              <RepositoryProvider storageMode={storageMode}>
-                <SidebarProvider>
-                  <AppShell />
-                </SidebarProvider>
-              </RepositoryProvider>
-            ) : (
-              <Navigate to="/onboarding" replace />
-            )
-          } />
-        </Route>
-      </Routes>
+        <Route path="/*" element={
+          storageMode ? (
+            <RepositoryProvider storageMode={storageMode}>
+              <SidebarProvider>
+                <AppShell />
+              </SidebarProvider>
+            </RepositoryProvider>
+          ) : (
+            <Navigate to="/onboarding" replace />
+          )
+        } />
+      </Route>
+    </Routes>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </BrowserRouter>
   );
 };

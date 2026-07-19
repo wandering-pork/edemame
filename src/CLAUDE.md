@@ -30,6 +30,8 @@ npm run lint      # TypeScript type check (tsc --noEmit)
 
 Requires a valid `GEMINI_API_KEY` in `.env.local`. The Vite config injects it at build time via `process.env.GEMINI_API_KEY`.
 
+Also requires `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local` for authentication (Settings → API in your Supabase project dashboard). These are consumed client-side via `import.meta.env` (standard Vite `VITE_`-prefixed env vars, no custom build config needed).
+
 ## Architecture
 
 **State management:** All app state lives in `App.tsx` (tasks, cases, clients, templates, theme). Pages receive data and mutation callbacks as props — no Redux/Zustand.
@@ -47,9 +49,13 @@ App.tsx (state) → props → pages/ components
 
 | File | Purpose |
 |------|---------|
-| `App.tsx` | Root component, all state, navigation logic |
+| `App.tsx` | Root component, all state, navigation logic, wraps router in `AuthProvider` |
 | `types.ts` | All TypeScript type definitions |
 | `services/geminiService.ts` | Gemini AI integration — `generateTasksFromCase()` |
+| `lib/supabaseClient.ts` | Supabase client singleton (auth today; cloud repositories later) |
+| `contexts/AuthContext.tsx` | `useAuth()` — session state, sign up/in/out, password reset |
+| `components/ProtectedRoute.tsx` | Redirects to `/login` when there's no authenticated session |
+| `pages/Login.tsx` / `pages/Register.tsx` | Email/password auth pages |
 | `pages/Dashboard.tsx` | Task calendar view (main screen) |
 | `pages/CaseManager.tsx` | Case list + actions |
 | `pages/CaseDetails.tsx` | Per-case task view + AI generation trigger |
@@ -57,6 +63,8 @@ App.tsx (state) → props → pages/ components
 | `pages/Clients.tsx` | Client CRUD |
 | `pages/Templates.tsx` | Workflow template management |
 | `vite.config.ts` | Build config, API key injection, path alias `@/*` |
+
+Authentication (Supabase Auth, email/password) gates every route in the app — see the root-level `CLAUDE.md`'s "Authentication Flow" section for the full flow and known gaps (no `profiles` table, no local-mode PIN lock, `currentUserId` not yet unified with the authenticated user).
 
 ## Data Models (types.ts)
 
