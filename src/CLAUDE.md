@@ -64,7 +64,7 @@ App.tsx (state) → props → pages/ components
 | `pages/Templates.tsx` | Workflow template management |
 | `vite.config.ts` | Build config, API key injection, path alias `@/*` |
 
-Authentication (Supabase Auth, email/password) gates every route in the app — see the root-level `CLAUDE.md`'s "Authentication Flow" section for the full flow and known gaps (no `profiles` table, no local-mode PIN lock, `currentUserId` not yet unified with the authenticated user).
+Authentication (Supabase Auth, email/password) gates every route in the app — see the root-level `CLAUDE.md`'s "Authentication Flow" and "Per-User Data Isolation" sections for the full flow. `currentUserId` is the real authenticated `user.id`, and every repository enforces per-user ownership on read/write — a logged-in user only ever sees data they created (known gaps that remain: no `profiles` table, no local-mode PIN lock).
 
 ## Data Models (types.ts)
 

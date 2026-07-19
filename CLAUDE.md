@@ -76,13 +76,22 @@ Registration/login gates the **entire app** (not just cloud storage mode) via Su
 2. `ProtectedRoute` (`src/components/ProtectedRoute.tsx`) reads `useAuth()` — redirects to `/login` if no session, shows a spinner while `loading` is true. It gates `/onboarding` and the `/*` app-shell route; `/`, `/login`, `/register` stay public.
 3. `pages/Register.tsx` calls `signUp(email, password, fullName)` — full name is stored in Supabase's `user_metadata.full_name` (no separate `profiles` table). If Supabase requires email confirmation, the page shows a "check your email" state instead of navigating away.
 4. `pages/Login.tsx` calls `signIn(email, password)`, with a "Forgot password?" link that calls `resetPassword(email)`.
-5. Sign-out lives in `pages/Settings.tsx` (Account section) — calls `signOut()` then navigates to `/login`.
+5. Sign-out is available both in `pages/Settings.tsx` (Account section) and as a link in `components/Sidebar.tsx` — both call `signOut()` then navigate to `/login`.
 
 **Important:** Auth (who you are) and `StorageMode` (`'local' | 'cloud'`, where your data lives) are independent axes. Logging in does not imply cloud storage — a logged-in user can still choose "Local" at `/onboarding` and have their case/client/task data stay in IndexedDB. Cloud storage mode itself is still a stub (`repositories/cloud/` falls back to local) — implementing real Supabase Postgres-backed repositories is a separate, not-yet-done piece of work.
 
-`currentUserId` in `App.tsx` (used for `assignedTo`/`actorId` on tasks and activity events) is still sourced from seed `teamMembers[0]`, not from the authenticated Supabase user — team-member identity is not yet unified with auth identity.
+`currentUserId` in `App.tsx` is the authenticated Supabase `user.id` (via `useAuth()`) — used for `assignedTo`/`actorId` on tasks and activity events, and as the id of the "you" entry seeded into Team Members. Team-member identity is now unified with auth identity (see "Per-User Data Isolation" below).
 
-The sidebar's static "Sign Out" link (`components/Sidebar.tsx`) is dead UI, not wired to `signOut()` — it's a leftover from before real auth existed. Only Settings → Account → Log out actually signs out.
+### Per-User Data Isolation
+
+Every logged-in user only ever sees Clients, Cases, Tasks, Case Notes, Documents, Notifications, custom Workflow Templates, Team Members, and the Activity Feed that **they** created — enforced at the repository layer, not in page components, so no call site has to remember to filter.
+
+- **Repositories** (`repositories/local/index.ts`): `createLocalRepositories(userId)` constructs every `Local*Repository` with the authenticated user's id. Reads (`getAll`, `getByCaseId`, etc.) filter to `row.userId === userId`; `create()` stamps `userId` on the item only if the caller left it unset; `update()`/`delete()` look up the existing row first and throw an `OwnershipError` if it belongs to someone else.
+- **Workflow Templates** are the one exception with a shared tier: the 5 system defaults have `userId: null` and remain visible to everyone; custom templates a user creates are private, same as everything else.
+- **Wiring**: `contexts/RepositoryContext.tsx` calls `useAuth()` internally and passes `user.id` into `repositories/factory.ts`'s `createRepositories(mode, userId)` — isolation is on for both `local` and the cloud-fallback path.
+- **Dexie schema** (`lib/dexieDb.ts`) is at `version(2)`, adding a `userId` index to `caseNotes`, `documents`, `notifications` (the three tables that didn't have one in `version(1)`).
+- **Team Members / Activity Feed** don't go through Dexie — they're localStorage-backed in `App.tsx`, now namespaced per user (`` edamame_team_members_${userId} ``, `` edamame_team_activity_${userId} ``) instead of one shared global key. `lib/seedData.ts`'s `seedDefaultTeam(currentUser)` seeds the authenticated user as the first "you" entry (real name/email/id) ahead of the 3 synthetic demo colleagues (Eliza/Marcus/Priya).
+- **Known accepted gap**: local IndexedDB/localStorage rows created before this feature landed have no `userId` and are invisible post-upgrade — there's no principled way to attribute pre-existing orphaned rows to a specific account. Not an issue for anyone who signed up after this shipped.
 
 **Production:** Supabase project `edamame-legal-flow` (wandering-pork's Org) backs both dev and prod. Its Auth → URL Configuration Site URL is `https://edemame.vercel.app`, with `https://edemame.vercel.app/**` and `http://localhost:3000/**` allow-listed as redirect URLs. The Vercel project `edemame` has `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` set for Production + Preview.
 
