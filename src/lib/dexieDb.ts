@@ -30,6 +30,17 @@ class EdamameDB extends Dexie {
       documents: 'id, caseId, uploadedAt',
       notifications: 'id, createdAt, read',
     });
+
+    // v2: add userId index to tables that need per-user data isolation
+    this.version(2).stores({
+      clients: 'id, name, email, phone, userId',
+      cases: 'id, clientId, status, userId',
+      tasks: 'id, caseId, date, userId',
+      templates: 'id, userId, visaSubclass',
+      caseNotes: 'id, caseId, createdAt, userId',
+      documents: 'id, caseId, uploadedAt, userId',
+      notifications: 'id, createdAt, read, userId',
+    });
   }
 }
 

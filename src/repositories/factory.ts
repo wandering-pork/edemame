@@ -2,14 +2,14 @@ import type { Repositories } from './types';
 import type { StorageMode } from '../types';
 import { createLocalRepositories } from './local';
 
-export function createRepositories(mode: StorageMode): Repositories {
+export function createRepositories(mode: StorageMode, userId: string): Repositories {
   if (mode === 'local') {
-    return createLocalRepositories();
+    return createLocalRepositories(userId);
   }
   // Cloud mode - for now, fall back to local until Supabase is configured
   // This allows the app to work without Supabase credentials
   console.warn('Cloud mode not yet configured, falling back to local storage');
-  return createLocalRepositories();
+  return createLocalRepositories(userId);
 }
 
 export function getStorageMode(): StorageMode | null {

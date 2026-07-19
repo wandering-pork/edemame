@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo } from 'react';
 import type { Repositories } from '../repositories/types';
 import { createRepositories } from '../repositories/factory';
 import type { StorageMode } from '../types';
+import { useAuth } from './AuthContext';
 
 interface RepositoryContextValue {
   repositories: Repositories;
@@ -11,10 +12,13 @@ interface RepositoryContextValue {
 const RepositoryContext = createContext<RepositoryContextValue | null>(null);
 
 export function RepositoryProvider({ children, storageMode }: { children: React.ReactNode; storageMode: StorageMode }) {
+  const { user } = useAuth();
+  // Safe: RepositoryProvider is only ever rendered inside ProtectedRoute, which guarantees a session.
+  const userId = user!.id;
   const value = useMemo(() => ({
-    repositories: createRepositories(storageMode),
+    repositories: createRepositories(storageMode, userId),
     storageMode,
-  }), [storageMode]);
+  }), [storageMode, userId]);
 
   return (
     <RepositoryContext.Provider value={value}>
