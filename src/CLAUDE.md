@@ -81,7 +81,7 @@ Default seed data (hardcoded in `App.tsx`): 5 clients, 4 cases, 8 tasks, 5 visa 
 
 `geminiService.ts` → `generateTasksFromCase(caseDescription, workflowGuide, startDate)`
 
-- Model: Gemini 2.5 Flash Preview
+- Model: Gemini 3.5 Flash
 - Output: structured JSON array of tasks with date offsets
 - Called from `CaseDetails.tsx` when user triggers task generation
 
