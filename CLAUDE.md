@@ -39,9 +39,9 @@ Auth requires `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `src/.env.loca
 
 - **Frontend:** React 19 + TypeScript SPA, built with Vite 6. Tailwind CSS via CDN (config inline in `src/index.html`).
 - **Backend:** Vercel serverless functions in root `api/` directory (not `src/api/`):
-  - `/api/generate-tasks.ts` — generates task schedules from case descriptions using Gemini 2.5 Flash
+  - `/api/generate-tasks.ts` — generates task schedules from case descriptions using Gemini 3.5 Flash
   - `/api/scan-passport-gemini.ts` — extracts passport data from images using Gemini Vision API
-  - `/api/check-eligibility.ts` — assesses visa eligibility using Gemini 2.5 Flash with structured JSON schema
+  - `/api/check-eligibility.ts` — assesses visa eligibility using Gemini 3.5 Flash with structured JSON schema
 
 ### State Management
 
@@ -100,7 +100,7 @@ Every logged-in user only ever sees Clients, Cases, Tasks, Case Notes, Documents
 1. User navigates to Visa Advisor page (sidebar or "Check Eligibility" button on client card)
 2. 4-step wizard collects: personal info → immigration goal → conditional details → supporting factors
 3. On submit, POSTs collected data to `/api/check-eligibility` via `VisaAdvisor.tsx`
-4. Vercel function calls Gemini 2.5 Flash with visa assessment prompt
+4. Vercel function calls Gemini 3.5 Flash with visa assessment prompt
 5. Returns JSON with visa verdict cards: 9 Australian visa subclasses (189, 190, 482, 186, 500, 820, 485, 600, 417)
 6. Each card shows verdict (qualifies/possibly/unlikely/needs_more_info), reasons, and gaps
 7. "Open New Case" button on qualified visas navigates to CaseManager with template pre-selected via URL state
