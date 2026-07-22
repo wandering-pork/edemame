@@ -78,6 +78,7 @@ function getDescriptionPlaceholder(template: WorkflowTemplate | undefined): stri
 export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedTemplateKeyword, onTasksConfirmed, onChangeView: onGoBack }) => {
   const [step, setStep] = useState<'input' | 'review'>('input');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Form State
   const [clientId, setClientId] = useState('');
@@ -135,6 +136,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
   const handleAnalyze = async () => {
     if (!description || !templateId || !clientId) return;
 
+    setErrorMessage(null);
     setIsLoading(true);
 
     // Build rich client context — the more the LLM knows, the more specific the tasks
@@ -169,7 +171,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       setGeneratedTasks(tasks);
       setStep('review');
     } catch (e) {
-      alert("Failed to generate tasks. Please check your connection or API key.");
+      setErrorMessage("Failed to generate tasks. Please check your connection or try again.");
     } finally {
       setIsLoading(false);
     }
@@ -445,8 +447,14 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
               />
             </div>
 
+            {errorMessage && (
+              <div className="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
+                {errorMessage}
+              </div>
+            )}
+
             <div className="pt-4 flex justify-end">
-              <button 
+              <button
                 onClick={handleAnalyze}
                 disabled={isLoading || !description || !templateId || !clientId}
                 className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-900/20"
