@@ -52,9 +52,15 @@ App.tsx (state) → props → pages/ components
 | `App.tsx` | Root component, all state, navigation logic, wraps router in `AuthProvider` |
 | `types.ts` | All TypeScript type definitions |
 | `services/geminiService.ts` | Gemini AI integration — `generateTasksFromCase()` |
-| `lib/supabaseClient.ts` | Supabase client singleton (auth today; cloud repositories later) |
+| `lib/supabaseClient.ts` | Supabase client singleton (auth + `profiles` table today; cloud repositories later) |
 | `contexts/AuthContext.tsx` | `useAuth()` — session state, sign up/in/out, password reset |
+| `contexts/ProfileContext.tsx` | `useProfile()` — the `profiles` row (storage mode, theme, sidebar, linked-folder metadata) |
+| `contexts/LocalFolderContext.tsx` | `useLocalFolder()` — link/reconnect/redirect lifecycle for the linked local folder |
+| `lib/fsStorage.ts` | File System Access API wrapper (JSON/blob read-write, directory walk, tree copy) |
+| `lib/folderHandleStore.ts` | The one browser-persisted piece of local mode: the folder permission handle |
+| `repositories/filesystem/index.ts` | Local-mode repositories — one JSON file per record in the linked folder |
 | `components/ProtectedRoute.tsx` | Redirects to `/login` when there's no authenticated session |
+| `components/LinkFolderGate.tsx` | Full-screen prompt shown until the local folder is linked/reconnected |
 | `pages/Login.tsx` / `pages/Register.tsx` | Email/password auth pages |
 | `pages/Dashboard.tsx` | Task calendar view (main screen) |
 | `pages/CaseManager.tsx` | Case list + actions |
@@ -64,7 +70,7 @@ App.tsx (state) → props → pages/ components
 | `pages/Templates.tsx` | Workflow template management |
 | `vite.config.ts` | Build config, API key injection, path alias `@/*` |
 
-Authentication (Supabase Auth, email/password) gates every route in the app — see the root-level `CLAUDE.md`'s "Authentication Flow" and "Per-User Data Isolation" sections for the full flow. `currentUserId` is the real authenticated `user.id`, and every repository enforces per-user ownership on read/write — a logged-in user only ever sees data they created (known gaps that remain: no `profiles` table, no local-mode PIN lock).
+Authentication (Supabase Auth, email/password) gates every route in the app — see the root-level `CLAUDE.md`'s "Authentication Flow" and "Local-First Storage" sections for the full flow. `currentUserId` is the real authenticated `user.id`. Per-user isolation in local mode is now structural rather than a filter: each user links their own folder, so there's no shared store to leak across accounts (known gap that remains: no local-mode PIN lock, so anyone with OS-level access to the linked folder can read the files directly).
 
 ## Data Models (types.ts)
 
@@ -90,7 +96,7 @@ Default seed data (hardcoded in `App.tsx`): 5 clients, 4 cases, 8 tasks, 5 visa 
 - Tailwind config is inline in `index.html` (CDN usage)
 - Brand color: `#29B767` (edamame green), aliased as `edamame-*` in Tailwind config
 - Dark mode class-based (`dark:` prefix)
-- Theme stored in `localStorage`
+- Theme and sidebar-collapsed state are stored in the Supabase `profiles` table, not `localStorage` — see root `CLAUDE.md`'s "Local-First Storage" section
 
 ## Conventions
 

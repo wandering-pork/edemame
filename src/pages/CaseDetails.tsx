@@ -180,15 +180,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // ---- Right panel (chat) state ----
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
 
-  // ---- Document checklist state (localStorage-backed) ----
-  const checklistKey = `edamame_checklist_${caseItem.id}`;
-  const [checklist, setChecklist] = useState<DocumentChecklistItem[]>(() => {
-    try {
-      const raw = localStorage.getItem(`edamame_checklist_${caseItem.id}`);
-      if (raw) return JSON.parse(raw);
-    } catch { /* ignore */ }
-    return visaSubclass ? generateChecklist(caseItem.id, visaSubclass) : [];
-  });
+  // ---- Document checklist state ----
+  const [checklist, setChecklist] = useState<DocumentChecklistItem[]>([]);
   const [checklistOpen, setChecklistOpen] = useState(false);
 
   // ---- Documents state ----
@@ -206,18 +199,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [showBundleBuilder, setShowBundleBuilder] = useState(false);
 
   // ---- Chat state ----
-  const CHAT_STORAGE_KEY = `edamame_chat_${caseItem.id}`;
-  const LEGACY_CHAT_KEY = `edamame_focus_chat_${caseItem.id}`;
-
-  const [conversations, setConversations] = useState<FocusConversation[]>(() => {
-    try {
-      const raw = localStorage.getItem(CHAT_STORAGE_KEY) || localStorage.getItem(LEGACY_CHAT_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  });
-  const [activeConvId, setActiveConvId] = useState<string | null>(
-    () => conversations[0]?.id ?? null
-  );
+  const [conversations, setConversations] = useState<FocusConversation[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -254,20 +237,30 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setCurrentCase(caseItem);
   }, [caseItem]);
 
+  // Load checklist for this case, generating defaults on first-ever view
+  const [checklistLoaded, setChecklistLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setChecklistLoaded(false);
+    repos.checklist.getByCaseId(caseItem.id).then(items => {
+      if (cancelled) return;
+      if (items.length === 0 && visaSubclass) {
+        const generated = generateChecklist(caseItem.id, visaSubclass);
+        setChecklist(generated);
+        repos.checklist.setForCase(caseItem.id, generated);
+      } else {
+        setChecklist(items);
+      }
+      setChecklistLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [caseItem.id, visaSubclass, repos.checklist]);
+
   // Persist checklist changes
   useEffect(() => {
-    if (checklist.length > 0) {
-      localStorage.setItem(checklistKey, JSON.stringify(checklist));
-    }
-  }, [checklist, checklistKey]);
-
-  // Generate checklist lazily if none exists and we learn the subclass
-  useEffect(() => {
-    if (checklist.length === 0 && visaSubclass) {
-      const generated = generateChecklist(caseItem.id, visaSubclass);
-      setChecklist(generated);
-    }
-  }, [visaSubclass, caseItem.id, checklist.length]);
+    if (!checklistLoaded) return;
+    repos.checklist.setForCase(caseItem.id, checklist);
+  }, [checklist, checklistLoaded, caseItem.id, repos.checklist]);
 
   // Load documents on mount
   useEffect(() => {
@@ -415,9 +408,20 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     } catch { /* user cancelled */ }
   };
 
+  // Load conversations for this case
+  useEffect(() => {
+    let cancelled = false;
+    repos.chat.getByCaseId(caseItem.id).then(convs => {
+      if (cancelled) return;
+      setConversations(convs);
+      setActiveConvId(convs[0]?.id ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [caseItem.id, repos.chat]);
+
   // ---- Chat handlers ----
   const persistConvs = (convs: FocusConversation[]) => {
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(convs));
+    repos.chat.setForCase(caseItem.id, convs);
   };
 
   const createConversation = () => {

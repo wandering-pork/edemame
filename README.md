@@ -59,10 +59,10 @@ It replaces the fragmented, rule-based tools that dominate the incumbent market 
 
 ### Platform
 
-- **Local-first persistence** — All data is stored locally in IndexedDB via Dexie; documents live in OPFS. Works offline after first load.
-- **Repository pattern** — Pluggable storage backend; cloud mode is stubbed out for future Supabase integration.
-- **Onboarding flow** — First-run storage-mode picker seeds default team members, clients, cases, and templates.
-- **Dark / Light mode** — Class-based Tailwind theming, preference persisted in `localStorage`.
+- **Local-first persistence** — All data is stored as JSON files (and document blobs) in a real folder the user links via the File System Access API — no browser storage. Put the folder in Dropbox/OneDrive/iCloud Drive to carry data across machines.
+- **Repository pattern** — Pluggable storage backend; cloud mode (Supabase Postgres) is stubbed out for future implementation.
+- **Onboarding flow** — First-run storage-mode picker seeds default team members, clients, cases, and templates, then prompts local-mode users to link a folder.
+- **Dark / Light mode** — Class-based Tailwind theming, preference persisted in the Supabase `profiles` table.
 - **Toast notifications** — Non-blocking feedback via Sonner.
 
 ---
@@ -118,7 +118,7 @@ It replaces the fragmented, rule-based tools that dominate the incumbent market 
 
 ### State & Persistence
 
-App state is held in `App.tsx` as React hooks and mirrored to Dexie via a repository layer (`src/repositories/`). A `RepositoryContext` exposes the current backend (local by default) so components do not touch storage directly. Theme and onboarding status are kept in `localStorage`.
+App state is held in `App.tsx` as React hooks and mirrored to the linked local folder via a repository layer (`src/repositories/filesystem/`). A `RepositoryContext` exposes the current backend so components do not touch storage directly. Storage mode, theme, and sidebar state are kept in the Supabase `profiles` table — nothing is persisted in the browser except the folder permission handle needed to reconnect to it.
 
 ### Routing
 
