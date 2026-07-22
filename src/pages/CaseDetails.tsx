@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, FileTreeNode } from '../types';
+import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { CaseNotes } from '../components/CaseNotes';
 import { DocumentUpload } from '../components/DocumentUpload';
@@ -29,6 +29,8 @@ import {
   MoreHorizontal,
   MoreVertical,
   ArrowLeft,
+  Paperclip,
+  FileText,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Document } from '../types';
@@ -52,20 +54,12 @@ interface CaseDetailsProps {
 
 const AGENT_CHIPS = ['Draft consultation checklist', 'Document request email', 'Summarise eligibility'];
 
-async function buildFileTree(handle: FileSystemDirectoryHandle, depth = 0): Promise<FileTreeNode[]> {
-  if (depth > 3) return [];
-  const nodes: FileTreeNode[] = [];
-  for await (const [, entry] of (handle as any).entries()) {
-    if (entry.kind === 'directory') {
-      const children = await buildFileTree(entry as FileSystemDirectoryHandle, depth + 1);
-      nodes.push({ name: entry.name, kind: 'directory', children });
-    } else {
-      const file = await (entry as FileSystemFileHandle).getFile();
-      nodes.push({ name: entry.name, kind: 'file', handle: entry as FileSystemFileHandle, size: file.size });
-    }
-  }
-  return nodes.sort((a, b) => (a.kind === 'directory' ? -1 : 1) || a.name.localeCompare(b.name));
-}
+const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: string }> = {
+  verified: { cls: 'bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400', label: 'Verified' },
+  uploaded: { cls: 'bg-blue-500/[0.13] text-blue-700 dark:text-blue-400', label: 'Received' },
+  waived: { cls: 'bg-slate-500/[0.13] text-slate-600 dark:text-slate-300', label: 'Waived' },
+  pending: { cls: 'bg-amber-500/[0.13] text-amber-700 dark:text-amber-400', label: 'Pending' },
+};
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -116,11 +110,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- Documents state ----
   const [documents, setDocuments] = useState<Document[]>([]);
-
-  // ---- File explorer state ----
-  const [dirHandle, setDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
-  const [dirTree, setDirTree] = useState<FileTreeNode[] | null>(null);
-  const DIR_KEY = `edamame_workspace_${caseItem.id}`;
 
   // ---- PdfPackager state ----
   const [showPackager, setShowPackager] = useState(false);
@@ -213,19 +202,41 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   }, [activeConv?.messages]);
 
   // ---- Checklist handlers ----
+  const [checklistStatusMenuId, setChecklistStatusMenuId] = useState<string | null>(null);
+
   const updateChecklistStatus = (id: string, status: ChecklistItemStatus) => {
     setChecklist(prev => prev.map(item => item.id === id ? { ...item, status } : item));
   };
 
-  // Cycle checklist status on click: pending → uploaded → verified → pending
-  const cycleChecklistStatus = (id: string, currentStatus: ChecklistItemStatus) => {
-    const cycle: Record<ChecklistItemStatus, ChecklistItemStatus> = {
-      pending: 'uploaded',
-      uploaded: 'verified',
-      verified: 'pending',
-      waived: 'pending',
+  // Attach a specific file to a checklist item — creates the Document and links it
+  const handleChecklistUpload = async (item: DocumentChecklistItem, file: File) => {
+    const doc: Document = {
+      id: uuidv4(),
+      caseId: currentCase.id,
+      fileName: file.name,
+      filePath: `documents/${currentCase.id}/${file.name}`,
+      fileType: file.type,
+      fileSize: file.size,
+      uploadedAt: new Date().toISOString(),
     };
-    updateChecklistStatus(id, cycle[currentStatus]);
+    const created = await repos.documents.create(doc, file);
+    setDocuments(prev => [created, ...prev]);
+    setChecklist(prev => prev.map(c => c.id === item.id ? { ...c, linkedDocumentId: created.id, status: 'uploaded' } : c));
+    setDocRefreshKey(k => k + 1);
+  };
+
+  // Detach the linked file from a checklist item (the file itself is left in the case's document store)
+  const handleChecklistUnlink = (item: DocumentChecklistItem) => {
+    setChecklist(prev => prev.map(c => c.id === item.id ? { ...c, linkedDocumentId: undefined, status: 'pending' } : c));
+    setDocRefreshKey(k => k + 1);
+  };
+
+  const handleChecklistPreview = async (doc: Document) => {
+    const blob = await repos.documents.getFileData(doc);
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
   // ---- Case handlers ----
@@ -332,18 +343,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       onMoveTaskDate(offsetModal.taskId, offsetModal.newDate, offset);
       setOffsetModal(null);
     }
-  };
-
-  // ---- File explorer handlers ----
-  const pickDirectory = async () => {
-    if (!('showDirectoryPicker' in window)) return;
-    try {
-      const handle = await (window as any).showDirectoryPicker({ mode: 'read' });
-      setDirHandle(handle);
-      localStorage.setItem(DIR_KEY, handle.name);
-      const tree = await buildFileTree(handle);
-      setDirTree(tree);
-    } catch { /* user cancelled */ }
   };
 
   // Load conversations for this case
@@ -708,9 +707,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   {visaSubclass === '820' && (
                     <button onClick={() => { setShowBundleBuilder(true); setMoreOpen(false); }} className={menuItemCls}>820 bundle builder</button>
                   )}
-                  {('showDirectoryPicker' in window) && (
-                    <button onClick={() => { setMoreOpen(false); pickDirectory(); }} className={menuItemCls}>Link local folder</button>
-                  )}
                   <button
                     onClick={() => { setCaseEditForm({ title: currentCase.title, description: currentCase.description }); setIsEditingCase(true); setMoreOpen(false); }}
                     className={menuItemCls}
@@ -744,7 +740,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           completedCount={completedTasks.length}
           pendingCount={pendingTasks.length}
           alerts={railAlerts}
-          dirTree={dirTree}
         />
 
         {/* ── CENTER COLUMN ── */}
@@ -825,31 +820,92 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     <span className="text-[11px] font-bold text-gray-400 dark:text-slate-500">{uploadedCount}/{checklist.length}</span>
                   </div>
                   {checklist.map(item => {
-                    const chip =
-                      item.status === 'verified' ? { cls: 'bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400', label: 'Verified' } :
-                      item.status === 'uploaded' ? { cls: 'bg-blue-500/[0.13] text-blue-700 dark:text-blue-400', label: 'Received' } :
-                      item.status === 'waived' ? { cls: 'bg-slate-500/[0.13] text-slate-600 dark:text-slate-300', label: 'Waived' } :
-                      { cls: 'bg-amber-500/[0.13] text-amber-700 dark:text-amber-400', label: 'Pending' };
+                    const chip = CHECKLIST_STATUS_META[item.status];
+                    const linkedDoc = item.linkedDocumentId ? documents.find(d => d.id === item.linkedDocumentId) : undefined;
                     return (
                       <div key={item.id} className="table-row-hover flex items-center gap-3 px-5 py-2.5 border-t border-gray-100 dark:border-slate-800">
                         <div className="flex-1 min-w-0">
                           <div className="text-[13px] font-semibold text-gray-800 dark:text-slate-200 tracking-tight">{item.label}</div>
                           {item.description && <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{item.description}</div>}
+                          {linkedDoc ? (
+                            <div className="flex items-center gap-1.5 mt-1 text-[11px] text-gray-500 dark:text-slate-400">
+                              <FileText size={11} className="text-gray-400 dark:text-slate-600 flex-shrink-0" />
+                              <button
+                                onClick={() => handleChecklistPreview(linkedDoc)}
+                                title="Open file"
+                                className="truncate max-w-[240px] hover:text-edamame hover:underline text-left"
+                              >
+                                {linkedDoc.fileName}
+                              </button>
+                              <button
+                                onClick={() => handleChecklistUnlink(item)}
+                                title="Remove attached file"
+                                className="text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold text-edamame-600 dark:text-edamame-400 cursor-pointer hover:underline">
+                              <Paperclip size={11} />
+                              Attach file
+                              <input
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png,.docx"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleChecklistUpload(item, file);
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          )}
                         </div>
-                        <button
-                          onClick={() => cycleChecklistStatus(item.id, item.status)}
-                          title="Click to cycle status"
-                          className={`text-[10.5px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap select-none transition-colors ${chip.cls}`}
-                        >
-                          {chip.label} ▾
-                        </button>
+                        <div className="relative flex-shrink-0">
+                          <button
+                            onClick={() => setChecklistStatusMenuId(id => id === item.id ? null : item.id)}
+                            className={`inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap transition-colors ${chip.cls}`}
+                          >
+                            {chip.label}
+                            <ChevronDown size={11} />
+                          </button>
+                          {checklistStatusMenuId === item.id && (
+                            <>
+                              <div className="fixed inset-0 z-30" onClick={() => setChecklistStatusMenuId(null)} />
+                              <div className="absolute right-0 top-full mt-1.5 z-40 w-32 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
+                                {(['pending', 'uploaded', 'verified', 'waived'] as ChecklistItemStatus[]).map(s => (
+                                  <button
+                                    key={s}
+                                    onClick={() => { updateChecklistStatus(item.id, s); setChecklistStatusMenuId(null); }}
+                                    className={`w-full text-left px-3 py-1.5 rounded-lg text-[11.5px] font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors ${item.status === s ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-slate-400'}`}
+                                  >
+                                    {CHECKLIST_STATUS_META[s].label}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
               )}
-              <DocumentUpload caseId={currentCase.id} visaSubclass={visaSubclass} onUpload={() => setDocRefreshKey(k => k + 1)} />
-              <DocumentList caseId={currentCase.id} refreshKey={docRefreshKey} visaSubclass={visaSubclass} />
+              <div>
+                <div className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.08em] mb-2">
+                  {checklist.length > 0 ? 'Other documents' : 'Documents'}
+                </div>
+                <DocumentUpload caseId={currentCase.id} visaSubclass={visaSubclass} onUpload={() => setDocRefreshKey(k => k + 1)} />
+                <div className="mt-3">
+                  <DocumentList
+                    caseId={currentCase.id}
+                    refreshKey={docRefreshKey}
+                    visaSubclass={visaSubclass}
+                    excludeIds={checklist.map(c => c.linkedDocumentId).filter((id): id is string => !!id)}
+                  />
+                </div>
+              </div>
             </div>
           )}
 

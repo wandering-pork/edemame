@@ -1,6 +1,5 @@
 import React from 'react';
-import { FolderOpen, FileText } from 'lucide-react';
-import type { Client, FileTreeNode } from '../../types';
+import type { Client } from '../../types';
 
 export interface RailAlert {
   color: 'red' | 'amber' | 'blue';
@@ -13,25 +12,6 @@ const alertColor: Record<RailAlert['color'], string> = {
   blue: 'text-blue-600 dark:text-blue-400',
 };
 
-const FileTree: React.FC<{ nodes: FileTreeNode[]; depth?: number }> = ({ nodes, depth = 0 }) => (
-  <div className={depth > 0 ? 'pl-3 border-l border-gray-200 dark:border-slate-800 ml-1.5' : ''}>
-    {nodes.map((node, i) => (
-      <div key={i}>
-        <div className="flex items-center gap-1.5 py-0.5 text-[11px] text-gray-500 dark:text-slate-400">
-          {node.kind === 'directory'
-            ? <FolderOpen size={11} className="text-amber-500 flex-shrink-0" />
-            : <FileText size={11} className="text-gray-400 dark:text-slate-600 flex-shrink-0" />}
-          <span className="truncate">{node.name}</span>
-          {node.size != null && (
-            <span className="ml-auto text-gray-400 dark:text-slate-600 text-[10px] flex-shrink-0">{Math.round(node.size / 1024)}KB</span>
-          )}
-        </div>
-        {node.children && node.children.length > 0 && <FileTree nodes={node.children} depth={depth + 1} />}
-      </div>
-    ))}
-  </div>
-);
-
 interface CaseRailProps {
   client: Client;
   applicant?: Client;
@@ -39,7 +19,6 @@ interface CaseRailProps {
   completedCount: number;
   pendingCount: number;
   alerts: RailAlert[];
-  dirTree: FileTreeNode[] | null;
 }
 
 const RailLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -53,7 +32,6 @@ export const CaseRail: React.FC<CaseRailProps> = ({
   completedCount,
   pendingCount,
   alerts,
-  dirTree,
 }) => {
   return (
     <aside className="ed-rail xl:sticky xl:top-4 self-start bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-[18px]">
@@ -115,16 +93,6 @@ export const CaseRail: React.FC<CaseRailProps> = ({
                 {al.text}
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Linked workspace folder (shown only when a folder is linked) */}
-      {dirTree && dirTree.length > 0 && (
-        <div className="mt-3.5 pt-3.5 border-t border-gray-100 dark:border-slate-800">
-          <RailLabel>Workspace</RailLabel>
-          <div className="mt-2 max-h-52 overflow-y-auto custom-scrollbar">
-            <FileTree nodes={dirTree} />
           </div>
         </div>
       )}
