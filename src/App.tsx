@@ -20,44 +20,12 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent } from './types';
-import { getStorageMode, setStorageMode } from './repositories/factory';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-
-function teamStorageKey(userId: string) {
-  return `edamame_team_members_${userId}`;
-}
-
-function activityStorageKey(userId: string) {
-  return `edamame_team_activity_${userId}`;
-}
-
-function loadTeamFromStorage(key: string): TeamMember[] | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveTeamToStorage(key: string, members: TeamMember[]) {
-  try { localStorage.setItem(key, JSON.stringify(members)); } catch { /* ignore */ }
-}
-
-function loadActivityFromStorage(key: string): ActivityEvent[] {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveActivityToStorage(key: string, events: ActivityEvent[]) {
-  try { localStorage.setItem(key, JSON.stringify(events.slice(-200))); } catch { /* ignore */ }
-}
+import { ProfileProvider, useProfile } from './contexts/ProfileContext';
+import { LocalFolderProvider, useLocalFolder } from './contexts/LocalFolderContext';
+import { LinkFolderGate } from './components/LinkFolderGate';
 
 // ---------------------------------------------------------------------------
 // Inner app — has access to repositories and router
@@ -67,49 +35,27 @@ const AppShell: React.FC = () => {
   const repos = useRepositories();
   const { collapsed } = useSidebar();
   const { user } = useAuth();
-  // Safe: AppShell is only ever rendered inside ProtectedRoute, which guarantees a session.
+  const { profile, updateProfile } = useProfile();
+  // Safe: AppShell is only ever rendered inside ProtectedRoute, once a profile exists.
   const currentUserId = user!.id;
-  const teamKey = teamStorageKey(currentUserId);
-  const activityKey = activityStorageKey(currentUserId);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
-  const [theme, setTheme] = useState<Theme>('classic');
+  const theme: Theme = profile?.theme ?? 'classic';
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() => {
-    const fromStorage = loadTeamFromStorage(teamKey);
-    if (fromStorage && fromStorage.length > 0) return fromStorage;
-    const seeded = seedDefaultTeam({
-      id: currentUserId,
-      name: user!.user_metadata?.full_name || user!.email || 'You',
-      email: user!.email || '',
-    });
-    saveTeamToStorage(teamKey, seeded);
-    return seeded;
-  });
-  const [activity, setActivity] = useState<ActivityEvent[]>(() => loadActivityFromStorage(activityKey));
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
 
-  const pushActivity = useCallback((ev: Omit<ActivityEvent, 'id' | 'createdAt'> & { createdAt?: string }) => {
-    setActivity(prev => {
-      const next: ActivityEvent[] = [
-        ...prev,
-        {
-          ...ev,
-          id: uuidv4(),
-          createdAt: ev.createdAt || new Date().toISOString(),
-        },
-      ];
-      saveActivityToStorage(activityKey, next);
-      return next;
+  const pushActivity = useCallback(async (ev: Omit<ActivityEvent, 'id' | 'createdAt'> & { createdAt?: string }) => {
+    const created = await repos.activity.create({
+      ...ev,
+      id: uuidv4(),
+      createdAt: ev.createdAt || new Date().toISOString(),
     });
-  }, [activityKey]);
-
-  // Persist team members whenever they change
-  useEffect(() => {
-    saveTeamToStorage(teamKey, teamMembers);
-  }, [teamKey, teamMembers]);
+    setActivity(prev => [...prev, created]);
+  }, [repos]);
 
   // First-launch backfill: spread any unowned cases/tasks across the seeded team
   // so the Team Dashboard has meaningful distribution on first load.
@@ -138,28 +84,37 @@ const AppShell: React.FC = () => {
     let cancelled = false;
     async function loadData() {
       try {
-        const [t, tpl, cl, cs, notifs] = await Promise.all([
+        const [t, customTemplates, cl, cs, notifs, team, activityEvents] = await Promise.all([
           repos.tasks.getAll(),
           repos.templates.getAll(),
           repos.clients.getAll(),
           repos.cases.getAll(),
           repos.notifications.getAll(),
+          repos.teamMembers.getAll(),
+          repos.activity.getAll(),
         ]);
         if (cancelled) return;
 
-        // Seed default templates if none exist
-        if (tpl.length === 0) {
-          const defaults = seedDefaultTemplates();
-          await Promise.all(defaults.map(d => repos.templates.create(d)));
-          setTemplates(defaults);
-        } else {
-          setTemplates(tpl);
+        // System default templates are hardcoded in-app, never persisted — merge in every load.
+        setTemplates([...seedDefaultTemplates(), ...customTemplates]);
+
+        let resolvedTeam = team;
+        if (resolvedTeam.length === 0) {
+          const seeded = seedDefaultTeam({
+            id: currentUserId,
+            name: user!.user_metadata?.full_name || user!.email || 'You',
+            email: user!.email || '',
+          });
+          await Promise.all(seeded.map(m => repos.teamMembers.create(m)));
+          resolvedTeam = seeded;
         }
 
         setTasks(t);
         setClients(cl);
         setCases(cs);
         setNotifications(notifs);
+        setTeamMembers(resolvedTeam);
+        setActivity(activityEvents);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -168,15 +123,8 @@ const AppShell: React.FC = () => {
     return () => { cancelled = true; };
   }, [repos]);
 
-  // Theme
-  useEffect(() => {
-    const saved = localStorage.getItem('edamame_theme') as Theme;
-    if (saved) setTheme(saved);
-  }, []);
-
   const handleThemeChange = (newTheme: Theme) => {
-    setTheme(newTheme);
-    localStorage.setItem('edamame_theme', newTheme);
+    updateProfile({ theme: newTheme });
   };
 
   // --- Notification Handlers ---
@@ -375,7 +323,8 @@ const AppShell: React.FC = () => {
   }, [repos]);
 
   // --- Team Actions ---
-  const handleAddTeamMember = useCallback((member: TeamMember) => {
+  const handleAddTeamMember = useCallback(async (member: TeamMember) => {
+    await repos.teamMembers.create(member);
     setTeamMembers(prev => [...prev, member]);
     pushActivity({
       type: 'member_added',
@@ -384,20 +333,28 @@ const AppShell: React.FC = () => {
       summary: `${member.name} joined the team as ${member.role}.`,
     });
     toast.success(`${member.name} added to the team`);
-  }, [pushActivity, currentUserId]);
+  }, [repos, pushActivity, currentUserId]);
 
-  const handleUpdateTeamMember = useCallback((member: TeamMember) => {
+  const handleUpdateTeamMember = useCallback(async (member: TeamMember) => {
+    await repos.teamMembers.update(member);
     setTeamMembers(prev => prev.map(m => m.id === member.id ? member : m));
-  }, []);
+  }, [repos]);
 
-  const handleDeleteTeamMember = useCallback((id: string) => {
+  const handleDeleteTeamMember = useCallback(async (id: string) => {
     const member = teamMembers.find(m => m.id === id);
+    await repos.teamMembers.delete(id);
     setTeamMembers(prev => prev.filter(m => m.id !== id));
     // Clear assignments so the UI doesn't orphan-reference the removed id.
-    setCases(prev => prev.map(c => c.caseOwner === id ? { ...c, caseOwner: undefined } : c));
-    setTasks(prev => prev.map(t => t.assignedTo === id ? { ...t, assignedTo: undefined } : t));
+    const clearedCases = cases.map(c => c.caseOwner === id ? { ...c, caseOwner: undefined } : c);
+    const clearedTasks = tasks.map(t => t.assignedTo === id ? { ...t, assignedTo: undefined } : t);
+    await Promise.all([
+      ...clearedCases.filter((c, i) => c !== cases[i]).map(c => repos.cases.update(c)),
+      ...clearedTasks.filter((t, i) => t !== tasks[i]).map(t => repos.tasks.update(t)),
+    ]);
+    setCases(clearedCases);
+    setTasks(clearedTasks);
     if (member) toast.info(`${member.name} removed`);
-  }, [teamMembers]);
+  }, [repos, teamMembers, cases, tasks]);
 
   const handleAssignCase = useCallback(async (caseId: string, newOwnerId: string, note?: string) => {
     const caseItem = cases.find(c => c.id === caseId);
@@ -636,14 +593,70 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
 // Root App — handles onboarding + storage mode + provides context
 // ---------------------------------------------------------------------------
 
-const AppRoutes: React.FC = () => {
-  const [storageMode, setStorageModeState] = useState<StorageMode | null>(getStorageMode());
-  const { user } = useAuth();
+const Spinner: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+    <div className="w-8 h-8 border-2 border-edamame-500 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
-  const handleOnboardingComplete = (mode: StorageMode) => {
-    setStorageMode(mode);
-    setStorageModeState(mode);
+/**
+ * Gates the app shell on two things that live outside the browser now:
+ * the profiles row (which mode + prefs) and, for local mode, an active
+ * folder link (the browser-side permission handle to reconnect to it).
+ */
+const StorageGate: React.FC = () => {
+  const { profile, loading: profileLoading, completeOnboarding } = useProfile();
+  const { status: folderStatus, supported, linkFolder, reconnect } = useLocalFolder();
+
+  const handleOnboardingComplete = async (mode: StorageMode) => {
+    await completeOnboarding(mode);
   };
+
+  if (profileLoading) return <Spinner />;
+
+  if (!profile) {
+    return (
+      <Routes>
+        <Route path="/onboarding" element={<Onboarding onComplete={handleOnboardingComplete} />} />
+        <Route path="*" element={<Navigate to="/onboarding" replace />} />
+      </Routes>
+    );
+  }
+
+  if (profile.storageMode === 'cloud') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+        <p className="text-center text-gray-600 dark:text-gray-400 max-w-sm">
+          Cloud storage isn't available yet. Please choose Local storage for now — you can switch once cloud support ships.
+        </p>
+      </div>
+    );
+  }
+
+  if (folderStatus !== 'ready') {
+    if (folderStatus === 'checking') return <Spinner />;
+    return (
+      <LinkFolderGate
+        status={folderStatus}
+        supported={supported}
+        linkedFolderName={profile.linkedFolderName}
+        onLink={linkFolder}
+        onReconnect={reconnect}
+      />
+    );
+  }
+
+  return (
+    <RepositoryProvider storageMode={profile.storageMode}>
+      <SidebarProvider>
+        <AppShell />
+      </SidebarProvider>
+    </RepositoryProvider>
+  );
+};
+
+const AppRoutes: React.FC = () => {
+  const { user } = useAuth();
 
   return (
     <Routes>
@@ -651,21 +664,12 @@ const AppRoutes: React.FC = () => {
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
       <Route element={<ProtectedRoute />}>
-        <Route path="/onboarding" element={
-          storageMode
-            ? <Navigate to="/dashboard" replace />
-            : <Onboarding onComplete={handleOnboardingComplete} />
-        } />
         <Route path="/*" element={
-          storageMode ? (
-            <RepositoryProvider storageMode={storageMode}>
-              <SidebarProvider>
-                <AppShell />
-              </SidebarProvider>
-            </RepositoryProvider>
-          ) : (
-            <Navigate to="/onboarding" replace />
-          )
+          <ProfileProvider>
+            <LocalFolderProvider>
+              <StorageGate />
+            </LocalFolderProvider>
+          </ProfileProvider>
         } />
       </Route>
     </Routes>

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useProfile } from './ProfileContext';
 
 interface SidebarContextValue {
   collapsed: boolean;
@@ -15,17 +16,16 @@ const SidebarContext = createContext<SidebarContextValue>({
 export const useSidebar = () => useContext(SidebarContext);
 
 export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [collapsed, setCollapsedState] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('edamame_sidebar_collapsed') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const { profile, updateProfile } = useProfile();
+  const [collapsed, setCollapsedState] = useState<boolean>(profile?.sidebarCollapsed ?? false);
+
+  useEffect(() => {
+    if (profile) setCollapsedState(profile.sidebarCollapsed);
+  }, [profile]);
 
   const setCollapsed = (v: boolean) => {
     setCollapsedState(v);
-    try { localStorage.setItem('edamame_sidebar_collapsed', String(v)); } catch { /* ignore */ }
+    updateProfile({ sidebarCollapsed: v });
   };
 
   const toggle = () => setCollapsed(!collapsed);

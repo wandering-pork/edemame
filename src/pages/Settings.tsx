@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Theme } from '../types';
-import { Moon, Sun, Monitor, Save, Check, Palette, LogOut } from 'lucide-react';
+import { Moon, Sun, Monitor, Save, Check, Palette, LogOut, FolderCog, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useProfile } from '@/contexts/ProfileContext';
+import { useLocalFolder } from '@/contexts/LocalFolderContext';
 
 interface SettingsProps {
   currentTheme: Theme;
@@ -14,7 +16,29 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
   const [hasChanges, setHasChanges] = useState(false);
   const [saved, setSaved] = useState(false);
   const { user, signOut } = useAuth();
+  const { profile } = useProfile();
+  const { changeFolder } = useLocalFolder();
+  const [changingFolder, setChangingFolder] = useState(false);
+  const [changeResult, setChangeResult] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const handleChangeFolder = async () => {
+    setChangingFolder(true);
+    setChangeResult(null);
+    try {
+      const result = await changeFolder();
+      if (result.outcome === 'copied') {
+        setChangeResult(`Linked to "${result.folderName}" — your existing data was copied over.`);
+      } else if (result.outcome === 'adopted') {
+        setChangeResult(`Linked to "${result.folderName}" — that folder already had data, so it was adopted as-is.`);
+      }
+    } catch {
+      setChangeResult('Could not access that folder. Please try again.');
+    } finally {
+      setChangingFolder(false);
+      setTimeout(() => setChangeResult(null), 6000);
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -187,6 +211,48 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
             </button>
           </div>
         </div>
+
+        {/* Data Storage section */}
+        {profile?.storageMode === 'local' && (
+          <div className="mt-6 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 dark:text-edamame-400 flex items-center justify-center">
+                <FolderCog size={16} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-gray-900 dark:text-white">Data Storage</h2>
+                <p className="text-xs text-gray-400 dark:text-slate-500">Your clients, cases, and tasks are stored as files in this folder.</p>
+              </div>
+            </div>
+            <div className="p-6 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {profile.linkedFolderName || 'No folder linked'}
+                </p>
+                {profile.linkedAt && (
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+                    Linked {new Date(profile.linkedAt).toLocaleString()}
+                  </p>
+                )}
+                {changeResult && (
+                  <p className="text-xs text-edamame-600 dark:text-edamame-400 mt-1.5 max-w-sm">{changeResult}</p>
+                )}
+              </div>
+              <button
+                onClick={handleChangeFolder}
+                disabled={changingFolder}
+                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 transition-all disabled:opacity-50 flex-shrink-0"
+              >
+                <FolderCog size={15} />
+                {changingFolder ? 'Changing...' : 'Change Folder'}
+              </button>
+            </div>
+            <div className="px-6 pb-5 -mt-2 flex items-start gap-1.5 text-xs text-gray-400 dark:text-slate-500">
+              <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+              <span>If the folder you pick already has Edamame data in it, that data is adopted as-is rather than overwritten.</span>
+            </div>
+          </div>
+        )}
 
         {/* Account section */}
         <div className="mt-6 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">

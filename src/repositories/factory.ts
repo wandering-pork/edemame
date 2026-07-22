@@ -1,21 +1,11 @@
 import type { Repositories } from './types';
 import type { StorageMode } from '../types';
-import { createLocalRepositories } from './local';
+import { createFilesystemRepositories } from './filesystem';
 
-export function createRepositories(mode: StorageMode, userId: string): Repositories {
+export function createRepositories(mode: StorageMode, folderHandle: FileSystemDirectoryHandle | null): Repositories {
   if (mode === 'local') {
-    return createLocalRepositories(userId);
+    if (!folderHandle) throw new Error('Local mode requires a linked folder before repositories can be created.');
+    return createFilesystemRepositories(folderHandle);
   }
-  // Cloud mode - for now, fall back to local until Supabase is configured
-  // This allows the app to work without Supabase credentials
-  console.warn('Cloud mode not yet configured, falling back to local storage');
-  return createLocalRepositories(userId);
-}
-
-export function getStorageMode(): StorageMode | null {
-  return localStorage.getItem('edamame_storage_mode') as StorageMode | null;
-}
-
-export function setStorageMode(mode: StorageMode): void {
-  localStorage.setItem('edamame_storage_mode', mode);
+  throw new Error('Cloud storage is not available yet.');
 }

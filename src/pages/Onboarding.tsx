@@ -4,11 +4,22 @@ import { LogoBrand } from '@/components/LogoBrand';
 import type { StorageMode } from '../types';
 
 interface OnboardingProps {
-  onComplete: (mode: StorageMode) => void;
+  onComplete: (mode: StorageMode) => Promise<void>;
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
   const [selected, setSelected] = useState<StorageMode | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleContinue = async () => {
+    if (!selected || submitting) return;
+    setSubmitting(true);
+    try {
+      await onComplete(selected);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center px-4">
@@ -107,16 +118,16 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         <div className="flex justify-center">
           <button
             type="button"
-            disabled={!selected}
-            onClick={() => selected && onComplete(selected)}
+            disabled={!selected || submitting}
+            onClick={handleContinue}
             className={`px-10 py-3 rounded-xl text-base font-medium transition-all duration-200
               ${
-                selected
+                selected && !submitting
                   ? 'bg-edamame-500 hover:bg-edamame-600 text-white shadow-md hover:shadow-lg cursor-pointer'
                   : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
               }`}
           >
-            Continue
+            {submitting ? 'Continuing...' : 'Continue'}
           </button>
         </div>
 

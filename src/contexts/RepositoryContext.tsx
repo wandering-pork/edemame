@@ -2,7 +2,7 @@ import React, { createContext, useContext, useMemo } from 'react';
 import type { Repositories } from '../repositories/types';
 import { createRepositories } from '../repositories/factory';
 import type { StorageMode } from '../types';
-import { useAuth } from './AuthContext';
+import { useLocalFolder } from './LocalFolderContext';
 
 interface RepositoryContextValue {
   repositories: Repositories;
@@ -11,14 +11,16 @@ interface RepositoryContextValue {
 
 const RepositoryContext = createContext<RepositoryContextValue | null>(null);
 
+/**
+ * Only ever rendered once LocalFolderContext reports status 'ready' (local mode) —
+ * see AppRoutes in App.tsx, which shows the link/reconnect prompt otherwise.
+ */
 export function RepositoryProvider({ children, storageMode }: { children: React.ReactNode; storageMode: StorageMode }) {
-  const { user } = useAuth();
-  // Safe: RepositoryProvider is only ever rendered inside ProtectedRoute, which guarantees a session.
-  const userId = user!.id;
+  const { rootHandle } = useLocalFolder();
   const value = useMemo(() => ({
-    repositories: createRepositories(storageMode, userId),
+    repositories: createRepositories(storageMode, rootHandle),
     storageMode,
-  }), [storageMode, userId]);
+  }), [storageMode, rootHandle]);
 
   return (
     <RepositoryContext.Provider value={value}>
