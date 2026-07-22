@@ -1,17 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
-import { format } from 'date-fns';
 import {
   Plus,
   Pencil,
   Trash2,
-  Mail,
-  Briefcase,
-  CheckCircle2,
-  X,
   Search,
-  ArrowLeft,
+  Users,
+  X,
 } from 'lucide-react';
 import type { Case, Client, Task, TeamMember, TeamMemberRole, TeamMemberStatus } from '../types';
 
@@ -37,10 +32,20 @@ const statusOptions: { value: TeamMemberStatus; label: string }[] = [
   { value: 'offline', label: 'Offline' },
 ];
 
-const statusDot: Record<TeamMemberStatus, string> = {
-  available: 'bg-emerald-500',
-  busy: 'bg-amber-500',
-  offline: 'bg-slate-400',
+const statusStyle: Record<TeamMemberStatus, { dot: string; bg: string; text: string; label: string }> = {
+  available: { dot: '#10B981', bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-[#047857] dark:text-[#4ADE80]', label: 'Available' },
+  busy: { dot: '#F59E0B', bg: 'bg-amber-50 dark:bg-amber-900/20', text: 'text-[#B45309] dark:text-[#FBBF24]', label: 'Busy' },
+  offline: { dot: '#94A3B8', bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-600 dark:text-slate-300', label: 'Offline' },
+};
+
+/** Deterministic 0-360 hue from a string id, for pastel avatar backgrounds — matches Clients/CaseManager. */
+const hueFromId = (id: string): number => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash << 5) - hash + id.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) % 360;
 };
 
 function initialsOf(name: string) {
@@ -54,16 +59,14 @@ function initialsOf(name: string) {
 
 export const TeamMembers: React.FC<TeamMembersProps> = ({
   teamMembers,
-  cases,
-  clients,
+  cases: _cases,
+  clients: _clients,
   tasks,
   onAddMember,
   onUpdateMember,
   onDeleteMember,
 }) => {
-  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(teamMembers[0]?.id ?? null);
   const [editing, setEditing] = useState<TeamMember | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [form, setForm] = useState<{ name: string; email: string; role: TeamMemberRole; status: TeamMemberStatus }>(
@@ -78,17 +81,7 @@ export const TeamMembers: React.FC<TeamMembersProps> = ({
     );
   }, [teamMembers, searchTerm]);
 
-  const selected = teamMembers.find(m => m.id === selectedId) || null;
-
-  const memberCases = useMemo(() => {
-    if (!selected) return [];
-    return cases.filter(c => c.caseOwner === selected.id);
-  }, [cases, selected]);
-
-  const memberTasks = useMemo(() => {
-    if (!selected) return [];
-    return tasks.filter(t => t.assignedTo === selected.id);
-  }, [tasks, selected]);
+  const openTaskCount = (memberId: string) => tasks.filter(t => t.assignedTo === memberId && !t.isCompleted).length;
 
   const openCreate = () => {
     setIsCreating(true);
@@ -126,7 +119,6 @@ export const TeamMembers: React.FC<TeamMembersProps> = ({
         joinedAt: new Date().toISOString(),
       };
       onAddMember(newMember);
-      setSelectedId(newMember.id);
     }
     setEditing(null);
     setIsCreating(false);
@@ -135,211 +127,116 @@ export const TeamMembers: React.FC<TeamMembersProps> = ({
   const handleDelete = (id: string) => {
     onDeleteMember(id);
     setConfirmDeleteId(null);
-    if (selectedId === id) {
-      setSelectedId(teamMembers.find(m => m.id !== id)?.id ?? null);
-    }
   };
 
   const modalOpen = isCreating || !!editing;
 
   return (
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-white dark:bg-slate-900 min-h-screen transition-colors duration-200 page-enter">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[1440px] mx-auto">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <button
-              onClick={() => navigate('/team')}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-edamame-500 transition-colors mb-2"
-            >
-              <ArrowLeft size={14} /> Back to Team Dashboard
-            </button>
-            <h1 className="text-3xl md:text-4xl font-ibm-serif font-bold text-slate-900 dark:text-white mb-2">
+            <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-[-0.035em] text-gray-900 dark:text-slate-100">
               Team Members
             </h1>
-            <p className="text-base text-slate-600 dark:text-slate-400">
-              Add, remove, and update your firm's collaborators
+            <p className="text-[13px] text-gray-500 dark:text-slate-400 mt-1">
+              People with access to this workspace
             </p>
           </div>
           <button
             onClick={openCreate}
-            className="btn-press inline-flex items-center gap-2 bg-edamame-500 hover:bg-edamame-600 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-edamame-500/30 text-sm"
+            className="btn-press focus-ring inline-flex items-center gap-1.5 bg-edamame-500 hover:bg-edamame-700 text-white px-4 py-2.5 rounded-xl font-bold text-[13px] whitespace-nowrap transition-colors"
           >
-            <Plus size={16} /> Add Member
+            <Plus size={16} strokeWidth={1.8} /> Invite
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* List */}
-          <section className="lg:col-span-1">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search members..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 outline-none transition-all text-slate-900 dark:text-white placeholder-slate-400"
-              />
-            </div>
-            <div className="space-y-2">
-              {filtered.map(m => {
-                const isSelected = m.id === selectedId;
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => setSelectedId(m.id)}
-                    className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                      isSelected
-                        ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-900/20 ring-2 ring-edamame-500/20'
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="relative w-11 h-11 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                      {m.avatar || initialsOf(m.name)}
-                      <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${statusDot[m.status]}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900 dark:text-white text-sm truncate">{m.name}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate capitalize">{m.role}</p>
-                    </div>
-                  </button>
-                );
-              })}
-              {filtered.length === 0 && (
-                <p className="text-center text-sm text-slate-500 dark:text-slate-400 py-6">No members found.</p>
-              )}
-            </div>
-          </section>
+        {/* Search */}
+        <div className="relative max-w-xs mt-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" size={16} strokeWidth={1.8} />
+          <input
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Search members..."
+            className="focus-ring w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 focus:border-edamame-500 rounded-xl text-[13px] outline-none transition-colors text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500"
+          />
+        </div>
 
-          {/* Detail */}
-          <section className="lg:col-span-2">
-            {!selected ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-slate-500 dark:text-slate-400">
-                Select a team member to view their details.
+        {/* Table */}
+        <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden mt-5">
+          {/* Table header */}
+          <div className="grid grid-cols-12 gap-3 px-5 py-[11px] bg-gray-50/80 dark:bg-slate-800/60">
+            <div className="col-span-4 text-[9.5px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.11em]">Member</div>
+            <div className="col-span-3 text-[9.5px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.11em]">Role</div>
+            <div className="col-span-2 text-[9.5px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.11em]">Open tasks</div>
+            <div className="col-span-2 text-[9.5px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.11em]">Status</div>
+            <div className="col-span-1 text-right text-[9.5px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.11em]">Actions</div>
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="py-16 text-center border-t border-gray-100 dark:border-slate-800">
+              <div className="flex flex-col items-center gap-3 text-gray-400 dark:text-slate-600">
+                <Users size={32} className="opacity-30" strokeWidth={1.8} />
+                <span className="text-sm">No team members found.</span>
               </div>
-            ) : (
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
-                {/* Header */}
-                <div className="p-6 pb-4 flex items-start gap-5">
-                  <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center font-ibm-serif font-bold text-2xl flex-shrink-0">
-                    {selected.avatar || initialsOf(selected.name)}
-                    <span className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-[3px] border-white dark:border-slate-800 ${statusDot[selected.status]}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-2xl font-ibm-serif font-bold text-slate-900 dark:text-white truncate">
-                      {selected.name}
-                    </h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 capitalize">{selected.role}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Mail size={12} /> {selected.email}
+            </div>
+          ) : (
+            filtered.map(m => {
+              const hue = hueFromId(m.id);
+              const ss = statusStyle[m.status];
+              return (
+                <div key={m.id} className="border-t border-gray-100 dark:border-slate-800/80">
+                  <div className="table-row-hover grid grid-cols-12 gap-3 px-5 py-[13px] items-center hover:bg-gray-50/80 dark:hover:bg-slate-800/40">
+                    <div className="col-span-4 flex items-center gap-2.5 min-w-0">
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0"
+                        style={{ background: `oklch(0.93 0.05 ${hue})`, color: `oklch(0.42 0.12 ${hue})` }}
+                      >
+                        {m.avatar || initialsOf(m.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gray-900 dark:text-white text-[13px] tracking-[-0.01em] truncate">{m.name}</div>
+                        <div className="text-[11px] text-gray-400 dark:text-slate-500 truncate">{m.email}</div>
+                      </div>
+                    </div>
+
+                    <div className="col-span-3 text-[12.5px] text-gray-600 dark:text-slate-300 capitalize">
+                      {roleOptions.find(r => r.value === m.role)?.label || m.role}
+                    </div>
+
+                    <div className="col-span-2 text-[12.5px] text-gray-600 dark:text-slate-300">
+                      {openTaskCount(m.id)}
+                    </div>
+
+                    <div className="col-span-2">
+                      <span className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-[3px] rounded-md ${ss.bg} ${ss.text}`}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: ss.dot }} />
+                        {ss.label}
                       </span>
-                      {selected.joinedAt && (
-                        <span>Joined {format(new Date(selected.joinedAt), 'MMM yyyy')}</span>
-                      )}
+                    </div>
+
+                    <div className="col-span-1 flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => openEdit(m)}
+                        aria-label="Edit member"
+                        className="text-gray-400 dark:text-slate-500 hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors"
+                      >
+                        <Pencil size={14} strokeWidth={1.8} />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(m.id)}
+                        aria-label="Remove member"
+                        className="text-gray-400 dark:text-slate-500 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={14} strokeWidth={1.8} />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => openEdit(selected)}
-                      className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                      aria-label="Edit"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(selected.id)}
-                      className="p-2 rounded-lg border border-rose-200 dark:border-rose-900/50 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
-                      aria-label="Delete"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
                 </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 border-y border-slate-100 dark:border-slate-700">
-                  <div className="p-5 text-center border-r border-slate-100 dark:border-slate-700">
-                    <p className="text-3xl font-ibm-serif font-bold text-slate-900 dark:text-white">{memberCases.length}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mt-1">Cases</p>
-                  </div>
-                  <div className="p-5 text-center border-r border-slate-100 dark:border-slate-700">
-                    <p className="text-3xl font-ibm-serif font-bold text-slate-900 dark:text-white">
-                      {memberTasks.filter(t => !t.isCompleted).length}
-                    </p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mt-1">Open Tasks</p>
-                  </div>
-                  <div className="p-5 text-center">
-                    <p className="text-3xl font-ibm-serif font-bold text-edamame-500">
-                      {memberTasks.filter(t => t.isCompleted).length}
-                    </p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mt-1">Completed</p>
-                  </div>
-                </div>
-
-                {/* Cases list */}
-                <div className="p-6">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2">
-                    <Briefcase size={14} /> Owned Cases
-                  </h3>
-                  {memberCases.length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">No cases assigned.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {memberCases.map(c => {
-                        const client = clients.find(cl => cl.id === c.clientId);
-                        return (
-                          <button
-                            key={c.id}
-                            onClick={() => navigate(`/cases/${c.id}`)}
-                            className="w-full text-left flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-edamame-300 dark:hover:border-edamame-700 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{c.title}</p>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{client?.name || 'Unknown'}</p>
-                            </div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                              {c.status.replace('_', ' ')}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Tasks list */}
-                <div className="px-6 pb-6">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2">
-                    <CheckCircle2 size={14} /> Assigned Tasks
-                  </h3>
-                  {memberTasks.length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">No tasks assigned.</p>
-                  ) : (
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                      {memberTasks.slice(0, 10).map(t => (
-                        <div
-                          key={t.id}
-                          className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700"
-                        >
-                          <CheckCircle2
-                            size={14}
-                            className={t.isCompleted ? 'text-edamame-500' : 'text-slate-300 dark:text-slate-600'}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm truncate ${t.isCompleted ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
-                              {t.title}
-                            </p>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.date}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </section>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -347,43 +244,43 @@ export const TeamMembers: React.FC<TeamMembersProps> = ({
       {modalOpen && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full modal-content">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-xl font-ibm-serif font-bold text-slate-900 dark:text-white">
-                {editing ? 'Edit Member' : 'Add Member'}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                {editing ? 'Edit Member' : 'Invite Member'}
               </h2>
               <button
                 onClick={() => { setEditing(null); setIsCreating(false); }}
-                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Full name</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Full name</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                  className="focus-ring w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white outline-none transition-all"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Email</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Email</label>
                 <input
                   type="email"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                  className="focus-ring w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white outline-none transition-all"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Role</label>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Role</label>
                   <select
                     value={form.role}
                     onChange={e => setForm({ ...form, role: e.target.value as TeamMemberRole })}
-                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                    className="focus-ring w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white outline-none transition-all"
                   >
                     {roleOptions.map(r => (
                       <option key={r.value} value={r.value}>{r.label}</option>
@@ -391,11 +288,11 @@ export const TeamMembers: React.FC<TeamMembersProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Status</label>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Status</label>
                   <select
                     value={form.status}
                     onChange={e => setForm({ ...form, status: e.target.value as TeamMemberStatus })}
-                    className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                    className="focus-ring w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white outline-none transition-all"
                   >
                     {statusOptions.map(s => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -404,19 +301,19 @@ export const TeamMembers: React.FC<TeamMembersProps> = ({
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-6 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 p-6 border-t border-gray-200 dark:border-slate-700">
               <button
                 onClick={() => { setEditing(null); setIsCreating(false); }}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={!form.name.trim() || !form.email.trim()}
-                className="ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg transition-colors"
+                className="btn-press ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
-                {editing ? 'Save changes' : 'Add member'}
+                {editing ? 'Save changes' : 'Send invite'}
               </button>
             </div>
           </div>
@@ -427,20 +324,20 @@ export const TeamMembers: React.FC<TeamMembersProps> = ({
       {confirmDeleteId && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 modal-content">
-            <h2 className="text-lg font-ibm-serif font-bold text-slate-900 dark:text-white mb-2">Remove team member?</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-5">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Remove team member?</h2>
+            <p className="text-sm text-gray-600 dark:text-slate-400 mb-5">
               Their cases and tasks will remain but will lose their owner/assignee.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDeleteId(null)}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(confirmDeleteId)}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-rose-500 hover:bg-rose-600 rounded-lg transition-colors"
+                className="btn-press flex-1 px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
               >
                 Remove
               </button>

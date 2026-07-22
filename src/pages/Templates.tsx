@@ -9,8 +9,23 @@ interface TemplatesProps {
   onDeleteTemplate: (id: string) => void;
 }
 
-// Assign a stable accent color per template based on index
-const accentColors = [
+// Deterministic accent per visa subclass, matching the design handoff's
+// 186 (green/brand), 482 (blue), 490 (purple), 820 (amber) palette.
+// Any subclass not in this map falls back to a stable color chosen by
+// hashing the subclass/title, then cycling through the same palette.
+const subclassAccents: Record<string, { bar: string; icon: string }> = {
+  '186': { bar: 'bg-edamame', icon: 'bg-edamame/10 text-edamame-600 dark:bg-edamame/15 dark:text-edamame-400' },
+  '482': { bar: 'bg-blue-500', icon: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' },
+  '490': { bar: 'bg-violet-500', icon: 'bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400' },
+  '820': { bar: 'bg-amber-500', icon: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
+  '801': { bar: 'bg-amber-500', icon: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
+  '500': { bar: 'bg-rose-500', icon: 'bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' },
+  '600': { bar: 'bg-cyan-500', icon: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400' },
+  '485': { bar: 'bg-teal-500', icon: 'bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400' },
+  '190': { bar: 'bg-indigo-500', icon: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' },
+};
+
+const fallbackAccents = [
   { bar: 'bg-edamame', icon: 'bg-edamame/10 text-edamame-600 dark:bg-edamame/15 dark:text-edamame-400' },
   { bar: 'bg-blue-500', icon: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' },
   { bar: 'bg-violet-500', icon: 'bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400' },
@@ -18,6 +33,22 @@ const accentColors = [
   { bar: 'bg-rose-500', icon: 'bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' },
   { bar: 'bg-cyan-500', icon: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400' },
 ];
+
+const hashString = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+};
+
+const getAccent = (template: WorkflowTemplate, index: number) => {
+  const key = (template.visaSubclass || '').replace(/\D/g, '');
+  if (key && subclassAccents[key]) return subclassAccents[key];
+  const seed = template.visaSubclass || template.title || String(index);
+  return fallbackAccents[hashString(seed) % fallbackAccents.length];
+};
 
 export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, onDeleteTemplate }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -35,26 +66,25 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
   const userTemplates = templates.filter(t => t.userId !== null && t.userId !== undefined);
 
   const TemplateCard = ({ template, index }: { template: WorkflowTemplate; index: number; key?: string }) => {
-    const accent = accentColors[index % accentColors.length];
+    const accent = getAccent(template, index);
     const isSystem = template.userId === null || template.userId === undefined;
     const [stepsOpen, setStepsOpen] = useState(false);
     const steps = template.steps || [];
     return (
-      <div className="card-lift bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden group">
+      <div className="card-lift bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
         {/* Accent top bar */}
         <div className={`h-1 w-full ${accent.bar}`} />
         <div className="p-5">
-          <div className="flex items-start justify-between mb-4">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${accent.icon}`}>
-              <FileText size={18} />
+          <div className="flex items-center justify-between">
+            <div className={`w-[30px] h-[30px] rounded-[9px] flex items-center justify-center flex-shrink-0 ${accent.icon}`}>
+              <FileText size={16} strokeWidth={1.8} />
             </div>
             <div className="flex items-center gap-1.5">
-              {isSystem && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-edamame/8 dark:bg-edamame/12 text-edamame-700 dark:text-edamame-400 uppercase tracking-wider">
+              {isSystem ? (
+                <span className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.1em]">
                   System
                 </span>
-              )}
-              {!isSystem && (
+              ) : (
                 <button
                   onClick={() => onDeleteTemplate(template.id)}
                   className="p-1.5 text-gray-300 dark:text-slate-700 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
@@ -65,41 +95,41 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
               )}
             </div>
           </div>
-          <h3 className="font-bold text-gray-900 dark:text-white text-sm mb-1.5 leading-snug">
+          <h3 className="font-bold text-gray-900 dark:text-white text-[14.5px] tracking-tight mt-3 leading-snug">
             {template.title}
           </h3>
           {template.visaSubclass && (
-            <p className="text-[11px] font-semibold text-gray-400 dark:text-slate-500 mb-2">
+            <p className="text-[11px] font-semibold text-gray-400 dark:text-slate-500 mt-0.5">
               Subclass {template.visaSubclass}
             </p>
           )}
-          <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed line-clamp-3">
+          <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed mt-2 line-clamp-3">
             {template.description}
           </p>
 
           {steps.length > 0 && (
-            <div className="mt-3">
+            <div>
               <button
                 onClick={() => setStepsOpen(v => !v)}
-                className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 dark:text-slate-500 hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors"
+                className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-500 dark:text-slate-400 hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors mt-3.5 select-none"
               >
-                <List size={12} />
+                <List size={13} strokeWidth={1.8} />
                 {steps.length} steps
-                {stepsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                {stepsOpen ? <ChevronUp size={13} strokeWidth={1.8} /> : <ChevronDown size={13} strokeWidth={1.8} />}
               </button>
               {stepsOpen && (
-                <ol className="mt-2 space-y-1.5">
+                <ol className="mt-2.5 border-t border-gray-100 dark:border-slate-800">
                   {steps.map((step, i) => (
-                    <li key={i} className="flex gap-2 text-[11px]">
-                      <span className="flex-shrink-0 w-4 h-4 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 flex items-center justify-center font-bold text-[9px]">
-                        {i + 1}
+                    <li key={i} className="flex gap-2.5 items-baseline py-1.5 border-b border-gray-100 dark:border-slate-800">
+                      <span className="flex-shrink-0 w-4 text-[10px] font-extrabold text-gray-400 dark:text-slate-500">
+                        {String(i + 1).padStart(2, '0')}
                       </span>
-                      <div>
-                        <span className="font-semibold text-gray-700 dark:text-slate-300">{step.title}</span>
+                      <span className="text-xs text-gray-600 dark:text-slate-300 leading-snug">
+                        {step.title}
                         {step.description && (
                           <span className="text-gray-400 dark:text-slate-500"> — {step.description}</span>
                         )}
-                      </div>
+                      </span>
                     </li>
                   ))}
                 </ol>
@@ -115,16 +145,16 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200 page-enter">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-ibm-serif tracking-tight">
+            <h1 className="text-[26px] font-extrabold text-gray-900 dark:text-white font-ibm-serif tracking-tight">
               Workflow Templates
             </h1>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
               Define standard procedures for different visa types.
             </p>
           </div>
-          <div className="flex justify-end">
+          <div className="flex sm:justify-end">
             <button
               onClick={() => setIsEditing(!isEditing)}
               className="btn-press flex items-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm whitespace-nowrap"
@@ -202,12 +232,13 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
       {/* System templates */}
       {systemTemplates.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span className="w-4 h-px bg-gray-300 dark:bg-slate-700" />
-            Built-in Templates
-            <span className="flex-1 h-px bg-gray-100 dark:bg-slate-800" />
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex items-center gap-2.5 mb-3">
+            <span className="w-[22px] h-px bg-gray-300 dark:bg-slate-700" />
+            <span className="text-[9.5px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.12em]">
+              Built-in Templates
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {systemTemplates.map((template, i) => (
               <TemplateCard key={template.id} template={template} index={i} />
             ))}
@@ -218,12 +249,13 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
       {/* User templates */}
       {userTemplates.length > 0 && (
         <div>
-          <h2 className="text-xs font-bold text-gray-400 dark:text-slate-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span className="w-4 h-px bg-gray-300 dark:bg-slate-700" />
-            Custom Templates
-            <span className="flex-1 h-px bg-gray-100 dark:bg-slate-800" />
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex items-center gap-2.5 mb-3">
+            <span className="w-[22px] h-px bg-gray-300 dark:bg-slate-700" />
+            <span className="text-[9.5px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.12em]">
+              Custom Templates
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {userTemplates.map((template, i) => (
               <TemplateCard key={template.id} template={template} index={i + systemTemplates.length} />
             ))}

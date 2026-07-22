@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from '
 import { Toaster, toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { Sidebar } from './components/Sidebar';
-import { NotificationBell } from './components/NotificationBell';
+import { Header } from './components/Header';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RepositoryProvider, useRepositories } from './contexts/RepositoryContext';
 import { Dashboard } from './pages/Dashboard';
@@ -415,16 +415,18 @@ const AppShell: React.FC = () => {
       <Toaster position="top-right" richColors theme={theme === 'dark' ? 'dark' : 'light'} />
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 font-sans text-gray-900 dark:text-gray-100 transition-colors duration-200">
         <Sidebar />
-        {/* Notification bell — fixed top-right, clear of the 256px sidebar */}
-        <div className="fixed top-4 right-4 z-30">
-          <NotificationBell
+        <div className={`${collapsed ? 'md:ml-16' : 'md:ml-[240px]'} min-w-0 transition-[margin-left] duration-300 ease-in-out`}>
+          <Header
+            theme={theme}
+            onThemeChange={handleThemeChange}
+            userName={user!.user_metadata?.full_name || ''}
+            userEmail={user!.email || ''}
             notifications={notifications}
             onMarkAsRead={handleMarkAsRead}
             onMarkAllAsRead={handleMarkAllAsRead}
-            onDelete={handleDeleteNotification}
+            onDeleteNotification={handleDeleteNotification}
           />
-        </div>
-        <main className={`${collapsed ? 'md:ml-16' : 'md:ml-64'} min-w-0 transition-[margin-left] duration-300 ease-in-out`}>
+          <main>
           <Routes>
             <Route path="/dashboard" element={
               <Dashboard
@@ -514,7 +516,8 @@ const AppShell: React.FC = () => {
             } />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
-        </main>
+          </main>
+        </div>
       </div>
     </div>
   );

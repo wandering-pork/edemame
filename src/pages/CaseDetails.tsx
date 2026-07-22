@@ -6,43 +6,28 @@ import { DocumentUpload } from '../components/DocumentUpload';
 import { DocumentList } from '../components/DocumentList';
 import { PdfPackager } from '../components/PdfPackager';
 import { BundleBuilder820 } from '../components/BundleBuilder820';
+import { CaseRail, RailAlert } from '../components/case-details/CaseRail';
+import { AgentPanel } from '../components/case-details/AgentPanel';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Calendar,
   CheckCircle2,
-  Clock,
-  FileText,
-  User,
-  Mail,
-  Phone,
-  MapPin,
   AlertCircle,
   Plus,
   Trash2,
   Edit2,
   Check,
   RotateCcw,
-  Triangle,
   X,
   Save,
-  FolderOpen,
-  Users,
-  ClipboardList,
-  MessageSquare,
-  Send,
-  Loader2,
   ChevronDown,
-  ChevronUp,
-  ChevronLeft,
-  ChevronRight,
-  Circle,
-  Brain,
-  Package,
-  Layers,
-  PanelRightClose,
-  PanelRightOpen,
+  Sparkles,
+  PenLine,
+  ShieldCheck,
+  MoreHorizontal,
+  MoreVertical,
   ArrowLeft,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -62,65 +47,10 @@ interface CaseDetailsProps {
 }
 
 // ---------------------------------------------------------------------------
-// Helper components
+// Helpers
 // ---------------------------------------------------------------------------
 
-const InsightRow: React.FC<{ icon: React.ReactNode; color: string; text: string }> = ({ icon, color, text }) => {
-  const colorMap: Record<string, string> = {
-    red: 'text-red-500 dark:text-red-400',
-    amber: 'text-amber-500 dark:text-amber-400',
-    blue: 'text-blue-500 dark:text-blue-400',
-    green: 'text-green-500 dark:text-green-400',
-    gray: 'text-gray-400 dark:text-slate-500',
-  };
-  return (
-    <div className={`flex items-start gap-2 text-xs ${colorMap[color] || colorMap.gray}`}>
-      <span className="flex-shrink-0 mt-px">{icon}</span>
-      <span className="text-gray-600 dark:text-slate-300">{text}</span>
-    </div>
-  );
-};
-
-const ChatBubble: React.FC<{ message: FocusChatMessage }> = ({ message }) => {
-  const isUser = message.role === 'user';
-  return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-        isUser
-          ? 'bg-edamame text-white rounded-br-sm'
-          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-sm'
-      }`}>
-        <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-        <p className={`text-[10px] mt-1 ${isUser ? 'text-white/50' : 'text-gray-400 dark:text-gray-600'}`}>
-          {format(new Date(message.createdAt), 'HH:mm')}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-const FileTreeView: React.FC<{ nodes: FileTreeNode[]; depth?: number }> = ({ nodes, depth = 0 }) => {
-  return (
-    <div className={depth > 0 ? 'pl-3 border-l border-gray-200 dark:border-gray-800 ml-1.5' : ''}>
-      {nodes.map((node, i) => (
-        <div key={i}>
-          <div className="flex items-center gap-1.5 py-0.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
-            {node.kind === 'directory' ? (
-              <FolderOpen size={11} className="text-amber-500 flex-shrink-0" />
-            ) : (
-              <FileText size={11} className="text-gray-400 dark:text-gray-600 flex-shrink-0" />
-            )}
-            <span className="truncate">{node.name}</span>
-            {node.size && <span className="ml-auto text-gray-400 dark:text-gray-600 text-[10px] flex-shrink-0">{Math.round(node.size / 1024)}KB</span>}
-          </div>
-          {node.children && node.children.length > 0 && (
-            <FileTreeView nodes={node.children} depth={depth + 1} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-};
+const AGENT_CHIPS = ['Draft consultation checklist', 'Document request email', 'Summarise eligibility'];
 
 async function buildFileTree(handle: FileSystemDirectoryHandle, depth = 0): Promise<FileTreeNode[]> {
   if (depth > 3) return [];
@@ -174,15 +104,15 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // ---- Tab state ----
   const [activeTab, setActiveTab] = useState<'tasks' | 'documents' | 'notes'>('tasks');
 
-  // ---- Left panel collapse state ----
-  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  // ---- Top-bar menu state ----
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
-  // ---- Right panel (chat) state ----
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  // ---- Agent panel state (closed by default per design) ----
+  const [agentOpen, setAgentOpen] = useState(false);
 
   // ---- Document checklist state ----
   const [checklist, setChecklist] = useState<DocumentChecklistItem[]>([]);
-  const [checklistOpen, setChecklistOpen] = useState(false);
 
   // ---- Documents state ----
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -222,13 +152,21 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const passportExpiry = client.passportExpiry ? new Date(client.passportExpiry) : null;
   const daysToPassportExpiry = passportExpiry ? Math.floor((passportExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
   const uploadedCount = checklist.filter(c => c.status === 'uploaded' || c.status === 'verified').length;
+  const overdueCount = pendingTasks.filter(t => new Date(t.date) < new Date()).length;
+  const outstandingDocs = checklist.length > 0 ? checklist.length - uploadedCount : 0;
 
-  const statusConfig: Record<CaseStatus, { label: string; color: string; bg: string }> = {
-    open: { label: 'Open', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-    in_progress: { label: 'In Progress', color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-    on_hold: { label: 'On Hold', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30' },
-    closed: { label: 'Closed', color: 'text-green-700 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30' },
+  const STATUS_META: Record<CaseStatus, { label: string; chip: string; dot: string }> = {
+    open: { label: 'Open', chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+    in_progress: { label: 'In Progress', chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+    on_hold: { label: 'On Hold', chip: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
+    closed: { label: 'Closed', chip: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300', dot: 'bg-green-500' },
   };
+
+  // Rail alerts (overdue red, docs outstanding amber, passport expiry red)
+  const railAlerts: RailAlert[] = [];
+  if (overdueCount > 0) railAlerts.push({ color: 'red', text: `${overdueCount} overdue task${overdueCount !== 1 ? 's' : ''}` });
+  if (outstandingDocs > 0) railAlerts.push({ color: 'amber', text: `${outstandingDocs} doc${outstandingDocs !== 1 ? 's' : ''} outstanding` });
+  if (daysToPassportExpiry !== null && daysToPassportExpiry < 90) railAlerts.push({ color: 'red', text: `Passport expires in ${daysToPassportExpiry}d` });
 
   // ---- Effects ----
 
@@ -541,651 +479,407 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   const handleSkillAction = (msg: string) => {
     setChatInput(msg);
-    if (!rightPanelOpen) setRightPanelOpen(true);
+    if (!agentOpen) setAgentOpen(true);
   };
 
-  // ---- Render ----
-  return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-slate-950">
+  // ---- Top-bar action handlers ----
+  const handleEligibility = () => {
+    navigate(`/visa-advisor?clientId=${client.id}`);
+  };
 
-      {/* ══════════════════════════════════════════
-          PAGE HEADER — spans full width
-      ══════════════════════════════════════════ */}
-      <header className="flex-shrink-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 z-10">
-        {/* Top row: breadcrumb + title + actions */}
-        <div className="flex items-center gap-3 pl-5 pr-14 py-3">
-          {/* Back */}
-          <button
-            onClick={onBack}
-            className="group flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors flex-shrink-0"
-          >
-            <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
-            <span className="hidden sm:inline">Cases</span>
-          </button>
+  const handleRunCrusher = () => {
+    setMoreOpen(false);
+    if (SUPPORTED_SUBCLASSES.includes(visaSubclass || '')) setShowPackager(true);
+  };
 
-          <span className="text-gray-200 dark:text-slate-700 select-none">/</span>
+  // ---- Task row completion toggle ----
+  const toggleTaskComplete = (task: Task) => {
+    onUpdateTask({ ...task, isCompleted: !task.isCompleted });
+  };
 
-          {/* Case title + ID */}
-          <div className="flex-1 min-w-0 flex items-center gap-2.5">
-            <h1 className="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight">
-              {currentCase.title}
-            </h1>
-            <span className="hidden sm:inline-flex flex-shrink-0 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500 tracking-wider">
-              #{currentCase.id.slice(0, 8).toUpperCase()}
-            </span>
-            {visaSubclass && (
-              <span className="hidden md:inline-flex flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400 tracking-wide">
-                SC-{visaSubclass}
-              </span>
-            )}
+  // ---- Task row renderer (shared by pending + completed lists) ----
+  const rowMenuCls = 'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors';
+
+  const renderTaskRow = (task: Task, isCompleted: boolean) => {
+    const overdue = !isCompleted && new Date(task.date) < new Date();
+    const editing = editingDate?.taskId === task.id;
+    return (
+      <div key={task.id} className="task-card group relative flex items-center gap-3 px-[18px] py-3 border-b border-gray-100 dark:border-slate-800 last:border-b-0">
+        {/* Left edge — red when overdue */}
+        <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${overdue ? 'bg-red-500' : 'bg-transparent'}`} />
+
+        {/* Circular checkbox — direct toggle */}
+        <button
+          onClick={() => toggleTaskComplete(task)}
+          title={isCompleted ? 'Mark as pending' : 'Mark as complete'}
+          className={`check-btn w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+            isCompleted
+              ? 'bg-edamame border-[1.5px] border-edamame'
+              : 'border-[1.5px] border-gray-300 dark:border-slate-600 hover:border-edamame'
+          }`}
+        >
+          {isCompleted && <Check size={11} className="text-white" strokeWidth={3} />}
+        </button>
+
+        {/* Title + description */}
+        <div className="flex-1 min-w-0">
+          <div className={`text-[13.5px] font-semibold tracking-tight leading-snug ${isCompleted ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-900 dark:text-white'}`}>
+            {task.title}
           </div>
-
-          {/* Status selector */}
-          <select
-            value={currentCase.status}
-            onChange={(e) => handleStatusChange(e.target.value as CaseStatus)}
-            className={`flex-shrink-0 text-xs font-bold px-2.5 py-1.5 rounded-lg border-0 outline-none cursor-pointer transition-colors ${
-              currentCase.status === 'open' ? 'bg-blue-100 dark:bg-blue-800/70 text-blue-700 dark:text-blue-200' :
-              currentCase.status === 'in_progress' ? 'bg-amber-100 dark:bg-amber-800/70 text-amber-700 dark:text-amber-200' :
-              currentCase.status === 'on_hold' ? 'bg-orange-100 dark:bg-orange-800/70 text-orange-700 dark:text-orange-200' :
-              'bg-green-100 dark:bg-green-800/70 text-green-700 dark:text-green-200'
-            }`}
-          >
-            <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
-            <option value="on_hold">On Hold</option>
-            <option value="closed">Closed</option>
-          </select>
-
-          {/* AI tool buttons */}
-          <div className="flex items-center gap-1 border-l border-gray-100 dark:border-slate-800 pl-3 ml-0.5">
-            <button
-              onClick={() => handleSkillAction('Please help me draft a cover letter for this immigration case.')}
-              title="Draft Document"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-800/60 text-blue-600 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-700/70 transition-colors"
-            >
-              <FileText size={12} />
-              <span className="hidden lg:inline">Draft</span>
-            </button>
-            <button
-              onClick={() => handleSkillAction('Please analyse the current eligibility position for this case and flag any risks.')}
-              title="Check Eligibility"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-50 dark:bg-violet-800/60 text-violet-600 dark:text-violet-200 hover:bg-violet-100 dark:hover:bg-violet-700/70 transition-colors"
-            >
-              <Brain size={12} />
-              <span className="hidden lg:inline">Eligibility</span>
-            </button>
-            <button
-              onClick={() => handleSkillAction(`Which documents are still outstanding for this ${visaSubclass ? `Subclass ${visaSubclass}` : 'visa'} case?`)}
-              title="Check Documents"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 dark:bg-amber-800/60 text-amber-600 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-700/70 transition-colors"
-            >
-              <ClipboardList size={12} />
-              <span className="hidden lg:inline">Docs</span>
-            </button>
-            <button
-              onClick={() => { if (SUPPORTED_SUBCLASSES.includes(visaSubclass || '')) setShowPackager(true); }}
-              disabled={!SUPPORTED_SUBCLASSES.includes(visaSubclass || '')}
-              title="5MB Crusher"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                SUPPORTED_SUBCLASSES.includes(visaSubclass || '')
-                  ? 'bg-edamame/10 dark:bg-edamame/25 text-edamame-700 dark:text-edamame-200 hover:bg-edamame/20 dark:hover:bg-edamame/35'
-                  : 'bg-gray-50 dark:bg-slate-800/50 text-gray-300 dark:text-slate-700 cursor-not-allowed'
-              }`}
-            >
-              <Package size={12} />
-              {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && <span className="hidden lg:inline">Crusher</span>}
-            </button>
-            {visaSubclass === '820' && (
-              <button
-                onClick={() => setShowBundleBuilder(true)}
-                title="Build 820 Submission Bundle — per-slot PDFs for ImmiAccount"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-50 dark:bg-violet-800/60 text-violet-600 dark:text-violet-200 hover:bg-violet-100 dark:hover:bg-violet-700/70 transition-colors"
-              >
-                <Layers size={12} />
-                <span className="hidden lg:inline">820 Bundle</span>
-              </button>
-            )}
-          </div>
-
-          {/* Add Task + Agent toggle */}
-          <button
-            onClick={() => handleOpenTaskModal()}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-edamame hover:bg-edamame-600 text-white font-semibold rounded-lg text-xs shadow-sm shadow-edamame/20 transition-all"
-          >
-            <Plus size={13} />
-            Add Task
-          </button>
-          <button
-            onClick={() => setRightPanelOpen(v => !v)}
-            title={rightPanelOpen ? 'Close agent' : 'Open agent'}
-            className={`flex-shrink-0 p-1.5 rounded-lg transition-colors ${rightPanelOpen ? 'bg-edamame/10 text-edamame dark:text-edamame-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'}`}
-          >
-            {rightPanelOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
-          </button>
-        </div>
-      </header>
-
-      {/* ══════════════════════════════════════════
-          BODY — three columns
-      ══════════════════════════════════════════ */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-
-        {/* ── LEFT PANEL ── */}
-        <div className={`flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out hidden lg:flex ${leftPanelCollapsed ? 'w-12' : 'w-64'}`}>
-          {leftPanelCollapsed ? (
-            /* Icon rail */
-            <div className="flex flex-col items-center pt-3 gap-1 h-full">
-              <button onClick={() => setLeftPanelCollapsed(false)} title="Expand" className="p-2 text-gray-300 dark:text-slate-700 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-                <ChevronRight size={14} />
-              </button>
-              <div className="w-7 h-7 rounded-full bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center text-edamame text-[10px] font-black flex-shrink-0 mt-1" title={client.name}>
-                {client.name.charAt(0)}
-              </div>
-              <button onClick={() => setLeftPanelCollapsed(false)} title={`Progress: ${progress}%`} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors mt-1 relative">
-                <svg width="22" height="22" viewBox="0 0 22 22">
-                  <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-200 dark:text-gray-700" />
-                  <circle cx="11" cy="11" r="8" fill="none" stroke="#29B767" strokeWidth="2" strokeLinecap="round"
-                    strokeDasharray={`${(progress / 100) * 50.3} 50.3`} transform="rotate(-90 11 11)"
-                    style={{ transition: 'stroke-dasharray 0.5s ease' }} />
-                </svg>
-                <span className="absolute inset-0 flex items-center justify-center text-[7px] font-black text-gray-500 dark:text-slate-400 pointer-events-none">{progress}%</span>
-              </button>
-              {(hasOverdue || (daysToPassportExpiry !== null && daysToPassportExpiry < 90)) && (
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-0.5" title="Alerts" />
-              )}
-              <div className="flex-1" />
-              <button onClick={() => { setCaseEditForm({ title: currentCase.title, description: currentCase.description }); setIsEditingCase(true); }} title="Edit Case" className="p-2 text-gray-300 dark:text-slate-700 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors mb-1">
-                <Edit2 size={13} />
-              </button>
-              <button onClick={() => setShowDeleteConfirm(true)} title="Delete" className="p-2 text-red-300 dark:text-red-900 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors mb-2">
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ) : (
-            /* Full panel */
-            <div className="flex flex-col h-full overflow-hidden">
-              {/* Panel header */}
-              <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-100 dark:border-slate-800 flex-shrink-0">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-slate-500">Case Info</span>
-                <button onClick={() => setLeftPanelCollapsed(true)} className="p-1 text-gray-300 dark:text-slate-700 hover:text-gray-500 dark:hover:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-                  <ChevronLeft size={13} />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {/* Client block */}
-                <div className="px-4 py-4 border-b border-gray-100 dark:border-slate-800">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-full bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center text-edamame font-black text-sm flex-shrink-0">
-                      {client.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-bold text-gray-900 dark:text-white truncate">{client.name}</div>
-                      <div className="text-[10px] text-gray-400 dark:text-slate-500">DOB: {client.dob}</div>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-slate-400">
-                      <Mail size={10} className="flex-shrink-0 text-gray-300 dark:text-slate-600" />{client.email}
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-slate-400">
-                      <Phone size={10} className="flex-shrink-0 text-gray-300 dark:text-slate-600" />{client.phone}
-                    </div>
-                  </div>
-                  {applicant && applicant.id !== client.id && (
-                    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-800">
-                      <div className="text-[9px] font-bold uppercase tracking-widest text-edamame-500 dark:text-edamame-400 mb-1.5">Applicant</div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/20 flex items-center justify-center text-violet-600 dark:text-violet-400 font-black text-[10px] flex-shrink-0">
-                          {applicant.name.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 truncate">{applicant.name}</div>
-                          <div className="text-[10px] text-gray-400 dark:text-slate-500">DOB: {applicant.dob}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Progress */}
-                <div className="px-4 py-4 border-b border-gray-100 dark:border-slate-800">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-slate-500">Progress</span>
-                    <span className="text-xs font-bold text-edamame-600 dark:text-edamame-400">{progress}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-edamame rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
-                  </div>
-                  <div className="mt-1.5 flex justify-between text-[10px] text-gray-400 dark:text-slate-600">
-                    <span>{completedTasks.length} done</span>
-                    <span>{pendingTasks.length} pending</span>
-                  </div>
-                </div>
-
-                {/* AI Insights — compact alert list */}
-                {(hasOverdue || (daysToPassportExpiry !== null && daysToPassportExpiry < 90) || (checklist.length > 0 && uploadedCount < checklist.length)) && (
-                  <div className="px-4 py-4 border-b border-gray-100 dark:border-slate-800">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-2.5 flex items-center gap-1.5">
-                      <Brain size={10} />
-                      Alerts
-                    </div>
-                    <div className="space-y-1.5">
-                      {daysToPassportExpiry !== null && daysToPassportExpiry < 90 && (
-                        <div className="flex items-start gap-2 text-[11px]">
-                          <AlertCircle size={10} className="text-red-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-600 dark:text-slate-400 leading-snug">Passport expires in {daysToPassportExpiry}d</span>
-                        </div>
-                      )}
-                      {hasOverdue && (
-                        <div className="flex items-start gap-2 text-[11px]">
-                          <Clock size={10} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-600 dark:text-slate-400 leading-snug">{pendingTasks.filter(t => new Date(t.date) < new Date()).length} overdue task(s)</span>
-                        </div>
-                      )}
-                      {checklist.length > 0 && uploadedCount < checklist.length && (
-                        <div className="flex items-start gap-2 text-[11px]">
-                          <ClipboardList size={10} className="text-blue-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-600 dark:text-slate-400 leading-snug">{checklist.length - uploadedCount} doc(s) outstanding</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Expandable: Checklist */}
-                {checklist.length > 0 && (
-                  <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
-                    <button
-                      onClick={() => setChecklistOpen(v => !v)}
-                      className="w-full flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
-                    >
-                      <span className="flex items-center gap-1.5"><ClipboardList size={10} />Docs {uploadedCount}/{checklist.length}</span>
-                      {checklistOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                    </button>
-                    {checklistOpen && (
-                      <div className="mt-2.5 space-y-1.5">
-                        {checklist.map(item => (
-                          <div key={item.id} className="flex items-center gap-2">
-                            <button onClick={() => cycleChecklistStatus(item.id, item.status)} className="flex-shrink-0">
-                              {item.status === 'uploaded' || item.status === 'verified'
-                                ? <CheckCircle2 size={12} className="text-green-500" />
-                                : <Circle size={12} className="text-gray-300 dark:text-gray-700" />}
-                            </button>
-                            <span className={`text-[11px] truncate leading-snug ${item.status === 'uploaded' || item.status === 'verified' ? 'text-gray-400 line-through' : 'text-gray-600 dark:text-slate-400'}`}>
-                              {item.label}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Workspace */}
-                <div className="px-4 py-3">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-2 flex items-center gap-1.5">
-                    <FolderOpen size={10} />Workspace
-                  </div>
-                  {dirTree ? <FileTreeView nodes={dirTree} /> : (
-                    <button onClick={pickDirectory} className="w-full text-[11px] text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 border border-dashed border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 transition-colors hover:border-gray-300 dark:hover:border-slate-600 text-left">
-                      {('showDirectoryPicker' in window) ? '+ Link local folder' : 'Not supported'}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Edit / Delete */}
-              <div className="px-4 py-3 border-t border-gray-100 dark:border-slate-800 flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => { setCaseEditForm({ title: currentCase.title, description: currentCase.description }); setIsEditingCase(true); }}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-600 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                >
-                  <Edit2 size={12} />Edit
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                >
-                  <Trash2 size={12} />Delete
-                </button>
-              </div>
-            </div>
+          {task.description && !isCompleted && (
+            <div className="text-[11.5px] text-gray-400 dark:text-slate-500 mt-0.5 truncate">{task.description}</div>
           )}
         </div>
 
-        {/* ── CENTER PANEL ── */}
-        <div className="flex-1 min-w-0 flex flex-col bg-white dark:bg-slate-950 overflow-hidden">
+        {/* Due date — click to reschedule */}
+        {editing ? (
+          <input
+            type="date"
+            autoFocus
+            value={editingDate!.date}
+            onChange={(e) => handleDateChange(task.id, e.target.value)}
+            onBlur={() => handleDateBlur(task.id)}
+            className="text-[11.5px] font-semibold bg-transparent border border-gray-200 dark:border-slate-700 rounded-md px-1.5 py-0.5 outline-none focus:border-edamame text-gray-700 dark:text-slate-300"
+          />
+        ) : (
+          <button
+            onClick={() => { if (!isCompleted) setEditingDate({ taskId: task.id, date: task.date }); }}
+            disabled={isCompleted}
+            className={`text-[11.5px] font-bold whitespace-nowrap flex-shrink-0 ${
+              overdue ? 'text-red-600 dark:text-red-400' : isCompleted ? 'text-gray-300 dark:text-slate-600' : 'text-gray-500 dark:text-slate-400 hover:text-edamame'
+            }`}
+          >
+            {format(new Date(task.date), 'MMM d')}
+          </button>
+        )}
 
-          {/* Tab bar */}
-          <div className="flex-shrink-0 px-6 bg-white dark:bg-slate-950 border-b border-gray-100 dark:border-slate-800">
-            <div className="flex gap-0">
-              {[
-                { id: 'tasks', label: 'Tasks', icon: ClipboardList, count: pendingTasks.length },
-                { id: 'documents', label: 'Documents', icon: FolderOpen, count: checklist.length > 0 ? checklist.length - uploadedCount : 0 },
-                { id: 'notes', label: 'Notes', icon: FileText, count: 0 },
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
-                    activeTab === tab.id
-                      ? 'border-edamame text-gray-900 dark:text-white'
-                      : 'border-transparent text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
-                  }`}
-                >
-                  <tab.icon size={14} />
-                  {tab.label}
-                  {tab.count > 0 && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-600'}`}>
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Tab content */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-
-            {activeTab === 'tasks' && (
-              <div className="max-w-3xl mx-auto px-6 py-6 space-y-8">
-
-                {/* Pending Tasks */}
-                <section>
-                  <div className="flex items-center gap-3 mb-4">
-                    <h2 className="text-sm font-bold text-gray-900 dark:text-white">Pending</h2>
-                    <span className="text-xs text-gray-400 dark:text-slate-500">{pendingTasks.length} tasks</span>
-                    {hasOverdue && (
-                      <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400">
-                        {pendingTasks.filter(t => new Date(t.date) < new Date()).length} overdue
-                      </span>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    {pendingTasks.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-gray-200 dark:border-slate-800 p-10 text-center">
-                        <CheckCircle2 size={28} className="mx-auto mb-2 text-gray-200 dark:text-slate-700" />
-                        <p className="text-sm text-gray-400 dark:text-slate-500">All tasks completed</p>
-                      </div>
-                    ) : (
-                      pendingTasks.map(task => {
-                        const isOverdue = new Date(task.date) < new Date();
-                        return (
-                          <div
-                            key={task.id}
-                            className={`group relative bg-white dark:bg-slate-900 rounded-xl border transition-all hover:shadow-sm ${
-                              isOverdue
-                                ? 'border-red-200 dark:border-red-900/40 hover:border-red-300 dark:hover:border-red-800'
-                                : 'border-gray-100 dark:border-slate-800 hover:border-gray-200 dark:hover:border-slate-700'
-                            }`}
-                          >
-                            {/* Left accent stripe */}
-                            <div className={`absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full ${isOverdue ? 'bg-red-400' : 'bg-gray-200 dark:bg-slate-700 group-hover:bg-edamame/50'} transition-colors`} />
-
-                            <div className="flex items-center gap-3 px-4 py-3.5 pl-5">
-                              {/* Action button */}
-                              <div className="relative flex-shrink-0">
-                                <button
-                                  onClick={() => setActiveDropdown(activeDropdown === task.id ? null : task.id)}
-                                  className="w-5 h-5 rounded-full border-2 border-gray-200 dark:border-slate-600 hover:border-edamame dark:hover:border-edamame transition-colors flex items-center justify-center group/check"
-                                >
-                                  <Check size={10} className="text-transparent group-hover/check:text-edamame transition-colors" />
-                                </button>
-                                {activeDropdown === task.id && (
-                                  <>
-                                    <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
-                                    <div className="absolute left-0 top-full mt-1.5 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 py-1 z-20">
-                                      <button onClick={() => { onUpdateTask({ ...task, isCompleted: true }); setActiveDropdown(null); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
-                                        <Check size={14} className="text-green-500" />Mark Complete
-                                      </button>
-                                      <button onClick={() => { handleSetToday(task.id); setActiveDropdown(null); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
-                                        <Calendar size={14} className="text-edamame" />Set to Today
-                                      </button>
-                                      <div className="h-px bg-gray-100 dark:bg-slate-800 my-1" />
-                                      <button onClick={() => handleOpenTaskModal(task)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
-                                        <Edit2 size={14} className="text-blue-400" />Edit
-                                      </button>
-                                      <button onClick={() => { onDeleteTask(task.id); setActiveDropdown(null); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                                        <Trash2 size={14} />Delete
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-
-                              {/* Content */}
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-semibold text-gray-900 dark:text-white leading-snug">{task.title}</div>
-                                {task.description && (
-                                  <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 truncate">{task.description}</div>
-                                )}
-                              </div>
-
-                              {/* Date */}
-                              <div className="flex-shrink-0 text-right">
-                                <input
-                                  type="date"
-                                  value={editingDate?.taskId === task.id ? editingDate.date : task.date}
-                                  onChange={(e) => handleDateChange(task.id, e.target.value)}
-                                  onBlur={() => handleDateBlur(task.id)}
-                                  className={`text-xs font-medium bg-transparent border-none rounded-lg px-2 py-1 focus:ring-2 focus:ring-edamame outline-none transition-colors ${isOverdue ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </section>
-
-                {/* Completed Tasks */}
-                {completedTasks.length > 0 && (
-                  <section>
-                    <div className="flex items-center gap-3 mb-4">
-                      <h2 className="text-sm font-bold text-gray-500 dark:text-slate-500">Completed</h2>
-                      <span className="text-xs text-gray-300 dark:text-slate-600">{completedTasks.length} tasks</span>
-                    </div>
-                    <div className="space-y-1.5 opacity-60">
-                      {completedTasks.map(task => (
-                        <div key={task.id} className="group relative bg-gray-50 dark:bg-slate-900/50 rounded-xl border border-gray-100 dark:border-slate-800/50">
-                          <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-green-400/50" />
-                          <div className="flex items-center gap-3 px-4 py-3 pl-5">
-                            <div className="relative flex-shrink-0">
-                              <button
-                                onClick={() => setActiveDropdown(activeDropdown === task.id ? null : task.id)}
-                                className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-700 flex items-center justify-center"
-                              >
-                                <Check size={10} className="text-green-500 dark:text-green-400" />
-                              </button>
-                              {activeDropdown === task.id && (
-                                <>
-                                  <div className="fixed inset-0 z-10" onClick={() => setActiveDropdown(null)} />
-                                  <div className="absolute left-0 top-full mt-1.5 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 py-1 z-20">
-                                    <button onClick={() => { onUpdateTask({ ...task, isCompleted: false }); setActiveDropdown(null); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
-                                      <RotateCcw size={14} className="text-orange-400" />Revert to Pending
-                                    </button>
-                                    <button onClick={() => handleOpenTaskModal(task)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
-                                      <Edit2 size={14} className="text-blue-400" />Edit
-                                    </button>
-                                    <button onClick={() => { onDeleteTask(task.id); setActiveDropdown(null); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                                      <Trash2 size={14} />Delete
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm text-gray-400 dark:text-slate-500 line-through leading-snug">{task.title}</div>
-                            </div>
-                            <div className="flex-shrink-0 text-xs text-gray-300 dark:text-slate-600">
-                              {format(new Date(task.date), 'MMM d')}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'documents' && (
-              <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
-                {checklist.length > 0 && (
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 overflow-hidden">
-                    <div className="px-5 pt-5 pb-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <ClipboardList size={14} className="text-gray-400" />
-                          Document Checklist
-                        </h2>
-                        <span className="text-xs text-gray-400 dark:text-slate-500">{checklist.filter(c => c.status === 'uploaded' || c.status === 'verified').length}/{checklist.length}</span>
-                      </div>
-                      <div className="w-full h-1 bg-gray-100 dark:bg-slate-800 rounded-full mb-4">
-                        <div className="h-1 bg-edamame rounded-full transition-all duration-300" style={{ width: `${checklist.length > 0 ? (checklist.filter(c => c.status === 'uploaded' || c.status === 'verified').length / checklist.length) * 100 : 0}%` }} />
-                      </div>
-                      <div className="space-y-1.5">
-                        {checklist.map(item => (
-                          <div key={item.id} className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-gray-800 dark:text-slate-200">{item.label}</div>
-                              {item.description && <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{item.description}</div>}
-                            </div>
-                            <select
-                              value={item.status}
-                              onChange={(e) => updateChecklistStatus(item.id, e.target.value as ChecklistItemStatus)}
-                              className={`text-xs font-semibold px-2 py-1 rounded-lg border-0 outline-none cursor-pointer flex-shrink-0 ${
-                                item.status === 'verified' ? 'bg-green-100 dark:bg-green-800/70 text-green-700 dark:text-green-200' :
-                                item.status === 'uploaded' ? 'bg-blue-100 dark:bg-blue-800/70 text-blue-700 dark:text-blue-200' :
-                                item.status === 'waived' ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300' :
-                                'bg-amber-100 dark:bg-amber-800/70 text-amber-700 dark:text-amber-200'
-                              }`}
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="uploaded">Uploaded</option>
-                              <option value="verified">Verified</option>
-                              <option value="waived">Waived</option>
-                            </select>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <h2 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Upload Documents</h2>
-                  <DocumentUpload caseId={currentCase.id} visaSubclass={visaSubclass} onUpload={() => setDocRefreshKey(k => k + 1)} />
-                </div>
-                <DocumentList caseId={currentCase.id} refreshKey={docRefreshKey} visaSubclass={visaSubclass} />
-              </div>
-            )}
-
-            {activeTab === 'notes' && (
-              <div className="max-w-3xl mx-auto px-6 py-6">
-                <CaseNotes caseId={currentCase.id} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── RIGHT PANEL (chat) ── */}
-        <div className={`${rightPanelOpen ? 'w-80 xl:w-96' : 'w-0'} flex-shrink-0 border-l border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 flex flex-col overflow-hidden transition-[width] duration-200 hidden lg:flex`}>
-          {rightPanelOpen && (
+        {/* Row actions menu */}
+        <div className="relative flex-shrink-0">
+          <button
+            onClick={() => setActiveDropdown(activeDropdown === task.id ? null : task.id)}
+            className="w-6 h-6 rounded-md flex items-center justify-center text-gray-300 dark:text-slate-600 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 opacity-0 group-hover:opacity-100 transition-all"
+          >
+            <MoreVertical size={14} />
+          </button>
+          {activeDropdown === task.id && (
             <>
-              {/* Chat header */}
-              <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 dark:border-slate-800 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-edamame flex items-center justify-center">
-                    <Brain size={11} className="text-white" />
-                  </div>
-                  <span className="text-sm font-bold text-gray-900 dark:text-white">Agent</span>
-                  {conversations.length > 0 && (
-                    <span className="text-[10px] font-medium text-gray-400 dark:text-slate-500">{conversations.length} chat{conversations.length !== 1 ? 's' : ''}</span>
-                  )}
-                </div>
-                <button
-                  onClick={createConversation}
-                  className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 hover:text-gray-700 dark:text-slate-500 dark:hover:text-slate-200 transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
-                >
-                  <Plus size={11} />
-                  New
-                </button>
-              </div>
-
-              {/* Conversation tabs */}
-              {conversations.length > 1 && (
-                <div className="flex gap-1 px-3 py-2 border-b border-gray-100 dark:border-slate-800 overflow-x-auto">
-                  {conversations.map(conv => (
-                    <button
-                      key={conv.id}
-                      onClick={() => setActiveConvId(conv.id)}
-                      className={`flex-shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-colors truncate max-w-[90px] ${
-                        activeConvId === conv.id
-                          ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400'
-                          : 'text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
-                      }`}
-                    >{conv.title || 'Chat'}</button>
-                  ))}
-                </div>
-              )}
-
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 custom-scrollbar">
-                {!activeConv || activeConv.messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center px-4 pb-8">
-                    <div className="w-10 h-10 rounded-2xl bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center mb-3">
-                      <Brain size={18} className="text-edamame dark:text-edamame-400" />
-                    </div>
-                    <p className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Edamame Agent</p>
-                    <p className="text-xs text-gray-400 dark:text-slate-500 leading-relaxed">Ask anything about this case — I already know the context, client details, and outstanding tasks.</p>
-                  </div>
-                ) : (
-                  activeConv.messages.map(msg => (
-                    <ChatBubble key={msg.id} message={msg} />
-                  ))
-                )}
-                {isSending && (
-                  <div className="flex items-center gap-2 pl-1">
-                    <div className="flex gap-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '120ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '240ms' }} />
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-
-              {/* Input */}
-              <div className="p-3 border-t border-gray-100 dark:border-slate-800 flex-shrink-0">
-                <div className="relative">
-                  <textarea
-                    value={chatInput}
-                    onChange={e => setChatInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-                    }}
-                    placeholder="Ask about this case…"
-                    rows={2}
-                    className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 pr-10 text-sm text-gray-800 dark:text-gray-200 placeholder-gray-300 dark:placeholder-gray-600 resize-none outline-none focus:border-edamame/50 focus:ring-1 focus:ring-edamame/20 transition-all"
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={!chatInput.trim() || isSending}
-                    className="absolute bottom-2.5 right-2.5 p-1.5 bg-edamame hover:bg-edamame-600 text-white rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <Send size={13} />
+              <div className="fixed inset-0 z-30" onClick={() => setActiveDropdown(null)} />
+              <div className="absolute right-0 top-full mt-1 z-40 w-44 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
+                {isCompleted ? (
+                  <button onClick={() => { onUpdateTask({ ...task, isCompleted: false }); setActiveDropdown(null); }} className={rowMenuCls}>
+                    <RotateCcw size={14} className="text-orange-400" />Revert to pending
                   </button>
-                </div>
+                ) : (
+                  <button onClick={() => { handleSetToday(task.id); setActiveDropdown(null); }} className={rowMenuCls}>
+                    <Calendar size={14} className="text-edamame" />Set to today
+                  </button>
+                )}
+                <button onClick={() => handleOpenTaskModal(task)} className={rowMenuCls}>
+                  <Edit2 size={14} className="text-blue-400" />Edit
+                </button>
+                <button onClick={() => { onDeleteTask(task.id); setActiveDropdown(null); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                  <Trash2 size={14} />Delete
+                </button>
               </div>
             </>
           )}
         </div>
       </div>
+    );
+  };
+
+  // ---- Render ----
+  const status = STATUS_META[currentCase.status];
+
+  const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors';
+
+  return (
+    <div className="px-5 py-5 lg:px-7 lg:py-6 bg-gray-50 dark:bg-slate-950 min-h-full">
+
+      {/* ══════════════════════════════════════════
+          TOP BAR
+      ══════════════════════════════════════════ */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          onClick={onBack}
+          className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-100 transition-colors"
+        >
+          <ArrowLeft size={15} strokeWidth={1.8} className="group-hover:-translate-x-0.5 transition-transform" />
+          Cases
+        </button>
+        <h1 className="text-[17px] font-bold text-gray-900 dark:text-white tracking-tight min-w-0 truncate">
+          {currentCase.title}
+          <span className="text-gray-400 dark:text-slate-500 font-semibold"> — {client.name}</span>
+        </h1>
+        <span className="font-mono text-[10.5px] text-gray-400 dark:text-slate-500">#{currentCase.id.slice(0, 8).toUpperCase()}</span>
+        {visaSubclass && (
+          <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400">SC-{visaSubclass}</span>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          {/* Status chip dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setStatusOpen(o => !o)}
+              className={`inline-flex items-center gap-1.5 text-[11px] font-bold pl-2.5 pr-2 py-1.5 rounded-lg transition-colors ${status.chip}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full badge-pulse ${status.dot}`} />
+              {status.label}
+              <ChevronDown size={12} />
+            </button>
+            {statusOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setStatusOpen(false)} />
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-40 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
+                  {(['open', 'in_progress', 'on_hold', 'closed'] as CaseStatus[]).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => { handleStatusChange(s); setStatusOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors ${currentCase.status === s ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-slate-400'}`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[s].dot}`} />
+                      {STATUS_META[s].label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Draft + Eligibility action chips */}
+          <div className="flex items-center gap-1.5 pr-2 border-r border-gray-200 dark:border-slate-700">
+            <button
+              onClick={() => handleSkillAction('Please help me draft a cover letter for this immigration case.')}
+              title="Draft a document with the Agent"
+              className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11.5px] font-semibold text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame transition-colors"
+            >
+              <PenLine size={13} strokeWidth={1.8} />
+              <span className="hidden md:inline">Draft</span>
+            </button>
+            <button
+              onClick={handleEligibility}
+              title="Open the Visa Advisor pre-filled with this client"
+              className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11.5px] font-semibold text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame transition-colors"
+            >
+              <ShieldCheck size={13} strokeWidth={1.8} />
+              <span className="hidden md:inline">Eligibility</span>
+            </button>
+          </div>
+
+          {/* Add Task */}
+          <button
+            onClick={() => handleOpenTaskModal()}
+            className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-xs transition-colors"
+          >
+            <Plus size={13} strokeWidth={2.2} />
+            Add Task
+          </button>
+
+          {/* Agent toggle */}
+          <button
+            onClick={() => setAgentOpen(o => !o)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+              agentOpen
+                ? 'border-edamame bg-edamame/10 text-edamame-700 dark:text-edamame-400'
+                : 'border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 hover:border-edamame'
+            }`}
+          >
+            <Sparkles size={13} strokeWidth={1.8} />
+            <span className="hidden md:inline">Agent</span>
+          </button>
+
+          {/* ⋯ menu */}
+          <div className="relative">
+            <button
+              onClick={() => setMoreOpen(o => !o)}
+              title="More actions"
+              className="w-8 h-8 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-center text-gray-500 dark:text-slate-400 hover:border-edamame hover:text-edamame transition-colors"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {moreOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setMoreOpen(false)} />
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-52 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
+                  <button onClick={() => { setActiveTab('documents'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
+                  {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && (
+                    <button onClick={handleRunCrusher} className={menuItemCls}>Run Crusher</button>
+                  )}
+                  {visaSubclass === '820' && (
+                    <button onClick={() => { setShowBundleBuilder(true); setMoreOpen(false); }} className={menuItemCls}>820 bundle builder</button>
+                  )}
+                  {('showDirectoryPicker' in window) && (
+                    <button onClick={() => { setMoreOpen(false); pickDirectory(); }} className={menuItemCls}>Link local folder</button>
+                  )}
+                  <button
+                    onClick={() => { setCaseEditForm({ title: currentCase.title, description: currentCase.description }); setIsEditingCase(true); setMoreOpen(false); }}
+                    className={menuItemCls}
+                  >
+                    Edit case
+                  </button>
+                  <div className="h-px bg-gray-100 dark:bg-slate-800 my-1" />
+                  <button
+                    onClick={() => { setShowDeleteConfirm(true); setMoreOpen(false); }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    Delete case
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════
+          3-COLUMN GRID
+      ══════════════════════════════════════════ */}
+      <div className={`mt-4 grid grid-cols-1 gap-3.5 items-start ${agentOpen ? 'xl:grid-cols-[220px_minmax(320px,1fr)_minmax(280px,330px)]' : 'xl:grid-cols-[220px_minmax(320px,1fr)]'}`}>
+
+        {/* ── LEFT RAIL ── */}
+        <CaseRail
+          client={client}
+          applicant={applicant}
+          progress={progress}
+          completedCount={completedTasks.length}
+          pendingCount={pendingTasks.length}
+          alerts={railAlerts}
+          dirTree={dirTree}
+        />
+
+        {/* ── CENTER COLUMN ── */}
+        <div className="min-w-0">
+          {/* Tabs */}
+          <div className="flex gap-0.5 border-b border-gray-100 dark:border-slate-800">
+            {[
+              { id: 'tasks', label: 'Tasks', count: caseTasks.length },
+              { id: 'documents', label: 'Documents', count: checklist.length },
+              { id: 'notes', label: 'Notes', count: null as number | null },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as 'tasks' | 'documents' | 'notes')}
+                className={`flex items-center gap-2 px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-edamame text-gray-900 dark:text-white'
+                    : 'border-transparent text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
+                }`}
+              >
+                {tab.label}
+                {tab.count != null && tab.count > 0 && (
+                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTab === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* ── TASKS ── */}
+          {activeTab === 'tasks' && (
+            <div className="mt-4 space-y-6">
+              <section>
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">
+                    Pending <span className="text-gray-400 dark:text-slate-500 font-semibold">· {pendingTasks.length} tasks</span>
+                  </span>
+                  {overdueCount > 0 && (
+                    <span className="text-[10.5px] font-bold px-2.5 py-1 rounded-md bg-red-500/[0.13] text-red-700 dark:text-red-400">
+                      {overdueCount} overdue
+                    </span>
+                  )}
+                </div>
+
+                {pendingTasks.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-200 dark:border-slate-800 p-10 text-center">
+                    <CheckCircle2 size={26} className="mx-auto mb-2 text-gray-200 dark:text-slate-700" />
+                    <p className="text-sm text-gray-400 dark:text-slate-500">All tasks completed</p>
+                  </div>
+                ) : (
+                  <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+                    {pendingTasks.map(task => renderTaskRow(task, false))}
+                  </div>
+                )}
+              </section>
+
+              {completedTasks.length > 0 && (
+                <section>
+                  <div className="text-[12.5px] font-bold text-gray-500 dark:text-slate-500 mb-2.5">
+                    Completed <span className="text-gray-400 dark:text-slate-600 font-semibold">· {completedTasks.length} tasks</span>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+                    {completedTasks.map(task => renderTaskRow(task, true))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+
+          {/* ── DOCUMENTS ── */}
+          {activeTab === 'documents' && (
+            <div className="mt-4 space-y-4">
+              {checklist.length > 0 && (
+                <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-5 pt-4 pb-3">
+                    <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">Document checklist</span>
+                    <span className="text-[11px] font-bold text-gray-400 dark:text-slate-500">{uploadedCount}/{checklist.length}</span>
+                  </div>
+                  {checklist.map(item => {
+                    const chip =
+                      item.status === 'verified' ? { cls: 'bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400', label: 'Verified' } :
+                      item.status === 'uploaded' ? { cls: 'bg-blue-500/[0.13] text-blue-700 dark:text-blue-400', label: 'Received' } :
+                      item.status === 'waived' ? { cls: 'bg-slate-500/[0.13] text-slate-600 dark:text-slate-300', label: 'Waived' } :
+                      { cls: 'bg-amber-500/[0.13] text-amber-700 dark:text-amber-400', label: 'Pending' };
+                    return (
+                      <div key={item.id} className="table-row-hover flex items-center gap-3 px-5 py-2.5 border-t border-gray-100 dark:border-slate-800">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] font-semibold text-gray-800 dark:text-slate-200 tracking-tight">{item.label}</div>
+                          {item.description && <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{item.description}</div>}
+                        </div>
+                        <button
+                          onClick={() => cycleChecklistStatus(item.id, item.status)}
+                          title="Click to cycle status"
+                          className={`text-[10.5px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap select-none transition-colors ${chip.cls}`}
+                        >
+                          {chip.label} ▾
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <DocumentUpload caseId={currentCase.id} visaSubclass={visaSubclass} onUpload={() => setDocRefreshKey(k => k + 1)} />
+              <DocumentList caseId={currentCase.id} refreshKey={docRefreshKey} visaSubclass={visaSubclass} />
+            </div>
+          )}
+
+          {/* ── NOTES ── */}
+          {activeTab === 'notes' && (
+            <div className="mt-4">
+              <CaseNotes caseId={currentCase.id} />
+            </div>
+          )}
+        </div>
+
+        {/* ── AGENT PANEL ── */}
+        {agentOpen && (
+          <AgentPanel
+            conversations={conversations}
+            activeConv={activeConv}
+            activeConvId={activeConvId}
+            onSelectConversation={setActiveConvId}
+            onNewChat={createConversation}
+            chatInput={chatInput}
+            setChatInput={setChatInput}
+            isSending={isSending}
+            onSend={sendMessage}
+            onSuggested={handleSkillAction}
+            suggestedChips={AGENT_CHIPS}
+            chatEndRef={chatEndRef}
+          />
+        )}
+      </div>
+
 
       {/* ── MODALS ── */}
 

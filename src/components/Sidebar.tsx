@@ -272,7 +272,7 @@ export const Sidebar: React.FC = () => {
           h-screen fixed left-0 top-0 z-20
           transition-[width] duration-300 ease-in-out
           overflow-hidden
-          ${collapsed ? 'w-16' : 'w-64'}
+          ${collapsed ? 'w-16' : 'w-[240px]'}
         `}
       >
         {/* Subtle depth texture */}

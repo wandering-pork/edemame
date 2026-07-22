@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { generateTasksFromCase } from '../services/geminiService';
 import { WorkflowTemplate, Task, Client, Case } from '../types';
-import { Sparkles, Calendar, Loader2, Save, User, ChevronDown, ChevronUp, List, Users } from 'lucide-react';
+import { Sparkles, Calendar, Loader2, Save, User, ChevronDown, ChevronUp, List, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface NewCaseProps {
@@ -67,6 +67,16 @@ const DESCRIPTION_HINTS: Record<string, string> = {
 • Dependants to include (names, ages, relationship)`,
 };
 
+// Short guided-prompt chips shown once a template is selected — same substance
+// as DESCRIPTION_HINTS, condensed to a glanceable badge per topic.
+const GUIDED_CHIPS: Record<string, string[]> = {
+  '186': ['Current visa + expiry', 'Stream: TRT or DE?', 'Employer + tenure', 'English evidence', 'Deadlines or complications'],
+  '482': ['Current visa + expiry', 'Stream: ST/MT/LA?', 'Employer + sponsorship', 'English evidence', 'Deadlines or complications'],
+  '490': ['Current visa + expiry', 'Occupation + points', 'Skills assessment', 'English evidence', 'Deadlines or complications'],
+  '820': ['Current visa + expiry', 'Sponsor details', 'Relationship length', 'Cohabitation evidence', 'Deadlines or complications'],
+  default: ['Current visa + expiry', 'Immigration goal', 'Key prerequisites done', 'Deadlines or complications'],
+};
+
 function getDescriptionPlaceholder(template: WorkflowTemplate | undefined): string {
   if (!template) {
     return 'Select a workflow template above, then describe the case — current visa status, goals, deadlines, and any complications...';
@@ -75,8 +85,17 @@ function getDescriptionPlaceholder(template: WorkflowTemplate | undefined): stri
   return DESCRIPTION_HINTS[key] ?? DESCRIPTION_HINTS['default'];
 }
 
+function getGuidedChips(template: WorkflowTemplate | undefined): string[] {
+  if (!template) return [];
+  const key = template.visaSubclass ?? 'default';
+  return GUIDED_CHIPS[key] ?? GUIDED_CHIPS['default'];
+}
+
+// Time between each task row streaming into view during the "generating" phase.
+const REVEAL_DELAY_MS = 220;
+
 export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedTemplateKeyword, onTasksConfirmed, onChangeView: onGoBack }) => {
-  const [step, setStep] = useState<'input' | 'review'>('input');
+  const [step, setStep] = useState<'input' | 'generating' | 'review'>('input');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -100,6 +119,15 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
   const [clientSearchTerm, setClientSearchTerm] = useState('');
 
   const [generatedTasks, setGeneratedTasks] = useState<Partial<Task>[]>([]);
+  // Rows revealed so far during the "generating" phase's stream-in animation.
+  const [revealedTasks, setRevealedTasks] = useState<Partial<Task>[]>([]);
+  const revealTimers = useRef<number[]>([]);
+
+  useEffect(() => {
+    return () => {
+      revealTimers.current.forEach(id => window.clearTimeout(id));
+    };
+  }, []);
 
   // Auto-select suggested template if provided
   useEffect(() => {
@@ -132,12 +160,41 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
   const selectedClient = clients.find(c => c.id === clientId);
   const selectedApplicant = clients.find(c => c.id === applicantId);
   const selectedTemplate = templates.find(t => t.id === templateId);
+  const guidedChips = getGuidedChips(selectedTemplate);
+
+  // Reveals the already-fetched tasks into the UI one at a time, then
+  // advances to the review phase. The tasks themselves are the real API
+  // response — only the reveal pacing is client-side.
+  const streamInTasks = (tasks: Partial<Task>[]) => {
+    revealTimers.current.forEach(id => window.clearTimeout(id));
+    revealTimers.current = [];
+    setRevealedTasks([]);
+
+    if (tasks.length === 0) {
+      setStep('review');
+      return;
+    }
+
+    tasks.forEach((task, i) => {
+      const timerId = window.setTimeout(() => {
+        setRevealedTasks(prev => [...prev, task]);
+        if (i === tasks.length - 1) {
+          const finalTimer = window.setTimeout(() => setStep('review'), 400);
+          revealTimers.current.push(finalTimer);
+        }
+      }, i * REVEAL_DELAY_MS);
+      revealTimers.current.push(timerId);
+    });
+  };
 
   const handleAnalyze = async () => {
     if (!description || !templateId || !clientId) return;
 
     setErrorMessage(null);
     setIsLoading(true);
+    setGeneratedTasks([]);
+    setRevealedTasks([]);
+    setStep('generating');
 
     // Build rich client context — the more the LLM knows, the more specific the tasks
     const applicant = splitRoles && selectedApplicant ? selectedApplicant : selectedClient;
@@ -169,9 +226,10 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
         selectedTemplate?.steps,
       );
       setGeneratedTasks(tasks);
-      setStep('review');
+      streamInTasks(tasks);
     } catch (e) {
       setErrorMessage("Failed to generate tasks. Please check your connection or try again.");
+      setStep('input');
     } finally {
       setIsLoading(false);
     }
@@ -202,7 +260,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       isCompleted: false,
       priorityOrder: index,
       generatedByAi: true,
-      caseId: newCaseId, 
+      caseId: newCaseId,
     }));
 
     onTasksConfirmed(finalTasks, newCase);
@@ -213,6 +271,10 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
     const updated = [...generatedTasks];
     updated[index] = { ...updated[index], [field]: value };
     setGeneratedTasks(updated);
+  };
+
+  const removeGeneratedTask = (index: number) => {
+    setGeneratedTasks(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSelectClient = (client: Client) => {
@@ -227,34 +289,47 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
     setIsApplicantDropdownOpen(false);
   };
 
-  if (step === 'input') {
-    return (
-      <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">New Case Intake</h1>
-              <p className="text-gray-500 dark:text-slate-400">Select a client and let AI plan the workflow.</p>
-            </div>
-            <button 
-              onClick={() => onGoBack('cases')}
-              className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              Cancel
-            </button>
+  const canGenerate = !isLoading && !!description && !!templateId && !!clientId;
+
+  return (
+    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200">
+      <style>{`
+        @keyframes rowStreamIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .row-stream-in { animation: rowStreamIn 0.3s ease forwards; }
+      `}</style>
+      <div className="max-w-[720px] mx-auto page-enter">
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <h1 className="text-[26px] font-extrabold tracking-tight text-gray-900 dark:text-white">New Case Intake</h1>
+            <p className="text-[13px] text-gray-500 dark:text-slate-400 mt-1">Select a client and let AI plan the workflow.</p>
           </div>
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-8 space-y-6">
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <button
+            onClick={() => onGoBack('cases')}
+            className="text-[13px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* PHASE 1 — Form                                                   */}
+        {/* ---------------------------------------------------------------- */}
+        {step === 'input' && (
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-6 space-y-5">
+
+            <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4">
               {/* Custom Client Selector */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Client Name</label>
-                <div 
+              <div className="relative focus-ring rounded-lg">
+                <label className="block text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-1.5">Client</label>
+                <div
                   className="relative"
                   onClick={() => setIsClientDropdownOpen(true)}
                 >
-                  <User className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500" size={18} />
-                  <input 
+                  <User className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500" size={17} />
+                  <input
                     type="text"
                     value={clientSearchTerm}
                     onChange={(e) => {
@@ -265,30 +340,30 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                       }
                     }}
                     onFocus={() => setIsClientDropdownOpen(true)}
-                    className="w-full pl-10 pr-10 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 focus:border-green-500 dark:focus:border-green-600 text-gray-900 dark:text-white outline-none"
-                    placeholder="Search client..."
+                    className="w-full pl-9 pr-9 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-gray-900 dark:text-white outline-none"
+                    placeholder="Search client…"
                   />
-                  <ChevronDown className="absolute right-3 top-3 text-gray-400 dark:text-slate-500 pointer-events-none" size={16} />
+                  <ChevronDown className="absolute right-3 top-3 text-gray-400 dark:text-slate-500 pointer-events-none" size={15} />
                 </div>
 
                 {isClientDropdownOpen && (
                   <>
-                    <div 
-                      className="fixed inset-0 z-10" 
+                    <div
+                      className="fixed inset-0 z-10"
                       onClick={() => setIsClientDropdownOpen(false)}
                     ></div>
                     <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {filteredClients.length === 0 ? (
-                        <div className="p-3 text-sm text-gray-500 dark:text-slate-500 italic">No clients found.</div>
+                        <div className="p-3 text-[13px] text-gray-500 dark:text-slate-500 italic">No clients found.</div>
                       ) : (
                         filteredClients.map(c => (
-                          <div 
+                          <div
                             key={c.id}
                             onClick={() => handleSelectClient(c)}
-                            className="p-3 hover:bg-green-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-100 dark:border-slate-700 last:border-0"
+                            className="p-3 hover:bg-edamame-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-100 dark:border-slate-700 last:border-0"
                           >
-                            <div className="font-medium text-gray-900 dark:text-white">{c.name}</div>
-                            <div className="flex gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                            <div className="font-medium text-[13px] text-gray-900 dark:text-white">{c.name}</div>
+                            <div className="flex gap-2 text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
                               <span>DOB: {c.dob || 'N/A'}</span>
                               <span>•</span>
                               <span>{c.phone || c.email || 'No Contact Info'}</span>
@@ -301,15 +376,15 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Start Date</label>
+              <div className="focus-ring rounded-lg">
+                <label className="block text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-1.5">Start Date</label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500" size={18} />
-                  <input 
+                  <Calendar className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500" size={17} />
+                  <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 focus:border-green-500 dark:focus:border-green-600 text-gray-900 dark:text-white outline-none transition-all"
+                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-gray-900 dark:text-white outline-none transition-all"
                   />
                 </div>
               </div>
@@ -317,20 +392,19 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
 
             {/* Client/applicant split toggle */}
             <div>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <div
                   onClick={() => { setSplitRoles(v => !v); if (splitRoles) { setApplicantId(''); setApplicantSearchTerm(''); } }}
-                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${splitRoles ? 'bg-green-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${splitRoles ? 'bg-edamame-500' : 'bg-gray-300 dark:bg-slate-600'}`}
                 >
                   <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${splitRoles ? 'translate-x-4' : ''}`} />
                 </div>
-                <span className="text-sm font-medium text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Users size={14} />
+                <span className="text-[12.5px] font-medium text-gray-600 dark:text-slate-300">
                   Client and applicant are different people
                 </span>
               </label>
               {splitRoles && (
-                <p className="mt-1 ml-11 text-xs text-gray-400 dark:text-slate-500">
+                <p className="mt-1 ml-[46px] text-[11px] text-gray-400 dark:text-slate-500">
                   Client = the engaging/paying party. Applicant = the person named on the visa.
                 </p>
               )}
@@ -338,10 +412,10 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
 
             {/* Applicant picker (when roles split) */}
             {splitRoles && (
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Applicant (visa applicant)</label>
+              <div className="relative focus-ring rounded-lg">
+                <label className="block text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-1.5">Applicant (visa applicant)</label>
                 <div className="relative" onClick={() => setIsApplicantDropdownOpen(true)}>
-                  <User className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500" size={18} />
+                  <User className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500" size={17} />
                   <input
                     type="text"
                     value={applicantSearchTerm}
@@ -353,26 +427,26 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                       }
                     }}
                     onFocus={() => setIsApplicantDropdownOpen(true)}
-                    className="w-full pl-10 pr-10 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 focus:border-green-500 dark:focus:border-green-600 text-gray-900 dark:text-white outline-none"
-                    placeholder="Search applicant..."
+                    className="w-full pl-9 pr-9 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-gray-900 dark:text-white outline-none"
+                    placeholder="Search applicant…"
                   />
-                  <ChevronDown className="absolute right-3 top-3 text-gray-400 dark:text-slate-500 pointer-events-none" size={16} />
+                  <ChevronDown className="absolute right-3 top-3 text-gray-400 dark:text-slate-500 pointer-events-none" size={15} />
                 </div>
                 {isApplicantDropdownOpen && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setIsApplicantDropdownOpen(false)} />
                     <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {filteredApplicants.length === 0 ? (
-                        <div className="p-3 text-sm text-gray-500 dark:text-slate-500 italic">No clients found.</div>
+                        <div className="p-3 text-[13px] text-gray-500 dark:text-slate-500 italic">No clients found.</div>
                       ) : (
                         filteredApplicants.map(c => (
                           <div
                             key={c.id}
                             onClick={() => handleSelectApplicant(c)}
-                            className="p-3 hover:bg-green-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-100 dark:border-slate-700 last:border-0"
+                            className="p-3 hover:bg-edamame-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-100 dark:border-slate-700 last:border-0"
                           >
-                            <div className="font-medium text-gray-900 dark:text-white">{c.name}</div>
-                            <div className="flex gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                            <div className="font-medium text-[13px] text-gray-900 dark:text-white">{c.name}</div>
+                            <div className="flex gap-2 text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
                               <span>DOB: {c.dob || 'N/A'}</span>
                               <span>•</span>
                               <span>{c.phone || c.email || 'No Contact Info'}</span>
@@ -386,14 +460,14 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Select Workflow Template</label>
+            <div className="focus-ring rounded-lg">
+              <label className="block text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-1.5">Workflow Template</label>
               <select
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
-                className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 focus:border-green-500 dark:focus:border-green-600 text-gray-900 dark:text-white outline-none"
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-gray-900 dark:text-white outline-none"
               >
-                <option value="">-- Choose a Workflow --</option>
+                <option value="">— Choose a workflow —</option>
                 {templates.map(t => (
                   <option key={t.id} value={t.id}>{t.title}</option>
                 ))}
@@ -404,7 +478,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                   <button
                     type="button"
                     onClick={() => setStepsExpanded(v => !v)}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors"
                   >
                     <List size={13} />
                     This template includes {selectedTemplate.steps.length} steps
@@ -412,12 +486,12 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                   </button>
                   {stepsExpanded && (
                     <ol className="mt-2 space-y-1 pl-1">
-                      {selectedTemplate.steps.map((step, i) => (
-                        <li key={i} className="flex gap-2 text-xs text-gray-600 dark:text-slate-400">
+                      {selectedTemplate.steps.map((s, i) => (
+                        <li key={i} className="flex gap-2 text-[11px] text-gray-600 dark:text-slate-400">
                           <span className="flex-shrink-0 font-bold text-gray-400 dark:text-slate-500 w-4">{i + 1}.</span>
                           <div>
-                            <span className="font-semibold text-gray-700 dark:text-slate-300">{step.title}</span>
-                            {step.description && <span className="text-gray-400 dark:text-slate-500"> — {step.description}</span>}
+                            <span className="font-semibold text-gray-700 dark:text-slate-300">{s.title}</span>
+                            {s.description && <span className="text-gray-400 dark:text-slate-500"> — {s.description}</span>}
                           </div>
                         </li>
                       ))}
@@ -428,45 +502,61 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+              <div className="flex items-baseline justify-between mb-1.5">
+                <label className="text-[11px] font-semibold text-gray-500 dark:text-slate-400">
                   Case Notes
                 </label>
-                <span className="text-xs text-gray-400 dark:text-slate-500">
+                <span className="text-[10.5px] text-gray-400 dark:text-slate-500">
                   {templateId
                     ? 'Placeholder shows what to include for this visa type'
                     : 'Select a template to see guided prompts'}
                 </span>
               </div>
-              <textarea
-                rows={10}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600 focus:border-green-500 dark:focus:border-green-600 text-gray-900 dark:text-white outline-none transition-all resize-none text-sm leading-relaxed"
-                placeholder={getDescriptionPlaceholder(templates.find(t => t.id === templateId))}
-              />
+
+              {guidedChips.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {guidedChips.map((chip, i) => (
+                    <span
+                      key={i}
+                      className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-edamame-50 dark:bg-edamame-900/20 text-edamame-700 dark:text-edamame-400 border border-edamame-200 dark:border-edamame-800/50"
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="focus-ring rounded-lg">
+                <textarea
+                  rows={8}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full px-3.5 py-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-gray-900 dark:text-white outline-none transition-all resize-y text-[13px] leading-relaxed"
+                  placeholder={getDescriptionPlaceholder(selectedTemplate)}
+                />
+              </div>
             </div>
 
             {errorMessage && (
-              <div className="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
+              <div className="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-[13px]">
                 {errorMessage}
               </div>
             )}
 
-            <div className="pt-4 flex justify-end">
+            <div className="pt-2 flex justify-end">
               <button
                 onClick={handleAnalyze}
-                disabled={isLoading || !description || !templateId || !clientId}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-900/20"
+                disabled={!canGenerate}
+                className={`btn-press flex items-center gap-2 bg-edamame-500 hover:bg-edamame-700 text-white px-5 py-2.5 rounded-lg text-[13.5px] font-bold transition-all shadow-sm ${!canGenerate ? 'opacity-35 cursor-not-allowed' : 'cursor-pointer'}`}
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="animate-spin" size={20} />
-                    Analyzing Workflow...
+                    <Loader2 className="animate-spin" size={18} />
+                    Analyzing Workflow…
                   </>
                 ) : (
                   <>
-                    <Sparkles size={20} />
+                    <Sparkles size={18} />
                     Generate Plan with AI
                   </>
                 )}
@@ -474,97 +564,128 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
             </div>
 
           </div>
-        </div>
-      </div>
-    );
-  }
+        )}
 
-  return (
-    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200">
-       <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Review Plan</h1>
-              <p className="text-gray-500 dark:text-slate-400">Review AI suggested dates and tasks for <strong>{selectedClient?.name}</strong>.</p>
+        {/* ---------------------------------------------------------------- */}
+        {/* PHASE 2 — Generating                                             */}
+        {/* ---------------------------------------------------------------- */}
+        {step === 'generating' && (
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-6">
+            <div className="flex items-center gap-3">
+              <div className="w-[34px] h-[34px] rounded-[10px] bg-edamame-50 dark:bg-edamame-900/20 flex items-center justify-center text-edamame-600 dark:text-edamame-400 flex-shrink-0">
+                <Sparkles className="animate-spin" size={18} />
+              </div>
+              <div>
+                <div className="text-[14.5px] font-bold tracking-tight text-gray-900 dark:text-white">Drafting your task plan…</div>
+                <div className="text-[12px] text-gray-400 dark:text-slate-500 mt-0.5">
+                  {selectedTemplate?.title} · {selectedClient?.name} ·{' '}
+                  {generatedTasks.length > 0
+                    ? `task ${revealedTasks.length} of ${generatedTasks.length}`
+                    : 'analyzing case details…'}
+                </div>
+              </div>
             </div>
-            <button 
-              onClick={() => setStep('input')}
-              className="text-sm text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white underline"
-            >
-              Back to Edit
-            </button>
+
+            <div className="flex flex-col gap-1.5 mt-5">
+              {revealedTasks.map((task, idx) => (
+                <div
+                  key={idx}
+                  className="row-stream-in flex items-center gap-3 px-3.5 py-2.5 border border-gray-100 dark:border-slate-800 rounded-[10px] bg-gray-50 dark:bg-slate-800/50"
+                >
+                  <span className="w-5 h-5 rounded-md bg-edamame-100 dark:bg-edamame-900/30 text-edamame-700 dark:text-edamame-400 text-[10px] font-extrabold flex items-center justify-center flex-shrink-0">
+                    {idx + 1}
+                  </span>
+                  <span className="flex-1 text-[13px] font-semibold tracking-tight text-gray-900 dark:text-white truncate">{task.title}</span>
+                  <span className="text-[11px] font-semibold text-gray-400 dark:text-slate-500 flex-shrink-0">
+                    {task.date ? format(new Date(task.date), 'MMM d') : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
+        )}
 
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden">
-            <div className="p-6 bg-green-50 dark:bg-green-900/20 border-b border-green-100 dark:border-green-900/30">
-               <div className="flex items-center gap-2 text-green-800 dark:text-green-400 font-medium">
-                 <Sparkles size={18} />
-                 <span>AI Suggestion</span>
-               </div>
-               <p className="text-green-700 dark:text-green-500 text-sm mt-1">
-                 Based on the "{templates.find(t => t.id === templateId)?.title}" workflow.
-               </p>
+        {/* ---------------------------------------------------------------- */}
+        {/* PHASE 3 — Review                                                 */}
+        {/* ---------------------------------------------------------------- */}
+        {step === 'review' && (
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-6">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="text-edamame-600 dark:text-edamame-400 flex-shrink-0" size={18} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[15px] font-bold tracking-tight text-gray-900 dark:text-white">Review generated plan</div>
+                <div className="text-[12px] text-gray-400 dark:text-slate-500 mt-0.5 truncate">
+                  {selectedTemplate?.title} · {selectedClient?.name} · edit or remove tasks before saving
+                </div>
+              </div>
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-md bg-edamame-50 dark:bg-edamame-900/20 text-edamame-700 dark:text-edamame-400 flex-shrink-0">
+                {generatedTasks.length} tasks
+              </span>
             </div>
 
-            <div className="divide-y divide-gray-100 dark:divide-slate-800">
+            <div className="flex flex-col gap-2 mt-4">
               {generatedTasks.map((task, idx) => (
-                <div key={idx} className="p-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                   <div className="md:col-span-3">
-                     <div className="flex items-center justify-between mb-1">
-                       <label className="text-xs text-gray-400 dark:text-slate-500 font-semibold uppercase block">Due Date</label>
-                       <button 
-                         onClick={() => updateGeneratedTask(idx, 'date', format(new Date(), 'yyyy-MM-dd'))}
-                         className="text-[10px] font-bold text-green-600 hover:text-green-500 uppercase tracking-tighter"
-                       >
-                         Today
-                       </button>
-                     </div>
-                     <input 
-                       type="date"
-                       value={task.date}
-                       onChange={(e) => updateGeneratedTask(idx, 'date', e.target.value)}
-                       className="w-full text-sm bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700 rounded-md shadow-sm focus:border-green-500 focus:ring-green-500 text-gray-900 dark:text-white"
-                     />
-                   </div>
-                   <div className="md:col-span-9">
-                      <div className="mb-2">
-                        <input 
-                           type="text"
-                           value={task.title}
-                           onChange={(e) => updateGeneratedTask(idx, 'title', e.target.value)}
-                           className="w-full font-medium text-gray-900 dark:text-white border-none bg-transparent p-0 focus:ring-0 placeholder-gray-400"
-                           placeholder="Task Title"
-                        />
-                      </div>
-                      <textarea
-                         value={task.description}
-                         onChange={(e) => updateGeneratedTask(idx, 'description', e.target.value)}
-                         rows={2}
-                         className="w-full text-sm text-gray-500 dark:text-slate-400 border-none bg-transparent p-0 focus:ring-0 resize-none placeholder-gray-300 dark:placeholder-slate-600"
-                         placeholder="Description"
-                      />
-                   </div>
+                <div
+                  key={idx}
+                  className="flex items-start gap-3 p-3.5 border border-gray-200 dark:border-slate-800 rounded-[10px] hover:border-edamame-300 dark:hover:border-edamame-700 transition-colors"
+                >
+                  <span className="w-5 h-5 mt-0.5 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 text-[10px] font-extrabold flex items-center justify-center flex-shrink-0">
+                    {idx + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <input
+                      type="text"
+                      value={task.title}
+                      onChange={(e) => updateGeneratedTask(idx, 'title', e.target.value)}
+                      className="w-full text-[13px] font-semibold tracking-tight text-gray-900 dark:text-white border-none bg-transparent p-0 focus:ring-0 placeholder-gray-400"
+                      placeholder="Task Title"
+                    />
+                    <input
+                      type="text"
+                      value={(task.description || '').split(/(?<=[.!?])\s/)[0] || ''}
+                      onChange={(e) => updateGeneratedTask(idx, 'description', e.target.value)}
+                      className="w-full text-[11px] text-gray-500 dark:text-slate-400 border-none bg-transparent p-0 mt-0.5 focus:ring-0 placeholder-gray-300 dark:placeholder-slate-600"
+                      placeholder="Description"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <input
+                      type="date"
+                      value={task.date}
+                      onChange={(e) => updateGeneratedTask(idx, 'date', e.target.value)}
+                      className="text-[11px] font-semibold px-2 py-1 rounded-md bg-gray-100 dark:bg-slate-800 border-none text-gray-600 dark:text-slate-300 focus:ring-2 focus:ring-edamame-500"
+                    />
+                    <button
+                      onClick={() => removeGeneratedTask(idx)}
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors"
+                      aria-label="Remove task"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
 
-            <div className="p-6 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-200 dark:border-slate-800 flex justify-end gap-3">
-               <button 
-                 onClick={() => setStep('input')}
-                 className="px-6 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300 font-medium hover:bg-white dark:hover:bg-slate-800 transition-colors"
-               >
-                 Cancel
-               </button>
-               <button 
-                 onClick={handleConfirm}
-                 className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium transition-colors shadow-sm"
-               >
-                 <Save size={18} />
-                 Confirm & Create Case
-               </button>
+            <div className="flex items-center justify-between mt-5">
+              <button
+                onClick={handleAnalyze}
+                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 text-[12.5px] font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                ↺ Regenerate
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-lg bg-edamame-500 hover:bg-edamame-700 text-white text-[13.5px] font-bold transition-colors shadow-sm"
+              >
+                <Save size={16} />
+                Save case
+              </button>
             </div>
           </div>
-       </div>
+        )}
+
+      </div>
     </div>
   );
 };

@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Theme } from '../types';
-import { Moon, Sun, Monitor, Save, Check, Palette, LogOut, FolderCog, AlertTriangle } from 'lucide-react';
+import { Moon, Sun, Save, Check, Palette, LogOut, FolderCog, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useLocalFolder } from '@/contexts/LocalFolderContext';
+
+const initialsOf = (s: string) =>
+  s
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .map(p => p[0]!.toUpperCase())
+    .slice(0, 2)
+    .join('');
 
 interface SettingsProps {
   currentTheme: Theme;
@@ -64,19 +72,19 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
 
   return (
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200 page-enter">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-[680px] mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white font-ibm-serif tracking-tight">
+        <div className="mb-6">
+          <h1 className="text-[26px] font-extrabold tracking-[-0.035em] text-gray-900 dark:text-white">
             Settings
           </h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
-            Customize your workspace appearance.
+          <p className="text-[13px] text-gray-500 dark:text-slate-400 mt-1">
+            Customize your workspace appearance
           </p>
         </div>
 
         {/* Appearance section */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
           {/* Section header */}
           <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 dark:text-edamame-400 flex items-center justify-center">
@@ -93,7 +101,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
               {/* Classic Light */}
               <button
                 onClick={() => handleSelect('classic')}
-                className={`group relative rounded-2xl border-2 text-left transition-all duration-200 overflow-hidden ${
+                className={`group relative rounded-xl border-2 text-left transition-all duration-200 overflow-hidden ${
                   selectedTheme === 'classic'
                     ? 'border-edamame shadow-lg shadow-edamame/15 ring-2 ring-edamame/20'
                     : 'border-gray-200 dark:border-slate-700 hover:border-edamame/40 dark:hover:border-edamame/30'
@@ -140,7 +148,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
               {/* Dark Mode */}
               <button
                 onClick={() => handleSelect('dark')}
-                className={`group relative rounded-2xl border-2 text-left transition-all duration-200 overflow-hidden ${
+                className={`group relative rounded-xl border-2 text-left transition-all duration-200 overflow-hidden ${
                   selectedTheme === 'dark'
                     ? 'border-edamame shadow-lg shadow-edamame/15 ring-2 ring-edamame/20'
                     : 'border-gray-200 dark:border-slate-700 hover:border-edamame/40 dark:hover:border-edamame/30'
@@ -214,7 +222,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
 
         {/* Data Storage section */}
         {profile?.storageMode === 'local' && (
-          <div className="mt-6 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="mt-6 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 dark:text-edamame-400 flex items-center justify-center">
                 <FolderCog size={16} />
@@ -255,27 +263,42 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
         )}
 
         {/* Account section */}
-        <div className="mt-6 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800">
-            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Account</h2>
-            <p className="text-xs text-gray-400 dark:text-slate-500">{user?.email}</p>
-          </div>
-          <div className="p-6 flex items-center justify-between">
-            <p className="text-sm text-gray-500 dark:text-slate-400">Sign out of your Edamame account on this device.</p>
-            <button
-              onClick={handleSignOut}
-              className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:hover:bg-red-950/70 dark:text-red-400 transition-all"
-            >
-              <LogOut size={15} />
-              Log out
-            </button>
+        <div className="mt-6 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="p-6">
+            <div className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-gray-400 dark:text-slate-500 mb-3">
+              Account
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-[38px] h-[38px] rounded-full bg-edamame-500 text-white text-[13px] font-extrabold flex items-center justify-center flex-shrink-0">
+                {initialsOf(user?.user_metadata?.full_name || user?.email || '?')}
+              </div>
+              <div className="min-w-0">
+                <div className="text-[13.5px] font-bold text-gray-900 dark:text-white truncate">
+                  {user?.user_metadata?.full_name || 'Your account'}
+                </div>
+                <div className="text-xs text-gray-400 dark:text-slate-500 truncate">{user?.email}</div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between mt-[18px] pt-4 border-t border-gray-100 dark:border-slate-800">
+              <span className="text-[12.5px] text-gray-500 dark:text-slate-400">Sign out of your Edamame account on this device.</span>
+              <button
+                onClick={handleSignOut}
+                className="btn-press flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-red-200 dark:border-red-900/40 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/30 dark:hover:bg-red-950/60 dark:text-red-400 font-bold text-xs transition-all flex-shrink-0"
+              >
+                <LogOut size={14} strokeWidth={1.8} />
+                Log out
+              </button>
+            </div>
           </div>
         </div>
 
         {/* App info */}
         <div className="mt-6 px-2">
           <p className="text-xs text-gray-400 dark:text-slate-700 text-center">
-            Edamame Legal Flow · Built for AU/NZ Immigration Practitioners
+            Edamame Legal Flow · Built for AU/NZ Immigration Practitioners ·{' '}
+            <Link to="/" className="text-edamame-600 dark:text-edamame-400 hover:underline">
+              View marketing site →
+            </Link>
           </p>
         </div>
       </div>
