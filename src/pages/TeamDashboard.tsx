@@ -3,13 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
   Users,
-  Briefcase,
-  CheckCircle2,
-  AlertTriangle,
   Activity,
   ChevronRight,
   Filter,
-  UserCheck,
+  UserPlus,
   Clock,
   Search,
 } from 'lucide-react';
@@ -24,44 +21,30 @@ interface TeamDashboardProps {
   onAssignCase: (caseId: string, newOwnerId: string, note?: string) => void;
 }
 
-type Workload = 'light' | 'medium' | 'heavy';
-
-function workloadFor(activeCaseCount: number, activeTaskCount: number): Workload {
-  const score = activeCaseCount * 2 + activeTaskCount;
-  if (score <= 4) return 'light';
-  if (score <= 10) return 'medium';
-  return 'heavy';
-}
-
 const roleLabel: Record<TeamMember['role'], string> = {
   partner: 'Partner',
   lawyer: 'Lawyer',
   assistant: 'Assistant',
 };
 
-const statusStyles: Record<TeamMember['status'], { dot: string; label: string; ring: string }> = {
-  available: { dot: 'bg-emerald-500', label: 'Available', ring: 'ring-emerald-500/30' },
-  busy: { dot: 'bg-amber-500', label: 'Busy', ring: 'ring-amber-500/30' },
-  offline: { dot: 'bg-slate-400', label: 'Offline', ring: 'ring-slate-400/30' },
+/** Deterministic 0-360 hue from a string id, for pastel avatar backgrounds — matches Clients/CaseManager. */
+const hueFromId = (id: string): number => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash << 5) - hash + id.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) % 360;
 };
 
-const workloadStyles: Record<Workload, { label: string; badge: string; bar: string }> = {
-  light: {
-    label: 'Light',
-    badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-    bar: 'bg-emerald-500',
-  },
-  medium: {
-    label: 'Medium',
-    badge: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-    bar: 'bg-amber-500',
-  },
-  heavy: {
-    label: 'Heavy',
-    badge: 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 border-rose-200 dark:border-rose-800',
-    bar: 'bg-rose-500',
-  },
-};
+const initialsOf = (name: string): string =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(n => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
 export const TeamDashboard: React.FC<TeamDashboardProps> = ({
   teamMembers,
@@ -80,27 +63,15 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
 
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  // Per-member stats derived live from cases/tasks
-  const memberStats = useMemo(() => {
+  // Per-member open tasks, for the 3-column Team View board.
+  const memberColumns = useMemo(() => {
     return teamMembers.map(m => {
-      const memberCases = cases.filter(c => c.caseOwner === m.id && c.status !== 'closed');
-      const memberTasks = tasks.filter(t => t.assignedTo === m.id && !t.isCompleted);
-      const overdue = memberTasks.filter(t => t.date < today).length;
-      const wl = workloadFor(memberCases.length, memberTasks.length);
-      return {
-        member: m,
-        caseCount: memberCases.length,
-        taskCount: memberTasks.length,
-        overdueCount: overdue,
-        workload: wl,
-      };
+      const openTasks = tasks
+        .filter(t => t.assignedTo === m.id && !t.isCompleted)
+        .sort((a, b) => (a.date < b.date ? -1 : 1));
+      return { member: m, openTasks };
     });
-  }, [teamMembers, cases, tasks, today]);
-
-  const maxLoad = Math.max(
-    1,
-    ...memberStats.map(s => s.caseCount * 2 + s.taskCount),
-  );
+  }, [teamMembers, tasks]);
 
   const filteredCases = useMemo(() => {
     let list = cases;
@@ -123,13 +94,8 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
   const recentActivity = useMemo(() => {
     return [...activity]
       .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
-      .slice(0, 12);
+      .slice(0, 10);
   }, [activity]);
-
-  const totalActiveCases = cases.filter(c => c.status !== 'closed').length;
-  const totalOpenTasks = tasks.filter(t => !t.isCompleted).length;
-  const totalOverdue = tasks.filter(t => !t.isCompleted && t.date < today).length;
-  const atRiskMembers = memberStats.filter(s => s.overdueCount > 0).length;
 
   const openAssignModal = (caseId: string) => {
     setAssignModal({ caseId });
@@ -157,185 +123,119 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
 
   return (
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-white dark:bg-slate-900 min-h-screen transition-colors duration-200 page-enter">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[1440px] mx-auto">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-ibm-serif font-bold text-slate-900 dark:text-white mb-2">
-              Team Dashboard
+            <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-[-0.035em] text-gray-900 dark:text-slate-100">
+              Team View
             </h1>
-            <p className="text-base text-slate-600 dark:text-slate-400">
-              Workload, assignments, and collaboration across your firm
+            <p className="text-[13px] text-gray-500 dark:text-slate-400 mt-1">
+              Open tasks across the practice, by owner
             </p>
           </div>
           <button
             onClick={() => navigate('/team-members')}
-            className="btn-press inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-700 dark:hover:bg-white transition-colors"
+            className="btn-press focus-ring inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-[13px] bg-gray-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-gray-700 dark:hover:bg-white transition-colors whitespace-nowrap"
           >
-            <Users size={16} />
+            <Users size={16} strokeWidth={1.8} />
             Manage Members
           </button>
         </div>
 
-        {/* Top metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          <MetricCard
-            label="Team Members"
-            value={teamMembers.length}
-            icon={<Users className="w-5 h-5" />}
-            tone="slate"
-          />
-          <MetricCard
-            label="Active Cases"
-            value={totalActiveCases}
-            icon={<Briefcase className="w-5 h-5" />}
-            tone="edamame"
-          />
-          <MetricCard
-            label="Open Tasks"
-            value={totalOpenTasks}
-            icon={<CheckCircle2 className="w-5 h-5" />}
-            tone="blue"
-          />
-          <MetricCard
-            label="Overdue"
-            value={totalOverdue}
-            icon={<AlertTriangle className="w-5 h-5" />}
-            tone="rose"
-            sublabel={atRiskMembers > 0 ? `${atRiskMembers} at risk` : undefined}
-          />
+        {/* Team View: 3 columns per member */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-6 items-start">
+          {memberColumns.map(({ member, openTasks }) => {
+            const hue = hueFromId(member.id);
+            return (
+              <div
+                key={member.id}
+                className="bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-800 rounded-xl p-3"
+              >
+                <div className="flex items-center gap-2.5 px-1 pb-3">
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                    style={{ background: `oklch(0.93 0.05 ${hue})`, color: `oklch(0.42 0.12 ${hue})` }}
+                  >
+                    {member.avatar || initialsOf(member.name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-bold tracking-[-0.01em] text-gray-900 dark:text-slate-100 truncate">
+                      {member.name}
+                    </div>
+                    <div className="text-[10.5px] text-gray-400 dark:text-slate-500">{roleLabel[member.role]}</div>
+                  </div>
+                  <span className="text-[11px] font-bold text-gray-400 dark:text-slate-500 flex-shrink-0">
+                    {openTasks.length}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {openTasks.length === 0 ? (
+                    <div className="text-center text-xs text-gray-400 dark:text-slate-600 py-6">No open tasks</div>
+                  ) : (
+                    openTasks.map(t => {
+                      const c = t.caseId ? cases.find(cs => cs.id === t.caseId) : undefined;
+                      const overdue = t.date < today;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => c && navigate(`/cases/${c.id}`)}
+                          className="task-card text-left bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-[10px] px-3.5 py-3"
+                        >
+                          <div className="text-[12.5px] font-semibold tracking-[-0.01em] text-gray-900 dark:text-slate-100 leading-snug">
+                            {t.title}
+                          </div>
+                          <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-1 truncate">
+                            {c ? c.title : 'No case linked'}
+                          </div>
+                          <span
+                            className={`inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-md mt-2 ${
+                              overdue
+                                ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+                                : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'
+                            }`}
+                          >
+                            {overdue ? 'Overdue · ' : 'Due '}
+                            {format(new Date(t.date), 'MMM d')}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {memberColumns.length === 0 && (
+            <div className="col-span-full text-center text-sm text-gray-400 dark:text-slate-600 py-16">
+              No team members yet.
+            </div>
+          )}
         </div>
 
-        {/* Team Members Grid */}
-        <section className="mb-12">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-xl font-ibm-serif font-bold text-slate-900 dark:text-white">Team Members</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {memberStats.map(({ member, caseCount, taskCount, overdueCount, workload }) => {
-              const ss = statusStyles[member.status];
-              const ws = workloadStyles[workload];
-              return (
-                <div
-                  key={member.id}
-                  className="group relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`relative w-14 h-14 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center font-ibm-serif font-bold text-lg ring-4 ${ss.ring}`}>
-                      {member.avatar || member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-800 ${ss.dot}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-ibm-serif font-bold text-slate-900 dark:text-white text-base truncate">
-                        {member.name}
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{member.email}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                          {roleLabel[member.role]}
-                        </span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400 inline-flex items-center gap-1">
-                          <span className={`w-1.5 h-1.5 rounded-full ${ss.dot}`} />
-                          {ss.label}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 mt-5 pt-5 border-t border-slate-100 dark:border-slate-700">
-                    <Stat label="Cases" value={caseCount} />
-                    <Stat label="Tasks" value={taskCount} />
-                    <Stat
-                      label="Overdue"
-                      value={overdueCount}
-                      valueClass={overdueCount > 0 ? 'text-rose-600 dark:text-rose-400' : undefined}
-                    />
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Workload
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${ws.badge}`}>
-                        {ws.label}
-                      </span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${ws.bar}`}
-                        style={{ width: `${Math.min(100, ((caseCount * 2 + taskCount) / maxLoad) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Workload Overview */}
-        <section className="mb-12">
-          <h2 className="text-xl font-ibm-serif font-bold text-slate-900 dark:text-white mb-5">Workload Overview</h2>
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
-            <div className="space-y-4">
-              {memberStats.map(({ member, caseCount, taskCount, overdueCount }) => {
-                const load = caseCount * 2 + taskCount;
-                const pct = Math.min(100, (load / maxLoad) * 100);
-                return (
-                  <div key={member.id} className="flex items-center gap-4">
-                    <div className="w-44 flex-shrink-0 flex items-center gap-2 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
-                        {member.avatar}
-                      </div>
-                      <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                        {member.name}
-                      </span>
-                    </div>
-                    <div className="flex-1 h-7 rounded-lg bg-slate-100 dark:bg-slate-700 relative overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-edamame-400 to-edamame-600 rounded-lg transition-all duration-700"
-                        style={{ width: `${pct}%` }}
-                      />
-                      <div className="absolute inset-0 flex items-center px-3 text-xs font-semibold text-slate-700 dark:text-white">
-                        {caseCount} cases · {taskCount} tasks
-                        {overdueCount > 0 && (
-                          <span className="ml-2 text-rose-600 dark:text-rose-300 inline-flex items-center gap-1">
-                            <AlertTriangle size={12} /> {overdueCount}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
         {/* Shared Case Board + Activity Feed */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-10">
           {/* Case Board */}
           <section className="xl:col-span-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-              <h2 className="text-xl font-ibm-serif font-bold text-slate-900 dark:text-white">Shared Case Board</h2>
+              <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">Shared Case Board</h2>
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" size={14} strokeWidth={1.8} />
                   <input
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     placeholder="Search..."
-                    className="pl-9 pr-3 py-2 rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 outline-none transition-all text-slate-900 dark:text-white placeholder-slate-400"
+                    className="focus-ring pl-9 pr-3 py-2 rounded-lg text-[13px] bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 focus:border-edamame-500 outline-none transition-colors text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500"
                   />
                 </div>
                 <div className="relative">
-                  <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                  <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none" size={14} strokeWidth={1.8} />
                   <select
                     value={filterMemberId}
                     onChange={e => setFilterMemberId(e.target.value)}
-                    className="pl-9 pr-8 py-2 rounded-lg text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 outline-none text-slate-900 dark:text-white appearance-none cursor-pointer"
+                    className="focus-ring pl-9 pr-8 py-2 rounded-lg text-[13px] bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 focus:border-edamame-500 outline-none text-gray-900 dark:text-slate-100 appearance-none cursor-pointer"
                   >
                     <option value="all">All members</option>
                     {teamMembers.map(m => (
@@ -346,9 +246,9 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700 overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm divide-y divide-gray-100 dark:divide-slate-800 overflow-hidden">
               {filteredCases.length === 0 && (
-                <div className="p-10 text-center text-slate-500 dark:text-slate-400 text-sm">
+                <div className="p-10 text-center text-gray-400 dark:text-slate-600 text-sm">
                   No cases match this filter.
                 </div>
               )}
@@ -356,65 +256,66 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                 const owner = getMember(c.caseOwner);
                 const client = getClient(c.clientId);
                 const progress = caseProgress(c.id);
+                const hue = hueFromId(client?.id || c.clientId || c.id);
                 return (
                   <div
                     key={c.id}
-                    className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors group flex items-center gap-4"
+                    className="table-row-hover p-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 flex items-center gap-4"
                   >
                     <button
                       onClick={() => navigate(`/cases/${c.id}`)}
-                      className="flex-1 min-w-0 text-left"
+                      className="flex-1 min-w-0 text-left flex items-center gap-3"
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-slate-900 dark:text-white text-sm truncate group-hover:text-edamame-500 transition-colors">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-[10.5px] font-bold flex-shrink-0"
+                        style={{ background: `oklch(0.93 0.05 ${hue})`, color: `oklch(0.42 0.12 ${hue})` }}
+                      >
+                        {initialsOf(client?.name || 'Unknown')}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-gray-900 dark:text-slate-100 text-[13px] tracking-[-0.01em] truncate">
                           {c.title}
                         </h3>
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                        {client?.name || 'Unknown client'} · {c.status.replace('_', ' ')}
-                      </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="flex-1 h-1 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden max-w-[200px]">
-                          <div
-                            className="h-full bg-edamame-500 rounded-full"
-                            style={{ width: `${progress}%` }}
-                          />
+                        <p className="text-[11.5px] text-gray-400 dark:text-slate-500 truncate">
+                          {client?.name || 'Unknown client'} &middot; {c.status.replace('_', ' ')}
+                        </p>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="flex-1 h-1 rounded-full bg-gray-100 dark:bg-slate-800 overflow-hidden max-w-[160px]">
+                            <div className="progress-fill h-full bg-edamame-500 rounded-full" style={{ width: `${progress}%` }} />
+                          </div>
+                          <span className="text-[10px] font-semibold text-gray-400 dark:text-slate-500">{progress}%</span>
                         </div>
-                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                          {progress}%
-                        </span>
                       </div>
                     </button>
 
                     <div className="flex items-center gap-3 flex-shrink-0">
                       {owner ? (
-                        <div className="flex items-center gap-2 text-right">
-                          <div className="text-right hidden sm:block">
-                            <p className="text-[10px] uppercase tracking-wide font-bold text-slate-400">Owner</p>
-                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{owner.name.split(' ')[0]}</p>
-                          </div>
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center text-xs font-bold">
-                            {owner.avatar}
-                          </div>
+                        <div
+                          className="w-8 h-8 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center text-[10.5px] font-bold"
+                          title={`Owned by ${owner.name}`}
+                        >
+                          {owner.avatar || initialsOf(owner.name)}
                         </div>
                       ) : (
-                        <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-400 flex items-center justify-center">
-                          <UserCheck size={14} />
-                        </div>
+                        <button
+                          onClick={() => openAssignModal(c.id)}
+                          title="Assign case owner"
+                          className="w-8 h-8 rounded-full border border-dashed border-gray-300 dark:border-slate-600 text-gray-400 dark:text-slate-500 hover:border-edamame-500 hover:text-edamame-500 flex items-center justify-center transition-colors"
+                        >
+                          <UserPlus size={13} strokeWidth={1.8} />
+                        </button>
                       )}
                       <button
                         onClick={() => openAssignModal(c.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-edamame-500 hover:text-white dark:hover:bg-edamame-500 dark:hover:text-white transition-colors"
+                        className="btn-press px-3 py-1.5 rounded-lg text-[11.5px] font-semibold bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:bg-edamame-500 hover:text-white transition-colors"
                       >
                         Assign
                       </button>
-                      <button
-                        onClick={() => navigate(`/cases/${c.id}`)}
-                        className="text-slate-400 hover:text-edamame-500 transition-colors"
-                        aria-label="Open case"
-                      >
-                        <ChevronRight size={18} />
-                      </button>
+                      <ChevronRight
+                        size={17}
+                        strokeWidth={1.8}
+                        className="text-gray-300 dark:text-slate-600"
+                      />
                     </div>
                   </div>
                 );
@@ -425,29 +326,31 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
           {/* Activity Feed */}
           <section>
             <div className="flex items-center gap-2 mb-4">
-              <Activity className="w-5 h-5 text-edamame-500" />
-              <h2 className="text-xl font-ibm-serif font-bold text-slate-900 dark:text-white">Activity Feed</h2>
+              <Activity className="w-4 h-4 text-edamame-500" strokeWidth={1.8} />
+              <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">Activity Feed</h2>
             </div>
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 min-h-[320px]">
+            <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-4 min-h-[280px]">
               {recentActivity.length === 0 ? (
-                <div className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-                  <Clock className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                <div className="py-10 text-center text-sm text-gray-400 dark:text-slate-600">
+                  <Clock className="w-8 h-8 mx-auto mb-3 text-gray-300 dark:text-slate-700" strokeWidth={1.8} />
                   Activity will appear here as your team works.
                 </div>
               ) : (
                 <ul className="space-y-4">
                   {recentActivity.map(ev => {
                     const actor = getMember(ev.actorId);
+                    const hue = hueFromId(actor?.id || ev.actorId || ev.id);
                     return (
                       <li key={ev.id} className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0">
-                          {actor?.avatar || '—'}
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                          style={{ background: `oklch(0.93 0.05 ${hue})`, color: `oklch(0.42 0.12 ${hue})` }}
+                        >
+                          {actor ? (actor.avatar || initialsOf(actor.name)) : '—'}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-slate-800 dark:text-slate-100 leading-snug">
-                            {ev.summary}
-                          </p>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          <p className="text-[12.5px] text-gray-800 dark:text-slate-100 leading-snug">{ev.summary}</p>
+                          <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
                             {formatDistanceToNow(new Date(ev.createdAt), { addSuffix: true })}
                           </p>
                         </div>
@@ -465,18 +368,18 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
       {assignModal && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full modal-content">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-xl font-ibm-serif font-bold text-slate-900 dark:text-white">Assign Case</h2>
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Assign Case</h2>
               <button
                 onClick={() => setAssignModal(null)}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors text-xl"
+                className="text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors text-xl"
               >
                 ×
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Team member</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Team member</label>
                 <div className="space-y-2">
                   {teamMembers.map(m => (
                     <button
@@ -485,30 +388,30 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                       className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
                         assignTarget === m.id
                           ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-900/20 ring-2 ring-edamame-500/20'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                          : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600'
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center font-bold">
-                        {m.avatar}
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center font-bold text-sm">
+                        {m.avatar || initialsOf(m.name)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-900 dark:text-white text-sm">{m.name}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">{roleLabel[m.role]}</p>
+                        <p className="font-semibold text-gray-900 dark:text-white text-sm">{m.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">{roleLabel[m.role]}</p>
                       </div>
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                  Note <span className="font-normal text-slate-400">(optional)</span>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
+                  Note <span className="font-normal text-gray-400">(optional)</span>
                 </label>
                 <textarea
                   value={assignNote}
                   onChange={e => setAssignNote(e.target.value)}
                   placeholder="Context for the reassignment..."
                   rows={2}
-                  className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all resize-none"
+                  className="focus-ring w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-all resize-none"
                 />
               </div>
 
@@ -519,7 +422,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                 if (history.length === 0) return null;
                 return (
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
+                    <p className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-gray-400 dark:text-slate-500 mb-2">
                       Assignment history
                     </p>
                     <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
@@ -527,14 +430,14 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                         const fromMember = getMember(ev.fromOwnerId);
                         const toMember = getMember(ev.toOwnerId);
                         return (
-                          <div key={ev.id} className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                            <Clock size={12} />
+                          <div key={ev.id} className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-2">
+                            <Clock size={12} strokeWidth={1.8} />
                             <span>
                               {fromMember ? `${fromMember.name} → ` : 'Assigned to '}
-                              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                              <span className="font-semibold text-gray-700 dark:text-slate-200">
                                 {toMember?.name || 'Unknown'}
                               </span>
-                              <span className="ml-2 text-slate-400">{format(new Date(ev.changedAt), 'MMM d')}</span>
+                              <span className="ml-2 text-gray-400 dark:text-slate-500">{format(new Date(ev.changedAt), 'MMM d')}</span>
                             </span>
                           </div>
                         );
@@ -545,17 +448,17 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
               })()}
             </div>
 
-            <div className="flex items-center gap-3 p-6 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 p-6 border-t border-gray-200 dark:border-slate-700">
               <button
                 onClick={() => setAssignModal(null)}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmAssign}
                 disabled={!assignTarget}
-                className="ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg transition-colors"
+                className="btn-press ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
                 Confirm assignment
               </button>
@@ -566,47 +469,3 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
     </div>
   );
 };
-
-// --- Subcomponents -----------------------------------------------------------
-
-const MetricCard: React.FC<{
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  tone: 'slate' | 'edamame' | 'blue' | 'rose';
-  sublabel?: string;
-}> = ({ label, value, icon, tone, sublabel }) => {
-  const toneMap = {
-    slate: 'from-slate-500 to-slate-700',
-    edamame: 'from-edamame-400 to-edamame-600',
-    blue: 'from-blue-400 to-blue-600',
-    rose: 'from-rose-400 to-rose-600',
-  } as const;
-  return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 flex items-start gap-4 hover:shadow-md transition-all">
-      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${toneMap[tone]} text-white flex items-center justify-center flex-shrink-0`}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</p>
-        <p className="text-2xl font-ibm-serif font-bold text-slate-900 dark:text-white leading-tight">{value}</p>
-        {sublabel && <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">{sublabel}</p>}
-      </div>
-    </div>
-  );
-};
-
-const Stat: React.FC<{ label: string; value: number; valueClass?: string }> = ({
-  label,
-  value,
-  valueClass,
-}) => (
-  <div className="text-center">
-    <p className={`text-lg font-ibm-serif font-bold text-slate-900 dark:text-white ${valueClass || ''}`}>
-      {value}
-    </p>
-    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-      {label}
-    </p>
-  </div>
-);

@@ -13,6 +13,7 @@ import {
   Check,
   Lock,
   Target,
+  Sparkles,
 } from 'lucide-react';
 
 interface WizardState {
@@ -56,35 +57,77 @@ interface VisaAdvisorProps {
   onOpenNewCase: (templateKeyword: string) => void;
 }
 
-const verdictColors: Record<string, { bg: string; badge: string; text: string }> = {
+// Verdict language per design spec: Strong match (green) / Possible (amber) / Unlikely (red),
+// plus a neutral treatment for "needs more info" which has no equivalent in the prototype.
+const verdictColors: Record<
+  string,
+  { cardBg: string; cardBorder: string; badgeBg: string; badgeText: string; titleText: string; bar: string }
+> = {
   qualifies: {
-    bg: 'bg-green-50 dark:bg-green-900/15',
-    badge: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-    text: 'text-green-900 dark:text-green-200',
+    cardBg: 'bg-emerald-50/70 dark:bg-emerald-500/[0.06]',
+    cardBorder: 'border-emerald-200 dark:border-emerald-800/60',
+    badgeBg: 'bg-emerald-100 dark:bg-emerald-500/15',
+    badgeText: 'text-[#047857] dark:text-emerald-400',
+    titleText: 'text-slate-900 dark:text-white',
+    bar: 'bg-[#10B981]',
   },
   possibly_qualifies: {
-    bg: 'bg-amber-50 dark:bg-amber-900/15',
-    badge: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-    text: 'text-amber-900 dark:text-amber-200',
+    cardBg: 'bg-amber-50/70 dark:bg-amber-500/[0.06]',
+    cardBorder: 'border-amber-200 dark:border-amber-800/60',
+    badgeBg: 'bg-amber-100 dark:bg-amber-500/15',
+    badgeText: 'text-[#B45309] dark:text-amber-400',
+    titleText: 'text-slate-900 dark:text-white',
+    bar: 'bg-[#F59E0B]',
   },
   unlikely: {
-    bg: 'bg-red-50 dark:bg-red-900/15',
-    badge: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-    text: 'text-red-900 dark:text-red-200',
+    cardBg: 'bg-red-50/70 dark:bg-red-500/[0.06]',
+    cardBorder: 'border-red-200 dark:border-red-800/60',
+    badgeBg: 'bg-red-100 dark:bg-red-500/15',
+    badgeText: 'text-[#B91C1C] dark:text-red-400',
+    titleText: 'text-slate-900 dark:text-white',
+    bar: 'bg-[#EF4444]',
   },
   needs_more_info: {
-    bg: 'bg-blue-50 dark:bg-blue-900/15',
-    badge: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-    text: 'text-blue-900 dark:text-blue-200',
+    cardBg: 'bg-slate-50 dark:bg-slate-800/40',
+    cardBorder: 'border-slate-200 dark:border-slate-700',
+    badgeBg: 'bg-slate-100 dark:bg-slate-700/60',
+    badgeText: 'text-slate-600 dark:text-slate-300',
+    titleText: 'text-slate-900 dark:text-white',
+    bar: 'bg-slate-400',
   },
 };
 
 const verdictLabels: Record<string, string> = {
-  qualifies: 'Likely Qualifies',
-  possibly_qualifies: 'Possibly Qualifies',
+  qualifies: 'Strong match',
+  possibly_qualifies: 'Possible',
   unlikely: 'Unlikely',
-  needs_more_info: 'Needs More Info',
+  needs_more_info: 'Needs more info',
 };
+
+// Only used to render a match-strength bar when we can infer one from the verdict
+// (the API doesn't return a numeric score, so this is a coarse visual proxy, not a real %).
+const verdictBarWidth: Record<string, string> = {
+  qualifies: '88%',
+  possibly_qualifies: '60%',
+  unlikely: '25%',
+  needs_more_info: '0%',
+};
+
+const stepLabels = ['Personal', 'Goals', 'Details', 'Support'];
+
+// Shared chip styling for single-select pill groups (brand fill when active).
+const chipClass = (active: boolean) =>
+  `px-3.5 py-1.5 rounded-full border text-xs font-semibold transition-all btn-press ${
+    active
+      ? 'bg-edamame-500 border-edamame-500 text-white'
+      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-edamame-400 dark:hover:border-edamame-500'
+  }`;
+
+const inputClass =
+  'w-full px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/60 text-[13.5px] text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all';
+
+const labelClass =
+  'block text-[10px] font-bold uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400 mb-2';
 
 export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   clients,
@@ -184,74 +227,74 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
   return (
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-white dark:bg-slate-900 min-h-screen transition-colors duration-200 page-enter">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-[860px] mx-auto">
         {/* Input stage */}
         {wizardState.step === 'input' && (
           <>
             {/* Header */}
-            <div className="mb-10">
-              <h1 className="text-3xl md:text-4xl font-ibm-serif font-bold text-slate-900 dark:text-white mb-2">
+            <div className="mb-8">
+              <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-tight text-slate-900 dark:text-white">
                 Visa Eligibility Advisor
               </h1>
-              <p className="text-base text-slate-600 dark:text-slate-400">
+              <p className="text-[13px] text-slate-600 dark:text-slate-400 mt-1">
                 Discover which Australian visa pathways you may qualify for
               </p>
             </div>
 
             {/* Visual progress indicator */}
-            <div className="mb-10 space-y-4">
+            <div className="mb-8 space-y-4">
               <div className="flex items-center justify-between">
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   {[1, 2, 3, 4].map(step => (
                     <div key={step} className="relative flex flex-col items-center">
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
+                        className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-[13px] transition-all ${
                           step < wizardState.currentStep
                             ? 'bg-edamame-500 text-white'
                             : step === wizardState.currentStep
-                            ? 'bg-edamame-500/20 border-2 border-edamame-500 text-edamame-600 dark:text-edamame-400'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                            ? 'bg-edamame-500/15 border-2 border-edamame-500 text-edamame-600 dark:text-edamame-400'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                         }`}
                       >
-                        {step < wizardState.currentStep ? <Check size={20} /> : step}
+                        {step < wizardState.currentStep ? <Check size={16} /> : step}
                       </div>
-                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 mt-2 whitespace-nowrap">
-                        {['Personal', 'Goals', 'Details', 'Support'][step - 1]}
+                      <div className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 mt-2 whitespace-nowrap">
+                        {stepLabels[step - 1]}
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  <p className="text-[13px] font-bold text-slate-900 dark:text-white">
                     Step {wizardState.currentStep} of 4
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                     {Math.round((wizardState.currentStep / 4) * 100)}% complete
                   </p>
                 </div>
               </div>
 
               {/* Progress bar */}
-              <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-edamame-500 to-edamame-600 transition-all duration-500 ease-out"
+                  className="progress-fill h-full bg-edamame-500 rounded-full"
                   style={{ width: `${(wizardState.currentStep / 4) * 100}%` }}
                 />
               </div>
             </div>
 
             {/* Form card */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <div className="p-8">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="p-6">
               {/* Step label */}
-              <div className="mb-8">
-                <h2 className="text-2xl font-ibm-serif font-bold text-slate-900 dark:text-white">
+              <div className="mb-6">
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
                   {wizardState.currentStep === 1 && 'Personal Information'}
                   {wizardState.currentStep === 2 && 'Immigration Goals'}
                   {wizardState.currentStep === 3 && 'Additional Details'}
                   {wizardState.currentStep === 4 && 'Supporting Factors'}
                 </h2>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+                <p className="text-[12.5px] text-slate-500 dark:text-slate-400 mt-1">
                   {wizardState.currentStep === 1 && 'Tell us about yourself'}
                   {wizardState.currentStep === 2 && 'What brings you to Australia?'}
                   {wizardState.currentStep === 3 && 'Let\'s get into the specifics'}
@@ -263,9 +306,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
               {wizardState.currentStep === 1 && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                      Full Name
-                    </label>
+                    <label className={labelClass}>Full Name</label>
                     <input
                       type="text"
                       value={wizardState.clientInfo.fullName}
@@ -275,15 +316,13 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                           clientInfo: { ...prev.clientInfo, fullName: e.target.value },
                         }))
                       }
-                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                      className={inputClass}
                       placeholder="e.g. John Doe"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                      Date of Birth
-                    </label>
+                    <label className={labelClass}>Date of Birth</label>
                     <input
                       type="date"
                       value={wizardState.clientInfo.dob}
@@ -293,14 +332,12 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                           clientInfo: { ...prev.clientInfo, dob: e.target.value },
                         }))
                       }
-                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                      className={inputClass}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                      Country of Citizenship
-                    </label>
+                    <label className={labelClass}>Country of Citizenship</label>
                     <input
                       type="text"
                       value={wizardState.clientInfo.nationality}
@@ -310,16 +347,14 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                           clientInfo: { ...prev.clientInfo, nationality: e.target.value },
                         }))
                       }
-                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                      className={inputClass}
                       placeholder="e.g. Indian, British"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                      Currently in Australia?
-                    </label>
-                    <div className="flex gap-3">
+                    <label className={labelClass}>Currently in Australia?</label>
+                    <div className="flex flex-wrap gap-2">
                       {['Yes', 'No'].map((opt) => (
                         <button
                           key={opt}
@@ -332,12 +367,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               },
                             }))
                           }
-                          className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                          className={chipClass(
                             (opt === 'Yes' && wizardState.clientInfo.inAustralia) ||
-                            (opt === 'No' && !wizardState.clientInfo.inAustralia)
-                              ? 'bg-edamame text-white'
-                              : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700'
-                          }`}
+                              (opt === 'No' && !wizardState.clientInfo.inAustralia)
+                          )}
                         >
                           {opt}
                         </button>
@@ -347,9 +380,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
                   {wizardState.clientInfo.inAustralia && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                        Current Visa/Status in Australia
-                      </label>
+                      <label className={labelClass}>Current Visa/Status in Australia</label>
                       <select
                         value={wizardState.clientInfo.currentVisaStatus}
                         onChange={(e) =>
@@ -361,7 +392,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             },
                           }))
                         }
-                        className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                        className={inputClass}
                       >
                         <option value="">-- Select --</option>
                         <option value="tourist">Tourist/Visitor Visa</option>
@@ -379,12 +410,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
               {/* Step 2: Immigration Goals */}
               {wizardState.currentStep === 2 && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">
-                      Primary Purpose
-                    </label>
-                    <div className="grid grid-cols-1 gap-2">
+                    <label className={labelClass}>Primary Purpose</label>
+                    <div className="flex flex-wrap gap-2">
                       {[
                         { val: 'work', label: 'Work / Employment' },
                         { val: 'study', label: 'Study' },
@@ -401,11 +430,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               details: {}, // Reset conditional details
                             }))
                           }
-                          className={`text-left px-4 py-3 rounded-lg border-2 transition-all font-medium ${
-                            wizardState.goals.primaryPurpose === val
-                              ? 'border-edamame bg-edamame/8 text-edamame-700 dark:text-edamame-400'
-                              : 'border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:border-gray-300 dark:hover:border-slate-600'
-                          }`}
+                          className={chipClass(wizardState.goals.primaryPurpose === val)}
                         >
                           {label}
                         </button>
@@ -414,10 +439,8 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">
-                      Intended Duration of Stay
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <label className={labelClass}>Intended Duration of Stay</label>
+                    <div className="flex flex-wrap gap-2">
                       {[
                         { val: 'short', label: '< 3 months' },
                         { val: 'medium', label: '3–12 months' },
@@ -432,11 +455,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               goals: { ...prev.goals, intendedDuration: val },
                             }))
                           }
-                          className={`px-3 py-2 rounded-lg border-2 transition-all font-medium text-sm ${
-                            wizardState.goals.intendedDuration === val
-                              ? 'border-edamame bg-edamame/8 text-edamame-700 dark:text-edamame-400'
-                              : 'border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:border-gray-300 dark:hover:border-slate-600'
-                          }`}
+                          className={chipClass(wizardState.goals.intendedDuration === val)}
                         >
                           {label}
                         </button>
@@ -452,9 +471,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   {wizardState.goals.primaryPurpose === 'work' && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                          Occupation
-                        </label>
+                        <label className={labelClass}>Occupation</label>
                         <input
                           type="text"
                           value={wizardState.details.occupation || ''}
@@ -465,13 +482,11 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             }))
                           }
                           placeholder="e.g. Software Engineer"
-                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                          className={inputClass}
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                          Years of Experience
-                        </label>
+                        <label className={labelClass}>Years of Experience</label>
                         <input
                           type="number"
                           value={wizardState.details.yearsExperience || ''}
@@ -485,11 +500,11 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             }))
                           }
                           min="0"
-                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                          className={inputClass}
                         />
                       </div>
                       <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300 cursor-pointer">
+                        <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={wizardState.details.skillsAssessment || false}
@@ -502,7 +517,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                                 },
                               }))
                             }
-                            className="w-4 h-4 rounded"
+                            className="w-4 h-4 rounded accent-edamame-500"
                           />
                           Skills assessment completed?
                         </label>
@@ -513,9 +528,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   {wizardState.goals.primaryPurpose === 'study' && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                          Course Level
-                        </label>
+                        <label className={labelClass}>Course Level</label>
                         <select
                           value={wizardState.details.courseLevel || ''}
                           onChange={(e) =>
@@ -524,7 +537,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               details: { ...prev.details, courseLevel: e.target.value },
                             }))
                           }
-                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                          className={inputClass}
                         >
                           <option value="">-- Select --</option>
                           <option value="secondary">Secondary/Foundation</option>
@@ -535,7 +548,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                         </select>
                       </div>
                       <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300 cursor-pointer">
+                        <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={wizardState.details.financialSupport || false}
@@ -548,7 +561,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                                 },
                               }))
                             }
-                            className="w-4 h-4 rounded"
+                            className="w-4 h-4 rounded accent-edamame-500"
                           />
                           Financial support confirmed?
                         </label>
@@ -559,9 +572,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   {wizardState.goals.primaryPurpose === 'family' && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                          Relationship Type
-                        </label>
+                        <label className={labelClass}>Relationship Type</label>
                         <select
                           value={wizardState.details.relationshipType || ''}
                           onChange={(e) =>
@@ -570,7 +581,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               details: { ...prev.details, relationshipType: e.target.value },
                             }))
                           }
-                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                          className={inputClass}
                         >
                           <option value="">-- Select --</option>
                           <option value="spouse">Spouse / Partner</option>
@@ -581,9 +592,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                          Sponsor's AU Status
-                        </label>
+                        <label className={labelClass}>Sponsor's AU Status</label>
                         <select
                           value={wizardState.details.sponsorStatus || ''}
                           onChange={(e) =>
@@ -592,7 +601,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               details: { ...prev.details, sponsorStatus: e.target.value },
                             }))
                           }
-                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                          className={inputClass}
                         >
                           <option value="">-- Select --</option>
                           <option value="citizen">Australian Citizen</option>
@@ -606,9 +615,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   {wizardState.goals.primaryPurpose === 'pr' && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                          Self-Assessed Points Score
-                        </label>
+                        <label className={labelClass}>Self-Assessed Points Score</label>
                         <select
                           value={wizardState.details.pointsScore || ''}
                           onChange={(e) =>
@@ -617,7 +624,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                               details: { ...prev.details, pointsScore: e.target.value },
                             }))
                           }
-                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                          className={inputClass}
                         >
                           <option value="">-- Select --</option>
                           <option value="under65">Under 65 points</option>
@@ -627,9 +634,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                          Preferred State
-                        </label>
+                        <label className={labelClass}>Preferred State</label>
                         <input
                           type="text"
                           value={wizardState.details.statePreference || ''}
@@ -640,7 +645,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             }))
                           }
                           placeholder="e.g. NSW, VIC"
-                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                          className={inputClass}
                         />
                       </div>
                     </>
@@ -649,9 +654,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   {wizardState.goals.primaryPurpose === 'visit' && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                          Trip Duration
-                        </label>
+                        <label className={labelClass}>Trip Duration</label>
                         <input
                           type="text"
                           value={wizardState.details.tripDuration || ''}
@@ -662,11 +665,11 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             }))
                           }
                           placeholder="e.g. 2 weeks, 3 months"
-                          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                          className={inputClass}
                         />
                       </div>
                       <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300 cursor-pointer">
+                        <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={wizardState.details.strongTies || false}
@@ -679,7 +682,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                                 },
                               }))
                             }
-                            className="w-4 h-4 rounded"
+                            className="w-4 h-4 rounded accent-edamame-500"
                           />
                           Strong ties to home country (property, job, family)?
                         </label>
@@ -688,8 +691,8 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   )}
 
                   {!wizardState.goals.primaryPurpose && (
-                    <div className="text-center py-8 text-gray-400 dark:text-slate-600">
-                      <p className="text-sm">Please select a primary purpose in Step 2 to continue.</p>
+                    <div className="text-center py-8 text-slate-400 dark:text-slate-600">
+                      <p className="text-[13px]">Please select a primary purpose in Step 2 to continue.</p>
                     </div>
                   )}
                 </div>
@@ -699,9 +702,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
               {wizardState.currentStep === 4 && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">
-                      English Proficiency
-                    </label>
+                    <label className={labelClass}>English Proficiency</label>
                     <select
                       value={wizardState.supportingFactors.englishProficiency}
                       onChange={(e) =>
@@ -713,7 +714,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                           },
                         }))
                       }
-                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all"
+                      className={inputClass}
                     >
                       <option value="">-- Select --</option>
                       <option value="none">No English proficiency</option>
@@ -725,7 +726,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   </div>
 
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300 cursor-pointer">
+                    <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={wizardState.supportingFactors.healthConcerns}
@@ -738,14 +739,14 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             },
                           }))
                         }
-                        className="w-4 h-4 rounded"
+                        className="w-4 h-4 rounded accent-edamame-500"
                       />
                       Any significant health conditions requiring medical clearance?
                     </label>
                   </div>
 
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-slate-300 cursor-pointer">
+                    <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={wizardState.supportingFactors.criminalHistory}
@@ -758,7 +759,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             },
                           }))
                         }
-                        className="w-4 h-4 rounded"
+                        className="w-4 h-4 rounded accent-edamame-500"
                       />
                       Any criminal history or prior visa refusals?
                     </label>
@@ -768,30 +769,39 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
             </div>
 
             {/* Footer with buttons */}
-            <div className="px-8 py-6 bg-slate-50 dark:bg-slate-700/50 border-t border-slate-200 dark:border-slate-600 flex justify-between gap-3">
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 flex justify-between gap-3">
               <button
                 onClick={handleBack}
                 disabled={wizardState.currentStep === 1}
-                className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors btn-press"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={15} />
                 Back
               </button>
 
               <button
                 onClick={handleNext}
                 disabled={isLoading}
-                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg disabled:bg-slate-400 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-all shadow-lg shadow-edamame-500/30"
+                className="flex items-center gap-2 px-5 py-2 text-[13.5px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg disabled:bg-slate-400 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-all btn-press"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={15} className="animate-spin" />
                     Analyzing...
                   </>
                 ) : (
                   <>
-                    {wizardState.currentStep === 4 ? 'Get Assessment' : 'Continue'}
-                    <ChevronRight size={16} />
+                    {wizardState.currentStep === 4 ? (
+                      <>
+                        <Sparkles size={15} />
+                        Get Assessment
+                      </>
+                    ) : (
+                      <>
+                        Continue
+                        <ChevronRight size={15} />
+                      </>
+                    )}
                   </>
                 )}
               </button>
@@ -802,81 +812,88 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
         {/* Report stage */}
         {wizardState.step === 'report' && report && (
-          <div className="space-y-10">
+          <div className="space-y-8">
             {/* Header */}
-            <div className="text-center mb-12">
-              <h1 className="text-3xl md:text-4xl font-ibm-serif font-bold text-slate-900 dark:text-white mb-3">
+            <div className="text-center mb-4">
+              <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-tight text-slate-900 dark:text-white">
                 Your Visa Eligibility Results
               </h1>
-              <p className="text-base text-slate-600 dark:text-slate-400">
+              <p className="text-[13px] text-slate-600 dark:text-slate-400 mt-1">
                 Based on your information, here are the visa pathways you may qualify for
               </p>
             </div>
 
             {/* Summary section */}
-            <div className="bg-gradient-to-br from-edamame-50 dark:from-edamame-900/20 to-edamame-100/50 dark:to-edamame-900/10 rounded-2xl border border-edamame-200 dark:border-edamame-800 p-8">
-              <div className="flex items-start gap-3 mb-4">
-                <Target className="w-6 h-6 text-edamame-600 dark:text-edamame-400 flex-shrink-0 mt-0.5" />
+            <div className="bg-edamame-50 dark:bg-edamame-900/10 rounded-xl border border-edamame-200 dark:border-edamame-800/60 p-6">
+              <div className="flex items-start gap-3 mb-3">
+                <Target className="w-5 h-5 text-edamame-600 dark:text-edamame-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h2 className="text-xl font-ibm-serif font-bold text-slate-900 dark:text-white">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
                     Our Recommendation
                   </h2>
-                  <p className="text-base text-slate-700 dark:text-slate-300 mt-2 leading-relaxed">
+                  <p className="text-[13.5px] text-slate-700 dark:text-slate-300 mt-1.5 leading-relaxed">
                     {report.primaryRecommendation}
                   </p>
                 </div>
               </div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+              <p className="text-[12.5px] text-slate-600 dark:text-slate-400 leading-relaxed">
                 {report.summary}
               </p>
             </div>
 
             {/* Visa options */}
             <div>
-              <h3 className="text-2xl font-ibm-serif font-bold text-slate-900 dark:text-white mb-6">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">
                 Visa Eligibility Breakdown
               </h3>
-              <div className="grid gap-6">
+              <div className="flex flex-col gap-3">
                 {report.visaOptions.map((visa) => {
-                  const colors = verdictColors[visa.verdict];
+                  const colors = verdictColors[visa.verdict] ?? verdictColors.needs_more_info;
                   const isQualified = visa.verdict === 'qualifies' || visa.verdict === 'possibly_qualifies';
                   return (
                     <div
                       key={visa.visaSubclass}
-                      className={`group relative overflow-hidden rounded-2xl p-6 transition-all border ${colors.bg} ${
-                        isQualified
-                          ? 'border-slate-300 dark:border-slate-600 hover:shadow-lg hover:scale-[1.02]'
-                          : 'border-slate-200 dark:border-slate-700'
-                      }`}
+                      className={`card-lift rounded-xl border p-5 transition-all ${colors.cardBg} ${colors.cardBorder}`}
                     >
-                      <div className="flex items-start justify-between mb-4 gap-4">
-                        <div>
-                          <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-widest">
-                            {visa.visaSubclass}
-                          </p>
-                          <h4 className={`text-xl font-ibm-serif font-bold ${colors.text}`}>
-                            {visa.visaName}
-                          </h4>
-                        </div>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className={`text-[14.5px] font-bold tracking-tight ${colors.titleText}`}>
+                          {visa.visaName}
+                        </span>
+                        <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                          SC-{visa.visaSubclass}
+                        </span>
                         <span
-                          className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap flex-shrink-0 ${colors.badge}`}
+                          className={`ml-auto text-[10.5px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap ${colors.badgeBg} ${colors.badgeText}`}
                         >
-                          {verdictLabels[visa.verdict]}
+                          {verdictLabels[visa.verdict] ?? visa.verdict}
                         </span>
                       </div>
 
-                      <div className="space-y-3">
+                      {/* Match strength bar — no numeric score comes back from the API,
+                          so this reflects the verdict tier rather than an exact percentage. */}
+                      {visa.verdict !== 'needs_more_info' && (
+                        <div className="flex items-center gap-2.5 mt-3">
+                          <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-700/60 overflow-hidden">
+                            <div
+                              className={`progress-fill h-full rounded-full ${colors.bar}`}
+                              style={{ width: verdictBarWidth[visa.verdict] }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-3 mt-3.5">
                         <div>
-                          <p className="text-xs font-semibold text-gray-600 dark:text-slate-400 uppercase tracking-widest mb-2">
+                          <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 mb-1.5">
                             Why
                           </p>
                           <ul className="space-y-1">
                             {visa.reasons.map((reason, i) => (
                               <li
                                 key={i}
-                                className="text-sm text-gray-700 dark:text-slate-300 flex items-start gap-2"
+                                className="text-[12.5px] text-slate-600 dark:text-slate-300 flex items-start gap-2 leading-relaxed"
                               >
-                                <span className="text-edamame flex-shrink-0 mt-1">•</span>
+                                <span className="text-edamame-500 flex-shrink-0">·</span>
                                 {reason}
                               </li>
                             ))}
@@ -885,16 +902,16 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
                         {visa.gaps.length > 0 && (
                           <div>
-                            <p className="text-xs font-semibold text-gray-600 dark:text-slate-400 uppercase tracking-widest mb-2">
+                            <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 mb-1.5">
                               Gaps to Address
                             </p>
                             <ul className="space-y-1">
                               {visa.gaps.map((gap, i) => (
                                 <li
                                   key={i}
-                                  className="text-sm text-gray-700 dark:text-slate-300 flex items-start gap-2"
+                                  className="text-[12.5px] text-slate-600 dark:text-slate-300 flex items-start gap-2 leading-relaxed"
                                 >
-                                  <span className="text-amber-500 flex-shrink-0 mt-1">!</span>
+                                  <span className="text-amber-500 flex-shrink-0">!</span>
                                   {gap}
                                 </li>
                               ))}
@@ -902,14 +919,13 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                           </div>
                         )}
 
-                        {(visa.verdict === 'qualifies' ||
-                          visa.verdict === 'possibly_qualifies') && (
-                          <div className="pt-3 border-t border-gray-300 dark:border-slate-700">
+                        {isQualified && (
+                          <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
                             <button
                               onClick={() => handleOpenCase(visa.visaSubclass)}
-                              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-edamame hover:bg-edamame-600 text-white text-sm font-semibold rounded-lg transition-colors"
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-edamame-500 hover:bg-edamame-600 text-white text-[12.5px] font-bold rounded-lg transition-colors btn-press"
                             >
-                              Open New Case <ArrowRight size={14} />
+                              Open New Case <ArrowRight size={13} />
                             </button>
                           </div>
                         )}
@@ -921,10 +937,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
             </div>
 
             {/* Footer buttons */}
-            <div className="flex flex-col sm:flex-row justify-center gap-4 pt-8">
+            <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
               <button
                 onClick={handleStartOver}
-                className="px-6 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="px-5 py-2.5 text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors btn-press"
               >
                 Start Over
               </button>

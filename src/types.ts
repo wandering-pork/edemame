@@ -192,15 +192,3 @@ export interface FocusConversation {
   messages: FocusChatMessage[];
   createdAt: string;
 }
-
-// ---------------------------------------------------------------------------
-// File System (Focus Mode workspace)
-// ---------------------------------------------------------------------------
-
-export interface FileTreeNode {
-  name: string;
-  kind: 'file' | 'directory';
-  children?: FileTreeNode[];
-  handle?: FileSystemFileHandle;
-  size?: number;
-}

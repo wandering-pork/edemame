@@ -31,9 +31,11 @@ interface DocumentListProps {
   refreshKey?: number;
   /** When '820', renders aspect-tag badge + reassign dropdown per document. */
   visaSubclass?: string;
+  /** Document ids to hide — e.g. files already attached to a checklist item elsewhere on the page. */
+  excludeIds?: string[];
 }
 
-export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, visaSubclass }) => {
+export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, visaSubclass, excludeIds }) => {
   const repos = useRepositories();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,7 +138,11 @@ export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, 
     );
   }
 
-  if (documents.length === 0) {
+  const visibleDocuments = excludeIds && excludeIds.length > 0
+    ? documents.filter(d => !excludeIds.includes(d.id))
+    : documents;
+
+  if (visibleDocuments.length === 0) {
     return (
       <div className="text-sm text-gray-400 dark:text-gray-500 py-6 text-center border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
         No documents attached to this case yet.
@@ -146,7 +152,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, 
 
   return (
     <div className="space-y-2">
-      {documents.map(doc => {
+      {visibleDocuments.map(doc => {
         const IconComponent = getFileIcon(doc.fileType);
         const canPreview = isImage(doc.fileType) || isPdf(doc.fileType);
 
