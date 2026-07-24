@@ -11,7 +11,7 @@ import {
   startOfWeek,
   differenceInCalendarDays,
 } from 'date-fns';
-import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon } from 'lucide-react';
+import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface DashboardProps {
@@ -98,6 +98,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [newTask, setNewTask] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), caseId: '' });
   const [caseSearchTerm, setCaseSearchTerm] = useState('');
   const [isCaseDropdownOpen, setIsCaseDropdownOpen] = useState(false);
+  const [weekAnchor, setWeekAnchor] = useState<Date>(new Date());
 
   const today = startOfDay(new Date());
   const now = new Date();
@@ -293,8 +294,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [activity, tasks, cases, clients]);
 
   // ── This week board ───────────────────────────────────────────────────
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const weekStart = startOfWeek(weekAnchor, { weekStartsOn: 1 });
   const weekDays = useMemo(() => Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const isCurrentWeek = isSameDay(weekStart, startOfWeek(now, { weekStartsOn: 1 }));
 
   const boardTasks = scopeTasks(boardScope, tasks);
   const getTasksForDay = (day: Date) =>
@@ -428,12 +430,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* ── This week ─────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mt-7 mb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-7 mb-3">
           <div className="flex items-center gap-3">
-            <h3 className="text-base font-bold tracking-[-0.015em] text-slate-900 dark:text-white">This week</h3>
+            <h3 className="text-base font-bold tracking-[-0.015em] text-slate-900 dark:text-white">
+              {isCurrentWeek ? 'This week' : 'Week of'}
+            </h3>
             <span className="text-xs text-slate-400 dark:text-slate-500">
               {format(weekDays[0], 'MMM d')} – {format(weekDays[4], 'MMM d, yyyy')}
             </span>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => setWeekAnchor(d => addDays(d, -7))}
+                aria-label="Previous week"
+                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => setWeekAnchor(d => addDays(d, 7))}
+                aria-label="Next week"
+                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              >
+                <ChevronRight size={16} />
+              </button>
+              {!isCurrentWeek && (
+                <button
+                  onClick={() => setWeekAnchor(new Date())}
+                  className="ml-1 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase text-edamame-600 dark:text-edamame-400 hover:bg-edamame/10 transition-colors"
+                >
+                  Today
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex gap-0.5 p-[3px] bg-slate-100 dark:bg-slate-800 rounded-[9px]">
             {segs.map(sg => (
