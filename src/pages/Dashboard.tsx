@@ -11,7 +11,8 @@ import {
   startOfWeek,
   differenceInCalendarDays,
 } from 'date-fns';
-import { Plus, Sparkles, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 interface DashboardProps {
   tasks: Task[];
@@ -89,9 +90,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
   currentUserId,
   activity = [],
   checklistItems,
+  onAddTask,
 }) => {
   const navigate = useNavigate();
   const [boardScope, setBoardScope] = useState<ScopeFilter>(currentUserId ? 'mine' : 'all');
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [newTask, setNewTask] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), caseId: '' });
+  const [caseSearchTerm, setCaseSearchTerm] = useState('');
+  const [isCaseDropdownOpen, setIsCaseDropdownOpen] = useState(false);
+  const [weekAnchor, setWeekAnchor] = useState<Date>(new Date());
 
   const today = startOfDay(new Date());
   const now = new Date();
@@ -106,6 +113,43 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const getCaseAndClient = (caseId?: string) => {
     const c = getCase(caseId);
     return { case: c, client: c ? getClient(c.clientId) : undefined };
+  };
+  const getClientName = (clientId: string) => getClient(clientId)?.name || 'Unknown Client';
+
+  // ── New Task modal ────────────────────────────────────────────────────
+  const filteredCases = useMemo(
+    () =>
+      cases.filter(c =>
+        `${c.title} ${getClientName(c.clientId)}`.toLowerCase().includes(caseSearchTerm.toLowerCase())
+      ),
+    [cases, caseSearchTerm]
+  );
+
+  const handleOpenTaskModal = () => {
+    setNewTask({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), caseId: '' });
+    setCaseSearchTerm('');
+    setIsTaskModalOpen(true);
+  };
+
+  const handleSelectCase = (c: Case) => {
+    setNewTask({ ...newTask, caseId: c.id });
+    setCaseSearchTerm(`${c.title} - ${getClientName(c.clientId)}`);
+    setIsCaseDropdownOpen(false);
+  };
+
+  const handleSaveTask = () => {
+    if (!newTask.title || !newTask.date || !onAddTask) return;
+    onAddTask({
+      id: uuidv4(),
+      title: newTask.title,
+      description: newTask.description,
+      date: newTask.date,
+      caseId: newTask.caseId || undefined,
+      isCompleted: false,
+      priorityOrder: 99999,
+      generatedByAi: false,
+    });
+    setIsTaskModalOpen(false);
   };
 
   // ── Scoped tasks (by owner) — reused for the "This week" board segments ──
@@ -250,8 +294,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [activity, tasks, cases, clients]);
 
   // ── This week board ───────────────────────────────────────────────────
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const weekStart = startOfWeek(weekAnchor, { weekStartsOn: 1 });
   const weekDays = useMemo(() => Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const isCurrentWeek = isSameDay(weekStart, startOfWeek(now, { weekStartsOn: 1 }));
 
   const boardTasks = scopeTasks(boardScope, tasks);
   const getTasksForDay = (day: Date) =>
@@ -278,11 +323,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="text-[13.5px] text-slate-600 dark:text-slate-400 mt-1">{summaryLine}</div>
           </div>
           <button
-            onClick={() => navigate('/cases')}
+            onClick={handleOpenTaskModal}
             className="btn-press flex items-center justify-center gap-1.5 bg-edamame-500 hover:bg-edamame-600 text-white px-4 py-2.5 rounded-[10px] text-[13px] font-bold transition-colors whitespace-nowrap self-start sm:self-auto"
           >
             <Plus size={16} />
-            New Case
+            New Task
           </button>
         </div>
 
@@ -385,12 +430,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* ── This week ─────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mt-7 mb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-7 mb-3">
           <div className="flex items-center gap-3">
-            <h3 className="text-base font-bold tracking-[-0.015em] text-slate-900 dark:text-white">This week</h3>
+            <h3 className="text-base font-bold tracking-[-0.015em] text-slate-900 dark:text-white">
+              {isCurrentWeek ? 'This week' : 'Week of'}
+            </h3>
             <span className="text-xs text-slate-400 dark:text-slate-500">
               {format(weekDays[0], 'MMM d')} – {format(weekDays[4], 'MMM d, yyyy')}
             </span>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => setWeekAnchor(d => addDays(d, -7))}
+                aria-label="Previous week"
+                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => setWeekAnchor(d => addDays(d, 7))}
+                aria-label="Next week"
+                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              >
+                <ChevronRight size={16} />
+              </button>
+              {!isCurrentWeek && (
+                <button
+                  onClick={() => setWeekAnchor(new Date())}
+                  className="ml-1 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase text-edamame-600 dark:text-edamame-400 hover:bg-edamame/10 transition-colors"
+                >
+                  Today
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex gap-0.5 p-[3px] bg-slate-100 dark:bg-slate-800 rounded-[9px]">
             {segs.map(sg => (
@@ -491,6 +562,135 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ── New Task modal ────────────────────────────────────────────── */}
+      {isTaskModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-slate-800">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+              <h3 className="font-bold text-[15px] text-slate-900 dark:text-white">Create New Task</h3>
+              <button
+                onClick={() => setIsTaskModalOpen(false)}
+                className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Task Title
+                </label>
+                <input
+                  type="text"
+                  value={newTask.title}
+                  onChange={e => setNewTask({ ...newTask, title: e.target.value })}
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-slate-900 dark:text-white outline-none text-[13.5px]"
+                  placeholder="e.g. Call client regarding documents"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Due Date
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={newTask.date}
+                    onChange={e => setNewTask({ ...newTask, date: e.target.value })}
+                    className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-slate-900 dark:text-white outline-none text-[13.5px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setNewTask({ ...newTask, date: format(new Date(), 'yyyy-MM-dd') })}
+                    className="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-[10.5px] font-bold uppercase"
+                  >
+                    Today
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Case <span className="text-slate-400 dark:text-slate-500 font-normal">(select one)</span>
+                </label>
+                <div className="relative">
+                  <div className="relative">
+                    <LinkIcon className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" size={16} />
+                    <input
+                      type="text"
+                      value={caseSearchTerm}
+                      onChange={e => {
+                        setCaseSearchTerm(e.target.value);
+                        setIsCaseDropdownOpen(true);
+                        if (newTask.caseId && !e.target.value) {
+                          setNewTask({ ...newTask, caseId: '' });
+                        }
+                      }}
+                      onFocus={() => setIsCaseDropdownOpen(true)}
+                      className="w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-slate-900 dark:text-white outline-none text-[13.5px]"
+                      placeholder="Search case..."
+                    />
+                  </div>
+                  {isCaseDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsCaseDropdownOpen(false)} />
+                      <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filteredCases.length === 0 ? (
+                          <div className="p-3 text-[12.5px] text-slate-500 dark:text-slate-500 italic">No cases found.</div>
+                        ) : (
+                          filteredCases.map(c => (
+                            <div
+                              key={c.id}
+                              onClick={() => handleSelectCase(c)}
+                              className="p-2 hover:bg-edamame/10 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-100 dark:border-slate-700 last:border-0"
+                            >
+                              <div className="text-[13px] font-semibold text-slate-900 dark:text-white">{c.title}</div>
+                              <div className="text-[11.5px] text-slate-500 dark:text-slate-400">{getClientName(c.clientId)}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Description <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={newTask.description}
+                  onChange={e => setNewTask({ ...newTask, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-slate-900 dark:text-white outline-none resize-none text-[13.5px]"
+                  placeholder="Add details..."
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-2">
+              <button
+                onClick={() => setIsTaskModalOpen(false)}
+                className="px-4 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-gray-200 dark:hover:border-slate-700 rounded-lg transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveTask}
+                disabled={!newTask.title || !newTask.date || !newTask.caseId}
+                className="btn-press px-4 py-2 text-[13px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                Save Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
