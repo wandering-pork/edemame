@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "http";
+import { getUserManualContext } from "./_lib/userManual";
 
 interface VercelRequest extends IncomingMessage {
   method: string;
@@ -27,6 +28,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Build case-aware system prompt
+  const userManualContext = getUserManualContext();
+
   const systemPrompt = `You are Edamame Agent, an expert AI assistant for Australian immigration lawyers and migration agents.
 
 You are working inside Focus Mode on a specific case. Your role is to:
@@ -35,8 +38,11 @@ You are working inside Focus Mode on a specific case. Your role is to:
 - Analyse case circumstances and flag risks or opportunities
 - Reference Australian Department of Home Affairs policy accurately
 - Suggest next steps based on case progress
+- Answer "how do I…" / training questions about the Edamame product itself using the USER MANUAL below
 
 ${caseContext ? `ACTIVE CASE CONTEXT:\n${caseContext}\n` : ''}
+${userManualContext ? `USER MANUAL (authoritative reference for how Edamame is meant to work — use this to answer product training questions and to judge whether described behaviour matches what is documented):\n${userManualContext}\n` : ''}
+When asked how to use a feature, base your answer on the USER MANUAL content above. If the manual does not cover something, say so honestly instead of guessing.
 
 Keep responses concise but complete. Use markdown formatting for lists and headings. When referencing specific policy, cite the relevant legislative instrument or policy guidance.`;
 
