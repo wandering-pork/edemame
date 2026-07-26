@@ -21,6 +21,14 @@ to update what the agent knows, just edit or add markdown files and redeploy.
   agent's context on every chat request, so avoid pasting huge unrelated reference material into a
   single page.
 
+## Keep it in sync with the product
+
+Every time the app's user-facing behavior changes — a flow, a button, a new or removed feature —
+update the relevant page(s) here in the same change/PR. Stale docs make the Case Manager Agent
+confidently answer with outdated instructions, which is worse than having no docs at all. See the
+root `CLAUDE.md`'s "Keeping the User Manual in Sync" section, which instructs AI coding agents
+working in this repo to check this folder on every user-facing change.
+
 ## How this is wired up
 
 `api/_lib/userManual.ts` reads every `.md` file under this folder and concatenates them into a

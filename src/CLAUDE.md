@@ -105,3 +105,7 @@ Default seed data (hardcoded in `App.tsx`): 5 clients, 4 cases, 8 tasks, 5 visa 
 - Services (external API calls) go in `services/`
 - All types centralized in `types.ts`
 - Path alias `@/` resolves to project root
+
+## Keeping the User Manual in Sync
+
+Whenever a change here alters user-facing behavior in a `pages/` component, check `docs/user-manual/` (at the repo root, one level up) for pages describing the old behavior and update them in the same change — see the root `CLAUDE.md`'s "Keeping the User Manual in Sync" section for details.
