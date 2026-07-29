@@ -11,7 +11,7 @@ import {
   startOfWeek,
   differenceInCalendarDays,
 } from 'date-fns';
-import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight, ArrowRight, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface DashboardProps {
@@ -91,6 +91,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   activity = [],
   checklistItems,
   onAddTask,
+  onUpdateTask,
+  onDeleteTask,
+  onMoveTaskDate,
 }) => {
   const navigate = useNavigate();
   const [boardScope, setBoardScope] = useState<ScopeFilter>(currentUserId ? 'mine' : 'all');
@@ -99,6 +102,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [caseSearchTerm, setCaseSearchTerm] = useState('');
   const [isCaseDropdownOpen, setIsCaseDropdownOpen] = useState(false);
   const [weekAnchor, setWeekAnchor] = useState<Date>(new Date());
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [dragOverDayKey, setDragOverDayKey] = useState<string | null>(null);
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
 
   const today = startOfDay(new Date());
   const now = new Date();
@@ -229,31 +235,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // ── Needs attention ───────────────────────────────────────────────────
   const attentionItems = useMemo(() => {
-    const items: { id: string; dot: string; title: string; sub: string; caseId: string }[] = [];
+    const items: { id: string; dot: string; title: string; sub: string; caseId?: string }[] = [];
 
     overdueTasks.forEach(t => {
-      if (!t.caseId) return;
       const { case: c, client } = getCaseAndClient(t.caseId);
-      if (!c) return;
       items.push({
         id: t.id,
         dot: '#EF4444',
         title: `${t.title} overdue`,
-        sub: `${client?.name || 'Unknown client'} · ${c.title} · was due ${format(new Date(t.date), 'd MMM')}`,
-        caseId: c.id,
+        sub: c
+          ? `${client?.name || 'Unknown client'} · ${c.title} · was due ${format(new Date(t.date), 'd MMM')}`
+          : `No linked case · was due ${format(new Date(t.date), 'd MMM')}`,
+        caseId: c?.id,
       });
     });
 
     dueTodayTasks.forEach(t => {
-      if (!t.caseId) return;
       const { case: c, client } = getCaseAndClient(t.caseId);
-      if (!c) return;
       items.push({
         id: t.id,
         dot: '#F59E0B',
         title: `${t.title} due today`,
-        sub: `${client?.name || 'Unknown client'} · ${c.title}`,
-        caseId: c.id,
+        sub: c ? `${client?.name || 'Unknown client'} · ${c.title}` : 'No linked case',
+        caseId: c?.id,
       });
     });
 
@@ -300,7 +304,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const boardTasks = scopeTasks(boardScope, tasks);
   const getTasksForDay = (day: Date) =>
-    boardTasks.filter(t => isSameDay(new Date(t.date), day)).filter(t => t.caseId);
+    boardTasks.filter(t => isSameDay(new Date(t.date), day));
+
+  const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) || null : null;
+  const selectedTaskCaseAndClient = getCaseAndClient(selectedTask?.caseId);
+
+  const handleDropOnDay = (day: Date) => {
+    setDragOverDayKey(null);
+    if (!draggingTaskId || !onMoveTaskDate) {
+      setDraggingTaskId(null);
+      return;
+    }
+    const newDate = format(day, 'yyyy-MM-dd');
+    onMoveTaskDate(draggingTaskId, newDate, false);
+    setDraggingTaskId(null);
+  };
 
   const segs: { key: ScopeFilter; label: string }[] = [
     { key: 'mine', label: 'My Tasks' },
@@ -377,7 +395,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               attentionItems.map(item => (
                 <div
                   key={item.id}
-                  onClick={() => navigate(`/cases/${item.caseId}`)}
+                  onClick={() => (item.caseId ? navigate(`/cases/${item.caseId}`) : setSelectedTaskId(item.id))}
                   className="flex items-center gap-3 px-5 py-3 border-t border-gray-100 dark:border-slate-800 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
                 >
                   <span
@@ -391,7 +409,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div className="text-[11.5px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">{item.sub}</div>
                   </div>
                   <span className="text-xs font-semibold text-edamame-600 dark:text-edamame-400 whitespace-nowrap">
-                    Open case →
+                    {item.caseId ? 'Open case →' : 'View task →'}
                   </span>
                 </div>
               ))
@@ -485,12 +503,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {weekDays.map(day => {
               const isToday = isSameDay(day, today);
               const dayTasks = getTasksForDay(day);
+              const dayKey = day.toISOString();
+              const isDragOver = dragOverDayKey === dayKey;
 
               return (
                 <div
-                  key={day.toISOString()}
-                  className={`min-w-0 rounded-xl border p-3 min-h-[170px] flex flex-col gap-2 box-border ${
-                    isToday
+                  key={dayKey}
+                  onDragOver={e => {
+                    if (!draggingTaskId) return;
+                    e.preventDefault();
+                    if (dragOverDayKey !== dayKey) setDragOverDayKey(dayKey);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverDayKey === dayKey) setDragOverDayKey(null);
+                  }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    handleDropOnDay(day);
+                  }}
+                  className={`min-w-0 rounded-xl border p-3 min-h-[170px] flex flex-col gap-2 box-border transition-colors ${
+                    isDragOver
+                      ? 'bg-edamame/[.15] border-edamame-500 border-dashed'
+                      : isToday
                       ? 'bg-edamame/[.07] border-edamame/45'
                       : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800'
                   }`}
@@ -536,8 +570,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         return (
                           <div
                             key={task.id}
-                            onClick={() => navigate(`/cases/${task.caseId}`)}
-                            className={`task-card rounded-md py-1.5 px-2.5 cursor-pointer transition-transform hover:-translate-y-0.5 ${kind.bg}`}
+                            draggable
+                            onDragStart={e => {
+                              setDraggingTaskId(task.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                            }}
+                            onDragEnd={() => {
+                              setDraggingTaskId(null);
+                              setDragOverDayKey(null);
+                            }}
+                            onClick={() => setSelectedTaskId(task.id)}
+                            className={`task-card rounded-md py-1.5 px-2.5 cursor-pointer transition-transform hover:-translate-y-0.5 ${kind.bg} ${
+                              draggingTaskId === task.id ? 'opacity-40' : ''
+                            }`}
                             style={{ borderLeft: `3px solid ${kind.edge}` }}
                           >
                             <div className={`text-[9px] font-bold uppercase tracking-[0.08em] ${kind.text}`}>
@@ -615,7 +660,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
               <div>
                 <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Case <span className="text-slate-400 dark:text-slate-500 font-normal">(select one)</span>
+                  Case <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span>
                 </label>
                 <div className="relative">
                   <div className="relative">
@@ -682,11 +727,107 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </button>
               <button
                 onClick={handleSaveTask}
-                disabled={!newTask.title || !newTask.date || !newTask.caseId}
+                disabled={!newTask.title || !newTask.date}
                 className="btn-press px-4 py-2 text-[13px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 Save Task
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Task detail modal ─────────────────────────────────────────── */}
+      {selectedTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-slate-800">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+              <h3 className="font-bold text-[15px] text-slate-900 dark:text-white">Task Details</h3>
+              <button
+                onClick={() => setSelectedTaskId(null)}
+                className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-2.5">
+                <button
+                  onClick={() => onUpdateTask?.({ ...selectedTask, isCompleted: !selectedTask.isCompleted })}
+                  className="mt-0.5 text-edamame-500 flex-shrink-0"
+                  aria-label={selectedTask.isCompleted ? 'Mark incomplete' : 'Mark complete'}
+                >
+                  {selectedTask.isCompleted ? <CheckCircle2 size={20} /> : <Circle size={20} className="text-slate-300 dark:text-slate-600" />}
+                </button>
+                <div
+                  className={`text-[15px] font-bold text-slate-900 dark:text-white ${
+                    selectedTask.isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : ''
+                  }`}
+                >
+                  {selectedTask.title}
+                </div>
+              </div>
+
+              {selectedTask.description && (
+                <div className="text-[13px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+                  {selectedTask.description}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedTask.date}
+                  onChange={e => onMoveTaskDate?.(selectedTask.id, e.target.value, false)}
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-slate-900 dark:text-white outline-none text-[13.5px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Case
+                </label>
+                {selectedTaskCaseAndClient.case ? (
+                  <div className="text-[13px] text-slate-700 dark:text-slate-300">
+                    {selectedTaskCaseAndClient.case.title}
+                    {selectedTaskCaseAndClient.client && ` — ${selectedTaskCaseAndClient.client.name}`}
+                  </div>
+                ) : (
+                  <div className="text-[13px] text-slate-400 dark:text-slate-500 italic">Not linked to a case</div>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2">
+              <button
+                onClick={() => {
+                  if (!onDeleteTask) return;
+                  onDeleteTask(selectedTask.id);
+                  setSelectedTaskId(null);
+                }}
+                className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+                aria-label="Delete task"
+              >
+                <Trash2 size={16} />
+              </button>
+              <div className="flex items-center gap-2">
+                {selectedTask.caseId && (
+                  <button
+                    onClick={() => {
+                      navigate(`/cases/${selectedTask.caseId}`);
+                      setSelectedTaskId(null);
+                    }}
+                    className="btn-press flex items-center gap-1.5 px-4 py-2 text-[13px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg shadow-sm transition-all"
+                  >
+                    Go to Case
+                    <ArrowRight size={14} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
