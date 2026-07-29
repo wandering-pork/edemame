@@ -126,3 +126,9 @@ Registration/login gates the **entire app** (not just cloud storage mode) via Su
 ### Seed Data
 
 Hardcoded in `App.tsx`: 5 clients, 4 cases, 8 tasks, 5 Australian visa workflow templates (Student 500, Skilled 190, Partner 820/801, Visitor 600, Graduate 485). No persistence layer yet — state resets on reload.
+
+## Keeping the User Manual in Sync
+
+`docs/user-manual/` (see `docs/user-manual/README.md`) is the Case Manager Agent's (Focus Mode chat) source of truth for "how do I…" answers — it is loaded verbatim into the Gemini system prompt by `api/_lib/userManual.ts`, so stale pages make the agent actively wrong, not just outdated.
+
+**Whenever you change user-facing behavior** (a page's flow, a button/label, a new feature, a removed feature, a changed field, a renamed module), check whether any file under `docs/user-manual/` describes the old behavior and update it in the same change. Conversely, when adding a new module/page, add a corresponding module folder under `docs/user-manual/` (mirroring `case-manager/`, `dashboard/`, `clients/`, `templates/`) with at least a `getting-started.md`. Pure internal/refactor changes with no user-visible effect don't require a manual update.

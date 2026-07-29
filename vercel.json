@@ -3,6 +3,11 @@
   "outputDirectory": "src/dist",
   "framework": "vite",
   "regions": ["syd1"],
+  "functions": {
+    "api/focus-chat.ts": {
+      "includeFiles": "docs/user-manual/**"
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
