@@ -77,8 +77,3 @@ export function getUserManualContext(): string {
   }
   return cachedContext;
 }
-
-// Exported for potential future use (e.g. debugging/inspection endpoints).
-export function _resetUserManualCache(): void {
-  cachedContext = null;
-}
