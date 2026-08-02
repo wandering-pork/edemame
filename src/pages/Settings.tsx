@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Theme } from '../types';
-import { Moon, Sun, Save, Check, Palette, LogOut, FolderCog, AlertTriangle } from 'lucide-react';
+import { Moon, Sun, Save, Check, Palette, LogOut, FolderCog, AlertTriangle, Cloud, HardDrive } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useLocalFolder } from '@/contexts/LocalFolderContext';
+import { useRepositories } from '@/contexts/RepositoryContext';
+import { createCloudRepositories } from '@/repositories/cloud';
+import { createFilesystemRepositories } from '@/repositories/filesystem';
+import { copyAllData } from '@/repositories/migrate';
+import type { Repositories } from '@/repositories/types';
+import { isSupabaseConfigured } from '@/lib/supabaseClient';
+import { isEmpty } from '@/lib/fsStorage';
+import { saveHandle } from '@/lib/folderHandleStore';
 
 const initialsOf = (s: string) =>
   s
@@ -24,11 +32,130 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
   const [hasChanges, setHasChanges] = useState(false);
   const [saved, setSaved] = useState(false);
   const { user, signOut } = useAuth();
-  const { profile } = useProfile();
+  const { profile, updateProfile } = useProfile();
   const { changeFolder } = useLocalFolder();
+  const repositories = useRepositories();
   const [changingFolder, setChangingFolder] = useState(false);
   const [changeResult, setChangeResult] = useState<string | null>(null);
+  const [switchingMode, setSwitchingMode] = useState(false);
+  const [switchProgress, setSwitchProgress] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // Lightweight post-copy sanity check: the highest-value entities must have the
+  // same number of records on both sides before we flip storageMode. Returns an
+  // error message describing the mismatch, or null when the counts line up.
+  const verifyCopiedCounts = async (source: Repositories, dest: Repositories): Promise<string | null> => {
+    const [srcClients, srcCases, srcTasks, dstClients, dstCases, dstTasks] = await Promise.all([
+      source.clients.getAll(),
+      source.cases.getAll(),
+      source.tasks.getAll(),
+      dest.clients.getAll(),
+      dest.cases.getAll(),
+      dest.tasks.getAll(),
+    ]);
+    const mismatches: string[] = [];
+    if (dstClients.length !== srcClients.length) mismatches.push(`${dstClients.length} of ${srcClients.length} clients`);
+    if (dstCases.length !== srcCases.length) mismatches.push(`${dstCases.length} of ${srcCases.length} cases`);
+    if (dstTasks.length !== srcTasks.length) mismatches.push(`${dstTasks.length} of ${srcTasks.length} tasks`);
+    if (mismatches.length === 0) return null;
+    return `Copied ${mismatches.join(', ')} — nothing was switched over. Please try again.`;
+  };
+
+  const handleSwitchToCloud = async () => {
+    if (!isSupabaseConfigured) {
+      setSwitchError("Cloud storage isn't configured for this deployment. Contact your administrator.");
+      return;
+    }
+    if (!window.confirm('This copies all your data to the cloud. Your local folder is left untouched as a backup. Continue?')) return;
+    setSwitchError(null);
+    setSwitchingMode(true);
+    setSwitchProgress('Preparing...');
+    try {
+      const cloudRepos = createCloudRepositories(user!.id);
+      await copyAllData(repositories, cloudRepos, entity => setSwitchProgress(`Copying ${entity}...`));
+
+      setSwitchProgress('Verifying...');
+      const mismatch = await verifyCopiedCounts(repositories, cloudRepos);
+      if (mismatch) {
+        console.error('Storage mode switch to cloud aborted — copy verification failed:', mismatch);
+        setSwitchError(mismatch);
+        setSwitchingMode(false);
+        setSwitchProgress(null);
+        return;
+      }
+
+      setSwitchProgress('Finishing up...');
+      try {
+        await updateProfile({ storageMode: 'cloud' });
+      } catch (err) {
+        console.error('Copied all data to cloud but failed to update storageMode on the profile:', err);
+        setSwitchError('Your data was copied to the cloud, but we could not finish switching modes. Please try again — already-copied records are reused, not duplicated.');
+        setSwitchingMode(false);
+        setSwitchProgress(null);
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to switch storage mode to cloud:', err);
+      setSwitchError('Could not switch to cloud storage. Please try again — already-copied records are reused, not duplicated.');
+      setSwitchingMode(false);
+      setSwitchProgress(null);
+    }
+  };
+
+  const handleSwitchToLocal = async () => {
+    if (!('showDirectoryPicker' in window)) {
+      setSwitchError('Local storage requires Chrome or Edge.');
+      return;
+    }
+    let handle: FileSystemDirectoryHandle;
+    try {
+      handle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
+    } catch {
+      return; // user cancelled the picker
+    }
+    if (!(await isEmpty(handle))) {
+      setSwitchError('Please pick an empty folder — switching to local storage writes a fresh copy of your cloud data there.');
+      return;
+    }
+    if (!window.confirm(`This copies all your cloud data into "${handle.name}". Continue?`)) return;
+    setSwitchError(null);
+    setSwitchingMode(true);
+    setSwitchProgress('Preparing...');
+    try {
+      const fsRepos = createFilesystemRepositories(handle);
+      await copyAllData(repositories, fsRepos, entity => setSwitchProgress(`Copying ${entity}...`));
+
+      setSwitchProgress('Verifying...');
+      const mismatch = await verifyCopiedCounts(repositories, fsRepos);
+      if (mismatch) {
+        console.error('Storage mode switch to local aborted — copy verification failed:', mismatch);
+        setSwitchError(`${mismatch} Pick a fresh empty folder when you retry.`);
+        setSwitchingMode(false);
+        setSwitchProgress(null);
+        return;
+      }
+
+      setSwitchProgress('Finishing up...');
+      try {
+        await saveHandle(user!.id, handle);
+        await updateProfile({ storageMode: 'local', linkedFolderName: handle.name, linkedAt: new Date().toISOString() });
+      } catch (err) {
+        console.error(`Copied all data into "${handle.name}" but failed to finish switching storageMode to local:`, err);
+        setSwitchError(`Your data was copied into "${handle.name}", but we could not finish switching modes. Please try again with a fresh empty folder.`);
+        setSwitchingMode(false);
+        setSwitchProgress(null);
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to switch storage mode to local:', err);
+      setSwitchError('Could not switch to local storage. Please try again with a fresh empty folder.');
+      setSwitchingMode(false);
+      setSwitchProgress(null);
+    }
+  };
 
   const handleChangeFolder = async () => {
     setChangingFolder(true);
@@ -261,6 +388,53 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
             </div>
           </div>
         )}
+
+        {/* Storage mode switch */}
+        <div className="mt-6 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 dark:text-edamame-400 flex items-center justify-center">
+              {profile?.storageMode === 'local' ? <HardDrive size={16} /> : <Cloud size={16} />}
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white">Storage Mode</h2>
+              <p className="text-xs text-gray-400 dark:text-slate-500">
+                Currently storing data {profile?.storageMode === 'local' ? 'locally in a linked folder' : 'in the cloud'}.
+              </p>
+            </div>
+          </div>
+          <div className="p-6 flex items-center justify-between gap-4">
+            <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm">
+              {profile?.storageMode === 'local'
+                ? 'Switch to cloud storage to access your data from any device without a linked folder.'
+                : 'Switch to local storage to keep your data as files in a folder you control (e.g. inside Dropbox or OneDrive).'}
+            </p>
+            {profile?.storageMode === 'local' ? (
+              <button
+                onClick={handleSwitchToCloud}
+                disabled={switchingMode}
+                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 transition-all disabled:opacity-50 flex-shrink-0"
+              >
+                <Cloud size={15} />
+                {switchingMode ? (switchProgress || 'Switching...') : 'Switch to Cloud'}
+              </button>
+            ) : (
+              <button
+                onClick={handleSwitchToLocal}
+                disabled={switchingMode}
+                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 transition-all disabled:opacity-50 flex-shrink-0"
+              >
+                <HardDrive size={15} />
+                {switchingMode ? (switchProgress || 'Switching...') : 'Switch to Local'}
+              </button>
+            )}
+          </div>
+          {switchError && (
+            <div className="px-6 pb-5 -mt-2 flex items-start gap-1.5 text-xs text-red-500 dark:text-red-400">
+              <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+              <span>{switchError}</span>
+            </div>
+          )}
+        </div>
 
         {/* Account section */}
         <div className="mt-6 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">

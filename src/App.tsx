@@ -26,6 +26,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
 import { LocalFolderProvider, useLocalFolder } from './contexts/LocalFolderContext';
 import { LinkFolderGate } from './components/LinkFolderGate';
+import { isSupabaseConfigured } from './lib/supabaseClient';
 
 // ---------------------------------------------------------------------------
 // Inner app — has access to repositories and router
@@ -44,6 +45,7 @@ const AppShell: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
   const theme: Theme = profile?.theme ?? 'classic';
   const [loading, setLoading] = useState(true);
+  const [loadWarning, setLoadWarning] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
@@ -105,8 +107,22 @@ const AppShell: React.FC = () => {
             name: user!.user_metadata?.full_name || user!.email || 'You',
             email: user!.email || '',
           });
-          await Promise.all(seeded.map(m => repos.teamMembers.create(m)));
-          resolvedTeam = seeded;
+          // Persist each seed member independently: a single failed write must not
+          // abort the whole load and leave the user staring at an empty app. Anything
+          // that fails to persist still shows up for this session from memory.
+          let seedWriteFailed = false;
+          resolvedTeam = await Promise.all(seeded.map(async m => {
+            try {
+              return await repos.teamMembers.create(m);
+            } catch (err) {
+              seedWriteFailed = true;
+              console.error(`Failed to persist seed team member "${m.name}" (${m.id}) — continuing with the in-memory copy:`, err);
+              return m;
+            }
+          }));
+          if (seedWriteFailed && !cancelled) {
+            setLoadWarning('Some starter data could not be saved to your storage, so it may disappear on reload. See the browser console for details.');
+          }
         }
 
         setTasks(t);
@@ -115,6 +131,11 @@ const AppShell: React.FC = () => {
         setNotifications(notifs);
         setTeamMembers(resolvedTeam);
         setActivity(activityEvents);
+      } catch (err) {
+        console.error('Failed to load data from repositories:', err);
+        if (!cancelled) {
+          setLoadWarning('We could not load your data from storage. Please reload the page — if this keeps happening, check the browser console for details.');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -426,6 +447,17 @@ const AppShell: React.FC = () => {
             onMarkAllAsRead={handleMarkAllAsRead}
             onDeleteNotification={handleDeleteNotification}
           />
+          {loadWarning && (
+            <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
+              <span>{loadWarning}</span>
+              <button
+                onClick={() => setLoadWarning(null)}
+                className="flex-shrink-0 font-semibold underline underline-offset-2"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           <main>
           <Routes>
             <Route path="/dashboard" element={
@@ -626,13 +658,29 @@ const StorageGate: React.FC = () => {
     );
   }
 
+  if (profile.storageMode === 'cloud' && !isSupabaseConfigured) {
+    // Cloud mode routes every read and write through Supabase — without real
+    // credentials the app shell would render but silently fail on all data.
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950 px-6">
+        <div className="max-w-md text-center">
+          <h1 className="text-lg font-bold text-gray-900 dark:text-white">Cloud storage isn't configured</h1>
+          <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
+            This deployment is missing its Supabase configuration, so your cloud data can't be loaded or saved.
+            Contact your administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (profile.storageMode === 'cloud') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-        <p className="text-center text-gray-600 dark:text-gray-400 max-w-sm">
-          Cloud storage isn't available yet. Please choose Local storage for now — you can switch once cloud support ships.
-        </p>
-      </div>
+      <RepositoryProvider storageMode={profile.storageMode}>
+        <SidebarProvider>
+          <AppShell />
+        </SidebarProvider>
+      </RepositoryProvider>
     );
   }
 
