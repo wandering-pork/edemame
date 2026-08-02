@@ -3,10 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+/**
+ * True only when both env vars are actually present — i.e. the client below is
+ * talking to a real project rather than the placeholder fallback. Cloud storage
+ * mode routes all app data through Supabase, so callers must check this before
+ * assuming reads/writes can work at all.
+ */
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+
+if (!isSupabaseConfigured) {
   console.error(
     'Missing Supabase config. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in src/.env.local — ' +
-    'see https://supabase.com/dashboard/project/_/settings/api. Auth will not work until this is set.'
+    'see https://supabase.com/dashboard/project/_/settings/api. Auth and cloud storage will not work until this is set.'
   );
 }
 

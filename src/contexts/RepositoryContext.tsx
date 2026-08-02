@@ -3,6 +3,7 @@ import type { Repositories } from '../repositories/types';
 import { createRepositories } from '../repositories/factory';
 import type { StorageMode } from '../types';
 import { useLocalFolder } from './LocalFolderContext';
+import { useAuth } from './AuthContext';
 
 interface RepositoryContextValue {
   repositories: Repositories;
@@ -17,10 +18,13 @@ const RepositoryContext = createContext<RepositoryContextValue | null>(null);
  */
 export function RepositoryProvider({ children, storageMode }: { children: React.ReactNode; storageMode: StorageMode }) {
   const { rootHandle } = useLocalFolder();
+  // Safe: RepositoryProvider is only ever rendered inside ProtectedRoute, which guarantees a session.
+  const { user } = useAuth();
+  const userId = user!.id;
   const value = useMemo(() => ({
-    repositories: createRepositories(storageMode, rootHandle),
+    repositories: createRepositories(storageMode, rootHandle, userId),
     storageMode,
-  }), [storageMode, rootHandle]);
+  }), [storageMode, rootHandle, userId]);
 
   return (
     <RepositoryContext.Provider value={value}>
