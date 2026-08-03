@@ -13,7 +13,7 @@ Four cards at the top summarise your workload:
   due today.
 - **Overdue** — incomplete tasks whose due date has already passed, with the next one to deal with
   named underneath.
-- **Docs outstanding** — documents still pending or uploaded (not yet verified) across active
+- **Docs outstanding** — documents still pending or linked (not yet verified) across active
   document checklists, when checklist data is available for the case.
 
 ## Needs Attention

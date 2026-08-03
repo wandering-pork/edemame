@@ -162,7 +162,7 @@ export type ViewMode = 'dashboard' | 'clients' | 'cases' | 'case-details' | 'tem
 // Document Checklist
 // ---------------------------------------------------------------------------
 
-export type ChecklistItemStatus = 'pending' | 'uploaded' | 'verified' | 'waived';
+export type ChecklistItemStatus = 'pending' | 'linked' | 'verified' | 'waived';
 
 export interface DocumentChecklistItem {
   id: string;
@@ -172,6 +172,29 @@ export interface DocumentChecklistItem {
   status: ChecklistItemStatus;
   linkedDocumentId?: string;
   requiredForSubclass?: string[];
+  /** Document category this item belongs to, e.g. "482 — Sponsor & Nomination Documents". Renders as a collapsible section. */
+  category?: string;
+  /** True when this item was manually added by the user (rather than generated from the system default / workflow template). */
+  manuallyAdded?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Case Workspace — tabs, View/Tools catalogue
+// ---------------------------------------------------------------------------
+
+/** Built-in View items surfaced from the Workspace "View" section. */
+export type CaseViewKind = 'tasks' | 'checklist' | 'notes';
+
+/** Built-in Tool items surfaced from the Workspace "Tools" section. */
+export type CaseToolKind = 'checklist-generator' | 'auto-packager' | 'bundle-builder-820';
+
+export type CaseTabKind = 'workspace' | CaseViewKind | CaseToolKind;
+
+export interface CaseOpenTab {
+  id: string; // stable per-kind id, e.g. "view:tasks" or "tool:checklist-generator"
+  kind: CaseTabKind;
+  label: string;
+  pinned: boolean;
 }
 
 // ---------------------------------------------------------------------------

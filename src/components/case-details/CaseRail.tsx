@@ -1,5 +1,6 @@
 import React from 'react';
-import type { Client } from '../../types';
+import { FileText, Image as ImageIcon, File as FileIcon } from 'lucide-react';
+import type { Client, Document } from '../../types';
 
 export interface RailAlert {
   color: 'red' | 'amber' | 'blue';
@@ -12,6 +13,15 @@ const alertColor: Record<RailAlert['color'], string> = {
   blue: 'text-blue-600 dark:text-blue-400',
 };
 
+/** MIME type used on the drag payload when dragging a Case Files row onto a Document Checklist item. */
+export const CASE_FILE_DRAG_MIME = 'application/x-edamame-document-id';
+
+function fileIconFor(fileType: string) {
+  if (fileType.startsWith('image/')) return ImageIcon;
+  if (fileType === 'application/pdf' || fileType.includes('wordprocessing')) return FileText;
+  return FileIcon;
+}
+
 interface CaseRailProps {
   client: Client;
   applicant?: Client;
@@ -19,6 +29,9 @@ interface CaseRailProps {
   completedCount: number;
   pendingCount: number;
   alerts: RailAlert[];
+  /** Case Files panel (formerly a "WORKSPACE" left-panel subsection; the "DOCS" subsection has been removed). */
+  documents?: Document[];
+  onOpenDocument?: (doc: Document) => void;
 }
 
 const RailLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -32,6 +45,8 @@ export const CaseRail: React.FC<CaseRailProps> = ({
   completedCount,
   pendingCount,
   alerts,
+  documents = [],
+  onOpenDocument,
 }) => {
   return (
     <aside className="ed-rail xl:sticky xl:top-4 self-start bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-[18px]">
@@ -96,6 +111,43 @@ export const CaseRail: React.FC<CaseRailProps> = ({
           </div>
         </div>
       )}
+
+      {/* Case Files — drag a row onto a Document Checklist item to link it */}
+      <div className="mt-3.5 pt-3.5 border-t border-gray-100 dark:border-slate-800">
+        <div className="flex items-baseline justify-between">
+          <RailLabel>Case Files</RailLabel>
+          <span className="text-[10.5px] font-bold text-gray-400 dark:text-slate-500">{documents.length}</span>
+        </div>
+        {documents.length === 0 ? (
+          <p className="mt-2 text-[11px] text-gray-400 dark:text-slate-500 leading-relaxed">
+            No files in this case yet.
+          </p>
+        ) : (
+          <div className="mt-2 space-y-1 max-h-64 overflow-y-auto custom-scrollbar pr-0.5">
+            {documents.map(doc => {
+              const Icon = fileIconFor(doc.fileType);
+              return (
+                <div
+                  key={doc.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(CASE_FILE_DRAG_MIME, doc.id);
+                    e.dataTransfer.effectAllowed = 'link';
+                  }}
+                  onClick={() => onOpenDocument?.(doc)}
+                  title="Drag onto a Document Checklist item to link it"
+                  className="group flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-grab active:cursor-grabbing hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Icon size={12} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
+                  <span className="text-[11px] text-gray-600 dark:text-slate-300 truncate group-hover:text-edamame">
+                    {doc.fileName}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </aside>
   );
 };
