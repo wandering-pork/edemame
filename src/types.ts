@@ -178,11 +178,30 @@ export interface DocumentChecklistItem {
 // Focus Mode Chat
 // ---------------------------------------------------------------------------
 
+// Distinguishes a plain text turn from the agentic GitHub-issue-filing flow
+// (see GitHub issue #15): 'issue-draft' renders Confirm/Cancel buttons for a
+// drafted issue that hasn't been filed yet; 'issue-filed' is the confirmation
+// message after a real POST to GitHub succeeded.
+export type FocusMessageKind = 'text' | 'issue-draft' | 'issue-filed';
+
+export interface FocusIssueDraft {
+  title: string;
+  body: string;
+}
+
 export interface FocusChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   createdAt: string;
+  kind?: FocusMessageKind;
+  /** Present when kind === 'issue-draft' and still awaiting Confirm/Cancel. */
+  issueDraft?: FocusIssueDraft;
+  /** Set once the draft has been confirmed (filed) or cancelled (discarded). */
+  issueDraftResolved?: 'filed' | 'cancelled';
+  /** Present when kind === 'issue-filed'. */
+  issueUrl?: string;
+  issueNumber?: number;
 }
 
 export interface FocusConversation {

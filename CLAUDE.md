@@ -31,6 +31,8 @@ npm run lint      # TypeScript type check (tsc --noEmit)
 
 Requires `GEMINI_API_KEY` in `src/.env.local`.
 
+Agentic GitHub issue filing from Case Manager Focus Mode chat (see "Agentic Issue Filing" below) requires `GITHUB_ISSUES_TOKEN` — a fine-grained GitHub Personal Access Token scoped to Issues Read/Write only on `wandering-pork/edemame` — in `src/.env.local` for local dev, and as an environment variable on the Vercel project for production. This token is read only inside the `api/` serverless functions and is never bundled into client-side code.
+
 Auth requires `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `src/.env.local` (get these from your Supabase project's Settings → API page). Without them, the app still loads but `signUp`/`signIn` calls fail with a network error — `src/lib/supabaseClient.ts` falls back to a placeholder URL rather than crashing on load, and logs a console error.
 
 ## Architecture
@@ -95,6 +97,17 @@ Registration/login gates the **entire app** (not just cloud storage mode) via Su
 - **Switching Storage Mode**: `pages/Settings.tsx`'s "Storage Mode" section lets a user switch between local and cloud after onboarding (previously fixed for the account's lifetime). `repositories/migrate.ts`'s `copyAllData(source, dest)` copies every entity (including document blobs, via `getFileData`/`create`) from the currently active repositories into the other mode's repositories; the page then calls `updateProfile({ storageMode })` and does a full `window.location.reload()` so `StorageGate`/`RepositoryProvider` re-initialize cleanly rather than reconciling in-memory state against a swapped backend. Cloud → local requires picking an empty folder (rejects non-empty targets, unlike `changeFolder()`'s adopt-as-is behavior); local → cloud leaves the local folder untouched as a backup.
 
 **Production:** Supabase project `edamame-legal-flow` (wandering-pork's Org) backs both dev and prod. Its Auth → URL Configuration Site URL is `https://edemame.vercel.app`, with `https://edemame.vercel.app/**` and `http://localhost:3000/**` allow-listed as redirect URLs. The Vercel project `edemame` has `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` set for Production + Preview. The `profiles` table migration and the cloud data tables migration (`20260802000000_create_cloud_data_tables.sql`) must both be applied manually (Supabase SQL editor, or `supabase db push` once the CLI is linked to the project) — migrations are not applied automatically.
+
+### Agentic Issue Filing (Case Manager Focus Mode chat only)
+
+Focus Mode chat (`api/focus-chat.ts`, rendered by `AgentPanel.tsx`) can recognize when a user's message describes a product defect or feature request and offer to file a GitHub issue — scoped only to this chat surface, per GitHub issue #15.
+
+1. On every turn, the Gemini system prompt asks the model to silently classify the message against the loaded User Manual context (`api/_lib/userManual.ts`) into Normal Question / Defect / Feature Request / None.
+2. For Defect or Feature Request, the model uses Gemini function-calling (`tools` on the `generateContent` request) to call `search_github_issues(query)`, which `api/focus-chat.ts` executes server-side via the GitHub Search API (`api/_lib/github.ts`, using `GITHUB_ISSUES_TOKEN`).
+3. If a likely duplicate is found, the model replies in plain text with a link to the existing issue instead of drafting a new one.
+4. If not, the model calls `draft_github_issue(title, body)`. The backend does **not** file anything at this point — it returns `{ kind: 'issue-draft', draft }` to the frontend, which `AgentPanel.tsx` renders as a message with `kind: 'issue-draft'` (see `FocusChatMessage` in `types.ts`) showing the drafted title/body plus **Confirm** and **Cancel** buttons.
+5. Only a user's Confirm click hits the separate `api/file-github-issue.ts` endpoint, which performs the actual `POST /repos/wandering-pork/edemame/issues` call, labeling the issue `agent-reported`. Cancel just marks the draft discarded client-side — no API call.
+6. Filed issues are rate-limited to 3 per Focus Mode conversation (thread), enforced both in the `focus-chat.ts` system prompt/loop and re-checked in `file-github-issue.ts` by counting `kind === 'issue-filed'` messages already in that conversation's history (sent from the frontend on each request) — there's no separate session store.
 
 ### Visa Eligibility Advisor Flow
 

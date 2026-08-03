@@ -30,6 +30,8 @@ npm run lint      # TypeScript type check (tsc --noEmit)
 
 Requires a valid `GEMINI_API_KEY` in `.env.local`. The Vite config injects it at build time via `process.env.GEMINI_API_KEY`.
 
+For the Focus Mode chat's agentic GitHub issue filing to work end-to-end, also set `GITHUB_ISSUES_TOKEN` (server-side only, read by `api/focus-chat.ts` and `api/file-github-issue.ts`) — see the root `CLAUDE.md`'s "Agentic Issue Filing" section.
+
 Also requires `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local` for authentication (Settings → API in your Supabase project dashboard). These are consumed client-side via `import.meta.env` (standard Vite `VITE_`-prefixed env vars, no custom build config needed).
 
 ## Architecture

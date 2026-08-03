@@ -122,6 +122,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [filingIssueMessageId, setFilingIssueMessageId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const activeConv = conversations.find(c => c.id === activeConvId);
@@ -429,24 +430,40 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       const currentConv = conversations.find(c => c.id === convId);
       const historyMessages = [...(currentConv?.messages || []), userMsg];
 
+      // Per-session cap on agent-filed GitHub issues (see api/focus-chat.ts /
+      // api/file-github-issue.ts) — counted from this conversation's own
+      // history so it resets per Focus Mode chat thread.
+      const issuesFiledInSession = historyMessages.filter(m => m.kind === 'issue-filed').length;
+
       const response = await fetch('/api/focus-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: historyMessages.map(m => ({ role: m.role, content: m.content })),
           caseContext,
+          issuesFiledInSession,
         }),
       });
 
       const data = await response.json();
-      const replyText = data.reply || 'Sorry, I could not generate a response.';
 
-      const assistantMsg: FocusChatMessage = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: replyText,
-        createdAt: new Date().toISOString(),
-      };
+      const assistantMsg: FocusChatMessage =
+        data.kind === 'issue-draft' && data.draft
+          ? {
+              id: uuidv4(),
+              role: 'assistant',
+              content: "I think this is worth tracking — here's a drafted GitHub issue for your review.",
+              createdAt: new Date().toISOString(),
+              kind: 'issue-draft',
+              issueDraft: { title: data.draft.title, body: data.draft.body },
+            }
+          : {
+              id: uuidv4(),
+              role: 'assistant',
+              content: data.reply || 'Sorry, I could not generate a response.',
+              createdAt: new Date().toISOString(),
+              kind: 'text',
+            };
 
       setConversations(prev => {
         const next = prev.map(c => {
@@ -480,6 +497,97 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setChatInput(msg);
     if (!agentOpen) setAgentOpen(true);
   };
+
+  // ---- Agentic GitHub issue filing (GitHub issue #15) ----
+  // Confirm/Cancel are the only two ways a drafted issue is resolved — the
+  // draft itself is produced by /api/focus-chat's function-calling loop and
+  // is never filed automatically. Only Confirm hits /api/file-github-issue,
+  // the sole endpoint that performs the real POST /repos/.../issues call.
+  const updateMessageInActiveConv = useCallback(
+    (messageId: string, patch: Partial<FocusChatMessage>) => {
+      setConversations(prev => {
+        const next = prev.map(c => {
+          if (c.id !== activeConvId) return c;
+          return {
+            ...c,
+            messages: c.messages.map(m => (m.id === messageId ? { ...m, ...patch } : m)),
+          };
+        });
+        persistConvs(next);
+        return next;
+      });
+    },
+    [activeConvId]
+  );
+
+  const handleCancelIssueDraft = useCallback(
+    (messageId: string) => {
+      updateMessageInActiveConv(messageId, { issueDraftResolved: 'cancelled' });
+    },
+    [updateMessageInActiveConv]
+  );
+
+  const handleConfirmIssueDraft = useCallback(
+    async (messageId: string) => {
+      const conv = conversations.find(c => c.id === activeConvId);
+      const message = conv?.messages.find(m => m.id === messageId);
+      if (!message?.issueDraft || filingIssueMessageId) return;
+
+      const issuesFiledInSession = (conv?.messages || []).filter(m => m.kind === 'issue-filed').length;
+
+      setFilingIssueMessageId(messageId);
+      try {
+        const response = await fetch('/api/file-github-issue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: message.issueDraft.title,
+            body: message.issueDraft.body,
+            issuesFiledInSession,
+          }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          updateMessageInActiveConv(messageId, { issueDraftResolved: 'cancelled' });
+          const errMsg: FocusChatMessage = {
+            id: uuidv4(),
+            role: 'assistant',
+            content: data.error || 'Failed to file the GitHub issue. Please try again or file it manually.',
+            createdAt: new Date().toISOString(),
+            kind: 'text',
+          };
+          setConversations(prev => {
+            const next = prev.map(c => (c.id === activeConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
+            persistConvs(next);
+            return next;
+          });
+          return;
+        }
+
+        updateMessageInActiveConv(messageId, { issueDraftResolved: 'filed' });
+        const filedMsg: FocusChatMessage = {
+          id: uuidv4(),
+          role: 'assistant',
+          content: `Done — filed [#${data.number}](${data.url}).`,
+          createdAt: new Date().toISOString(),
+          kind: 'issue-filed',
+          issueUrl: data.url,
+          issueNumber: data.number,
+        };
+        setConversations(prev => {
+          const next = prev.map(c => (c.id === activeConvId ? { ...c, messages: [...c.messages, filedMsg] } : c));
+          persistConvs(next);
+          return next;
+        });
+      } catch {
+        updateMessageInActiveConv(messageId, { issueDraftResolved: 'cancelled' });
+      } finally {
+        setFilingIssueMessageId(null);
+      }
+    },
+    [conversations, activeConvId, filingIssueMessageId, updateMessageInActiveConv]
+  );
 
   // ---- Top-bar action handlers ----
   const handleEligibility = () => {
@@ -932,6 +1040,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             onSuggested={handleSkillAction}
             suggestedChips={AGENT_CHIPS}
             chatEndRef={chatEndRef}
+            filingIssueMessageId={filingIssueMessageId}
+            onConfirmIssueDraft={handleConfirmIssueDraft}
+            onCancelIssueDraft={handleCancelIssueDraft}
           />
         )}
       </div>
