@@ -7,6 +7,8 @@ interface OnboardingProps {
   onComplete: (mode: StorageMode) => Promise<void>;
 }
 
+const localStorageSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+
 export default function Onboarding({ onComplete }: OnboardingProps) {
   const [selected, setSelected] = useState<StorageMode | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -44,12 +46,16 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           {/* Local Storage Card */}
           <button
             type="button"
+            disabled={!localStorageSupported}
             onClick={() => setSelected('local')}
-            className={`relative flex flex-col items-center text-center rounded-2xl border-2 p-8 transition-all duration-200 cursor-pointer
-              ${
-                selected === 'local'
-                  ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-950 shadow-lg ring-2 ring-edamame-500/30'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-edamame-300 dark:hover:border-edamame-700 hover:shadow-md'
+            className={`relative flex flex-col items-center text-center rounded-2xl border-2 p-8 transition-all duration-200
+              ${!localStorageSupported
+                ? 'opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                : 'cursor-pointer ' + (
+                  selected === 'local'
+                    ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-950 shadow-lg ring-2 ring-edamame-500/30'
+                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-edamame-300 dark:hover:border-edamame-700 hover:shadow-md'
+                )
               }`}
           >
             <div
@@ -68,6 +74,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
               All data stays on this device. No account required. Full privacy compliance.
             </p>
+            {!localStorageSupported && (
+              <p className="text-xs text-amber-600 dark:text-amber-500 font-medium mt-3">
+                Requires Chrome or Edge
+              </p>
+            )}
             {selected === 'local' && (
               <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-edamame-500 flex items-center justify-center">
                 <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
