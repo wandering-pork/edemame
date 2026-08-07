@@ -86,10 +86,22 @@ export async function compressImage(blob: Blob, targetBytes: number): Promise<Co
 /** True if the given mime type or file name looks like a raster image the packager can handle. */
 export function isRasterImage(fileType: string, fileName: string): boolean {
   if (/^image\//.test(fileType)) return true;
-  return /\.(jpe?g|png|bmp|gif|webp)$/i.test(fileName);
+  return /\.(jpe?g|png|bmp|gif|webp|heic|heif|tiff?)$/i.test(fileName);
 }
 
 /** True for legacy raster formats DoHA/ImmiAccount don't want — always convert to JPG. */
 export function needsFormatConversion(fileType: string, fileName: string): boolean {
   return /^image\/(bmp|gif)$/i.test(fileType) || /\.(bmp|gif)$/i.test(fileName);
+}
+
+/**
+ * True for image formats we correctly *classify* as images (so they aren't
+ * mishandled as "other"/passthrough) but can't actually decode/re-encode
+ * client-side: no browser exposes a canvas/createImageBitmap decoder for
+ * HEIC/HEIF (iPhone photos) or TIFF (flatbed scanner output) without a new
+ * dependency. compressDocument() checks this and skips compression with a
+ * clear note instead of silently failing or corrupting the file.
+ */
+export function isUncompressibleImage(fileType: string, fileName: string): boolean {
+  return /^image\/(heic|heif|tiff)$/i.test(fileType) || /\.(heic|heif|tiff?)$/i.test(fileName);
 }

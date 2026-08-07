@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
+import { v4 as uuidv4 } from 'uuid';
 import {
   Package, X, ArrowRight, ArrowLeft, Loader2, CheckCircle, AlertCircle,
   FileWarning, Download, Save, GripVertical, Sparkles,
@@ -8,7 +9,7 @@ import type { Client, Document } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
 import {
-  classifyKind, kindLabel, compressDocument, suggestOutputName,
+  classifyKind, kindLabel, compressDocument, suggestOutputName, validateOutputNames,
   DOHA_MAX_BYTES, formatBytes, type CompressOutcome,
 } from '../lib/autoPackager';
 
@@ -83,6 +84,8 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
   const [finalizing, setFinalizing] = useState(false);
   const [finalError, setFinalError] = useState<string | null>(null);
   const [finalized, setFinalized] = useState(false);
+  /** docIds already written by a (possibly partial/failed) finalize() run — makes retries idempotent. */
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
 
   const docsById = useMemo(() => new Map(documents.map(d => [d.id, d])), [documents]);
   const assignedIds = useMemo((): Set<string> => {
@@ -93,6 +96,11 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
   const unassigned = useMemo(() => documents.filter(d => !assignedIds.has(d.id)), [documents, assignedIds]);
   const resultList = useMemo((): FileResult[] => Object.keys(results).map((k: string) => results[k]), [results]);
   const totalAssigned = assignedIds.size;
+  const nameErrors = useMemo(
+    () => validateOutputNames(resultList.map(r => ({ docId: r.docId, outputName: r.outputName }))),
+    [resultList],
+  );
+  const hasNameErrors = Object.keys(nameErrors).length > 0;
 
   const lastName = (applicant.name || '').trim().split(/\s+/).pop() || 'Applicant';
   const dateStr = format(new Date(), 'yyyyMMdd');
@@ -137,6 +145,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
     setPhase('dashboard');
     const assignedDocIds: string[] = Array.from(assignedIds);
     const next: Record<string, FileResult> = {};
+    const usedNames = new Set<string>();
     for (let i = 0; i < assignedDocIds.length; i++) {
       const docId: string = assignedDocIds[i];
       const doc = docsById.get(docId);
@@ -154,9 +163,21 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
           doc, ext: outcome.ext, dateStr,
           slotLabel: slotLabel && slotLabel !== GENERIC_SLOT.label ? slotLabel : undefined,
           applicantLastName: lastName,
+          existingNames: usedNames,
         });
+        usedNames.add(outputName.toLowerCase());
         next[docId] = { docId, outcome, outputName };
       } catch (err) {
+        let fallbackName = doc.fileName;
+        if (usedNames.has(fallbackName.toLowerCase())) {
+          const dot = fallbackName.lastIndexOf('.');
+          const stem = dot > -1 ? fallbackName.slice(0, dot) : fallbackName;
+          const suffix = dot > -1 ? fallbackName.slice(dot) : '';
+          let n = 2;
+          while (usedNames.has(`${stem}_${n}${suffix}`.toLowerCase())) n += 1;
+          fallbackName = `${stem}_${n}${suffix}`;
+        }
+        usedNames.add(fallbackName.toLowerCase());
         next[docId] = {
           docId,
           outcome: {
@@ -166,7 +187,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
             flagged: true,
             note: err instanceof Error ? err.message : 'Compression failed',
           },
-          outputName: doc.fileName,
+          outputName: fallbackName,
         };
       }
     }
@@ -186,7 +207,10 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
       const originalSize = doc?.fileSize ?? 0;
       before += originalSize;
       after += r.outcome.bytes.length;
-      if (r.outcome.bytes.length < originalSize) needingCompression++;
+      // Count files that actually needed compression — i.e. were originally
+      // over the DoHA 5 MB ceiling — not merely files that lost a few bytes
+      // of metadata during lossless recompression.
+      if (originalSize > DOHA_MAX_BYTES) needingCompression++;
     }
     return { count: items.length, needingCompression, before, after };
   }, [results, docsById]);
@@ -202,17 +226,26 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
   // ---- Output (Phase 5 & 6) ----
 
   const finalize = async () => {
+    // Guard against re-running the naming step's validation being bypassed
+    // (e.g. stale state) — never write a batch with empty/duplicate names.
+    if (hasNameErrors) {
+      setFinalError('Fix the file name issues on the Naming step before packaging.');
+      return;
+    }
     setFinalizing(true);
     setFinalError(null);
     try {
       const items = resultList;
       for (const item of items) {
+        // Idempotency: skip anything a previous (partially-failed) run already
+        // wrote, so retrying after an error doesn't duplicate saved files.
+        if (completedIds.has(item.docId)) continue;
         const doc = docsById.get(item.docId);
         if (!doc) continue;
         const blob = new Blob([item.outcome.bytes], { type: item.outcome.mimeType });
         if (outputMode === 'save') {
           const outDoc: Document = {
-            id: `${doc.id}-packaged-${Date.now()}`,
+            id: uuidv4(),
             caseId,
             fileName: item.outputName,
             filePath: `documents/${caseId}/${item.outputName}`,
@@ -233,6 +266,8 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         }
+        // eslint-disable-next-line no-loop-func
+        setCompletedIds(prev => new Set(prev).add(item.docId));
       }
       setFinalized(true);
       if (outputMode === 'save') onSaved?.();
@@ -249,6 +284,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
       setResults({});
       setFinalized(false);
       setFinalError(null);
+      setCompletedIds(new Set());
     }
   }, [phase]);
 
@@ -450,18 +486,31 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
               <p className="text-[12.5px] text-gray-500 dark:text-slate-400">
                 Auto-suggested from applicant name, document type, and today's date — edit any name before packaging.
               </p>
-              {resultList.map(r => (
-                <div key={r.docId} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-100 dark:border-white/5">
-                  <Sparkles size={14} className="flex-shrink-0 text-edamame-400" />
-                  <input
-                    type="text"
-                    value={r.outputName}
-                    onChange={(e) => renameResult(r.docId, e.target.value)}
-                    className="flex-1 min-w-0 text-[12.5px] font-mono bg-transparent border-b border-gray-200 dark:border-slate-700 focus:border-edamame-500 outline-none py-1 text-gray-800 dark:text-slate-200"
-                  />
-                  <span className="flex-shrink-0 font-mono text-[11px] text-gray-400 dark:text-slate-500">{formatBytes(r.outcome.bytes.length)}</span>
+              {hasNameErrors && (
+                <div className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2.5">
+                  <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+                  Fix the highlighted file name{Object.keys(nameErrors).length === 1 ? '' : 's'} below before continuing — names must be non-empty and unique.
                 </div>
-              ))}
+              )}
+              {resultList.map(r => {
+                const error = nameErrors[r.docId];
+                return (
+                  <div key={r.docId} className="space-y-1">
+                    <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${error ? 'border-red-300 dark:border-red-700/60 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-100 dark:border-white/5'}`}>
+                      <Sparkles size={14} className="flex-shrink-0 text-edamame-400" />
+                      <input
+                        type="text"
+                        value={r.outputName}
+                        onChange={(e) => renameResult(r.docId, e.target.value)}
+                        aria-invalid={!!error}
+                        className={`flex-1 min-w-0 text-[12.5px] font-mono bg-transparent border-b outline-none py-1 text-gray-800 dark:text-slate-200 ${error ? 'border-red-400 dark:border-red-600' : 'border-gray-200 dark:border-slate-700 focus:border-edamame-500'}`}
+                      />
+                      <span className="flex-shrink-0 font-mono text-[11px] text-gray-400 dark:text-slate-500">{formatBytes(r.outcome.bytes.length)}</span>
+                    </div>
+                    {error && <div className="pl-3 text-[11px] font-semibold text-red-600 dark:text-red-400">{error}</div>}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -544,7 +593,9 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
           {phase === 'naming' && (
             <button
               onClick={() => setPhase('output')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-[12.5px] transition-colors"
+              disabled={hasNameErrors}
+              title={hasNameErrors ? 'Fix file name issues before continuing' : undefined}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-[12.5px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Continue to Output <ArrowRight size={14} />
             </button>
@@ -552,8 +603,9 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
           {phase === 'output' && (
             <button
               onClick={finalize}
-              disabled={finalizing || finalized}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-[12.5px] transition-colors disabled:opacity-50"
+              disabled={finalizing || finalized || hasNameErrors}
+              title={hasNameErrors ? 'Go back and fix file name issues before packaging' : undefined}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-[12.5px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {finalizing ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
               {finalizing ? 'Packaging…' : finalized ? 'Done' : 'Compress & Package'}

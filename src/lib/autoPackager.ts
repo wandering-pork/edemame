@@ -1,6 +1,6 @@
 import type { Document } from '../types';
 import { loadPdf, mergePdfs, sanitiseFilenameSegment } from './pdfBundle';
-import { compressImage, isRasterImage, needsFormatConversion } from './imageCompress';
+import { compressImage, isRasterImage, needsFormatConversion, isUncompressibleImage } from './imageCompress';
 
 /**
  * Auto-Packager orchestration — classification + per-file compression
@@ -101,6 +101,22 @@ export async function compressDocument(doc: Document, blob: Blob): Promise<Compr
   }
 
   if (kind === 'image') {
+    if (isUncompressibleImage(doc.fileType, doc.fileName)) {
+      // HEIC/HEIF (iPhone photos) and TIFF (scanner output) aren't decodable
+      // via canvas/createImageBitmap in-browser — classify correctly as
+      // images but pass through unchanged rather than silently mishandling
+      // or corrupting them.
+      const flagged = originalBytes.length > DOHA_MAX_BYTES;
+      return {
+        bytes: originalBytes,
+        mimeType: doc.fileType,
+        ext,
+        flagged,
+        note: flagged
+          ? `${ext.toUpperCase()} images aren't supported for in-browser compression and this file exceeds 5 MB — convert to JPEG/PNG first, or re-scan at a smaller size.`
+          : `${ext.toUpperCase()} images aren't supported for in-browser compression — left unchanged (within size limit).`,
+      };
+    }
     try {
       const result = await compressImage(blob, IMAGE_TARGET_BYTES);
       const bytes = new Uint8Array(await result.blob.arrayBuffer());
@@ -143,6 +159,12 @@ export async function compressDocument(doc: Document, blob: Blob): Promise<Compr
  * When assigned to a checklist slot, prefers `<Applicant>_<SlotLabel>_<date>.<ext>`;
  * otherwise falls back to `<originalBase>_<date>.<ext>`. Always editable by the
  * agent before finalising (Phase 4 of the Auto-Packager flow).
+ *
+ * Pass `existingNames` (case-insensitive set of names already claimed in this
+ * batch) to guarantee uniqueness — when the suggested name collides, a `_2`,
+ * `_3`, ... disambiguator is appended before the extension so multiple
+ * documents assigned to the same checklist slot never resolve to the same
+ * output filename (and therefore the same storage key/filePath).
  */
 export function suggestOutputName(opts: {
   doc: Document;
@@ -150,14 +172,55 @@ export function suggestOutputName(opts: {
   dateStr: string;
   slotLabel?: string;
   applicantLastName?: string;
+  existingNames?: Set<string>;
 }): string {
-  const { doc, ext, dateStr, slotLabel, applicantLastName } = opts;
+  const { doc, ext, dateStr, slotLabel, applicantLastName, existingNames } = opts;
+  let name: string;
   if (slotLabel) {
     const parts = [applicantLastName, slotLabel].filter(Boolean).map(sanitiseFilenameSegment);
-    return `${parts.join('_')}_${dateStr}.${ext}`;
+    name = `${parts.join('_')}_${dateStr}.${ext}`;
+  } else {
+    const base = doc.fileName.replace(/\.[^.]+$/, '');
+    name = `${sanitiseFilenameSegment(base)}_${dateStr}.${ext}`;
   }
-  const base = doc.fileName.replace(/\.[^.]+$/, '');
-  return `${sanitiseFilenameSegment(base)}_${dateStr}.${ext}`;
+  if (!existingNames || !existingNames.has(name.toLowerCase())) return name;
+
+  const dot = name.lastIndexOf('.');
+  const stem = dot > -1 ? name.slice(0, dot) : name;
+  const suffix = dot > -1 ? name.slice(dot) : '';
+  let n = 2;
+  let candidate = `${stem}_${n}${suffix}`;
+  while (existingNames.has(candidate.toLowerCase())) {
+    n += 1;
+    candidate = `${stem}_${n}${suffix}`;
+  }
+  return candidate;
+}
+
+/**
+ * Validate a batch of proposed output names before finalising: every name
+ * must be non-empty (after trimming) and unique (case-insensitive) across
+ * the batch. Returns a map of docId -> error message for invalid entries;
+ * an empty map means the batch is clean.
+ */
+export function validateOutputNames(items: { docId: string; outputName: string }[]): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const seen = new Map<string, string>(); // lowercased name -> first docId that claimed it
+  for (const { docId, outputName } of items) {
+    const trimmed = outputName.trim();
+    if (!trimmed) {
+      errors[docId] = 'File name cannot be empty.';
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    const firstDocId = seen.get(key);
+    if (firstDocId && firstDocId !== docId) {
+      errors[docId] = 'Duplicate file name — give this file a unique name.';
+    } else {
+      seen.set(key, docId);
+    }
+  }
+  return errors;
 }
 
 /** Pretty-print a byte count (re-exported here so callers only need one import). */
