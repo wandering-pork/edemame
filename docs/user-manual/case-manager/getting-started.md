@@ -41,5 +41,11 @@ capability that doesn't exist yet, the agent will check whether it's already bee
 finds a match, it tells you and links the existing GitHub issue instead of creating a duplicate. If
 it's new, it drafts a GitHub issue and shows it in the chat with **Confirm** and **Cancel** buttons
 — nothing is filed until you click **Confirm**. Each conversation thread can file up to 3 issues
-this way; after that, file further reports manually. This only happens in the Case Manager Focus
-Mode chat, not elsewhere in the app.
+this way (also capped at 5 per day per account, enforced server-side); after that, file further
+reports manually. This only happens in the Case Manager Focus Mode chat, not elsewhere in the app.
+
+**Filing an issue posts it to the public `wandering-pork/edemame` GitHub repository** — visible to
+anyone on the internet. The draft card says so before you confirm; review the title and body for
+any client-identifying details first. The app also strips obvious patterns (emails, phone numbers,
+passport-number-like strings) before filing as a backstop, but this is not a substitute for
+checking the draft yourself.

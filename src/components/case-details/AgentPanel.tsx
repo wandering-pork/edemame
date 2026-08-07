@@ -159,24 +159,31 @@ const IssueDraftCard: React.FC<{
         </p>
       </div>
       {message.issueDraftResolved !== 'filed' && (
-        <div className="flex items-center gap-2 px-3 py-2 border-t border-gray-200 dark:border-slate-700">
-          <button
-            onClick={onConfirm}
-            disabled={isSubmitting}
-            className="btn-press flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-edamame hover:bg-edamame-600 text-white transition-colors disabled:opacity-50"
-          >
-            <Check size={12} strokeWidth={2.5} />
-            {isSubmitting ? 'Filing…' : 'Confirm & File'}
-          </button>
-          <button
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="btn-press flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
-          >
-            <X size={12} strokeWidth={2.5} />
-            Cancel
-          </button>
-        </div>
+        <>
+          <div className="px-3 pb-2 -mt-0.5 text-[10.5px] text-amber-700 dark:text-amber-400 leading-relaxed">
+            Filing posts this title and body to the <strong>public</strong> GitHub repo{' '}
+            <span className="font-mono">wandering-pork/edemame</span> — visible to anyone on the internet.
+            Review it for client-identifying details before confirming.
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 border-t border-gray-200 dark:border-slate-700">
+            <button
+              onClick={onConfirm}
+              disabled={isSubmitting}
+              className="btn-press flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-edamame hover:bg-edamame-600 text-white transition-colors disabled:opacity-50"
+            >
+              <Check size={12} strokeWidth={2.5} />
+              {isSubmitting ? 'Filing…' : 'Confirm & File Publicly'}
+            </button>
+            <button
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="btn-press flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+            >
+              <X size={12} strokeWidth={2.5} />
+              Cancel
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

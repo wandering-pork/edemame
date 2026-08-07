@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
+import { useAuth } from '../contexts/AuthContext';
 import { CaseNotes } from '../components/CaseNotes';
 import { DocumentUpload } from '../components/DocumentUpload';
 import { DocumentList } from '../components/DocumentList';
@@ -79,6 +80,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 }) => {
   const repos = useRepositories();
   const navigate = useNavigate();
+  const { session } = useAuth();
 
   // ---- Task state ----
   const [offsetModal, setOffsetModal] = useState<{ taskId: string, newDate: string } | null>(null);
@@ -437,7 +439,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
       const response = await fetch('/api/focus-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           messages: historyMessages.map(m => ({ role: m.role, content: m.content })),
           caseContext,
@@ -491,7 +496,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     } finally {
       setIsSending(false);
     }
-  }, [chatInput, isSending, activeConvId, conversations, caseItem, client, applicant, visaSubclass, completedTasks, caseTasks, pendingTasks, checklist, progress, uploadedCount]);
+  }, [chatInput, isSending, activeConvId, conversations, caseItem, client, applicant, visaSubclass, completedTasks, caseTasks, pendingTasks, checklist, progress, uploadedCount, session]);
 
   const handleSkillAction = (msg: string) => {
     setChatInput(msg);
@@ -539,7 +544,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       try {
         const response = await fetch('/api/file-github-issue', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
           body: JSON.stringify({
             title: message.issueDraft.title,
             body: message.issueDraft.body,
@@ -586,7 +594,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         setFilingIssueMessageId(null);
       }
     },
-    [conversations, activeConvId, filingIssueMessageId, updateMessageInActiveConv]
+    [conversations, activeConvId, filingIssueMessageId, updateMessageInActiveConv, session]
   );
 
   // ---- Top-bar action handlers ----

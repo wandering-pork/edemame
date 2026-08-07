@@ -1,10 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import { getUserManualContext } from "./_lib/userManual";
 import { searchGithubIssues } from "./_lib/github";
+import { verifySupabaseUser } from "./_lib/auth";
 
 interface VercelRequest extends IncomingMessage {
   method: string;
   body: any;
+  headers: Record<string, string | string[] | undefined>;
 }
 
 interface VercelResponse extends ServerResponse {
@@ -14,9 +16,13 @@ interface VercelResponse extends ServerResponse {
 
 const GEMINI_MODEL = "gemini-3.5-flash";
 
-// Per-session cap on how many issues the agent will offer to file from a
-// single Focus Mode conversation (see api/file-github-issue.ts, which
-// re-enforces the same limit at the point the issue is actually created).
+// Per-session cap on how many issues the agent will *offer* to file from a
+// single Focus Mode conversation. This only steers the model's own behaviour
+// (via the system prompt below) and the `issuesFiledInSession` count it's
+// computed from is client-supplied -- it is NOT a security control. The real,
+// server-enforced per-user daily cap lives in api/file-github-issue.ts,
+// backed by the `agent_issue_filings` table, since that's the endpoint with
+// the actual side effect.
 const MAX_ISSUES_PER_SESSION = 3;
 
 // Safety valve on the search -> draft function-calling loop so a confused
@@ -139,6 +145,15 @@ async function callGemini(apiKey: string, systemPrompt: string, contents: any[])
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Focus Mode chat is only reachable from inside the authenticated app shell
+  // (see CLAUDE.md's Authentication Flow), and this endpoint calls the GitHub
+  // Search API with the shared GITHUB_ISSUES_TOKEN and burns Gemini calls per
+  // turn -- require a verified Supabase session before doing either.
+  const auth = await verifySupabaseUser(req.headers);
+  if (!auth) {
+    return res.status(401).json({ error: "You must be signed in to use this chat" });
   }
 
   const { messages, caseContext, issuesFiledInSession } = req.body;
