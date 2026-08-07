@@ -6,7 +6,12 @@ interface AuthContextValue {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    extraMetadata?: Record<string, unknown>
+  ) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
@@ -32,11 +37,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.subscription.unsubscribe();
   }, []);
 
-  const signUp: AuthContextValue['signUp'] = async (email, password, fullName) => {
+  const signUp: AuthContextValue['signUp'] = async (email, password, fullName, extraMetadata) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName, ...extraMetadata } },
     });
     if (error) return { error: error.message, needsEmailConfirmation: false };
     // If email confirmation is required, Supabase returns a user with no session.

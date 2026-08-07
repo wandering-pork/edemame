@@ -5,15 +5,18 @@ import { LogoBrand } from '@/components/LogoBrand';
 import { useAuth } from '@/contexts/AuthContext';
 
 // TODO: replace this hardcoded placeholder list with a real company/firm list
-// (e.g. backed by a `companies` table) once one exists. Selection is captured
-// in local component state only for now — it is not persisted anywhere.
+// (e.g. backed by a `companies` table) once one exists. These are intentionally
+// generic/fictional placeholder names — not references to any real firm.
 const COMPANY_OPTIONS = [
   'Independent / Sole Practitioner',
-  'Sterling Migration Lawyers',
-  'Southern Cross Visa & Migration',
-  'Harbourline Immigration Consultants',
+  'Acme Migration Services',
+  'Sample Legal Partners',
+  'Placeholder Immigration Consultants',
   'Other',
 ];
+
+const OTHER_COMPANY_OPTION = 'Other';
+const NAME_MAX_LENGTH = 100;
 
 export default function Register() {
   const { signUp } = useAuth();
@@ -21,7 +24,8 @@ export default function Register() {
 
   const [firstName, setFirstName] = useState('');
   const [surname, setSurname] = useState('');
-  const [company, setCompany] = useState('');
+  const [companySelection, setCompanySelection] = useState('');
+  const [otherCompany, setOtherCompany] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -44,10 +48,21 @@ export default function Register() {
       return;
     }
 
-    const fullName = `${firstName} ${surname}`.trim();
+    const trimmedFirstName = firstName.trim();
+    const trimmedSurname = surname.trim();
+    if (!trimmedFirstName || !trimmedSurname) {
+      setError('First name and surname cannot be empty.');
+      return;
+    }
+
+    const fullName = `${trimmedFirstName} ${trimmedSurname}`.trim();
+    const company =
+      companySelection === OTHER_COMPANY_OPTION ? otherCompany.trim() : companySelection;
 
     setSubmitting(true);
-    const { error: signUpError, needsEmailConfirmation } = await signUp(email, password, fullName);
+    const { error: signUpError, needsEmailConfirmation } = await signUp(email, password, fullName, {
+      company: company || undefined,
+    });
     setSubmitting(false);
 
     if (signUpError) {
@@ -116,6 +131,7 @@ export default function Register() {
                     type="text"
                     required
                     autoComplete="given-name"
+                    maxLength={NAME_MAX_LENGTH}
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
@@ -132,6 +148,7 @@ export default function Register() {
                     type="text"
                     required
                     autoComplete="family-name"
+                    maxLength={NAME_MAX_LENGTH}
                     value={surname}
                     onChange={(e) => setSurname(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
@@ -148,8 +165,8 @@ export default function Register() {
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <select
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
+                  value={companySelection}
+                  onChange={(e) => setCompanySelection(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors appearance-none"
                 >
                   <option value="">Select a company…</option>
@@ -160,6 +177,20 @@ export default function Register() {
                   ))}
                 </select>
               </div>
+              {companySelection === OTHER_COMPANY_OPTION && (
+                <div className="relative mt-2">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    autoComplete="organization"
+                    maxLength={NAME_MAX_LENGTH}
+                    value={otherCompany}
+                    onChange={(e) => setOtherCompany(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
+                    placeholder="Enter your company name"
+                  />
+                </div>
+              )}
             </div>
 
             <div>
