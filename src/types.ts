@@ -191,7 +191,7 @@ export type CaseToolKind = 'checklist-generator' | 'auto-packager' | 'bundle-bui
 export type CaseTabKind = 'workspace' | CaseViewKind | CaseToolKind;
 
 export interface CaseOpenTab {
-  id: string; // stable per-kind id, e.g. "view:tasks" or "tool:checklist-generator"
+  id: string; // stable per-kind id, e.g. "tab:tasks" or "tab:checklist-generator"
   kind: CaseTabKind;
   label: string;
   pinned: boolean;

@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileText, Image as ImageIcon, File as FileIcon } from 'lucide-react';
 import type { Client, Document } from '../../types';
+import { DocumentUpload } from '../DocumentUpload';
 
 export interface RailAlert {
   color: 'red' | 'amber' | 'blue';
@@ -32,6 +33,11 @@ interface CaseRailProps {
   /** Case Files panel (formerly a "WORKSPACE" left-panel subsection; the "DOCS" subsection has been removed). */
   documents?: Document[];
   onOpenDocument?: (doc: Document) => void;
+  /** Case id + visa subclass, needed to upload new files directly from this rail. */
+  caseId: string;
+  visaSubclass?: string;
+  /** Called after a file finishes uploading via repos.documents.create(), so the caller can refresh its document list. */
+  onDocumentUploaded?: (doc: Document) => void;
 }
 
 const RailLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -47,6 +53,9 @@ export const CaseRail: React.FC<CaseRailProps> = ({
   alerts,
   documents = [],
   onOpenDocument,
+  caseId,
+  visaSubclass,
+  onDocumentUploaded,
 }) => {
   return (
     <aside className="ed-rail xl:sticky xl:top-4 self-start bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-[18px]">
@@ -117,6 +126,14 @@ export const CaseRail: React.FC<CaseRailProps> = ({
         <div className="flex items-baseline justify-between">
           <RailLabel>Case Files</RailLabel>
           <span className="text-[10.5px] font-bold text-gray-400 dark:text-slate-500">{documents.length}</span>
+        </div>
+        <div className="mt-2">
+          <DocumentUpload
+            caseId={caseId}
+            visaSubclass={visaSubclass}
+            onUpload={(doc) => onDocumentUploaded?.(doc)}
+            compact
+          />
         </div>
         {documents.length === 0 ? (
           <p className="mt-2 text-[11px] text-gray-400 dark:text-slate-500 leading-relaxed">

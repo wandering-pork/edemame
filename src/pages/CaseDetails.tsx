@@ -57,6 +57,15 @@ interface CaseDetailsProps {
 
 const AGENT_CHIPS = ['Draft consultation checklist', 'Document request email', 'Summarise eligibility'];
 
+const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
+  tasks: 'Tasks',
+  checklist: 'Document Checklist',
+  notes: 'Notes',
+  'checklist-generator': 'Document Checklist Generator',
+  'auto-packager': 'Auto-Packager',
+  'bundle-builder-820': '820 Bundle Builder',
+};
+
 const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: string }> = {
   verified: { cls: 'bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400', label: 'Verified' },
   linked: { cls: 'bg-blue-500/[0.13] text-blue-700 dark:text-blue-400', label: 'Linked' },
@@ -308,15 +317,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   // ---- Workspace tab handlers ----
-  const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
-    tasks: 'Tasks',
-    checklist: 'Document Checklist',
-    notes: 'Notes',
-    'checklist-generator': 'Document Checklist Generator',
-    'auto-packager': 'Auto-Packager',
-    'bundle-builder-820': '820 Bundle Builder',
-  };
-
   const openOrFocusTab = (kind: CaseTabKind, label?: string) => {
     if (kind === 'workspace') { setActiveTabId('workspace'); return; }
     if (kind === 'checklist-generator') { setShowChecklistGenerator(true); return; }
@@ -602,7 +602,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     } finally {
       setIsSending(false);
     }
-  }, [chatInput, isSending, activeConvId, conversations, caseItem, client, applicant, visaSubclass, completedTasks, caseTasks, pendingTasks, checklist, progress, uploadedCount, TAB_LABELS]);
+  }, [chatInput, isSending, activeConvId, conversations, caseItem, client, applicant, visaSubclass, completedTasks, caseTasks, pendingTasks, checklist, progress, uploadedCount]);
 
   const handleSkillAction = (msg: string) => {
     setChatInput(msg);
@@ -871,6 +871,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           alerts={railAlerts}
           documents={documents}
           onOpenDocument={handleChecklistPreview}
+          caseId={currentCase.id}
+          visaSubclass={visaSubclass}
+          onDocumentUploaded={(doc) => {
+            setDocuments(prev => [...prev, doc]);
+            setDocRefreshKey(k => k + 1);
+          }}
         />
 
         {/* ── CENTER COLUMN ── */}
@@ -903,6 +909,11 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 {tab.kind === 'checklist' && checklist.length > 0 && (
                   <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
                     {checklist.length}
+                  </span>
+                )}
+                {tab.kind === 'tasks' && caseTasks.length > 0 && (
+                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                    {caseTasks.length}
                   </span>
                 )}
                 <button
