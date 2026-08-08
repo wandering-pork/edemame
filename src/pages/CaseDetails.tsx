@@ -1,15 +1,16 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation } from '../types';
+import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { CaseNotes } from '../components/CaseNotes';
-import { DocumentUpload } from '../components/DocumentUpload';
-import { DocumentList } from '../components/DocumentList';
 import { PdfPackager } from '../components/PdfPackager';
 import { BundleBuilder820 } from '../components/BundleBuilder820';
 import { AutoPackager } from '../components/AutoPackager';
-import { CaseRail, RailAlert } from '../components/case-details/CaseRail';
+import { CaseRail, RailAlert, CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
 import { AgentPanel } from '../components/case-details/AgentPanel';
+import { Workspace, WorkspaceCatalogItem, MessageRecommendation } from '../components/case-details/Workspace';
+import { DocumentChecklistGenerator } from '../components/case-details/DocumentChecklistGenerator';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
+import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib/caseTabsStore';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -24,14 +25,16 @@ import {
   X,
   Save,
   ChevronDown,
+  ChevronRight,
   Sparkles,
   PenLine,
   ShieldCheck,
   MoreHorizontal,
   MoreVertical,
   ArrowLeft,
-  Paperclip,
   FileText,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Document } from '../types';
@@ -55,12 +58,32 @@ interface CaseDetailsProps {
 
 const AGENT_CHIPS = ['Draft consultation checklist', 'Document request email', 'Summarise eligibility'];
 
+const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
+  tasks: 'Tasks',
+  checklist: 'Document Checklist',
+  notes: 'Notes',
+  'checklist-generator': 'Document Checklist Generator',
+  'auto-packager': 'Auto-Packager',
+  'bundle-builder-820': '820 Bundle Builder',
+};
+
 const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: string }> = {
   verified: { cls: 'bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400', label: 'Verified' },
-  uploaded: { cls: 'bg-blue-500/[0.13] text-blue-700 dark:text-blue-400', label: 'Received' },
+  linked: { cls: 'bg-blue-500/[0.13] text-blue-700 dark:text-blue-400', label: 'Linked' },
   waived: { cls: 'bg-slate-500/[0.13] text-slate-600 dark:text-slate-300', label: 'Waived' },
   pending: { cls: 'bg-amber-500/[0.13] text-amber-700 dark:text-amber-400', label: 'Pending' },
 };
+
+// Keyword heuristics used to (a) rank AI-recommended Workspace items, and
+// (b) decide which items to surface as inline hyperlinks after a chat reply.
+const RECOMMEND_KEYWORDS: Array<[CaseTabKind, RegExp]> = [
+  ['checklist', /document|checklist|evidence|paperwork/i],
+  ['tasks', /task|deadline|due date|schedule|overdue/i],
+  ['notes', /note|summary|history|record/i],
+  ['checklist-generator', /generate|missing document|category|categories/i],
+  ['auto-packager', /crusher|compress|5\s*mb|packager|auto-?packager/i],
+  ['bundle-builder-820', /820|bundle|submission/i],
+];
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -96,8 +119,21 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [docRefreshKey, setDocRefreshKey] = useState(0);
 
-  // ---- Tab state ----
-  const [activeTab, setActiveTab] = useState<'tasks' | 'documents' | 'notes'>('tasks');
+  // ---- Workspace tab state ----
+  // 'workspace' is always available and isn't part of openTabs (it can't be closed/pinned).
+  // Opening a View or Tool from the Workspace tab adds an entry to openTabs and focuses it.
+  const [openTabs, setOpenTabs] = useState<CaseOpenTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>('workspace');
+  const [tabsLoaded, setTabsLoaded] = useState(false);
+  const [workflowTemplate, setWorkflowTemplate] = useState<WorkflowTemplate | undefined>(undefined);
+  const [showChecklistGenerator, setShowChecklistGenerator] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [addItemOpen, setAddItemOpen] = useState(false);
+  const [addItemForm, setAddItemForm] = useState({ label: '', category: 'Manually Added' });
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const [recommendedViewKinds, setRecommendedViewKinds] = useState<CaseTabKind[]>(['checklist', 'tasks', 'notes']);
+  const [recommendedToolKinds, setRecommendedToolKinds] = useState<CaseTabKind[]>(['checklist-generator', 'auto-packager', 'bundle-builder-820']);
+  const [messageRecommendations, setMessageRecommendations] = useState<Record<string, MessageRecommendation[]>>({});
 
   // ---- Top-bar menu state ----
   const [statusOpen, setStatusOpen] = useState(false);
@@ -144,7 +180,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const hasOverdue = pendingTasks.some(t => new Date(t.date) < new Date());
   const passportExpiry = client.passportExpiry ? new Date(client.passportExpiry) : null;
   const daysToPassportExpiry = passportExpiry ? Math.floor((passportExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
-  const uploadedCount = checklist.filter(c => c.status === 'uploaded' || c.status === 'verified').length;
+  const uploadedCount = checklist.filter(c => c.status === 'linked' || c.status === 'verified').length;
   const overdueCount = pendingTasks.filter(t => new Date(t.date) < new Date()).length;
   const outstandingDocs = checklist.length > 0 ? checklist.length - uploadedCount : 0;
 
@@ -200,6 +236,32 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       .catch(() => setDocuments([]));
   }, [caseItem.id, repos.documents, docRefreshKey]);
 
+  // Load the case's workflow template (firm-level customisation merged into generated checklists)
+  useEffect(() => {
+    let cancelled = false;
+    if (!caseItem.templateId) { setWorkflowTemplate(undefined); return; }
+    repos.templates.getById(caseItem.templateId).then(t => {
+      if (!cancelled) setWorkflowTemplate(t);
+    }).catch(() => { if (!cancelled) setWorkflowTemplate(undefined); });
+    return () => { cancelled = true; };
+  }, [caseItem.templateId, repos.templates]);
+
+  // Restore only pinned tabs + the last active tab on entry to this case; discard the rest.
+  useEffect(() => {
+    setTabsLoaded(false);
+    const saved = loadCaseTabsState(caseItem.id);
+    const restored = restoreTabsOnEntry(saved);
+    setOpenTabs(restored.tabs);
+    setActiveTabId(restored.activeTabId);
+    setTabsLoaded(true);
+  }, [caseItem.id]);
+
+  // Persist tab state on every change (once initial restore has happened)
+  useEffect(() => {
+    if (!tabsLoaded) return;
+    saveCaseTabsState(caseItem.id, { tabs: openTabs, activeTabId });
+  }, [openTabs, activeTabId, tabsLoaded, caseItem.id]);
+
   // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -212,27 +274,74 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setChecklist(prev => prev.map(item => item.id === id ? { ...item, status } : item));
   };
 
-  // Attach a specific file to a checklist item — creates the Document and links it
-  const handleChecklistUpload = async (item: DocumentChecklistItem, file: File) => {
-    const doc: Document = {
-      id: uuidv4(),
-      caseId: currentCase.id,
-      fileName: file.name,
-      filePath: `documents/${currentCase.id}/${file.name}`,
-      fileType: file.type,
-      fileSize: file.size,
-      uploadedAt: new Date().toISOString(),
-    };
-    const created = await repos.documents.create(doc, file);
-    setDocuments(prev => [created, ...prev]);
-    setChecklist(prev => prev.map(c => c.id === item.id ? { ...c, linkedDocumentId: created.id, status: 'uploaded' } : c));
-    setDocRefreshKey(k => k + 1);
+  // Link an existing Case Files document to a checklist item — dragged in from the CASE FILES rail.
+  // Files are linked from the case's already-connected local/cloud folder, never uploaded through this tab.
+  const handleChecklistLinkDocument = (item: DocumentChecklistItem, documentId: string) => {
+    setChecklist(prev => prev.map(c => c.id === item.id ? { ...c, linkedDocumentId: documentId, status: 'linked' } : c));
   };
 
   // Detach the linked file from a checklist item (the file itself is left in the case's document store)
   const handleChecklistUnlink = (item: DocumentChecklistItem) => {
     setChecklist(prev => prev.map(c => c.id === item.id ? { ...c, linkedDocumentId: undefined, status: 'pending' } : c));
     setDocRefreshKey(k => k + 1);
+  };
+
+  const handleAddChecklistItem = () => {
+    if (!addItemForm.label.trim()) return;
+    const item: DocumentChecklistItem = {
+      id: uuidv4(),
+      caseId: currentCase.id,
+      label: addItemForm.label.trim(),
+      status: 'pending',
+      category: addItemForm.category.trim() || 'Manually Added',
+      manuallyAdded: true,
+    };
+    setChecklist(prev => [...prev, item]);
+    setAddItemForm({ label: '', category: addItemForm.category });
+    setAddItemOpen(false);
+  };
+
+  const toggleCategoryCollapsed = (category: string) => {
+    setCollapsedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) next.delete(category); else next.add(category);
+      return next;
+    });
+  };
+
+  const handleGeneratedChecklist = (items: DocumentChecklistItem[]) => {
+    // Merge into the existing checklist, skipping items whose label already exists (case-insensitive)
+    setChecklist(prev => {
+      const existingLabels = new Set(prev.map(i => i.label.trim().toLowerCase()));
+      const toAdd = items.filter(i => !existingLabels.has(i.label.trim().toLowerCase()));
+      return [...prev, ...toAdd];
+    });
+    setShowChecklistGenerator(false);
+    openOrFocusTab('checklist', 'Document Checklist');
+  };
+
+  // ---- Workspace tab handlers ----
+  const openOrFocusTab = (kind: CaseTabKind, label?: string) => {
+    if (kind === 'workspace') { setActiveTabId('workspace'); return; }
+    if (kind === 'checklist-generator') { setShowChecklistGenerator(true); return; }
+    if (kind === 'auto-packager') { setShowPackager(true); return; }
+    if (kind === 'bundle-builder-820') { setShowBundleBuilder(true); return; }
+
+    const id = `tab:${kind}`;
+    setOpenTabs(prev => {
+      if (prev.some(t => t.id === id)) return prev;
+      return [...prev, { id, kind, label: label || TAB_LABELS[kind], pinned: false }];
+    });
+    setActiveTabId(id);
+  };
+
+  const closeTab = (id: string) => {
+    setOpenTabs(prev => prev.filter(t => t.id !== id));
+    setActiveTabId(current => (current === id ? 'workspace' : current));
+  };
+
+  const togglePinTab = (id: string) => {
+    setOpenTabs(prev => prev.map(t => t.id === id ? { ...t, pinned: !t.pinned } : t));
   };
 
   const handleChecklistPreview = async (doc: Document) => {
@@ -460,6 +569,25 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         persistConvs(next);
         return next;
       });
+
+      // Refresh Workspace View/Tools suggestions from the exchange, and record
+      // which items to render as inline hyperlinks under this assistant message.
+      const combinedText = `${userMsg.content}\n${replyText}`;
+      const matchedKinds = RECOMMEND_KEYWORDS.filter(([, re]) => re.test(combinedText)).map(([kind]) => kind);
+      if (matchedKinds.length > 0) {
+        const matchedViews = matchedKinds.filter(k => k === 'tasks' || k === 'checklist' || k === 'notes');
+        const matchedTools = matchedKinds.filter(k => k === 'checklist-generator' || k === 'auto-packager' || k === 'bundle-builder-820');
+        if (matchedViews.length > 0) {
+          setRecommendedViewKinds(prev => [...matchedViews, ...prev.filter(k => !matchedViews.includes(k))]);
+        }
+        if (matchedTools.length > 0) {
+          setRecommendedToolKinds(prev => [...matchedTools, ...prev.filter(k => !matchedTools.includes(k))]);
+        }
+        setMessageRecommendations(prev => ({
+          ...prev,
+          [assistantMsg.id]: matchedKinds.map(kind => ({ kind, label: TAB_LABELS[kind as Exclude<CaseTabKind, 'workspace'>] })),
+        }));
+      }
     } catch {
       const errMsg: FocusChatMessage = {
         id: uuidv4(),
@@ -704,7 +832,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMoreOpen(false)} />
                 <div className="absolute right-0 top-full mt-1.5 z-40 w-52 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
-                  <button onClick={() => { setActiveTab('documents'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
+                  <button onClick={() => { openOrFocusTab('checklist'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
+                  <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Workspace</button>
                   <button onClick={() => { setShowAutoPackager(true); setMoreOpen(false); }} className={menuItemCls}>Auto-Packager</button>
                   {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && (
                     <button onClick={handleRunCrusher} className={menuItemCls}>Run Crusher</button>
@@ -745,38 +874,100 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           completedCount={completedTasks.length}
           pendingCount={pendingTasks.length}
           alerts={railAlerts}
+          documents={documents}
+          onOpenDocument={handleChecklistPreview}
+          caseId={currentCase.id}
+          visaSubclass={visaSubclass}
+          onDocumentUploaded={(doc) => {
+            setDocuments(prev => [...prev, doc]);
+            setDocRefreshKey(k => k + 1);
+          }}
         />
 
         {/* ── CENTER COLUMN ── */}
         <div className="min-w-0">
-          {/* Tabs */}
-          <div className="flex gap-0.5 border-b border-gray-100 dark:border-slate-800">
-            {[
-              { id: 'tasks', label: 'Tasks', count: caseTasks.length },
-              { id: 'documents', label: 'Documents', count: checklist.length },
-              { id: 'notes', label: 'Notes', count: null as number | null },
-            ].map(tab => (
-              <button
+          {/* Tabs — Workspace is always present; opening a View/Tool adds a closable, pinnable tab */}
+          <div className="flex items-center gap-0.5 border-b border-gray-100 dark:border-slate-800 overflow-x-auto custom-scrollbar">
+            <button
+              onClick={() => setActiveTabId('workspace')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                activeTabId === 'workspace'
+                  ? 'border-edamame text-gray-900 dark:text-white'
+                  : 'border-transparent text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <Sparkles size={13} className={activeTabId === 'workspace' ? 'text-edamame' : ''} />
+              Workspace
+            </button>
+
+            {openTabs.map(tab => (
+              <div
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'tasks' | 'documents' | 'notes')}
-                className={`flex items-center gap-2 px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px transition-colors ${
-                  activeTab === tab.id
+                className={`group flex items-center gap-1.5 pl-4 pr-2 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors cursor-pointer ${
+                  activeTabId === tab.id
                     ? 'border-edamame text-gray-900 dark:text-white'
                     : 'border-transparent text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
                 }`}
+                onClick={() => setActiveTabId(tab.id)}
               >
                 {tab.label}
-                {tab.count != null && tab.count > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTab === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
-                    {tab.count}
+                {tab.kind === 'checklist' && checklist.length > 0 && (
+                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                    {checklist.length}
                   </span>
                 )}
-              </button>
+                {tab.kind === 'tasks' && caseTasks.length > 0 && (
+                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                    {caseTasks.length}
+                  </span>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); togglePinTab(tab.id); }}
+                  title={tab.pinned ? 'Unpin tab' : 'Pin tab (persists across reloads)'}
+                  className={`p-0.5 rounded transition-colors ${tab.pinned ? 'text-edamame' : 'text-gray-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 hover:text-edamame'}`}
+                >
+                  {tab.pinned ? <Pin size={11} /> : <PinOff size={11} />}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
+                  title="Close tab"
+                  className="p-0.5 rounded text-gray-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-colors"
+                >
+                  <X size={11} />
+                </button>
+              </div>
             ))}
           </div>
 
+          {/* ── WORKSPACE ── */}
+          {activeTabId === 'workspace' && (
+            <Workspace
+              viewCatalog={[
+                { kind: 'tasks', label: 'Tasks', description: `${pendingTasks.length} pending · ${completedTasks.length} completed` },
+                { kind: 'checklist', label: 'Document Checklist', description: `${uploadedCount}/${checklist.length} documents linked` },
+                { kind: 'notes', label: 'Notes', description: 'Case notes and history' },
+              ] as WorkspaceCatalogItem[]}
+              toolCatalog={[
+                { kind: 'checklist-generator', label: 'Document Checklist Generator', description: 'Pick categories to generate a checklist from the system default + workflow template' },
+                ...(SUPPORTED_SUBCLASSES.includes(visaSubclass || '') ? [{ kind: 'auto-packager', label: 'Auto-Packager', description: 'Compress & bundle documents under 5MB' }] as WorkspaceCatalogItem[] : []),
+                ...(visaSubclass === '820' ? [{ kind: 'bundle-builder-820', label: '820 Bundle Builder', description: 'Build the ImmiAccount submission bundle' }] as WorkspaceCatalogItem[] : []),
+              ]}
+              recommendedViewKinds={recommendedViewKinds}
+              recommendedToolKinds={recommendedToolKinds}
+              onOpen={(kind) => openOrFocusTab(kind)}
+              conversationMessages={activeConv?.messages || []}
+              chatInput={chatInput}
+              setChatInput={setChatInput}
+              isSending={isSending}
+              onSend={sendMessage}
+              onNewChat={createConversation}
+              messageRecommendations={messageRecommendations}
+              chatEndRef={chatEndRef}
+            />
+          )}
+
           {/* ── TASKS ── */}
-          {activeTab === 'tasks' && (
+          {activeTabId === 'tab:tasks' && (
             <div className="mt-4 space-y-6">
               <section>
                 <div className="flex items-center justify-between mb-2.5">
@@ -815,107 +1006,142 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             </div>
           )}
 
-          {/* ── DOCUMENTS ── */}
-          {activeTab === 'documents' && (
-            <div className="mt-4 space-y-4">
-              {checklist.length > 0 && (
-                <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
-                  <div className="flex items-center justify-between px-5 pt-4 pb-3">
-                    <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">Document checklist</span>
-                    <span className="text-[11px] font-bold text-gray-400 dark:text-slate-500">{uploadedCount}/{checklist.length}</span>
+          {/* ── DOCUMENT CHECKLIST (renamed + upgraded from "Documents") ── */}
+          {activeTabId === 'tab:checklist' && (() => {
+            const groups = new Map<string, DocumentChecklistItem[]>();
+            for (const item of checklist) {
+              const cat = item.category || 'Uncategorised';
+              if (!groups.has(cat)) groups.set(cat, []);
+              groups.get(cat)!.push(item);
+            }
+            return (
+              <div className="mt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">
+                    Document Checklist <span className="text-gray-400 dark:text-slate-500 font-semibold">· {uploadedCount}/{checklist.length} linked</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowChecklistGenerator(true)}
+                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame transition-colors"
+                    >
+                      <Sparkles size={12} /> Generate
+                    </button>
+                    <button
+                      onClick={() => setAddItemOpen(true)}
+                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg bg-edamame hover:bg-edamame-600 text-white transition-colors"
+                    >
+                      <Plus size={12} /> Add item
+                    </button>
                   </div>
-                  {checklist.map(item => {
-                    const chip = CHECKLIST_STATUS_META[item.status];
-                    const linkedDoc = item.linkedDocumentId ? documents.find(d => d.id === item.linkedDocumentId) : undefined;
+                </div>
+
+                {checklist.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-200 dark:border-slate-800 p-10 text-center">
+                    <FileText size={26} className="mx-auto mb-2 text-gray-200 dark:text-slate-700" />
+                    <p className="text-sm text-gray-400 dark:text-slate-500">No checklist items yet. Generate one or add items manually.</p>
+                  </div>
+                ) : (
+                  Array.from(groups.entries()).map(([category, items]) => {
+                    const collapsed = collapsedCategories.has(category);
                     return (
-                      <div key={item.id} className="table-row-hover flex items-center gap-3 px-5 py-2.5 border-t border-gray-100 dark:border-slate-800">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-semibold text-gray-800 dark:text-slate-200 tracking-tight">{item.label}</div>
-                          {item.description && <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{item.description}</div>}
-                          {linkedDoc ? (
-                            <div className="flex items-center gap-1.5 mt-1 text-[11px] text-gray-500 dark:text-slate-400">
-                              <FileText size={11} className="text-gray-400 dark:text-slate-600 flex-shrink-0" />
-                              <button
-                                onClick={() => handleChecklistPreview(linkedDoc)}
-                                title="Open file"
-                                className="truncate max-w-[240px] hover:text-edamame hover:underline text-left"
-                              >
-                                {linkedDoc.fileName}
-                              </button>
-                              <button
-                                onClick={() => handleChecklistUnlink(item)}
-                                title="Remove attached file"
-                                className="text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400"
-                              >
-                                <X size={11} />
-                              </button>
-                            </div>
-                          ) : (
-                            <label className="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold text-edamame-600 dark:text-edamame-400 cursor-pointer hover:underline">
-                              <Paperclip size={11} />
-                              Attach file
-                              <input
-                                type="file"
-                                accept=".pdf,.jpg,.jpeg,.png,.docx"
-                                className="hidden"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleChecklistUpload(item, file);
-                                  e.target.value = '';
-                                }}
-                              />
-                            </label>
-                          )}
-                        </div>
-                        <div className="relative flex-shrink-0">
-                          <button
-                            onClick={() => setChecklistStatusMenuId(id => id === item.id ? null : item.id)}
-                            className={`inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap transition-colors ${chip.cls}`}
-                          >
-                            {chip.label}
-                            <ChevronDown size={11} />
-                          </button>
-                          {checklistStatusMenuId === item.id && (
-                            <>
-                              <div className="fixed inset-0 z-30" onClick={() => setChecklistStatusMenuId(null)} />
-                              <div className="absolute right-0 top-full mt-1.5 z-40 w-32 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
-                                {(['pending', 'uploaded', 'verified', 'waived'] as ChecklistItemStatus[]).map(s => (
-                                  <button
-                                    key={s}
-                                    onClick={() => { updateChecklistStatus(item.id, s); setChecklistStatusMenuId(null); }}
-                                    className={`w-full text-left px-3 py-1.5 rounded-lg text-[11.5px] font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors ${item.status === s ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-slate-400'}`}
-                                  >
-                                    {CHECKLIST_STATUS_META[s].label}
-                                  </button>
-                                ))}
+                      <div key={category} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+                        <button
+                          onClick={() => toggleCategoryCollapsed(category)}
+                          className="w-full flex items-center justify-between px-5 py-3 text-left"
+                        >
+                          <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">{category}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-gray-400 dark:text-slate-500">
+                              {items.filter(i => i.status === 'linked' || i.status === 'verified').length}/{items.length}
+                            </span>
+                            {collapsed ? <ChevronRight size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+                          </div>
+                        </button>
+                        {!collapsed && items.map(item => {
+                          const chip = CHECKLIST_STATUS_META[item.status];
+                          const linkedDoc = item.linkedDocumentId ? documents.find(d => d.id === item.linkedDocumentId) : undefined;
+                          const isDragOver = dragOverItemId === item.id;
+                          return (
+                            <div
+                              key={item.id}
+                              onDragOver={(e) => { if (e.dataTransfer.types.includes(CASE_FILE_DRAG_MIME)) { e.preventDefault(); setDragOverItemId(item.id); } }}
+                              onDragLeave={() => setDragOverItemId(id => (id === item.id ? null : id))}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                setDragOverItemId(null);
+                                const docId = e.dataTransfer.getData(CASE_FILE_DRAG_MIME);
+                                if (docId) handleChecklistLinkDocument(item, docId);
+                              }}
+                              className={`table-row-hover flex items-center gap-3 px-5 py-2.5 border-t border-gray-100 dark:border-slate-800 transition-colors ${
+                                isDragOver ? 'bg-edamame/[0.06] dark:bg-edamame/[0.08]' : ''
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[13px] font-semibold text-gray-800 dark:text-slate-200 tracking-tight">{item.label}</div>
+                                {item.description && <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{item.description}</div>}
+                                {linkedDoc ? (
+                                  <div className="flex items-center gap-1.5 mt-1 text-[11px] text-gray-500 dark:text-slate-400">
+                                    <FileText size={11} className="text-gray-400 dark:text-slate-600 flex-shrink-0" />
+                                    <button
+                                      onClick={() => handleChecklistPreview(linkedDoc)}
+                                      title="Open file"
+                                      className="truncate max-w-[240px] hover:text-edamame hover:underline text-left"
+                                    >
+                                      {linkedDoc.fileName}
+                                    </button>
+                                    <button
+                                      onClick={() => handleChecklistUnlink(item)}
+                                      title="Remove linked file"
+                                      className="text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400"
+                                    >
+                                      <X size={11} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className={`mt-1 text-[10.5px] italic ${isDragOver ? 'text-edamame font-semibold' : 'text-gray-400 dark:text-slate-500'}`}>
+                                    Drag a file from Case Files to link it here
+                                  </div>
+                                )}
                               </div>
-                            </>
-                          )}
-                        </div>
+                              <div className="relative flex-shrink-0">
+                                <button
+                                  onClick={() => setChecklistStatusMenuId(id => id === item.id ? null : item.id)}
+                                  className={`inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap transition-colors ${chip.cls}`}
+                                >
+                                  {chip.label}
+                                  <ChevronDown size={11} />
+                                </button>
+                                {checklistStatusMenuId === item.id && (
+                                  <>
+                                    <div className="fixed inset-0 z-30" onClick={() => setChecklistStatusMenuId(null)} />
+                                    <div className="absolute right-0 top-full mt-1.5 z-40 w-32 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
+                                      {(['pending', 'linked', 'verified', 'waived'] as ChecklistItemStatus[]).map(s => (
+                                        <button
+                                          key={s}
+                                          onClick={() => { updateChecklistStatus(item.id, s); setChecklistStatusMenuId(null); }}
+                                          className={`w-full text-left px-3 py-1.5 rounded-lg text-[11.5px] font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors ${item.status === s ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-slate-400'}`}
+                                        >
+                                          {CHECKLIST_STATUS_META[s].label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
-                  })}
-                </div>
-              )}
-              <div>
-                <div className="text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.08em] mb-2">
-                  {checklist.length > 0 ? 'Other documents' : 'Documents'}
-                </div>
-                <DocumentUpload caseId={currentCase.id} visaSubclass={visaSubclass} onUpload={() => setDocRefreshKey(k => k + 1)} />
-                <div className="mt-3">
-                  <DocumentList
-                    caseId={currentCase.id}
-                    refreshKey={docRefreshKey}
-                    visaSubclass={visaSubclass}
-                    excludeIds={checklist.map(c => c.linkedDocumentId).filter((id): id is string => !!id)}
-                  />
-                </div>
+                  })
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── NOTES ── */}
-          {activeTab === 'notes' && (
+          {activeTabId === 'tab:notes' && (
             <div className="mt-4">
               <CaseNotes caseId={currentCase.id} />
             </div>
@@ -1152,6 +1378,70 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             setDocRefreshKey(k => k + 1);
           }}
         />
+      )}
+
+      {/* Document Checklist Generator tool */}
+      {showChecklistGenerator && (
+        <DocumentChecklistGenerator
+          caseId={currentCase.id}
+          visaSubclass={visaSubclass}
+          workflowTemplate={workflowTemplate}
+          onClose={() => setShowChecklistGenerator(false)}
+          onGenerate={handleGeneratedChecklist}
+        />
+      )}
+
+      {/* Manually add a Document Checklist item */}
+      {addItemOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Add Checklist Item</h3>
+              <button onClick={() => setAddItemOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-6 space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Document Name</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={addItemForm.label}
+                  onChange={(e) => setAddItemForm({ ...addItemForm, label: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddChecklistItem(); }}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white"
+                  placeholder="e.g., Additional reference letter"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                <input
+                  type="text"
+                  value={addItemForm.category}
+                  onChange={(e) => setAddItemForm({ ...addItemForm, category: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-3">
+              <button
+                onClick={() => setAddItemOpen(false)}
+                className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddChecklistItem}
+                disabled={!addItemForm.label.trim()}
+                className="flex items-center gap-2 px-6 py-2 bg-edamame hover:bg-edamame-600 disabled:opacity-40 text-white font-bold rounded-xl shadow-lg shadow-edamame/20 transition-all"
+              >
+                <Plus size={16} />
+                Add Item
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Auto-Packager slide-over */}

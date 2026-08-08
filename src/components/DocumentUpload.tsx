@@ -20,9 +20,11 @@ interface DocumentUploadProps {
   /** Visa subclass — when '820', filename heuristics pre-fill aspectTag */
   visaSubclass?: string;
   onUpload: (doc: Document) => void;
+  /** Renders a smaller dropzone for tight spaces, e.g. the Case Files rail. */
+  compact?: boolean;
 }
 
-export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubclass, onUpload }) => {
+export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubclass, onUpload, compact }) => {
   const repos = useRepositories();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,8 +96,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
       <div
         {...getRootProps()}
         className={`
-          group relative border-2 border-dashed rounded-2xl px-6 py-9 text-center cursor-pointer
+          group relative border-2 border-dashed rounded-2xl text-center cursor-pointer
           transition-all duration-200 ease-out
+          ${compact ? 'px-3 py-4' : 'px-6 py-9'}
           ${isDragActive
             ? 'border-edamame-500 bg-edamame-50/70 dark:bg-edamame-500/10 scale-[1.005]'
             : 'border-gray-250 dark:border-white/10 bg-white/40 dark:bg-white/[0.015] hover:border-edamame-400 hover:bg-edamame-50/30 dark:hover:border-edamame-700/60 dark:hover:bg-edamame-500/[0.04]'
@@ -104,21 +107,28 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
         `}
       >
         <input {...getInputProps()} />
-        <div className="flex flex-col items-center gap-2.5">
+        <div className={`flex flex-col items-center ${compact ? 'gap-1.5' : 'gap-2.5'}`}>
           <div
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 ${
+            className={`rounded-2xl flex items-center justify-center transition-all duration-200 ${compact ? 'w-8 h-8' : 'w-11 h-11'} ${
               isDragActive
                 ? 'bg-edamame-500 text-white scale-110'
                 : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-slate-500 group-hover:bg-edamame-100 dark:group-hover:bg-edamame-500/15 group-hover:text-edamame-600 dark:group-hover:text-edamame-400'
             }`}
           >
-            <Upload size={18} strokeWidth={2} />
+            <Upload size={compact ? 13 : 18} strokeWidth={2} />
           </div>
           {uploading ? (
-            <p className="text-sm font-semibold text-gray-500 dark:text-slate-400">Uploading…</p>
+            <p className={`font-semibold text-gray-500 dark:text-slate-400 ${compact ? 'text-[11px]' : 'text-sm'}`}>Uploading…</p>
           ) : isDragActive ? (
-            <p className="text-sm font-bold text-edamame-600 dark:text-edamame-400">
+            <p className={`font-bold text-edamame-600 dark:text-edamame-400 ${compact ? 'text-[11px]' : 'text-sm'}`}>
               Drop to upload
+            </p>
+          ) : compact ? (
+            <p className="text-[11px] font-semibold text-gray-700 dark:text-slate-200">
+              Drop files, or{' '}
+              <span className="text-edamame-600 dark:text-edamame-400 underline decoration-edamame-300 dark:decoration-edamame-700/60 underline-offset-2">
+                browse
+              </span>
             </p>
           ) : (
             <>

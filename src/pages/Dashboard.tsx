@@ -194,7 +194,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   );
 
   const docsOutstanding = checklistItems
-    ? checklistItems.filter(i => i.status === 'pending' || i.status === 'uploaded').length
+    ? checklistItems.filter(i => i.status === 'pending' || i.status === 'linked').length
     : null;
 
   const topOverdue = overdueTasks[0];
