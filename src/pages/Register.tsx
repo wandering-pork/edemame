@@ -1,17 +1,36 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, UserPlus, MailCheck } from 'lucide-react';
+import { Mail, Lock, User, UserPlus, MailCheck, Building2, Eye, EyeOff } from 'lucide-react';
 import { LogoBrand } from '@/components/LogoBrand';
 import { useAuth } from '@/contexts/AuthContext';
+
+// TODO: replace this hardcoded placeholder list with a real company/firm list
+// (e.g. backed by a `companies` table) once one exists. These are intentionally
+// generic/fictional placeholder names — not references to any real firm.
+const COMPANY_OPTIONS = [
+  'Independent / Sole Practitioner',
+  'Acme Migration Services',
+  'Sample Legal Partners',
+  'Placeholder Immigration Consultants',
+  'Other',
+];
+
+const OTHER_COMPANY_OPTION = 'Other';
+const NAME_MAX_LENGTH = 100;
 
 export default function Register() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [surname, setSurname] = useState('');
+  const [companySelection, setCompanySelection] = useState('');
+  const [otherCompany, setOtherCompany] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
@@ -29,8 +48,21 @@ export default function Register() {
       return;
     }
 
+    const trimmedFirstName = firstName.trim();
+    const trimmedSurname = surname.trim();
+    if (!trimmedFirstName || !trimmedSurname) {
+      setError('First name and surname cannot be empty.');
+      return;
+    }
+
+    const fullName = `${trimmedFirstName} ${trimmedSurname}`.trim();
+    const company =
+      companySelection === OTHER_COMPANY_OPTION ? otherCompany.trim() : companySelection;
+
     setSubmitting(true);
-    const { error: signUpError, needsEmailConfirmation } = await signUp(email, password, fullName);
+    const { error: signUpError, needsEmailConfirmation } = await signUp(email, password, fullName, {
+      company: company || undefined,
+    });
     setSubmitting(false);
 
     if (signUpError) {
@@ -90,20 +122,75 @@ export default function Register() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Full name</label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  required
-                  autoComplete="name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
-                  placeholder="Jane Smith"
-                />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">First name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    required
+                    autoComplete="given-name"
+                    maxLength={NAME_MAX_LENGTH}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
+                    placeholder="Jane"
+                  />
+                </div>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Surname</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    required
+                    autoComplete="family-name"
+                    maxLength={NAME_MAX_LENGTH}
+                    value={surname}
+                    onChange={(e) => setSurname(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
+                    placeholder="Smith"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Company <span className="font-normal text-gray-400 dark:text-gray-500">(optional)</span>
+              </label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <select
+                  value={companySelection}
+                  onChange={(e) => setCompanySelection(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors appearance-none"
+                >
+                  <option value="">Select a company…</option>
+                  {COMPANY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {companySelection === OTHER_COMPANY_OPTION && (
+                <div className="relative mt-2">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    autoComplete="organization"
+                    maxLength={NAME_MAX_LENGTH}
+                    value={otherCompany}
+                    onChange={(e) => setOtherCompany(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
+                    placeholder="Enter your company name"
+                  />
+                </div>
+              )}
             </div>
 
             <div>
@@ -127,15 +214,23 @@ export default function Register() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   autoComplete="new-password"
                   minLength={6}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
+                  className="w-full pl-10 pr-11 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
                   placeholder="At least 6 characters"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -144,14 +239,22 @@ export default function Register() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   required
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
+                  className="w-full pl-10 pr-11 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:border-edamame-500 transition-colors"
                   placeholder="Re-enter password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 

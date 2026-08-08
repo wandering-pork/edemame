@@ -4,6 +4,7 @@ import { useRepositories } from '../contexts/RepositoryContext';
 import { CaseNotes } from '../components/CaseNotes';
 import { PdfPackager } from '../components/PdfPackager';
 import { BundleBuilder820 } from '../components/BundleBuilder820';
+import { AutoPackager } from '../components/AutoPackager';
 import { CaseRail, RailAlert, CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
 import { AgentPanel } from '../components/case-details/AgentPanel';
 import { Workspace, WorkspaceCatalogItem, MessageRecommendation } from '../components/case-details/Workspace';
@@ -152,6 +153,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- 820 Submission Bundle Builder state ----
   const [showBundleBuilder, setShowBundleBuilder] = useState(false);
+
+  // ---- Auto-Packager state ----
+  const [showAutoPackager, setShowAutoPackager] = useState(false);
 
   // ---- Chat state ----
   const [conversations, setConversations] = useState<FocusConversation[]>([]);
@@ -830,6 +834,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 <div className="absolute right-0 top-full mt-1.5 z-40 w-52 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
                   <button onClick={() => { openOrFocusTab('checklist'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
                   <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Workspace</button>
+                  <button onClick={() => { setShowAutoPackager(true); setMoreOpen(false); }} className={menuItemCls}>Auto-Packager</button>
                   {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && (
                     <button onClick={handleRunCrusher} className={menuItemCls}>Run Crusher</button>
                   )}
@@ -1437,6 +1442,18 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Auto-Packager slide-over */}
+      {showAutoPackager && (
+        <AutoPackager
+          caseId={caseItem.id}
+          documents={documents}
+          visaSubclass={visaSubclass}
+          applicant={applicant ?? client}
+          onClose={() => setShowAutoPackager(false)}
+          onSaved={() => setDocRefreshKey(k => k + 1)}
+        />
       )}
 
     </div>
