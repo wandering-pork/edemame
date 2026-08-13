@@ -12,6 +12,7 @@ import { Workspace, WorkspaceCatalogItem, MessageRecommendation } from '../compo
 import { DocumentChecklistGenerator } from '../components/case-details/DocumentChecklistGenerator';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
 import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib/caseTabsStore';
+import { displayCaseNumber } from '../lib/caseNumber';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -594,7 +595,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
       // Refresh Workspace View/Tools suggestions from the exchange, and record
       // which items to render as inline hyperlinks under this assistant message.
-      const combinedText = `${userMsg.content}\n${replyText}`;
+      const combinedText = `${userMsg.content}\n${assistantMsg.content}`;
       const matchedKinds = RECOMMEND_KEYWORDS.filter(([, re]) => re.test(combinedText)).map(([kind]) => kind);
       if (matchedKinds.length > 0) {
         const matchedViews = matchedKinds.filter(k => k === 'tasks' || k === 'checklist' || k === 'notes');
@@ -858,7 +859,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           {currentCase.title}
           <span className="text-gray-400 dark:text-slate-500 font-semibold"> — {client.name}</span>
         </h1>
-        <span className="font-mono text-[10.5px] text-gray-400 dark:text-slate-500">#{currentCase.id.slice(0, 8).toUpperCase()}</span>
+        <span className="font-mono text-[10.5px] text-gray-400 dark:text-slate-500">{displayCaseNumber(currentCase)}</span>
         {visaSubclass && (
           <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400">SC-{visaSubclass}</span>
         )}

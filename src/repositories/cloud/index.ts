@@ -165,6 +165,7 @@ function caseToRow(userId: string, c: Case) {
     case_owner: c.caseOwner ?? null,
     assignment_history: c.assignmentHistory ?? null,
     applicant_id: c.applicantId ?? null,
+    case_number: c.caseNumber ?? null,
   };
 }
 
@@ -182,6 +183,7 @@ function rowToCase(row: any): Case {
     caseOwner: row.case_owner ?? undefined,
     assignmentHistory: row.assignment_history ?? undefined,
     applicantId: row.applicant_id ?? undefined,
+    caseNumber: row.case_number ?? undefined,
   };
 }
 

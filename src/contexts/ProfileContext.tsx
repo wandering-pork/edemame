@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { useAuth } from './AuthContext';
 import { getProfile, createProfile, updateProfile as updateProfileRow, type Profile, type ProfileUpdate } from '@/services/profileService';
 import type { StorageMode } from '@/types';
+// LOCAL DEV ONLY — remove with `git checkout src/contexts/ProfileContext.tsx`.
+import { DEV_OFFLINE_AUTH, loadDevProfile, saveDevProfile } from '@/lib/devOfflineAuth';
 
 interface ProfileContextValue {
   profile: Profile | null;
@@ -21,6 +23,13 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // LOCAL DEV ONLY — localStorage stands in for the `profiles` table.
+    if (DEV_OFFLINE_AUTH) {
+      setProfile(loadDevProfile());
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     getProfile(userId)
@@ -30,12 +39,34 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, [userId]);
 
   const completeOnboarding = useCallback(async (storageMode: StorageMode) => {
+    // LOCAL DEV ONLY
+    if (DEV_OFFLINE_AUTH) {
+      const created = saveDevProfile({
+        userId,
+        storageMode,
+        theme: 'classic',
+        sidebarCollapsed: false,
+        linkedFolderName: null,
+        linkedAt: null,
+      });
+      setProfile(created);
+      return created;
+    }
+
     const created = await createProfile(userId, storageMode);
     setProfile(created);
     return created;
   }, [userId]);
 
   const updateProfile = useCallback(async (update: ProfileUpdate) => {
+    // LOCAL DEV ONLY
+    if (DEV_OFFLINE_AUTH) {
+      const current = loadDevProfile();
+      if (!current) return;
+      setProfile(saveDevProfile({ ...current, ...update }));
+      return;
+    }
+
     const updated = await updateProfileRow(userId, update);
     setProfile(updated);
   }, [userId]);

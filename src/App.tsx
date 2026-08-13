@@ -21,6 +21,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent } from './types';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
+import { generateCaseNumber } from './lib/caseNumber';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
@@ -311,6 +312,7 @@ const AppShell: React.FC = () => {
     const caseWithOwner: Case = {
       ...newCase,
       caseOwner: newCase.caseOwner || currentUserId,
+      caseNumber: newCase.caseNumber || generateCaseNumber(cases),
     };
     const tasksWithAssignee = newTasks.map(t => ({
       ...t,
@@ -330,7 +332,7 @@ const AppShell: React.FC = () => {
       subjectId: caseWithOwner.id,
       summary: `New case created: "${caseWithOwner.title}".`,
     });
-  }, [repos, currentUserId, pushActivity]);
+  }, [repos, currentUserId, pushActivity, cases]);
 
   // --- Template Actions ---
   const handleAddTemplate = useCallback(async (template: WorkflowTemplate) => {
@@ -446,6 +448,13 @@ const AppShell: React.FC = () => {
             onMarkAsRead={handleMarkAsRead}
             onMarkAllAsRead={handleMarkAllAsRead}
             onDeleteNotification={handleDeleteNotification}
+            clients={clients}
+            cases={cases}
+            tasks={tasks}
+            templates={templates}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onMoveTaskDate={handleMoveTaskDate}
           />
           {loadWarning && (
             <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
