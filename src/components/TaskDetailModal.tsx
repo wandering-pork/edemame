@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X, ArrowRight, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import type { Task, Case, Client } from '../types';
@@ -19,7 +20,12 @@ interface TaskDetailModalProps {
    * path drag-and-drop uses. Saving the date via `onUpdateTask` would carry
    * the old day's `priorityOrder` across and scramble ordering on the new day.
    */
-  onMoveTaskDate?: (taskId: string, newDate: string, offsetFuture: boolean) => void;
+  onMoveTaskDate?: (
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean,
+    taskPatch?: { title?: string; description?: string },
+  ) => void;
   /** When the case link is followed. Lets the host close its own surrounding UI. */
   onNavigateAway?: () => void;
 }
@@ -63,22 +69,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const handleSave = () => {
     if (!isDirty || !title.trim() || !date) return;
-    const textChanged = title.trim() !== task.title || description !== task.description;
-    if (textChanged) {
-      onUpdateTask?.({ ...task, title: title.trim(), description });
-    }
-    if (date !== task.date) {
+    const trimmedTitle = title.trim();
+    const textChanged = trimmedTitle !== task.title || description !== task.description;
+    const dateChanged = date !== task.date;
+    if (dateChanged && onMoveTaskDate) {
       // Keeps day-ordering consistent with drag-and-drop; see onMoveTaskDate.
-      if (onMoveTaskDate) {
-        onMoveTaskDate(task.id, date, false);
-      } else {
-        onUpdateTask?.({ ...task, title: title.trim(), description, date });
+      onMoveTaskDate(
+        task.id,
+        date,
+        false,
+        textChanged ? { title: trimmedTitle, description } : undefined,
+      );
+    } else {
+      if (textChanged) {
+        onUpdateTask?.({ ...task, title: trimmedTitle, description });
+      }
+      if (dateChanged) {
+        onUpdateTask?.({ ...task, title: trimmedTitle, description, date });
       }
     }
     onClose();
   };
 
-  return (
+  const modal = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 p-4 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-slate-800">
         <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
@@ -192,4 +205,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 };

@@ -50,7 +50,12 @@ interface CaseDetailsProps {
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
   onAddTask: (task: Task) => void;
-  onMoveTaskDate: (taskId: string, newDate: string, offsetFuture: boolean) => void;
+  onMoveTaskDate: (
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean,
+    taskPatch?: { title?: string; description?: string },
+  ) => void;
   onBack: () => void;
 }
 

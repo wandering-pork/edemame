@@ -21,7 +21,12 @@ interface HeaderProps {
   templates: WorkflowTemplate[];
   onUpdateTask?: (task: Task) => void;
   onDeleteTask?: (id: string) => void;
-  onMoveTaskDate?: (taskId: string, newDate: string, offsetFuture: boolean) => void;
+  onMoveTaskDate?: (
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean,
+    taskPatch?: { title?: string; description?: string },
+  ) => void;
 }
 
 const initials = (name: string) =>

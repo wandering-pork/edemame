@@ -23,7 +23,12 @@ interface DashboardProps {
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onMoveTaskOrder: (taskId: string, direction: 'up' | 'down') => void;
-  onMoveTaskDate: (taskId: string, newDate: string, offsetFuture: boolean) => void;
+  onMoveTaskDate: (
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean,
+    taskPatch?: { title?: string; description?: string },
+  ) => void;
   onAddTask: (task: Task) => void;
   /**
    * Optional — App.tsx already tracks an `activity: ActivityEvent[]` state (see

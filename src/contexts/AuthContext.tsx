@@ -1,18 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
-// LOCAL DEV ONLY — remove with `git checkout src/contexts/AuthContext.tsx`.
-import {
-  DEV_OFFLINE_AUTH,
-  DEV_EMAIL,
-  DEV_PASSWORD,
-  loadDevSession,
-  saveDevSession,
-  clearDevSession,
-} from '@/lib/devOfflineAuth';
+
+type AuthUser = Pick<User, 'id' | 'email' | 'user_metadata'>;
 
 interface AuthContextValue {
-  user: User | null;
+  user: AuthUser | null;
   session: Session | null;
   loading: boolean;
   signUp: (
@@ -28,25 +21,75 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const DEV_OFFLINE_AUTH = import.meta.env.VITE_DEV_OFFLINE_AUTH === 'true';
+const DEV_TEST_EMAIL = (import.meta.env.VITE_DEV_AUTH_EMAIL as string | undefined)?.trim().toLowerCase() || 'test@edamame.local';
+const DEV_TEST_PASSWORD = import.meta.env.VITE_DEV_AUTH_PASSWORD as string | undefined;
+const DEV_TEST_USER_ID = '00000000-0000-4000-8000-000000000001';
+const DEV_OFFLINE_USER_KEY = 'edamame:dev-offline-auth-user';
+
+interface DevOfflineUserRecord {
+  id: string;
+  email: string;
+  fullName: string;
+}
+
+function toAuthUser(record: DevOfflineUserRecord): AuthUser {
+  return {
+    id: record.id,
+    email: record.email,
+    user_metadata: { full_name: record.fullName },
+  };
+}
+
+function readDevOfflineUser(): DevOfflineUserRecord | null {
+  const raw = localStorage.getItem(DEV_OFFLINE_USER_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<DevOfflineUserRecord>;
+    if (
+      typeof parsed.id === 'string' &&
+      typeof parsed.email === 'string' &&
+      typeof parsed.fullName === 'string'
+    ) {
+      return { id: parsed.id, email: parsed.email, fullName: parsed.fullName };
+    }
+    console.error('Invalid dev offline auth payload in localStorage.');
+    localStorage.removeItem(DEV_OFFLINE_USER_KEY);
+    return null;
+  } catch (error) {
+    console.error('Failed to parse dev offline auth payload.', error);
+    localStorage.removeItem(DEV_OFFLINE_USER_KEY);
+    return null;
+  }
+}
+
+function saveDevOfflineUser(record: DevOfflineUserRecord): void {
+  localStorage.setItem(DEV_OFFLINE_USER_KEY, JSON.stringify(record));
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // LOCAL DEV ONLY — offline session, no network.
     if (DEV_OFFLINE_AUTH) {
-      setSession(loadDevSession());
+      const stored = readDevOfflineUser();
+      setSession(null);
+      setUser(stored ? toAuthUser(stored) : null);
       setLoading(false);
       return;
     }
 
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
+      setUser(data.session?.user ?? null);
       setLoading(false);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
+      setUser(newSession?.user ?? null);
       setLoading(false);
     });
 
@@ -54,9 +97,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp: AuthContextValue['signUp'] = async (email, password, fullName, extraMetadata) => {
-    // LOCAL DEV ONLY — registering just signs straight in as the dev user.
     if (DEV_OFFLINE_AUTH) {
-      setSession(saveDevSession());
+      if (!DEV_TEST_PASSWORD) {
+        return {
+          error: 'Dev offline mode requires VITE_DEV_AUTH_PASSWORD to be set in local env.',
+          needsEmailConfirmation: false,
+        };
+      }
+      if (email.trim().toLowerCase() !== DEV_TEST_EMAIL || password !== DEV_TEST_PASSWORD) {
+        return {
+          error: `Dev offline mode allows only ${DEV_TEST_EMAIL} with the configured test password.`,
+          needsEmailConfirmation: false,
+        };
+      }
+      const company = typeof extraMetadata?.company === 'string' ? extraMetadata.company : undefined;
+      const displayName = fullName.trim() || 'Edamame Test User';
+      const record: DevOfflineUserRecord = {
+        id: DEV_TEST_USER_ID,
+        email: DEV_TEST_EMAIL,
+        fullName: company ? `${displayName} (${company})` : displayName,
+      };
+      saveDevOfflineUser(record);
+      setSession(null);
+      setUser(toAuthUser(record));
       return { error: null, needsEmailConfirmation: false };
     }
 
@@ -72,12 +135,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn: AuthContextValue['signIn'] = async (email, password) => {
-    // LOCAL DEV ONLY — validates against the credentials in src/.env.local.
     if (DEV_OFFLINE_AUTH) {
-      if (email.trim().toLowerCase() !== DEV_EMAIL.toLowerCase() || password !== DEV_PASSWORD) {
-        return { error: 'Invalid login credentials' };
+      if (!DEV_TEST_PASSWORD) {
+        return { error: 'Dev offline mode requires VITE_DEV_AUTH_PASSWORD to be set in local env.' };
       }
-      setSession(saveDevSession());
+      if (email.trim().toLowerCase() !== DEV_TEST_EMAIL || password !== DEV_TEST_PASSWORD) {
+        return { error: 'Invalid email or password.' };
+      }
+      const existing = readDevOfflineUser();
+      const record: DevOfflineUserRecord = existing ?? {
+        id: DEV_TEST_USER_ID,
+        email: DEV_TEST_EMAIL,
+        fullName: 'Edamame Test User',
+      };
+      saveDevOfflineUser(record);
+      setSession(null);
+      setUser(toAuthUser(record));
       return { error: null };
     }
 
@@ -86,26 +159,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    // LOCAL DEV ONLY
     if (DEV_OFFLINE_AUTH) {
-      clearDevSession();
+      localStorage.removeItem(DEV_OFFLINE_USER_KEY);
       setSession(null);
+      setUser(null);
       return;
     }
     await supabase.auth.signOut();
   };
 
   const resetPassword: AuthContextValue['resetPassword'] = async (email) => {
-    // LOCAL DEV ONLY — nothing to email offline.
-    if (DEV_OFFLINE_AUTH) return { error: null };
-
+    if (DEV_OFFLINE_AUTH) {
+      return { error: `Password reset is unavailable in dev offline mode. Use ${DEV_TEST_EMAIL}.` };
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     return { error: error ? error.message : null };
   };
 
   return (
     <AuthContext.Provider
-      value={{ user: session?.user ?? null, session, loading, signUp, signIn, signOut, resetPassword }}
+      value={{ user, session, loading, signUp, signIn, signOut, resetPassword }}
     >
       {children}
     </AuthContext.Provider>

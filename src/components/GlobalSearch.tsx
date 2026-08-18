@@ -13,7 +13,12 @@ interface GlobalSearchProps {
   templates: WorkflowTemplate[];
   onUpdateTask?: (task: Task) => void;
   onDeleteTask?: (id: string) => void;
-  onMoveTaskDate?: (taskId: string, newDate: string, offsetFuture: boolean) => void;
+  onMoveTaskDate?: (
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean,
+    taskPatch?: { title?: string; description?: string },
+  ) => void;
 }
 
 const formatDob = (dob?: string) => {

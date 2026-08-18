@@ -263,7 +263,12 @@ const AppShell: React.FC = () => {
     });
   }, [repos]);
 
-  const handleMoveTaskDate = useCallback((taskId: string, newDate: string, offsetFuture: boolean = false) => {
+  const handleMoveTaskDate = useCallback((
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean = false,
+    taskPatch?: { title?: string; description?: string },
+  ) => {
     setTasks(prev => {
       const task = prev.find(t => t.id === taskId);
       if (!task) return prev;
@@ -273,7 +278,7 @@ const AppShell: React.FC = () => {
       const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
       const updated = prev.map(t => {
-        if (t.id === taskId) return { ...t, date: newDate, priorityOrder: 999 };
+        if (t.id === taskId) return { ...t, ...taskPatch, date: newDate, priorityOrder: 999 };
         if (offsetFuture && t.caseId === task.caseId && !t.isCompleted) {
           const tDate = new Date(t.date);
           if (tDate > oldDate) {
@@ -576,7 +581,12 @@ interface CaseDetailsRouteProps {
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onAddTask: (task: Task) => void;
-  onMoveTaskDate: (taskId: string, newDate: string, offsetFuture: boolean) => void;
+  onMoveTaskDate: (
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean,
+    taskPatch?: { title?: string; description?: string },
+  ) => void;
 }
 
 const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {

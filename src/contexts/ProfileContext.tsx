@@ -2,8 +2,6 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { useAuth } from './AuthContext';
 import { getProfile, createProfile, updateProfile as updateProfileRow, type Profile, type ProfileUpdate } from '@/services/profileService';
 import type { StorageMode } from '@/types';
-// LOCAL DEV ONLY — remove with `git checkout src/contexts/ProfileContext.tsx`.
-import { DEV_OFFLINE_AUTH, loadDevProfile, saveDevProfile } from '@/lib/devOfflineAuth';
 
 interface ProfileContextValue {
   profile: Profile | null;
@@ -14,6 +12,56 @@ interface ProfileContextValue {
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
+const DEV_OFFLINE_AUTH = import.meta.env.VITE_DEV_OFFLINE_AUTH === 'true';
+
+function devProfileStorageKey(userId: string): string {
+  return `edamame:dev-offline-profile:${userId}`;
+}
+
+function readDevProfile(userId: string): Profile | null {
+  const raw = localStorage.getItem(devProfileStorageKey(userId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<Profile>;
+    if (
+      parsed.userId === userId &&
+      (parsed.storageMode === 'local' || parsed.storageMode === 'cloud') &&
+      (parsed.theme === 'classic' || parsed.theme === 'dark') &&
+      typeof parsed.sidebarCollapsed === 'boolean'
+    ) {
+      return {
+        userId,
+        storageMode: parsed.storageMode,
+        theme: parsed.theme,
+        sidebarCollapsed: parsed.sidebarCollapsed,
+        linkedFolderName: parsed.linkedFolderName ?? null,
+        linkedAt: parsed.linkedAt ?? null,
+      };
+    }
+    console.error('Invalid dev offline profile payload in localStorage.');
+    localStorage.removeItem(devProfileStorageKey(userId));
+    return null;
+  } catch (error) {
+    console.error('Failed to parse dev offline profile payload.', error);
+    localStorage.removeItem(devProfileStorageKey(userId));
+    return null;
+  }
+}
+
+function saveDevProfile(profile: Profile): void {
+  localStorage.setItem(devProfileStorageKey(profile.userId), JSON.stringify(profile));
+}
+
+function defaultDevProfile(userId: string, storageMode: StorageMode): Profile {
+  return {
+    userId,
+    storageMode,
+    theme: 'classic',
+    sidebarCollapsed: false,
+    linkedFolderName: null,
+    linkedAt: null,
+  };
+}
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -23,9 +71,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // LOCAL DEV ONLY — localStorage stands in for the `profiles` table.
     if (DEV_OFFLINE_AUTH) {
-      setProfile(loadDevProfile());
+      setLoading(true);
+      setProfile(readDevProfile(userId));
       setLoading(false);
       return;
     }
@@ -39,34 +87,32 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, [userId]);
 
   const completeOnboarding = useCallback(async (storageMode: StorageMode) => {
-    // LOCAL DEV ONLY
     if (DEV_OFFLINE_AUTH) {
-      const created = saveDevProfile({
-        userId,
-        storageMode,
-        theme: 'classic',
-        sidebarCollapsed: false,
-        linkedFolderName: null,
-        linkedAt: null,
-      });
+      const created = defaultDevProfile(userId, storageMode);
+      saveDevProfile(created);
       setProfile(created);
       return created;
     }
-
     const created = await createProfile(userId, storageMode);
     setProfile(created);
     return created;
   }, [userId]);
 
   const updateProfile = useCallback(async (update: ProfileUpdate) => {
-    // LOCAL DEV ONLY
     if (DEV_OFFLINE_AUTH) {
-      const current = loadDevProfile();
-      if (!current) return;
-      setProfile(saveDevProfile({ ...current, ...update }));
+      const current = readDevProfile(userId) ?? defaultDevProfile(userId, 'local');
+      const updated: Profile = {
+        userId,
+        storageMode: update.storageMode ?? current.storageMode,
+        theme: update.theme ?? current.theme,
+        sidebarCollapsed: update.sidebarCollapsed ?? current.sidebarCollapsed,
+        linkedFolderName: update.linkedFolderName ?? current.linkedFolderName,
+        linkedAt: update.linkedAt ?? current.linkedAt,
+      };
+      saveDevProfile(updated);
+      setProfile(updated);
       return;
     }
-
     const updated = await updateProfileRow(userId, update);
     setProfile(updated);
   }, [userId]);
