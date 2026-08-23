@@ -594,7 +594,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
       // Refresh Workspace View/Tools suggestions from the exchange, and record
       // which items to render as inline hyperlinks under this assistant message.
-      const combinedText = `${userMsg.content}\n${replyText}`;
+      const combinedText = `${userMsg.content}\n${data.reply || ''}`;
       const matchedKinds = RECOMMEND_KEYWORDS.filter(([, re]) => re.test(combinedText)).map(([kind]) => kind);
       if (matchedKinds.length > 0) {
         const matchedViews = matchedKinds.filter(k => k === 'tasks' || k === 'checklist' || k === 'notes');
