@@ -2,18 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { v4 as uuidv4 } from 'uuid';
 import { useRepositories } from '@/contexts/RepositoryContext';
-import { Upload, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Package } from 'lucide-react';
 import type { Document } from '../types';
 import { suggestAspectFromFilename } from '../lib/aspects820';
-
-const ACCEPTED_TYPES: Record<string, string[]> = {
-  'application/pdf': ['.pdf'],
-  'image/jpeg': ['.jpg', '.jpeg'],
-  'image/png': ['.png'],
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-};
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+import { ACCEPTED_DOCUMENT_TYPES, CASE_FILES_MAX_BYTES } from '../lib/supportedFormats';
 
 interface DocumentUploadProps {
   caseId: string;
@@ -22,17 +14,30 @@ interface DocumentUploadProps {
   onUpload: (doc: Document) => void;
   /** Renders a smaller dropzone for tight spaces, e.g. the Case Files rail. */
   compact?: boolean;
+  /**
+   * Called when a file was rejected for exceeding CASE_FILES_MAX_BYTES and the
+   * user opts to compress it instead (CF-2). Hands off the raw File(s) in
+   * memory — these were never accepted into Case Files, so there's nothing to
+   * re-browse to; the caller should open Auto-Packager with them pre-loaded.
+   */
+  onRequestCompress?: (files: File[]) => void;
 }
 
-export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubclass, onUpload, compact }) => {
+function formatMB(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+}
+
+export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubclass, onUpload, compact, onRequestCompress }) => {
   const repos = useRepositories();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [oversizedFiles, setOversizedFiles] = useState<File[]>([]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     setError(null);
     setSuccess(null);
+    setOversizedFiles([]);
 
     if (acceptedFiles.length === 0) return;
 
@@ -68,10 +73,11 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
 
   const onDropRejected = useCallback((fileRejections: any[]) => {
     const messages: string[] = [];
+    const tooLarge: File[] = [];
     for (const rejection of fileRejections) {
       for (const err of rejection.errors) {
         if (err.code === 'file-too-large') {
-          messages.push(`"${rejection.file.name}" exceeds 5 MB. Use the 5MB Crusher in Focus Mode to compress and bundle your documents.`);
+          tooLarge.push(rejection.file);
         } else if (err.code === 'file-invalid-type') {
           messages.push(`"${rejection.file.name}" is not a supported file type.`);
         } else {
@@ -79,15 +85,16 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
         }
       }
     }
-    setError(messages.join(' '));
+    if (tooLarge.length > 0) setOversizedFiles(tooLarge);
+    setError(messages.length > 0 ? messages.join(' ') : null);
     setSuccess(null);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     onDropRejected,
-    accept: ACCEPTED_TYPES,
-    maxSize: MAX_FILE_SIZE,
+    accept: ACCEPTED_DOCUMENT_TYPES,
+    maxSize: CASE_FILES_MAX_BYTES,
     multiple: true,
   } as any);
 
@@ -139,12 +146,45 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
                 </span>
               </p>
               <p className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-gray-400 dark:text-slate-500">
-                PDF · JPG · PNG · DOCX  —  max 5 MB
+                PDF · JPG · PNG · DOCX  —  max 50 MB
               </p>
             </>
           )}
         </div>
       </div>
+
+      {oversizedFiles.length > 0 && (
+        <div className="flex flex-col gap-2 text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2.5">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>
+              {oversizedFiles.length === 1
+                ? `"${oversizedFiles[0].name}" exceeds ${formatMB(CASE_FILES_MAX_BYTES)}.`
+                : `${oversizedFiles.length} files exceed ${formatMB(CASE_FILES_MAX_BYTES)}.`}
+              {' '}Compress {oversizedFiles.length === 1 ? 'it' : 'them'} with Auto-Packager first?
+            </span>
+          </div>
+          <div className="flex items-center gap-2 pl-6">
+            <button
+              type="button"
+              onClick={() => {
+                onRequestCompress?.(oversizedFiles);
+                setOversizedFiles([]);
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-edamame-600 hover:bg-edamame-700 text-white text-[12px] font-bold transition-colors"
+            >
+              <Package className="w-3.5 h-3.5" /> Use Auto-Packager
+            </button>
+            <button
+              type="button"
+              onClick={() => setOversizedFiles([])}
+              className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">

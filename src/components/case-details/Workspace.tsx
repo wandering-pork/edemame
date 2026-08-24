@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Search, Sparkles, Send, Plus, ListChecks, StickyNote, CalendarCheck, Wand2, Package, FolderKanban, ExternalLink } from 'lucide-react';
+import { Search, Sparkles, Send, Plus, ListChecks, StickyNote, CalendarCheck, Wand2, Package, FolderKanban, ExternalLink, FolderOpen } from 'lucide-react';
 import { format } from 'date-fns';
 import type { CaseTabKind, CaseToolKind, CaseViewKind, FocusChatMessage, FocusConversation } from '../../types';
 
@@ -17,6 +17,7 @@ export interface MessageRecommendation {
 const VIEW_ICONS: Record<CaseViewKind, React.ElementType> = {
   tasks: CalendarCheck,
   checklist: ListChecks,
+  documents: FolderOpen,
   notes: StickyNote,
 };
 

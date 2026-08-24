@@ -3,6 +3,8 @@ import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemSta
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useAuth } from '../contexts/AuthContext';
 import { CaseNotes } from '../components/CaseNotes';
+import { DocumentUpload } from '../components/DocumentUpload';
+import { DocumentList } from '../components/DocumentList';
 import { PdfPackager } from '../components/PdfPackager';
 import { BundleBuilder820 } from '../components/BundleBuilder820';
 import { AutoPackager } from '../components/AutoPackager';
@@ -63,6 +65,7 @@ const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
   tasks: 'Tasks',
   checklist: 'Document Checklist',
   notes: 'Notes',
+  documents: 'Case Files',
   'checklist-generator': 'Document Checklist Generator',
   'auto-packager': 'Auto-Packager',
   'bundle-builder-820': '820 Bundle Builder',
@@ -158,6 +161,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- Auto-Packager state ----
   const [showAutoPackager, setShowAutoPackager] = useState(false);
+  /** CF-2: files handed off from an over-the-limit Case Files upload attempt, pre-loaded into Auto-Packager's local-PC source. */
+  const [packagerInitialFiles, setPackagerInitialFiles] = useState<File[] | undefined>(undefined);
 
   // ---- Chat state ----
   const [conversations, setConversations] = useState<FocusConversation[]>([]);
@@ -353,6 +358,24 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  /** CF-4: "Remove file" from the Case Files rail's hover menu. */
+  const handleRemoveDocument = async (doc: Document) => {
+    await repos.documents.delete(doc.id);
+    handleDocumentRemovedFromState(doc.id);
+  };
+
+  /** Keeps this page's own `documents` state (used by the rail + checklist linking) in sync after a delete performed elsewhere, e.g. the Case Files tab's DocumentList. */
+  const handleDocumentRemovedFromState = (id: string) => {
+    setDocuments(prev => prev.filter(d => d.id !== id));
+    setDocRefreshKey(k => k + 1);
+  };
+
+  /** CF-2: user opted to compress an over-the-limit Case Files upload instead of re-browsing. */
+  const handleRequestCompress = (files: File[]) => {
+    setPackagerInitialFiles(files);
+    setShowAutoPackager(true);
   };
 
   // ---- Case handlers ----
@@ -998,6 +1021,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             setDocuments(prev => [...prev, doc]);
             setDocRefreshKey(k => k + 1);
           }}
+          onRequestCompress={handleRequestCompress}
+          onRemoveDocument={handleRemoveDocument}
+          onOpenCaseFilesTab={() => openOrFocusTab('documents')}
         />
 
         {/* ── CENTER COLUMN ── */}
@@ -1037,6 +1063,11 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     {caseTasks.length}
                   </span>
                 )}
+                {tab.kind === 'documents' && documents.length > 0 && (
+                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                    {documents.length}
+                  </span>
+                )}
                 <button
                   onClick={(e) => { e.stopPropagation(); togglePinTab(tab.id); }}
                   title={tab.pinned ? 'Unpin tab' : 'Pin tab (persists across reloads)'}
@@ -1061,6 +1092,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               viewCatalog={[
                 { kind: 'tasks', label: 'Tasks', description: `${pendingTasks.length} pending · ${completedTasks.length} completed` },
                 { kind: 'checklist', label: 'Document Checklist', description: `${uploadedCount}/${checklist.length} documents linked` },
+                { kind: 'documents', label: 'Case Files', description: `${documents.length} file${documents.length === 1 ? '' : 's'} uploaded` },
                 { kind: 'notes', label: 'Notes', description: 'Case notes and history' },
               ] as WorkspaceCatalogItem[]}
               toolCatalog={[
@@ -1119,6 +1151,22 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   </div>
                 </section>
               )}
+            </div>
+          )}
+
+          {/* ── CASE FILES — full-tab view (formerly rail-only), better visibility/actions for a large document set ── */}
+          {activeTabId === 'tab:documents' && (
+            <div className="mt-4 space-y-4">
+              <DocumentUpload
+                caseId={currentCase.id}
+                visaSubclass={visaSubclass}
+                onUpload={(doc) => {
+                  setDocuments(prev => [...prev, doc]);
+                  setDocRefreshKey(k => k + 1);
+                }}
+                onRequestCompress={handleRequestCompress}
+              />
+              <DocumentList caseId={currentCase.id} refreshKey={docRefreshKey} visaSubclass={visaSubclass} onDeleted={handleDocumentRemovedFromState} />
             </div>
           )}
 
@@ -1570,7 +1618,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           documents={documents}
           visaSubclass={visaSubclass}
           applicant={applicant ?? client}
-          onClose={() => setShowAutoPackager(false)}
+          initialLocalFiles={packagerInitialFiles}
+          onClose={() => { setShowAutoPackager(false); setPackagerInitialFiles(undefined); }}
           onSaved={() => setDocRefreshKey(k => k + 1)}
         />
       )}
