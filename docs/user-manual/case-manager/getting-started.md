@@ -14,15 +14,17 @@ decision.
 
 Every time you open a case, you land on the **Workspace** tab. This is the AI-assisted entry point
 for the case — it doesn't hold case data itself, it's a launcher for the case's Views (Tasks,
-Document Checklist, Notes) and Tools (Document Checklist Generator, Auto-Packager, and the 820
-Bundle Builder where applicable). See
+Document Checklist, Case Files, Notes) and Tools (Document Checklist Generator, Auto-Packager, and
+the 820 Bundle Builder where applicable). See
 [Workspace, tabs, and pinning](./workspace-and-tabs.md) for how the Workspace tab, tab opening, and
 tab pinning work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
 
-The left-hand rail on a case also has a **Case Files** panel — every file attached to the case,
-which you can drag directly onto a Document Checklist item to link it (see Document Checklist doc
-above).
+The left-hand rail on a case also has a compact **Case Files** panel — every file attached to the
+case, which you can drag directly onto a Document Checklist item to link it (see Document Checklist
+doc above). For a bigger, easier-to-work-with view of the same files — upload, preview, download,
+and delete, with full-size thumbnails rather than the rail's condensed list — click **Open in tab**
+next to the rail's Case Files heading, or open **Case Files** from the Workspace tab's View section.
 
 ## Generating tasks with AI
 

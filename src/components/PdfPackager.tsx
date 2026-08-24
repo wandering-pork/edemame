@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import type { Document } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { immiAccountName, loadPdf, mergePdfs, formatBytes, createDownloadUrl, triggerDownload } from '../lib/pdfBundle';
+import { DOHA_MAX_BYTES } from '../lib/autoPackager';
 
 interface PdfPackagerProps {
   caseId: string;
@@ -12,18 +13,11 @@ interface PdfPackagerProps {
   onClose: () => void;
 }
 
-const TARGET_SIZES = [
-  { label: '5 MB (ImmiAccount limit)', bytes: 5 * 1024 * 1024 },
-  { label: '4 MB (safe margin)', bytes: 4 * 1024 * 1024 },
-  { label: '3 MB (maximum safety)', bytes: 3 * 1024 * 1024 },
-];
-
 export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, visaSubclass, onClose }) => {
   const repos = useRepositories();
   const pdfDocs = documents.filter(d => d.fileType === 'application/pdf');
 
   const [selected, setSelected] = useState<Set<string>>(new Set(pdfDocs.map(d => d.id)));
-  const [targetIdx, setTargetIdx] = useState(0);
   const [status, setStatus] = useState<'idle' | 'processing' | 'done' | 'error'>('idle');
   const [progress, setProgress] = useState('');
   const [result, setResult] = useState<{ url: string; size: number; filename: string } | null>(null);
@@ -132,29 +126,6 @@ export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, vis
             </div>
           )}
 
-          {/* Target size */}
-          <div>
-            <div className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2">
-              Target size
-            </div>
-            <div className="flex gap-2">
-              {TARGET_SIZES.map((t, i) => (
-                <button
-                  key={i}
-                  onClick={() => setTargetIdx(i)}
-                  className={`flex-1 text-xs font-semibold px-2 py-1.5 rounded-lg transition-colors ${
-                    targetIdx === i
-                      ? 'bg-edamame text-white'
-                      : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  {t.label.split(' ')[0]}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">{TARGET_SIZES[targetIdx].label}</p>
-          </div>
-
           {/* Status */}
           {status === 'processing' && (
             <div className="flex items-center gap-2.5 text-sm text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-800/50 rounded-lg px-3 py-2.5">
@@ -170,7 +141,7 @@ export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, vis
                 Bundle ready — {formatBytes(result.size)}
               </div>
               <div className="text-xs text-green-600 dark:text-green-500">{result.filename}</div>
-              {result.size > TARGET_SIZES[targetIdx].bytes && (
+              {result.size > DOHA_MAX_BYTES && (
                 <div className="text-xs text-amber-600 dark:text-amber-400">
                   Bundle is over target after lossless compression. To reduce further, split large scanned PDFs into separate uploads, or reduce scan resolution (150 DPI is sufficient for ImmiAccount). ImmiAccount typically accepts up to 5.1 MB.
                 </div>

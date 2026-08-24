@@ -183,7 +183,7 @@ export interface DocumentChecklistItem {
 // ---------------------------------------------------------------------------
 
 /** Built-in View items surfaced from the Workspace "View" section. */
-export type CaseViewKind = 'tasks' | 'checklist' | 'notes';
+export type CaseViewKind = 'tasks' | 'checklist' | 'notes' | 'documents';
 
 /** Built-in Tool items surfaced from the Workspace "Tools" section. */
 export type CaseToolKind = 'checklist-generator' | 'auto-packager' | 'bundle-builder-820';

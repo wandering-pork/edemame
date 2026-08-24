@@ -5,9 +5,9 @@
 Opening a case always lands you on the **Workspace** tab — it's the AI-assisted starting point for
 the case, not a place case data lives. It has two sections:
 
-- **View** — read-only case data: Tasks, Document Checklist, Notes. AI-recommended items are shown
-  first (ranked by what's most likely relevant right now, e.g. outstanding documents or overdue
-  tasks), with a quick search bar if you want to jump straight to something else.
+- **View** — read-only case data: Tasks, Document Checklist, Case Files, Notes. AI-recommended items
+  are shown first (ranked by what's most likely relevant right now, e.g. outstanding documents or
+  overdue tasks), with a quick search bar if you want to jump straight to something else.
 - **Tools** — built-in tools you can act on: the **Document Checklist Generator** and, where
   applicable to the case's visa subclass, the **Auto-Packager** and the **820 Bundle Builder**.
   Same pattern as View — AI-recommended tools first, plus quick search.
