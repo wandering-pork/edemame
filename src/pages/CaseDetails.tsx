@@ -13,6 +13,7 @@ import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList'
 import { AgentPanel } from '../components/case-details/AgentPanel';
 import { Workspace, WorkspaceCatalogItem, MessageRecommendation } from '../components/case-details/Workspace';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
+import { ReferenceLetterValidator } from '../components/case-details/ReferenceLetterValidator';
 import { DocumentTypePicker, DocumentTypeBadge } from '../components/DocumentTypePicker';
 import { useDocumentTypes } from '../contexts/DocumentTypeContext';
 import { recalcAutoLinks, recalcAutoLinkForItem } from '../lib/autoLink';
@@ -75,6 +76,7 @@ const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
   'checklist-generator': 'Document Checklist Generator',
   'auto-packager': 'Auto-Packager',
   'bundle-builder-820': '820 Bundle Builder',
+  'reference-letter-validator': 'Reference Letter Validator',
 };
 
 const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: string }> = {
@@ -93,6 +95,7 @@ const RECOMMEND_KEYWORDS: Array<[CaseTabKind, RegExp]> = [
   ['checklist-generator', /generate|missing document|category|categories/i],
   ['auto-packager', /crusher|compress|5\s*mb|packager|auto-?packager/i],
   ['bundle-builder-820', /820|bundle|submission/i],
+  ['reference-letter-validator', /reference letter|employment reference|skills assessment|acs|aitsl|vetassess|anmac|engineers australia/i],
 ];
 
 // ---------------------------------------------------------------------------
@@ -170,6 +173,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- 820 Submission Bundle Builder state ----
   const [showBundleBuilder, setShowBundleBuilder] = useState(false);
+
+  // ---- Reference Letter Validator + Generator state (issue #32) ----
+  const [showReferenceLetterValidator, setShowReferenceLetterValidator] = useState(false);
 
   // ---- Auto-Packager state ----
   const [showAutoPackager, setShowAutoPackager] = useState(false);
@@ -377,6 +383,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     if (kind === 'checklist-generator') { setShowChecklistGenerator(true); return; }
     if (kind === 'auto-packager') { setShowPackager(true); return; }
     if (kind === 'bundle-builder-820') { setShowBundleBuilder(true); return; }
+    if (kind === 'reference-letter-validator') { setShowReferenceLetterValidator(true); return; }
 
     const id = `tab:${kind}`;
     setOpenTabs(prev => {
@@ -664,7 +671,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       const matchedKinds = RECOMMEND_KEYWORDS.filter(([, re]) => re.test(combinedText)).map(([kind]) => kind);
       if (matchedKinds.length > 0) {
         const matchedViews = matchedKinds.filter(k => k === 'tasks' || k === 'checklist' || k === 'notes');
-        const matchedTools = matchedKinds.filter(k => k === 'checklist-generator' || k === 'auto-packager' || k === 'bundle-builder-820');
+        const matchedTools = matchedKinds.filter(k => k === 'checklist-generator' || k === 'auto-packager' || k === 'bundle-builder-820' || k === 'reference-letter-validator');
         if (matchedViews.length > 0) {
           setRecommendedViewKinds(prev => [...matchedViews, ...prev.filter(k => !matchedViews.includes(k))]);
         }
@@ -1142,6 +1149,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 { kind: 'checklist-generator', label: 'Document Checklist Generator', description: 'Pick categories to generate a checklist from the system default + workflow template' },
                 ...(SUPPORTED_SUBCLASSES.includes(visaSubclass || '') ? [{ kind: 'auto-packager', label: 'Auto-Packager', description: 'Compress & bundle documents under 5MB' }] as WorkspaceCatalogItem[] : []),
                 ...(visaSubclass === '820' ? [{ kind: 'bundle-builder-820', label: '820 Bundle Builder', description: 'Build the ImmiAccount submission bundle' }] as WorkspaceCatalogItem[] : []),
+                { kind: 'reference-letter-validator', label: 'Reference Letter Validator', description: 'Check an employment reference against ACS / AITSL / EA / VETASSESS / ANMAC and draft a compliant template' },
               ]}
               recommendedViewKinds={recommendedViewKinds}
               recommendedToolKinds={recommendedToolKinds}
@@ -1727,6 +1735,18 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Reference Letter Validator + Generator tool */}
+      {showReferenceLetterValidator && (
+        <ReferenceLetterValidator
+          caseId={caseItem.id}
+          applicant={applicant ?? client}
+          employer={client.role === 'employer' || client.role === 'sponsor' ? client : undefined}
+          workflowTemplate={workflowTemplate}
+          onClose={() => setShowReferenceLetterValidator(false)}
+          onSaved={() => setDocRefreshKey(k => k + 1)}
+        />
       )}
 
       {/* Auto-Packager slide-over */}
