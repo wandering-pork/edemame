@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "Supabase env vars not configured" });
   }
 
-  const response = await fetch(`${supabaseUrl}/rest/v1/profiles?select=id&limit=1`, {
+  const response = await fetch(`${supabaseUrl}/rest/v1/profiles?select=user_id&limit=1`, {
     headers: {
       apikey: supabaseAnonKey,
       Authorization: `Bearer ${supabaseAnonKey}`,
