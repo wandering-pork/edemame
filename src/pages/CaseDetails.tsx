@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate } from '../types';
+import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate, LmtAdRecord, Notification } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useAuth } from '../contexts/AuthContext';
 import { CaseNotes } from '../components/CaseNotes';
@@ -13,6 +13,18 @@ import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList'
 import { AgentPanel } from '../components/case-details/AgentPanel';
 import { Workspace, WorkspaceCatalogItem, MessageRecommendation } from '../components/case-details/Workspace';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
+import { LmtEvidencePanel, LmtExpiryBanner } from '../components/case-details/LmtEvidencePanel';
+import { LmtAdScanner, LmtAdDraft } from '../components/LmtAdScanner';
+import {
+  caseRequiresLmt,
+  computeLmtWindow,
+  inferNominationLodged,
+  lmtNotificationId,
+  shouldAlertLmt,
+  LMT_EVIDENCE_DOCUMENT_TYPE_CODE,
+  NOMINATION_DOCUMENT_TYPE_CODE,
+  LMT_WINDOW_MONTHS,
+} from '../lib/lmt';
 import { DocumentTypePicker, DocumentTypeBadge } from '../components/DocumentTypePicker';
 import { useDocumentTypes } from '../contexts/DocumentTypeContext';
 import { recalcAutoLinks, recalcAutoLinkForItem } from '../lib/autoLink';
@@ -75,6 +87,7 @@ const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
   'checklist-generator': 'Document Checklist Generator',
   'auto-packager': 'Auto-Packager',
   'bundle-builder-820': '820 Bundle Builder',
+  'lmt-evidence': 'LMT Evidence',
 };
 
 const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: string }> = {
@@ -93,6 +106,7 @@ const RECOMMEND_KEYWORDS: Array<[CaseTabKind, RegExp]> = [
   ['checklist-generator', /generate|missing document|category|categories/i],
   ['auto-packager', /crusher|compress|5\s*mb|packager|auto-?packager/i],
   ['bundle-builder-820', /820|bundle|submission/i],
+  ['lmt-evidence', /\blmt\b|labour market|labor market|advertis|nomination|re-?advertis/i],
 ];
 
 // ---------------------------------------------------------------------------
@@ -165,6 +179,11 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // ---- Documents state ----
   const [documents, setDocuments] = useState<Document[]>([]);
 
+  // ---- LMT evidence state (GitHub issue #31) ----
+  const [lmtRecords, setLmtRecords] = useState<LmtAdRecord[]>([]);
+  /** null = closed; { record: undefined } = add; { record } = edit that record. */
+  const [lmtScanner, setLmtScanner] = useState<{ record?: LmtAdRecord } | null>(null);
+
   // ---- PdfPackager state ----
   const [showPackager, setShowPackager] = useState(false);
 
@@ -211,11 +230,25 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     closed: { label: 'Closed', chip: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300', dot: 'bg-green-500' },
   };
 
+  // ---- LMT window (issue #31) ----
+  // Enabled by subclass membership (482/494/186), never by an `=== '482'` check.
+  const lmtApplies = caseRequiresLmt(visaSubclass);
+  const lmtStatus = useMemo(() => computeLmtWindow(lmtRecords), [lmtRecords]);
+  const nominationSignal = useMemo(() => inferNominationLodged(checklist, caseTasks), [checklist, caseTasks]);
+  const lmtAlertActive = lmtApplies && shouldAlertLmt(lmtStatus, nominationSignal.lodged);
+
   // Rail alerts (overdue red, docs outstanding amber, passport expiry red)
   const railAlerts: RailAlert[] = [];
   if (overdueCount > 0) railAlerts.push({ color: 'red', text: `${overdueCount} overdue task${overdueCount !== 1 ? 's' : ''}` });
   if (outstandingDocs > 0) railAlerts.push({ color: 'amber', text: `${outstandingDocs} doc${outstandingDocs !== 1 ? 's' : ''} outstanding` });
   if (daysToPassportExpiry !== null && daysToPassportExpiry < 90) railAlerts.push({ color: 'red', text: `Passport expires in ${daysToPassportExpiry}d` });
+  if (lmtAlertActive) {
+    railAlerts.push(
+      lmtStatus.state === 'lapsed'
+        ? { color: 'red', text: 'LMT evidence expired' }
+        : { color: 'amber', text: `LMT window closes in ${lmtStatus.daysRemaining}d` },
+    );
+  }
 
   // ---- Effects ----
 
@@ -255,6 +288,45 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       .then(setDocuments)
       .catch(() => setDocuments([]));
   }, [caseItem.id, repos.documents, docRefreshKey]);
+
+  // Load LMT ad records — only for subclasses that carry an LMT requirement.
+  useEffect(() => {
+    let cancelled = false;
+    if (!lmtApplies) { setLmtRecords([]); return; }
+    repos.lmtAds.getByCaseId(caseItem.id)
+      .then(records => { if (!cancelled) setLmtRecords(records); })
+      .catch(() => { if (!cancelled) setLmtRecords([]); });
+    return () => { cancelled = true; };
+  }, [caseItem.id, lmtApplies, repos.lmtAds]);
+
+  // Raise a Notification the first time a given window reaches "approaching" or
+  // "lapsed" without the nomination being lodged. The id is derived from the
+  // case + expiry date + state, so re-rendering (or reopening the case) never
+  // duplicates it, and a genuinely new window after re-advertising does notify.
+  useEffect(() => {
+    if (!lmtAlertActive) return;
+    let cancelled = false;
+    const id = lmtNotificationId(caseItem.id, lmtStatus);
+
+    (async () => {
+      const existing = await repos.notifications.getAll();
+      if (cancelled || existing.some(n => n.id === id)) return;
+      const notification: Notification = {
+        id,
+        title: lmtStatus.state === 'lapsed' ? 'LMT evidence expired' : 'LMT window closing',
+        message:
+          lmtStatus.state === 'lapsed'
+            ? `"${currentCase.title}" — the ${LMT_WINDOW_MONTHS}-month window to lodge the nomination ended on ${lmtStatus.expiryDate}. The position must be re-advertised.`
+            : `"${currentCase.title}" — the nomination must be lodged by ${lmtStatus.expiryDate} (${lmtStatus.daysRemaining} days) or the LMT evidence expires.`,
+        type: lmtStatus.state === 'lapsed' ? 'error' : 'warning',
+        read: false,
+        createdAt: new Date().toISOString(),
+      };
+      await repos.notifications.create(notification);
+    })().catch(() => { /* a failed alert must never break the case view */ });
+
+    return () => { cancelled = true; };
+  }, [lmtAlertActive, lmtStatus, caseItem.id, currentCase.title, repos.notifications]);
 
   // Load the case's workflow template (firm-level customisation merged into generated checklists)
   useEffect(() => {
@@ -419,6 +491,92 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const handleRequestCompress = (files: File[]) => {
     setPackagerInitialFiles(files);
     setShowAutoPackager(true);
+  };
+
+  // ---- LMT evidence handlers (issue #31) ----
+
+  /**
+   * Saves one advertisement. When the user came through the scan flow, the
+   * source file is also added to Case Files tagged `LMTEVD` and linked to the
+   * record — the evidence and the dates it was read from stay together.
+   */
+  const handleSaveLmtAd = async (draft: LmtAdDraft, file?: File) => {
+    let documentId = lmtScanner?.record?.documentId;
+
+    if (file) {
+      const doc: Document = {
+        id: uuidv4(),
+        caseId: currentCase.id,
+        fileName: file.name,
+        filePath: `documents/${currentCase.id}/${file.name}`,
+        fileType: file.type,
+        fileSize: file.size,
+        uploadedAt: new Date().toISOString(),
+        documentTypeCode: LMT_EVIDENCE_DOCUMENT_TYPE_CODE,
+      };
+      const created = await repos.documents.create(doc, file);
+      setDocuments(prev => [...prev, created]);
+      setDocRefreshKey(k => k + 1);
+      documentId = created.id;
+    }
+
+    if (lmtScanner?.record) {
+      const updated: LmtAdRecord = { ...lmtScanner.record, ...draft, documentId };
+      await repos.lmtAds.update(updated);
+      setLmtRecords(prev => prev.map(r => (r.id === updated.id ? updated : r)));
+      return;
+    }
+
+    const record: LmtAdRecord = {
+      id: uuidv4(),
+      caseId: currentCase.id,
+      ...draft,
+      documentId,
+      createdAt: new Date().toISOString(),
+    };
+    await repos.lmtAds.create(record);
+    setLmtRecords(prev => [...prev, record].sort((a, b) => a.endDate.localeCompare(b.endDate)));
+  };
+
+  const handleDeleteLmtAd = async (record: LmtAdRecord) => {
+    await repos.lmtAds.delete(record.id);
+    setLmtRecords(prev => prev.filter(r => r.id !== record.id));
+  };
+
+  const openLmtScanner = (record?: LmtAdRecord) => {
+    openOrFocusTab('lmt-evidence');
+    setLmtScanner({ record });
+  };
+
+  /**
+   * Records nomination lodgement through the Document Checklist rather than a
+   * new nomination entity: an existing nomination item is marked verified, and
+   * if the case has none, one manually-added item is appended. That keeps the
+   * "is it lodged?" signal in the one place the case already tracks nomination
+   * paperwork, and keeps it reversible from the checklist itself.
+   */
+  const handleMarkNominationLodged = () => {
+    setChecklist(prev => {
+      const idx = prev.findIndex(
+        i => i.documentTypeCode === NOMINATION_DOCUMENT_TYPE_CODE || /nomination/i.test(i.label),
+      );
+      if (idx >= 0) {
+        return prev.map((item, i) => (i === idx ? { ...item, status: 'verified' as ChecklistItemStatus } : item));
+      }
+      return [
+        ...prev,
+        {
+          id: uuidv4(),
+          caseId: currentCase.id,
+          label: 'Nomination lodged',
+          description: 'Recorded from the LMT Evidence expiry alert.',
+          status: 'verified' as ChecklistItemStatus,
+          category: ADDITIONAL_DOCUMENTS_CATEGORY,
+          manuallyAdded: true,
+          documentTypeCode: NOMINATION_DOCUMENT_TYPE_CODE,
+        },
+      ];
+    });
   };
 
   // ---- Case handlers ----
@@ -1043,6 +1201,18 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         </div>
       </div>
 
+      {/* LMT window warning — persistent while the window is closing/lapsed and
+          the nomination isn't lodged (issue #31). */}
+      {lmtAlertActive && (
+        <LmtExpiryBanner
+          status={lmtStatus}
+          nomination={nominationSignal}
+          onOpenLmtTab={() => openOrFocusTab('lmt-evidence')}
+          onAddAdRecord={() => openLmtScanner()}
+          onMarkNominationLodged={handleMarkNominationLodged}
+        />
+      )}
+
       {/* ══════════════════════════════════════════
           3-COLUMN GRID
       ══════════════════════════════════════════ */}
@@ -1142,6 +1312,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 { kind: 'checklist-generator', label: 'Document Checklist Generator', description: 'Pick categories to generate a checklist from the system default + workflow template' },
                 ...(SUPPORTED_SUBCLASSES.includes(visaSubclass || '') ? [{ kind: 'auto-packager', label: 'Auto-Packager', description: 'Compress & bundle documents under 5MB' }] as WorkspaceCatalogItem[] : []),
                 ...(visaSubclass === '820' ? [{ kind: 'bundle-builder-820', label: '820 Bundle Builder', description: 'Build the ImmiAccount submission bundle' }] as WorkspaceCatalogItem[] : []),
+                ...(lmtApplies ? [{ kind: 'lmt-evidence', label: 'LMT Evidence', description: lmtStatus.state === 'no-records' ? 'Record job ads and track the nomination lodgement window' : `Lodge nomination by ${lmtStatus.expiryDate}` }] as WorkspaceCatalogItem[] : []),
               ]}
               recommendedViewKinds={recommendedViewKinds}
               recommendedToolKinds={recommendedToolKinds}
@@ -1413,6 +1584,21 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               </div>
             );
           })()}
+
+          {/* ── LMT EVIDENCE ── */}
+          {activeTabId === 'tab:lmt-evidence' && (
+            <LmtEvidencePanel
+              records={lmtRecords}
+              documents={documents}
+              status={lmtStatus}
+              nomination={nominationSignal}
+              onAdd={() => setLmtScanner({})}
+              onEdit={(record) => setLmtScanner({ record })}
+              onDelete={handleDeleteLmtAd}
+              onOpenDocument={handleChecklistPreview}
+              onMarkNominationLodged={handleMarkNominationLodged}
+            />
+          )}
 
           {/* ── NOTES ── */}
           {activeTabId === 'tab:notes' && (
@@ -1727,6 +1913,15 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* LMT advertisement scanner / editor */}
+      {lmtScanner && (
+        <LmtAdScanner
+          existing={lmtScanner.record}
+          onClose={() => setLmtScanner(null)}
+          onSave={handleSaveLmtAd}
+        />
       )}
 
       {/* Auto-Packager slide-over */}

@@ -64,7 +64,8 @@ const CHECKLIST_CATEGORIES: Record<string, CategoryDef[]> = {
       category: '482 — Sponsor & Nomination Documents',
       items: [
         ['SBS approval evidence', 'Standard Business Sponsorship approval letter for employer'],
-        ['Labour Market Testing evidence', 'Minimum 2 job ads run for at least 28 days, stating salary'],
+        ['Labour Market Testing evidence', 'Minimum 2 job ads run for at least 28 days, stating salary — record the ad dates in the LMT Evidence tab'],
+        ['Nomination application (Form 1395)', 'Must be lodged within 4 months of the LMT advertising campaign closing'],
         ['Skilling Australians Fund (SAF) levy receipt', undefined],
         ['Employment contract', 'Position, salary, and conditions must match nomination'],
         ['Evidence salary meets current TSMIT', undefined],

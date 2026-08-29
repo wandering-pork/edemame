@@ -218,6 +218,38 @@ export interface DocumentType {
 }
 
 // ---------------------------------------------------------------------------
+// Labour Market Testing (LMT) evidence
+// ---------------------------------------------------------------------------
+
+/**
+ * One job advertisement run as Labour Market Testing evidence for an
+ * employer-sponsored nomination (GitHub issue #31).
+ *
+ * A case normally has 2+ of these (DoHA requires a minimum of two ads, each run
+ * for at least 28 days). The nomination must be lodged within
+ * `LMT_WINDOW_MONTHS` of the campaign's closing date — see `lib/lmt.ts`, which
+ * derives the whole expiry window from the latest `endDate` in the set.
+ */
+export interface LmtAdRecord {
+  id: string;
+  caseId: string;
+  /** Where the ad ran — e.g. "Seek", "LinkedIn", "Company website". */
+  platform: string;
+  /** Date the ad went live, YYYY-MM-DD. */
+  startDate: string;
+  /** Date the ad closed, YYYY-MM-DD. Drives the 4-month nomination window. */
+  endDate: string;
+  /** `Document.id` of the uploaded ad screenshot/PDF (normally tagged `LMTEVD`). */
+  documentId?: string;
+  /** Free-text note, e.g. the advertised position title or salary range. */
+  notes?: string;
+  /** True when the platform/dates came from Gemini Vision rather than manual entry. */
+  extractedByAi?: boolean;
+  createdAt: string; // ISO
+  userId?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Case Workspace — tabs, View/Tools catalogue
 // ---------------------------------------------------------------------------
 
@@ -225,7 +257,7 @@ export interface DocumentType {
 export type CaseViewKind = 'tasks' | 'checklist' | 'notes' | 'documents';
 
 /** Built-in Tool items surfaced from the Workspace "Tools" section. */
-export type CaseToolKind = 'checklist-generator' | 'auto-packager' | 'bundle-builder-820';
+export type CaseToolKind = 'checklist-generator' | 'auto-packager' | 'bundle-builder-820' | 'lmt-evidence';
 
 export type CaseTabKind = 'workspace' | CaseViewKind | CaseToolKind;
 
