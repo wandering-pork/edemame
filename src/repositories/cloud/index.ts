@@ -10,6 +10,7 @@ import type {
   TeamMember,
   ActivityEvent,
   DocumentChecklistItem,
+  DocumentType,
   FocusConversation,
 } from '@/types';
 import type {
@@ -23,6 +24,7 @@ import type {
   ITeamMemberRepository,
   IActivityRepository,
   IChecklistRepository,
+  IDocumentTypeRepository,
   IChatRepository,
   Repositories,
 } from '@/repositories/types';
@@ -425,6 +427,7 @@ function docToRow(userId: string, d: Document) {
     file_type: d.fileType,
     file_size: d.fileSize,
     uploaded_at: d.uploadedAt,
+    document_type_code: d.documentTypeCode ?? null,
     aspect_tag: d.aspectTag ?? null,
     evidence_note: d.evidenceNote ?? null,
   };
@@ -440,6 +443,7 @@ function rowToDoc(row: any): Document {
     fileSize: row.file_size,
     uploadedAt: row.uploaded_at,
     userId: row.user_id,
+    documentTypeCode: row.document_type_code ?? undefined,
     aspectTag: row.aspect_tag ?? undefined,
     evidenceNote: row.evidence_note ?? undefined,
   };
@@ -680,6 +684,9 @@ function checklistToRow(userId: string, caseId: string, i: DocumentChecklistItem
     status: i.status,
     linked_document_id: i.linkedDocumentId ?? null,
     required_for_subclass: i.requiredForSubclass ?? null,
+    category: i.category ?? null,
+    manually_added: i.manuallyAdded ?? null,
+    document_type_code: i.documentTypeCode ?? null,
   };
 }
 
@@ -692,6 +699,9 @@ function rowToChecklistItem(row: any): DocumentChecklistItem {
     status: row.status,
     linkedDocumentId: row.linked_document_id ?? undefined,
     requiredForSubclass: row.required_for_subclass ?? undefined,
+    category: row.category ?? undefined,
+    manuallyAdded: row.manually_added ?? undefined,
+    documentTypeCode: row.document_type_code ?? undefined,
   };
 }
 
@@ -730,6 +740,78 @@ class CloudChecklistRepository implements IChecklistRepository {
 
   async setForCase(caseId: string, items: DocumentChecklistItem[]): Promise<void> {
     await replaceCaseRows('checklist_items', this.userId, caseId, items.map(i => checklistToRow(this.userId, caseId, i)));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Document Types — account-level reference list (no case_id)
+// ---------------------------------------------------------------------------
+
+function documentTypeToRow(userId: string, t: DocumentType) {
+  return {
+    id: t.id,
+    user_id: userId,
+    code: t.code,
+    description: t.description,
+    category: t.category,
+    is_system_default: t.isSystemDefault,
+    auto_link: t.autoLink,
+  };
+}
+
+function rowToDocumentType(row: any): DocumentType {
+  return {
+    id: row.id,
+    code: row.code,
+    description: row.description,
+    category: row.category,
+    isSystemDefault: row.is_system_default,
+    autoLink: row.auto_link,
+    userId: row.user_id,
+  };
+}
+
+class CloudDocumentTypeRepository implements IDocumentTypeRepository {
+  constructor(private userId: string) {}
+
+  async getAll(): Promise<DocumentType[]> {
+    const rows = await fetchAllRows('document_types', q => q.eq('user_id', this.userId));
+    return rows.map(rowToDocumentType);
+  }
+
+  async getById(id: string): Promise<DocumentType | undefined> {
+    const { data, error } = await supabase.from('document_types').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data ? rowToDocumentType(data) : undefined;
+  }
+
+  async create(item: DocumentType): Promise<DocumentType> {
+    const { error } = await supabase.from('document_types').upsert(documentTypeToRow(this.userId, item), { onConflict: 'id' });
+    if (error) throw error;
+    return item;
+  }
+
+  async update(item: DocumentType): Promise<DocumentType> {
+    const { error } = await supabase.from('document_types').upsert(documentTypeToRow(this.userId, item), { onConflict: 'id' });
+    if (error) throw error;
+    return item;
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('document_types').delete().eq('user_id', this.userId).eq('id', id);
+    if (error) throw error;
+  }
+
+  async createMany(items: DocumentType[]): Promise<DocumentType[]> {
+    if (items.length === 0) return items;
+    // onConflict on (user_id, code) rather than id: seeding races (two tabs
+    // opening at once) would otherwise both mint a fresh uuid for the same
+    // code and trip the unique constraint.
+    const { error } = await supabase
+      .from('document_types')
+      .upsert(items.map(i => documentTypeToRow(this.userId, i)), { onConflict: 'user_id,code', ignoreDuplicates: true });
+    if (error) throw error;
+    return items;
   }
 }
 
@@ -787,6 +869,7 @@ export function createCloudRepositories(userId: string): Repositories {
     teamMembers: new CloudTeamMemberRepository(userId),
     activity: new CloudActivityRepository(userId),
     checklist: new CloudChecklistRepository(userId),
+    documentTypes: new CloudDocumentTypeRepository(userId),
     chat: new CloudChatRepository(userId),
   };
 }

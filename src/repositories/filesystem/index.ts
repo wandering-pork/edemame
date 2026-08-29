@@ -10,6 +10,7 @@ import type {
   TeamMember,
   ActivityEvent,
   DocumentChecklistItem,
+  DocumentType,
   FocusConversation,
 } from '@/types';
 import type {
@@ -23,6 +24,7 @@ import type {
   ITeamMemberRepository,
   IActivityRepository,
   IChecklistRepository,
+  IDocumentTypeRepository,
   IChatRepository,
   Repositories,
 } from '@/repositories/types';
@@ -354,6 +356,41 @@ class FsChecklistRepository implements IChecklistRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Document Types — account-level reference list, one file per row
+// ---------------------------------------------------------------------------
+
+class FsDocumentTypeRepository implements IDocumentTypeRepository {
+  constructor(private root: FileSystemDirectoryHandle) {}
+
+  async getAll(): Promise<DocumentType[]> {
+    return readAllInDir<DocumentType>(this.root, 'document-types');
+  }
+
+  async getById(id: string): Promise<DocumentType | undefined> {
+    return (await readJson<DocumentType>(this.root, `document-types/${id}.json`)) ?? undefined;
+  }
+
+  async create(item: DocumentType): Promise<DocumentType> {
+    await writeJson(this.root, `document-types/${item.id}.json`, item);
+    return item;
+  }
+
+  async update(item: DocumentType): Promise<DocumentType> {
+    await writeJson(this.root, `document-types/${item.id}.json`, item);
+    return item;
+  }
+
+  async delete(id: string): Promise<void> {
+    await deleteEntry(this.root, `document-types/${id}.json`);
+  }
+
+  async createMany(items: DocumentType[]): Promise<DocumentType[]> {
+    await Promise.all(items.map(item => this.create(item)));
+    return items;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Chat — one file per conversation, nested under the case
 // ---------------------------------------------------------------------------
 
@@ -392,6 +429,7 @@ export function createFilesystemRepositories(root: FileSystemDirectoryHandle): R
     teamMembers: new FsTeamMemberRepository(root),
     activity: new FsActivityRepository(root),
     checklist: new FsChecklistRepository(root),
+    documentTypes: new FsDocumentTypeRepository(root),
     chat: new FsChatRepository(root),
   };
 }
