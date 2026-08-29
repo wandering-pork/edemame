@@ -1,4 +1,4 @@
-import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation } from '../types';
+import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation, CasePointsClaim } from '../types';
 
 // Generic CRUD interface
 export interface IRepository<T> {
@@ -72,6 +72,17 @@ export interface IDocumentTypeRepository extends IRepository<DocumentType> {
   createMany(items: DocumentType[]): Promise<DocumentType[]>;
 }
 
+/**
+ * The case's GSM points claim (GitHub issue #36) — exactly one record per
+ * case, so this is shaped like `IChecklistRepository` (a whole-record
+ * get/set) rather than a CRUD collection. The entries are only ever read and
+ * written as a set, and there is nothing to list account-wide.
+ */
+export interface IPointsClaimRepository {
+  getByCaseId(caseId: string): Promise<CasePointsClaim | undefined>;
+  setForCase(caseId: string, claim: CasePointsClaim): Promise<void>;
+}
+
 export interface IChatRepository {
   getByCaseId(caseId: string): Promise<FocusConversation[]>;
   setForCase(caseId: string, conversations: FocusConversation[]): Promise<void>;
@@ -89,5 +100,6 @@ export interface Repositories {
   activity: IActivityRepository;
   checklist: IChecklistRepository;
   documentTypes: IDocumentTypeRepository;
+  pointsClaims: IPointsClaimRepository;
   chat: IChatRepository;
 }

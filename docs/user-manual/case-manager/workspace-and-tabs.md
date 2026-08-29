@@ -8,9 +8,11 @@ the case, not a place case data lives. It has two sections:
 - **View** — read-only case data: Tasks, Document Checklist, Case Files, Notes. AI-recommended items
   are shown first (ranked by what's most likely relevant right now, e.g. outstanding documents or
   overdue tasks), with a quick search bar if you want to jump straight to something else.
-- **Tools** — built-in tools you can act on: the **Document Checklist Generator** and, where
-  applicable to the case's visa subclass, the **Auto-Packager** and the **820 Bundle Builder**.
-  Same pattern as View — AI-recommended tools first, plus quick search.
+- **Tools** — built-in tools you can act on: the **Document Checklist Generator**, the
+  **[Points Calculator](./points-calculator.md)** (GSM points test for subclasses 189/190/491, with
+  claimed vs. proven evidence tracking) and, where applicable to the case's visa subclass, the
+  **Auto-Packager** and the **820 Bundle Builder**. Same pattern as View — AI-recommended tools
+  first, plus quick search.
 
 If you're not sure what you need, use **Chat with Edamame** on the right of the Workspace tab —
 describe what you're trying to do, and the View and Tools suggestions above refresh based on the

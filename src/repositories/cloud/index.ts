@@ -12,6 +12,7 @@ import type {
   DocumentChecklistItem,
   DocumentType,
   FocusConversation,
+  CasePointsClaim,
 } from '@/types';
 import type {
   IClientRepository,
@@ -25,6 +26,7 @@ import type {
   IActivityRepository,
   IChecklistRepository,
   IDocumentTypeRepository,
+  IPointsClaimRepository,
   IChatRepository,
   Repositories,
 } from '@/repositories/types';
@@ -816,6 +818,62 @@ class CloudDocumentTypeRepository implements IDocumentTypeRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Points claims — one row per case
+// ---------------------------------------------------------------------------
+
+// The per-criterion entries ride along as a jsonb column rather than getting a
+// child table of their own: they are only ever read and written as a complete
+// set for one case (the same access pattern as `focus_conversations.messages`),
+// and keeping them in one row makes the write atomic, so a half-saved claim
+// can't show a total that never existed.
+function pointsClaimToRow(userId: string, caseId: string, claim: CasePointsClaim) {
+  return {
+    id: claim.id,
+    user_id: userId,
+    case_id: caseId,
+    subclass: claim.subclass,
+    entries: claim.entries,
+    updated_at: claim.updatedAt,
+  };
+}
+
+function rowToPointsClaim(row: any): CasePointsClaim {
+  return {
+    id: row.id,
+    caseId: row.case_id,
+    subclass: row.subclass,
+    entries: row.entries ?? [],
+    updatedAt: row.updated_at,
+    userId: row.user_id,
+  };
+}
+
+class CloudPointsClaimRepository implements IPointsClaimRepository {
+  constructor(private userId: string) {}
+
+  async getByCaseId(caseId: string): Promise<CasePointsClaim | undefined> {
+    const { data, error } = await supabase
+      .from('points_claims')
+      .select('*')
+      .eq('user_id', this.userId)
+      .eq('case_id', caseId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? rowToPointsClaim(data) : undefined;
+  }
+
+  async setForCase(caseId: string, claim: CasePointsClaim): Promise<void> {
+    // onConflict on (user_id, case_id), not id: a claim copied between storage
+    // modes, or written from two tabs, must land on the case's single row
+    // rather than trip the unique constraint with a second uuid.
+    const { error } = await supabase
+      .from('points_claims')
+      .upsert(pointsClaimToRow(this.userId, caseId, claim), { onConflict: 'user_id,case_id' });
+    if (error) throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Chat
 // ---------------------------------------------------------------------------
 
@@ -870,6 +928,7 @@ export function createCloudRepositories(userId: string): Repositories {
     activity: new CloudActivityRepository(userId),
     checklist: new CloudChecklistRepository(userId),
     documentTypes: new CloudDocumentTypeRepository(userId),
+    pointsClaims: new CloudPointsClaimRepository(userId),
     chat: new CloudChatRepository(userId),
   };
 }
