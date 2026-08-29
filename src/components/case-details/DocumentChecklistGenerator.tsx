@@ -3,6 +3,12 @@ import { X, ChevronRight, ChevronLeft, Plus, Trash2, Sparkles, CheckSquare, Squa
 import { v4 as uuidv4 } from 'uuid';
 import type { DocumentChecklistItem, WorkflowTemplate } from '../../types';
 import { getCategoriesForSubclass, generateChecklistForCategories, mergeWithWorkflowTemplateSteps } from '../../lib/checklistTemplates';
+import { DocumentTypePicker } from '../DocumentTypePicker';
+import { useDocumentTypes } from '@/contexts/DocumentTypeContext';
+import { suggestDocumentTypeCode } from '../../lib/documentTypes';
+
+/** The category generated items with no home end up in (issue #4 §5.3). */
+export const ADDITIONAL_DOCUMENTS_CATEGORY = 'Additional Documents';
 
 interface DocumentChecklistGeneratorProps {
   caseId: string;
@@ -19,9 +25,11 @@ interface DocumentChecklistGeneratorProps {
  *
  * Step 1: pick one or more document categories (per-visa-subclass subsections
  * from the system default checklist).
- * Step 2: preview the generated checklist (system default + workflow template
- * steps merged in), with the ability to manually add missing items before
- * confirming. Confirming populates the Document Checklist tab.
+ * Step 2: review the generated checklist (system default + workflow template
+ * steps merged in). Every generated item carries a Document Type defaulted
+ * from the firm's configured list, editable here and later on the Document
+ * Checklist tab; each category has a "+" to add a missing item, and the
+ * "Additional Documents" section at the bottom takes anything else.
  */
 export const DocumentChecklistGenerator: React.FC<DocumentChecklistGeneratorProps> = ({
   caseId,
@@ -30,12 +38,17 @@ export const DocumentChecklistGenerator: React.FC<DocumentChecklistGeneratorProp
   onClose,
   onGenerate,
 }) => {
+  const { documentTypes } = useDocumentTypes();
   const categories = useMemo(() => (visaSubclass ? getCategoriesForSubclass(visaSubclass) : []), [visaSubclass]);
   const [step, setStep] = useState<1 | 2>(1);
   const [selected, setSelected] = useState<Set<string>>(new Set(categories));
   const [preview, setPreview] = useState<DocumentChecklistItem[]>([]);
   const [manualLabel, setManualLabel] = useState('');
-  const [manualCategory, setManualCategory] = useState('Manually Added');
+  const [manualTypeCode, setManualTypeCode] = useState<string | undefined>(undefined);
+  /** Category whose inline "+ add missing item" row is open (§5.2). */
+  const [addingInCategory, setAddingInCategory] = useState<string | null>(null);
+  const [categoryItemLabel, setCategoryItemLabel] = useState('');
+  const [categoryItemTypeCode, setCategoryItemTypeCode] = useState<string | undefined>(undefined);
 
   const toggleCategory = (cat: string) => {
     setSelected(prev => {
@@ -52,27 +65,50 @@ export const DocumentChecklistGenerator: React.FC<DocumentChecklistGeneratorProp
     const merged = workflowTemplate?.steps?.length
       ? mergeWithWorkflowTemplateSteps(systemItems, caseId, workflowTemplate.steps)
       : systemItems;
-    setPreview(merged);
+    // §5.1 — default each generated item's Document Type from the firm's list.
+    setPreview(
+      merged.map(item => ({
+        ...item,
+        documentTypeCode: suggestDocumentTypeCode(item.label, documentTypes, item.description),
+      })),
+    );
     setStep(2);
   };
 
-  const addManualItem = () => {
-    if (!manualLabel.trim()) return;
+  const addItem = (label: string, category: string, documentTypeCode?: string) => {
     setPreview(prev => [
       ...prev,
       {
         id: uuidv4(),
         caseId,
-        label: manualLabel.trim(),
+        label: label.trim(),
         status: 'pending',
-        category: manualCategory.trim() || 'Manually Added',
+        category,
         manuallyAdded: true,
+        documentTypeCode: documentTypeCode || suggestDocumentTypeCode(label, documentTypes),
       },
     ]);
+  };
+
+  const addManualItem = () => {
+    if (!manualLabel.trim()) return;
+    addItem(manualLabel, ADDITIONAL_DOCUMENTS_CATEGORY, manualTypeCode);
     setManualLabel('');
+    setManualTypeCode(undefined);
+  };
+
+  const addCategoryItem = (category: string) => {
+    if (!categoryItemLabel.trim()) return;
+    addItem(categoryItemLabel, category, categoryItemTypeCode);
+    setCategoryItemLabel('');
+    setCategoryItemTypeCode(undefined);
+    setAddingInCategory(null);
   };
 
   const removeItem = (id: string) => setPreview(prev => prev.filter(i => i.id !== id));
+
+  const setItemType = (id: string, code: string) =>
+    setPreview(prev => prev.map(i => (i.id === id ? { ...i, documentTypeCode: code } : i)));
 
   const groupedPreview = useMemo(() => {
     const groups = new Map<string, DocumentChecklistItem[]>();
@@ -86,7 +122,7 @@ export const DocumentChecklistGenerator: React.FC<DocumentChecklistGeneratorProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="p-5 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -138,9 +174,28 @@ export const DocumentChecklistGenerator: React.FC<DocumentChecklistGeneratorProp
             </div>
           ) : (
             <div className="space-y-5">
+              <p className="text-[11.5px] text-gray-500 dark:text-slate-400">
+                Each item is tagged with a Document Type from your firm's list. Change any that were guessed wrong —
+                you can also change them later on the Document Checklist tab.
+              </p>
+
               {groupedPreview.map(([cat, items]) => (
                 <div key={cat}>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-400 dark:text-slate-500 mb-1.5">{cat}</div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-400 dark:text-slate-500">{cat}</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingInCategory(current => (current === cat ? null : cat));
+                        setCategoryItemLabel('');
+                        setCategoryItemTypeCode(undefined);
+                      }}
+                      title={`Add a missing item to "${cat}"`}
+                      className="inline-flex items-center gap-1 text-[10.5px] font-bold px-1.5 py-0.5 rounded-md text-gray-400 dark:text-slate-500 hover:text-edamame hover:bg-edamame/[0.08] transition-colors"
+                    >
+                      <Plus size={12} /> Add
+                    </button>
+                  </div>
                   <div className="rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
                     {items.map(item => (
                       <div key={item.id} className="flex items-center gap-2 px-3.5 py-2 border-b border-gray-100 dark:border-slate-800 last:border-b-0">
@@ -148,18 +203,52 @@ export const DocumentChecklistGenerator: React.FC<DocumentChecklistGeneratorProp
                           <div className="text-[12.5px] font-semibold text-gray-800 dark:text-slate-200 truncate">{item.label}</div>
                           {item.description && <div className="text-[10.5px] text-gray-400 dark:text-slate-500 truncate">{item.description}</div>}
                         </div>
+                        <DocumentTypePicker
+                          value={item.documentTypeCode}
+                          onChange={code => setItemType(item.id, code)}
+                          compact
+                          className="w-52 flex-shrink-0"
+                        />
                         <button onClick={() => removeItem(item.id)} className="p-1 text-gray-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 flex-shrink-0">
                           <Trash2 size={13} />
                         </button>
                       </div>
                     ))}
+                    {addingInCategory === cat && (
+                      <div className="flex flex-col sm:flex-row gap-2 px-3.5 py-2.5 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800">
+                        <input
+                          autoFocus
+                          value={categoryItemLabel}
+                          onChange={e => setCategoryItemLabel(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCategoryItem(cat); } }}
+                          placeholder="Document name…"
+                          className="flex-1 min-w-0 px-3 py-1.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-[12px] text-gray-800 dark:text-white outline-none focus:border-edamame"
+                        />
+                        <DocumentTypePicker
+                          value={categoryItemTypeCode}
+                          onChange={setCategoryItemTypeCode}
+                          placeholder="Document type"
+                          compact
+                          className="sm:w-52 flex-shrink-0"
+                        />
+                        <button
+                          onClick={() => addCategoryItem(cat)}
+                          disabled={!categoryItemLabel.trim()}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-edamame hover:bg-edamame-600 disabled:opacity-40 text-white font-bold rounded-lg text-[11.5px] transition-colors flex-shrink-0"
+                        >
+                          <Plus size={12} /> Add
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
 
-              {/* Manually add missing item */}
+              {/* Additional Documents — the catch-all section (§5.3) */}
               <div className="rounded-xl border border-dashed border-gray-200 dark:border-slate-700 p-3.5">
-                <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-400 dark:text-slate-500 mb-2">Add a missing item</div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-400 dark:text-slate-500 mb-2">
+                  {ADDITIONAL_DOCUMENTS_CATEGORY}
+                </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     value={manualLabel}
@@ -168,11 +257,11 @@ export const DocumentChecklistGenerator: React.FC<DocumentChecklistGeneratorProp
                     placeholder="Document name…"
                     className="flex-1 min-w-0 px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[12.5px] text-gray-800 dark:text-white outline-none focus:border-edamame"
                   />
-                  <input
-                    value={manualCategory}
-                    onChange={e => setManualCategory(e.target.value)}
-                    placeholder="Category"
-                    className="sm:w-48 px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[12.5px] text-gray-800 dark:text-white outline-none focus:border-edamame"
+                  <DocumentTypePicker
+                    value={manualTypeCode}
+                    onChange={setManualTypeCode}
+                    placeholder="Document type"
+                    className="sm:w-56 flex-shrink-0"
                   />
                   <button
                     onClick={addManualItem}

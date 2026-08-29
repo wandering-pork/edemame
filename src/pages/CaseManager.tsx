@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Case, Client, Task, WorkflowTemplate, TeamMember } from '../types';
-import { Search, Plus, FileText, X, ChevronRight, Calendar, UserPlus } from 'lucide-react';
+import { Search, Plus, FileText, X, ChevronRight, Calendar, UserPlus, Settings2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { NewCase } from './NewCase';
+import { ConfigurationsPanel } from '../components/case-manager/ConfigurationsPanel';
 
 interface CaseManagerProps {
   cases: Case[];
@@ -111,6 +112,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const [showIntake, setShowIntake] = useState(false);
+  const [showConfigurations, setShowConfigurations] = useState(false);
   const [suggestedTemplateKeyword, setSuggestedTemplateKeyword] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -201,14 +203,26 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
               Track and manage all immigration cases at a glance
             </p>
           </div>
-          <button
-            onClick={() => setShowIntake(true)}
-            className="btn-press focus-ring flex items-center justify-center gap-1.5 bg-edamame-500 hover:bg-edamame-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors text-[13px] whitespace-nowrap"
-          >
-            <Plus size={17} strokeWidth={1.8} />
-            New Case
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowConfigurations(true)}
+              title="Case Manager configurations — document types and other module settings"
+              className="btn-press focus-ring flex items-center justify-center gap-1.5 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-edamame-500 hover:text-edamame-600 dark:hover:text-edamame-400 px-4 py-2.5 rounded-xl font-bold transition-colors text-[13px] whitespace-nowrap"
+            >
+              <Settings2 size={16} strokeWidth={1.8} />
+              Configurations
+            </button>
+            <button
+              onClick={() => setShowIntake(true)}
+              className="btn-press focus-ring flex items-center justify-center gap-1.5 bg-edamame-500 hover:bg-edamame-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors text-[13px] whitespace-nowrap"
+            >
+              <Plus size={17} strokeWidth={1.8} />
+              New Case
+            </button>
+          </div>
         </div>
+
+        {showConfigurations && <ConfigurationsPanel onClose={() => setShowConfigurations(false)} />}
 
         {/* Search bar */}
         <div className="relative max-w-md mt-6">

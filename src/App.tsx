@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RepositoryProvider, useRepositories } from './contexts/RepositoryContext';
+import { DocumentTypeProvider } from './contexts/DocumentTypeContext';
 import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
 import { CaseDetails } from './pages/CaseDetails';
@@ -687,9 +688,11 @@ const StorageGate: React.FC = () => {
   if (profile.storageMode === 'cloud') {
     return (
       <RepositoryProvider storageMode={profile.storageMode}>
-        <SidebarProvider>
-          <AppShell />
-        </SidebarProvider>
+        <DocumentTypeProvider>
+          <SidebarProvider>
+            <AppShell />
+          </SidebarProvider>
+        </DocumentTypeProvider>
       </RepositoryProvider>
     );
   }
@@ -709,9 +712,11 @@ const StorageGate: React.FC = () => {
 
   return (
     <RepositoryProvider storageMode={profile.storageMode}>
-      <SidebarProvider>
-        <AppShell />
-      </SidebarProvider>
+      <DocumentTypeProvider>
+        <SidebarProvider>
+          <AppShell />
+        </SidebarProvider>
+      </DocumentTypeProvider>
     </RepositoryProvider>
   );
 };

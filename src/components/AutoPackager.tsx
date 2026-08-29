@@ -335,6 +335,10 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
             fileType: item.outcome.mimeType,
             fileSize: blob.size,
             uploadedAt: new Date().toISOString(),
+            // A compressed copy is the same document, so it inherits the
+            // source file's Document Type — otherwise the compressed version
+            // (the one a firm actually lodges) would drop out of auto-link.
+            documentTypeCode: doc.documentTypeCode,
             evidenceNote: `Auto-Packager output from "${doc.fileName}"`,
           };
           // eslint-disable-next-line no-await-in-loop

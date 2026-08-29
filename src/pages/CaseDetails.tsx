@@ -9,9 +9,13 @@ import { PdfPackager } from '../components/PdfPackager';
 import { BundleBuilder820 } from '../components/BundleBuilder820';
 import { AutoPackager } from '../components/AutoPackager';
 import { CaseRail, RailAlert, CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
+import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList';
 import { AgentPanel } from '../components/case-details/AgentPanel';
 import { Workspace, WorkspaceCatalogItem, MessageRecommendation } from '../components/case-details/Workspace';
-import { DocumentChecklistGenerator } from '../components/case-details/DocumentChecklistGenerator';
+import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
+import { DocumentTypePicker, DocumentTypeBadge } from '../components/DocumentTypePicker';
+import { useDocumentTypes } from '../contexts/DocumentTypeContext';
+import { recalcAutoLinks, recalcAutoLinkForItem } from '../lib/autoLink';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
 import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib/caseTabsStore';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +42,8 @@ import {
   FileText,
   Pin,
   PinOff,
+  RefreshCw,
+  Columns2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Document } from '../types';
@@ -108,6 +114,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const repos = useRepositories();
   const navigate = useNavigate();
   const { session } = useAuth();
+  const { documentTypes, byCode: documentTypesByCode } = useDocumentTypes();
 
   // ---- Task state ----
   const [offsetModal, setOffsetModal] = useState<{ taskId: string, newDate: string } | null>(null);
@@ -134,7 +141,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [showChecklistGenerator, setShowChecklistGenerator] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [addItemOpen, setAddItemOpen] = useState(false);
-  const [addItemForm, setAddItemForm] = useState({ label: '', category: 'Manually Added' });
+  const [addItemForm, setAddItemForm] = useState<{ label: string; category: string; documentTypeCode?: string }>({
+    label: '',
+    category: ADDITIONAL_DOCUMENTS_CATEGORY,
+  });
+  /** §4.4 — renders the Case Files tab's content beside the checklist for drag-to-link. */
+  const [caseFilesSplit, setCaseFilesSplit] = useState(false);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
   const [recommendedViewKinds, setRecommendedViewKinds] = useState<CaseTabKind[]>(['checklist', 'tasks', 'notes']);
   const [recommendedToolKinds, setRecommendedToolKinds] = useState<CaseTabKind[]>(['checklist-generator', 'auto-packager', 'bundle-builder-820']);
@@ -301,13 +313,44 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       caseId: currentCase.id,
       label: addItemForm.label.trim(),
       status: 'pending',
-      category: addItemForm.category.trim() || 'Manually Added',
+      category: addItemForm.category.trim() || ADDITIONAL_DOCUMENTS_CATEGORY,
       manuallyAdded: true,
+      documentTypeCode: addItemForm.documentTypeCode,
     };
-    setChecklist(prev => [...prev, item]);
+    // A brand-new item can already have a matching file waiting for it.
+    setChecklist(prev => [...prev, recalcAutoLinkForItem(item, documents, documentTypesByCode)]);
     setAddItemForm({ label: '', category: addItemForm.category });
     setAddItemOpen(false);
   };
+
+  /**
+   * §4.2 — the Document Type on an item is editable at any time, and changing
+   * it triggers an immediate auto-link recalculation for that item alone
+   * (unlike the whole-tab pass below, which waits for an open or a refresh).
+   */
+  const handleChecklistTypeChange = (itemId: string, code: string) => {
+    setChecklist(prev =>
+      prev.map(item =>
+        item.id === itemId
+          ? recalcAutoLinkForItem({ ...item, documentTypeCode: code }, documents, documentTypesByCode)
+          : item,
+      ),
+    );
+  };
+
+  /** §4.3.1 — the on-demand Refresh button at the top of the Document Checklist tab. */
+  const runAutoLinkPass = useCallback(() => {
+    setChecklist(prev => recalcAutoLinks(prev, documents, documentTypes));
+  }, [documents, documentTypes]);
+
+  // §4.3.1 — re-run the auto-link pass whenever the Document Checklist tab is
+  // opened (and when the files or firm config it depends on change while it's
+  // open). recalcAutoLinks returns the same array identity on a no-op, so this
+  // does not loop through the "persist checklist changes" effect.
+  useEffect(() => {
+    if (activeTabId !== 'tab:checklist' || !checklistLoaded) return;
+    runAutoLinkPass();
+  }, [activeTabId, checklistLoaded, runAutoLinkPass]);
 
   const toggleCategoryCollapsed = (category: string) => {
     setCollapsedCategories(prev => {
@@ -1178,28 +1221,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               if (!groups.has(cat)) groups.set(cat, []);
               groups.get(cat)!.push(item);
             }
-            return (
-              <div className="mt-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">
-                    Document Checklist <span className="text-gray-400 dark:text-slate-500 font-semibold">· {uploadedCount}/{checklist.length} linked</span>
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setShowChecklistGenerator(true)}
-                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame transition-colors"
-                    >
-                      <Sparkles size={12} /> Generate
-                    </button>
-                    <button
-                      onClick={() => setAddItemOpen(true)}
-                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg bg-edamame hover:bg-edamame-600 text-white transition-colors"
-                    >
-                      <Plus size={12} /> Add item
-                    </button>
-                  </div>
-                </div>
-
+            const checklistBody = (
+              <div className="space-y-4">
                 {checklist.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 dark:border-slate-800 p-10 text-center">
                     <FileText size={26} className="mx-auto mb-2 text-gray-200 dark:text-slate-700" />
@@ -1242,7 +1265,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                               }`}
                             >
                               <div className="flex-1 min-w-0">
-                                <div className="text-[13px] font-semibold text-gray-800 dark:text-slate-200 tracking-tight">{item.label}</div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[13px] font-semibold text-gray-800 dark:text-slate-200 tracking-tight">{item.label}</span>
+                                  <DocumentTypeBadge code={item.documentTypeCode} />
+                                </div>
                                 {item.description && <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{item.description}</div>}
                                 {linkedDoc ? (
                                   <div className="flex items-center gap-1.5 mt-1 text-[11px] text-gray-500 dark:text-slate-400">
@@ -1268,6 +1294,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                                   </div>
                                 )}
                               </div>
+                              {/* §4.2 — Document Type, editable at any time; changing it re-runs auto-link for this item immediately. */}
+                              <DocumentTypePicker
+                                value={item.documentTypeCode}
+                                onChange={(code) => handleChecklistTypeChange(item.id, code)}
+                                placeholder="Set type"
+                                compact
+                                className="w-44 flex-shrink-0 hidden md:block"
+                              />
                               <div className="relative flex-shrink-0">
                                 <button
                                   onClick={() => setChecklistStatusMenuId(id => id === item.id ? null : item.id)}
@@ -1299,6 +1333,82 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                       </div>
                     );
                   })
+                )}
+              </div>
+            );
+
+            return (
+              <div className="mt-4 space-y-4">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">
+                    Document Checklist <span className="text-gray-400 dark:text-slate-500 font-semibold">· {uploadedCount}/{checklist.length} linked</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {/* §4.4 — show Case Files beside the checklist so a file can be dragged across without switching tabs. */}
+                    <button
+                      onClick={() => setCaseFilesSplit(v => !v)}
+                      title="Show Case Files side by side"
+                      className={`inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
+                        caseFilesSplit
+                          ? 'border-edamame text-edamame bg-edamame/[0.06]'
+                          : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame'
+                      }`}
+                    >
+                      <Columns2 size={12} /> Case Files
+                    </button>
+                    {/* §4.3.1 — re-run auto-link on demand, without leaving and re-entering the tab. */}
+                    <button
+                      onClick={runAutoLinkPass}
+                      title="Re-run auto-link against the current Case Files and document type settings"
+                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame transition-colors"
+                    >
+                      <RefreshCw size={12} /> Refresh
+                    </button>
+                    <button
+                      onClick={() => setShowChecklistGenerator(true)}
+                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame transition-colors"
+                    >
+                      <Sparkles size={12} /> Generate
+                    </button>
+                    <button
+                      onClick={() => setAddItemOpen(true)}
+                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg bg-edamame hover:bg-edamame-600 text-white transition-colors"
+                    >
+                      <Plus size={12} /> Add item
+                    </button>
+                  </div>
+                </div>
+
+                {caseFilesSplit ? (
+                  <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
+                    <div className="min-w-0">{checklistBody}</div>
+                    <aside className="min-w-0 space-y-3 xl:sticky xl:top-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[12px] font-bold text-gray-900 dark:text-white">
+                          Case Files <span className="text-gray-400 dark:text-slate-500 font-semibold">· {documents.length}</span>
+                        </span>
+                        <button
+                          onClick={() => openOrFocusTab('documents')}
+                          className="text-[11px] font-semibold text-edamame hover:underline"
+                        >
+                          Open tab
+                        </button>
+                      </div>
+                      <DocumentUpload
+                        caseId={currentCase.id}
+                        visaSubclass={visaSubclass}
+                        compact
+                        onUpload={(doc) => {
+                          setDocuments(prev => [...prev, doc]);
+                          setDocRefreshKey(k => k + 1);
+                        }}
+                        onRequestCompress={handleRequestCompress}
+                      />
+                      <CaseFilesDragList documents={documents} onOpenDocument={handleChecklistPreview} />
+                    </aside>
+                  </div>
+                ) : (
+                  checklistBody
                 )}
               </div>
             );
@@ -1588,6 +1698,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   value={addItemForm.category}
                   onChange={(e) => setAddItemForm({ ...addItemForm, category: e.target.value })}
                   className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Document Type</label>
+                <DocumentTypePicker
+                  value={addItemForm.documentTypeCode}
+                  onChange={(code) => setAddItemForm({ ...addItemForm, documentTypeCode: code })}
+                  placeholder="Optional — enables auto-link"
                 />
               </div>
             </div>

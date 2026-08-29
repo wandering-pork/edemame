@@ -26,6 +26,12 @@ doc above). For a bigger, easier-to-work-with view of the same files — upload,
 and delete, with full-size thumbnails rather than the rail's condensed list — click **Open in tab**
 next to the rail's Case Files heading, or open **Case Files** from the Workspace tab's View section.
 
+When you drop files into any Case Files upload area, they wait in a short list until you give each
+one a **Document Type** — this is required, and nothing is uploaded until every file has one. Type
+to search the list by code or description; pick `OTH — Other` if nothing fits. The document type is
+what lets a file link itself to a Document Checklist item automatically — see
+[Configurations & Document Types](./configurations.md).
+
 ## Generating tasks with AI
 
 1. Open the case and click **Generate Tasks**.

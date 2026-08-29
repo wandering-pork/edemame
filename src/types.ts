@@ -122,6 +122,13 @@ export interface Document {
   fileSize: number;
   uploadedAt: string;
   userId?: string;
+  /**
+   * Document Type code from the firm's Document Type list (see `DocumentType`).
+   * Mandatory at upload time (`components/DocumentUpload.tsx`) — `OTH` is the
+   * escape hatch for anything uncategorisable. Optional on the type only
+   * because files uploaded before this field existed have none.
+   */
+  documentTypeCode?: string;
   /** 820-specific evidence categorisation — drives Submission Bundle Auto-Builder */
   aspectTag?: Aspect820;
   /** One-line description shown in the submission index */
@@ -176,6 +183,38 @@ export interface DocumentChecklistItem {
   category?: string;
   /** True when this item was manually added by the user (rather than generated from the system default / workflow template). */
   manuallyAdded?: boolean;
+  /**
+   * Document Type code (see `DocumentType`) this checklist item expects.
+   * Drives auto-link: a Case File tagged with the same code, whose Document
+   * Type has `autoLink` on, links itself here. Editable at any time.
+   */
+  documentTypeCode?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Document Types — firm/account-level reference list
+// ---------------------------------------------------------------------------
+
+/**
+ * One row of the account's Document Type reference list (GitHub issue #4 §3.3).
+ *
+ * Seeded with a locked system-default set (`lib/documentTypes.ts`); firms may
+ * append their own rows. Scoped per account, the same way `profiles` is — never
+ * per-case, never shared across tenants.
+ */
+export interface DocumentType {
+  id: string;
+  /** Short uppercase code, `^[A-Z0-9]{1,6}$`, unique within the account. */
+  code: string;
+  /** Human-readable label, max 100 chars. */
+  description: string;
+  /** Grouping used by the search-as-you-type pickers, e.g. "Identity". */
+  category: string;
+  /** Seeded row — the app blocks renaming/recoding/deleting it (but not `autoLink`). */
+  isSystemDefault: boolean;
+  /** Per-firm opt-in: tag a Case File with this code and it auto-links to matching checklist items. */
+  autoLink: boolean;
+  userId?: string;
 }
 
 // ---------------------------------------------------------------------------

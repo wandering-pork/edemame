@@ -32,6 +32,10 @@ export async function copyAllData(
   report('templates');
   await Promise.all(templates.map(t => dest.templates.create(t)));
 
+  report('document types');
+  const documentTypes = await source.documentTypes.getAll();
+  await dest.documentTypes.createMany(documentTypes);
+
   const caseIds = cases.map(c => c.id);
 
   report('notifications');

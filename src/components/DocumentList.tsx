@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { FileText, Image, Download, Trash2, File, Eye, AlertTriangle } from 'lucide-react';
 import type { Document, Aspect820 } from '../types';
 import { ASPECTS_820, ASPECT_ORDER_820 } from '../lib/aspects820';
+import { DocumentTypeBadge } from './DocumentTypePicker';
 import { DOHA_MAX_BYTES } from '../lib/autoPackager';
 
 function formatFileSize(bytes: number): string {
@@ -184,8 +185,9 @@ export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, 
               <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                 {doc.fileName}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                {formatFileSize(doc.fileSize)} &middot; {format(new Date(doc.uploadedAt), 'dd MMM yyyy, h:mm a')}
+              <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                <DocumentTypeBadge code={doc.documentTypeCode} />
+                <span>{formatFileSize(doc.fileSize)} &middot; {format(new Date(doc.uploadedAt), 'dd MMM yyyy, h:mm a')}</span>
               </p>
               {oversized && (
                 <p
