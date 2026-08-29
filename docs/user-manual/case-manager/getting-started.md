@@ -14,8 +14,9 @@ decision.
 
 Every time you open a case, you land on the **Workspace** tab. This is the AI-assisted entry point
 for the case — it doesn't hold case data itself, it's a launcher for the case's Views (Tasks,
-Document Checklist, Case Files, Notes) and Tools (Document Checklist Generator, Auto-Packager, and
-the 820 Bundle Builder where applicable). See
+Document Checklist, Case Files, Notes) and Tools (Document Checklist Generator,
+[Points Calculator](./points-calculator.md), Auto-Packager, and the 820 Bundle Builder where
+applicable). See
 [Workspace, tabs, and pinning](./workspace-and-tabs.md) for how the Workspace tab, tab opening, and
 tab pinning work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.

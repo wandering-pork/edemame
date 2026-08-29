@@ -12,6 +12,7 @@ import type {
   DocumentChecklistItem,
   DocumentType,
   FocusConversation,
+  CasePointsClaim,
 } from '@/types';
 import type {
   IClientRepository,
@@ -25,6 +26,7 @@ import type {
   IActivityRepository,
   IChecklistRepository,
   IDocumentTypeRepository,
+  IPointsClaimRepository,
   IChatRepository,
   Repositories,
 } from '@/repositories/types';
@@ -391,6 +393,22 @@ class FsDocumentTypeRepository implements IDocumentTypeRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Points claims — one file per case, like the checklist
+// ---------------------------------------------------------------------------
+
+class FsPointsClaimRepository implements IPointsClaimRepository {
+  constructor(private root: FileSystemDirectoryHandle) {}
+
+  async getByCaseId(caseId: string): Promise<CasePointsClaim | undefined> {
+    return (await readJson<CasePointsClaim>(this.root, `points-claims/${caseId}.json`)) ?? undefined;
+  }
+
+  async setForCase(caseId: string, claim: CasePointsClaim): Promise<void> {
+    await writeJson(this.root, `points-claims/${caseId}.json`, claim);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Chat — one file per conversation, nested under the case
 // ---------------------------------------------------------------------------
 
@@ -430,6 +448,7 @@ export function createFilesystemRepositories(root: FileSystemDirectoryHandle): R
     activity: new FsActivityRepository(root),
     checklist: new FsChecklistRepository(root),
     documentTypes: new FsDocumentTypeRepository(root),
+    pointsClaims: new FsPointsClaimRepository(root),
     chat: new FsChatRepository(root),
   };
 }

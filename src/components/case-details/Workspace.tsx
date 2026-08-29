@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Search, Sparkles, Send, Plus, ListChecks, StickyNote, CalendarCheck, Wand2, Package, FolderKanban, ExternalLink, FolderOpen } from 'lucide-react';
+import { Search, Sparkles, Send, Plus, ListChecks, StickyNote, CalendarCheck, Wand2, Package, FolderKanban, ExternalLink, FolderOpen, Calculator } from 'lucide-react';
 import { format } from 'date-fns';
 import type { CaseTabKind, CaseToolKind, CaseViewKind, FocusChatMessage, FocusConversation } from '../../types';
 
@@ -25,6 +25,7 @@ const TOOL_ICONS: Record<CaseToolKind, React.ElementType> = {
   'checklist-generator': Wand2,
   'auto-packager': Package,
   'bundle-builder-820': FolderKanban,
+  'points-calculator': Calculator,
 };
 
 interface WorkspaceProps {

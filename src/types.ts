@@ -218,6 +218,43 @@ export interface DocumentType {
 }
 
 // ---------------------------------------------------------------------------
+// Points Calculator + Evidence Mapper (GitHub issue #36)
+// ---------------------------------------------------------------------------
+
+/**
+ * One criterion of the GSM points test as claimed on a case.
+ *
+ * `criterionId` / `optionId` reference the authored rule table in
+ * `lib/pointsTest.ts` — those ids are stable and must never be renamed, since
+ * they are what is persisted here.
+ */
+export interface PointsClaimEntry {
+  criterionId: string;
+  /** The band the client claims. Absent = nothing claimed for this criterion. */
+  optionId?: string;
+  /** Case Files (`Document.id`) linked as evidence for the claim. */
+  documentIds: string[];
+  /** Free-text working note, e.g. "8y 3m — Acme Pty Ltd + Beta GmbH". */
+  note?: string;
+}
+
+/**
+ * A case's points claim — one record per case, holding every criterion.
+ * Claimed vs. Proven vs. Outstanding is derived (see `lib/pointsTest.ts`'s
+ * `calculatePoints`), never stored, so it can never drift from the evidence
+ * actually sitting in Case Files.
+ */
+export interface CasePointsClaim {
+  id: string;
+  caseId: string;
+  /** Points-tested subclass the claim is scored against ('189' | '190' | '491'). */
+  subclass: string;
+  entries: PointsClaimEntry[];
+  updatedAt: string; // ISO
+  userId?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Case Workspace — tabs, View/Tools catalogue
 // ---------------------------------------------------------------------------
 
@@ -225,7 +262,7 @@ export interface DocumentType {
 export type CaseViewKind = 'tasks' | 'checklist' | 'notes' | 'documents';
 
 /** Built-in Tool items surfaced from the Workspace "Tools" section. */
-export type CaseToolKind = 'checklist-generator' | 'auto-packager' | 'bundle-builder-820';
+export type CaseToolKind = 'checklist-generator' | 'auto-packager' | 'bundle-builder-820' | 'points-calculator';
 
 export type CaseTabKind = 'workspace' | CaseViewKind | CaseToolKind;
 

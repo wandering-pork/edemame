@@ -54,11 +54,12 @@ export async function copyAllData(
   for (const caseId of caseIds) {
     caseIdx++;
     report(`case details (${caseIdx} of ${caseIds.length})`);
-    const [notes, docs, checklist, conversations] = await Promise.all([
+    const [notes, docs, checklist, conversations, pointsClaim] = await Promise.all([
       source.caseNotes.getByCaseId(caseId),
       source.documents.getByCaseId(caseId),
       source.checklist.getByCaseId(caseId),
       source.chat.getByCaseId(caseId),
+      source.pointsClaims.getByCaseId(caseId),
     ]);
 
     await Promise.all(notes.map(n => dest.caseNotes.create(n)));
@@ -68,6 +69,7 @@ export async function copyAllData(
       if (blob) await dest.documents.create(doc, blob);
     }
 
+    if (pointsClaim) await dest.pointsClaims.setForCase(caseId, pointsClaim);
     if (checklist.length > 0) await dest.checklist.setForCase(caseId, checklist);
     if (conversations.length > 0) await dest.chat.setForCase(caseId, conversations);
   }
