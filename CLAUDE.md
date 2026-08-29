@@ -120,6 +120,15 @@ A firm/account-level **Document Type** reference list is the shared vocabulary b
 - **Auto-link** (`lib/autoLink.ts`): a *display-time recalculation*, never a background job. It runs when the Document Checklist tab is opened, on its Refresh button, and immediately for one item when that item's Document Type changes. Verified/Waived items are never touched; the most recent `Document.uploadedAt` wins ties; an existing manual link is only re-pointed when it is stale (document deleted, or its type no longer matches).
 - **Upload**: `components/DocumentUpload.tsx` stages dropped files and refuses to upload until each has a Document Type (`OTH` is the escape hatch).
 
+### Reference Letter Validator + Generator (GitHub issue #32)
+
+A Case Workspace tool (`CaseToolKind` `'reference-letter-validator'`, rendered by
+`components/case-details/ReferenceLetterValidator.tsx`, opened from `pages/CaseDetails.tsx`'s Tools catalog) that checks an employment reference letter against a skills assessing authority's expectations and drafts a compliant replacement.
+
+- **Rule sets**: `lib/referenceLetterRequirements.ts` holds the canonical field catalogue plus per-authority required/recommended field sets for ACS, AITSL, Engineers Australia, VETASSESS and ANMAC, the template builder, and the pure `validateAgainstAuthority()` comparison. **These rules are authored from general knowledge, not from a published source, and have not had a legal review** — every UI surface frames output as "AI-suggested, review before use", never as a compliance guarantee. Changing the rules should be a diff to this one file.
+- **Extraction**: `api/validate-reference-letter-gemini.ts` mirrors `scan-passport-gemini.ts` (inline base64 → Gemini Vision → JSON) with two differences: it accepts `application/pdf` as well as images (Gemini takes PDFs as inline data, so no client-side rasterisation), and the fields to extract are sent by the client — the rule sets live in `src/`, and root-level `api/` functions have no import path into `src/`. The function validates/caps the field list and builds the `responseSchema` from it. `services/referenceLetterService.ts` is the client half.
+- **No new persisted entity**: the validation result is transient. The only durable output is the finalised draft, saved into Case Files as a normal `Document` (`text/plain`, Document Type `REFLTR`) — so there is no new table and no migration.
+
 ### Visa Eligibility Advisor Flow
 
 1. User navigates to Visa Advisor page (sidebar or "Check Eligibility" button on client card)
