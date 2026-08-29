@@ -13,13 +13,16 @@ interface VercelResponse extends ServerResponse {
 /**
  * Pings Supabase so the free-tier project doesn't auto-pause after a week of
  * no API activity. Vercel Cron calls this on a schedule (see vercel.json).
- * Vercel signs cron requests with this header — reject anything else so the
- * endpoint can't be used as an open way to hammer the DB. Uses a plain REST
+ * Auth follows Vercel's documented cron pattern (CRON_SECRET env var checked
+ * against the Authorization header) rather than the undocumented
+ * `x-vercel-cron` header, which isn't reliably present on cron-triggered
+ * requests and was silently 401-ing every real invocation. Uses a plain REST
  * call (not the supabase-js SDK) since api/ has no npm deps of its own —
  * see generate-tasks.ts / scan-passport-gemini.ts for the same pattern.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.headers["x-vercel-cron"] === undefined && process.env.VERCEL_ENV === "production") {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && req.headers["authorization"] !== `Bearer ${cronSecret}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
