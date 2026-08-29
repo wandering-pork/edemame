@@ -1,4 +1,4 @@
-import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation } from '../types';
+import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation, LmtAdRecord } from '../types';
 
 // Generic CRUD interface
 export interface IRepository<T> {
@@ -72,6 +72,19 @@ export interface IDocumentTypeRepository extends IRepository<DocumentType> {
   createMany(items: DocumentType[]): Promise<DocumentType[]>;
 }
 
+/**
+ * Labour Market Testing ad records, scoped to a case (GitHub issue #31).
+ * Shaped like `ICaseNoteRepository` — a case-scoped collection with no
+ * account-level `getAll()` — plus `update()`, because a user correcting an
+ * OCR-extracted closing date is the expected path, not the exception.
+ */
+export interface ILmtAdRepository {
+  getByCaseId(caseId: string): Promise<LmtAdRecord[]>;
+  create(record: LmtAdRecord): Promise<LmtAdRecord>;
+  update(record: LmtAdRecord): Promise<LmtAdRecord>;
+  delete(id: string): Promise<void>;
+}
+
 export interface IChatRepository {
   getByCaseId(caseId: string): Promise<FocusConversation[]>;
   setForCase(caseId: string, conversations: FocusConversation[]): Promise<void>;
@@ -89,5 +102,6 @@ export interface Repositories {
   activity: IActivityRepository;
   checklist: IChecklistRepository;
   documentTypes: IDocumentTypeRepository;
+  lmtAds: ILmtAdRepository;
   chat: IChatRepository;
 }

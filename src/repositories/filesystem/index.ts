@@ -12,6 +12,7 @@ import type {
   DocumentChecklistItem,
   DocumentType,
   FocusConversation,
+  LmtAdRecord,
 } from '@/types';
 import type {
   IClientRepository,
@@ -25,6 +26,7 @@ import type {
   IActivityRepository,
   IChecklistRepository,
   IDocumentTypeRepository,
+  ILmtAdRepository,
   IChatRepository,
   Repositories,
 } from '@/repositories/types';
@@ -391,6 +393,40 @@ class FsDocumentTypeRepository implements IDocumentTypeRepository {
 }
 
 // ---------------------------------------------------------------------------
+// LMT ad records — one file per ad, nested under the case (like case notes)
+// ---------------------------------------------------------------------------
+
+class FsLmtAdRepository implements ILmtAdRepository {
+  constructor(private root: FileSystemDirectoryHandle) {}
+
+  async getByCaseId(caseId: string): Promise<LmtAdRecord[]> {
+    const records = await readAllInDir<LmtAdRecord>(this.root, `lmt-ads/${caseId}`);
+    return records.sort((a, b) => a.endDate.localeCompare(b.endDate));
+  }
+
+  async create(record: LmtAdRecord): Promise<LmtAdRecord> {
+    await writeJson(this.root, `lmt-ads/${record.caseId}/${record.id}.json`, record);
+    return record;
+  }
+
+  async update(record: LmtAdRecord): Promise<LmtAdRecord> {
+    await writeJson(this.root, `lmt-ads/${record.caseId}/${record.id}.json`, record);
+    return record;
+  }
+
+  async delete(id: string): Promise<void> {
+    const caseDirs = await listDirNames(this.root, 'lmt-ads');
+    for (const caseId of caseDirs) {
+      const record = await readJson<LmtAdRecord>(this.root, `lmt-ads/${caseId}/${id}.json`);
+      if (record) {
+        await deleteEntry(this.root, `lmt-ads/${caseId}/${id}.json`);
+        return;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Chat — one file per conversation, nested under the case
 // ---------------------------------------------------------------------------
 
@@ -430,6 +466,7 @@ export function createFilesystemRepositories(root: FileSystemDirectoryHandle): R
     activity: new FsActivityRepository(root),
     checklist: new FsChecklistRepository(root),
     documentTypes: new FsDocumentTypeRepository(root),
+    lmtAds: new FsLmtAdRepository(root),
     chat: new FsChatRepository(root),
   };
 }

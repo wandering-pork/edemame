@@ -12,6 +12,7 @@ import type {
   DocumentChecklistItem,
   DocumentType,
   FocusConversation,
+  LmtAdRecord,
 } from '@/types';
 import type {
   IClientRepository,
@@ -25,6 +26,7 @@ import type {
   IActivityRepository,
   IChecklistRepository,
   IDocumentTypeRepository,
+  ILmtAdRepository,
   IChatRepository,
   Repositories,
 } from '@/repositories/types';
@@ -816,6 +818,66 @@ class CloudDocumentTypeRepository implements IDocumentTypeRepository {
 }
 
 // ---------------------------------------------------------------------------
+// LMT ad records — case-scoped, one row per advertisement
+// ---------------------------------------------------------------------------
+
+function lmtAdToRow(userId: string, r: LmtAdRecord) {
+  return {
+    id: r.id,
+    user_id: userId,
+    case_id: r.caseId,
+    platform: r.platform,
+    start_date: r.startDate,
+    end_date: r.endDate,
+    document_id: r.documentId ?? null,
+    notes: r.notes ?? null,
+    extracted_by_ai: r.extractedByAi ?? null,
+    created_at: r.createdAt,
+  };
+}
+
+function rowToLmtAd(row: any): LmtAdRecord {
+  return {
+    id: row.id,
+    caseId: row.case_id,
+    platform: row.platform,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    documentId: row.document_id ?? undefined,
+    notes: row.notes ?? undefined,
+    extractedByAi: row.extracted_by_ai ?? undefined,
+    createdAt: row.created_at,
+    userId: row.user_id,
+  };
+}
+
+class CloudLmtAdRepository implements ILmtAdRepository {
+  constructor(private userId: string) {}
+
+  async getByCaseId(caseId: string): Promise<LmtAdRecord[]> {
+    const rows = await fetchAllRows('lmt_ad_records', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    return rows.map(rowToLmtAd).sort((a, b) => a.endDate.localeCompare(b.endDate));
+  }
+
+  async create(record: LmtAdRecord): Promise<LmtAdRecord> {
+    const { error } = await supabase.from('lmt_ad_records').upsert(lmtAdToRow(this.userId, record), { onConflict: 'id' });
+    if (error) throw error;
+    return record;
+  }
+
+  async update(record: LmtAdRecord): Promise<LmtAdRecord> {
+    const { error } = await supabase.from('lmt_ad_records').upsert(lmtAdToRow(this.userId, record), { onConflict: 'id' });
+    if (error) throw error;
+    return record;
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('lmt_ad_records').delete().eq('user_id', this.userId).eq('id', id);
+    if (error) throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Chat
 // ---------------------------------------------------------------------------
 
@@ -870,6 +932,7 @@ export function createCloudRepositories(userId: string): Repositories {
     activity: new CloudActivityRepository(userId),
     checklist: new CloudChecklistRepository(userId),
     documentTypes: new CloudDocumentTypeRepository(userId),
+    lmtAds: new CloudLmtAdRepository(userId),
     chat: new CloudChatRepository(userId),
   };
 }
