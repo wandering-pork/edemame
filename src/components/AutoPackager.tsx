@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Package, X, ArrowRight, ArrowLeft, Loader2, CheckCircle, AlertCircle,
-  FileWarning, Download, Save, GripVertical, Sparkles,
+  FileWarning, Download, Save, GripVertical, Sparkles, FolderOpen, Monitor, Plus,
 } from 'lucide-react';
 import type { Client, Document } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
@@ -12,11 +12,18 @@ import {
   classifyKind, kindLabel, compressDocument, suggestOutputName, validateOutputNames,
   DOHA_MAX_BYTES, formatBytes, type CompressOutcome,
 } from '../lib/autoPackager';
+import { ACCEPTED_DOCUMENT_EXTENSIONS, SUPPORTED_FORMATS_LABEL, isSupportedDocumentFile } from '../lib/supportedFormats';
 
 /**
- * Auto-Packager — the full 6-phase flow from issue #2:
+ * Auto-Packager — the full flow from issue #2 (extended per the Case Files
+ * upload-limit fix, "Auto-Packager Circular Dependency" defect):
+ *   0. Source screen — compress files already in Case Files, or pick files
+ *      straight from the local PC (so oversized files that Case Files never
+ *      accepted can still reach the packager).
  *   1. Checklist generated from the visa subclass template.
- *   2. Drag & drop assignment of case documents onto checklist slots.
+ *   2. Drag & drop assignment of documents onto checklist slots — files over
+ *      the DoHA 5MB ceiling in a supported format are auto-selected/sorted
+ *      to the top when the source is Case Files.
  *   3. Size dashboard (before/after, summary line).
  *   4. Editable auto-suggested output filenames.
  *   5. Output location (save into the case's linked storage, or download).
@@ -35,10 +42,17 @@ interface AutoPackagerProps {
   onClose: () => void;
   /** Called after files are saved back into the case's documents, so the caller can refresh its list. */
   onSaved?: () => void;
+  /**
+   * CF-2 handoff: files a Case Files upload rejected for exceeding the size
+   * ceiling, handed straight to the local-PC source in memory (no re-browse
+   * needed since they were never accepted into Case Files).
+   */
+  initialLocalFiles?: File[];
 }
 
-type Phase = 'assign' | 'dashboard' | 'naming' | 'output';
+type Phase = 'source' | 'assign' | 'dashboard' | 'naming' | 'output';
 type OutputMode = 'save' | 'download';
+type Source = 'case' | 'local';
 
 interface Slot {
   id: string;
@@ -68,13 +82,36 @@ function buildSlots(caseId: string, visaSubclass?: string): Slot[] {
   return [GENERIC_SLOT];
 }
 
-export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, visaSubclass, applicant, onClose, onSaved }) => {
+/** AP-2: files eligible to be auto-selected for compression — over the DoHA ceiling and in a format the packager can process. */
+function isAutoSelectEligible(doc: Document): boolean {
+  return doc.fileSize > DOHA_MAX_BYTES && isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType });
+}
+
+export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, visaSubclass, applicant, onClose, onSaved, initialLocalFiles }) => {
   const repos = useRepositories();
   const slots = useMemo(() => buildSlots(caseId, visaSubclass), [caseId, visaSubclass]);
 
-  const [phase, setPhase] = useState<Phase>('assign');
+  const hasInitialLocalFiles = !!initialLocalFiles && initialLocalFiles.length > 0;
+  const [phase, setPhase] = useState<Phase>(hasInitialLocalFiles ? 'assign' : 'source');
+  const [source, setSource] = useState<Source>(hasInitialLocalFiles ? 'local' : 'case');
   const [assignments, setAssignments] = useState<Record<string, string[]>>({}); // slotId -> docIds
   const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  // ---- AP-3: local-PC source ----
+  const [localFiles, setLocalFiles] = useState<{ id: string; file: File }[]>(
+    () => (initialLocalFiles || []).map(file => ({ id: uuidv4(), file })),
+  );
+  const [localFileError, setLocalFileError] = useState<string | null>(null);
+  const localFileMap = useMemo(() => new Map(localFiles.map(lf => [lf.id, lf.file])), [localFiles]);
+  const localDocs = useMemo((): Document[] => localFiles.map(({ id, file }) => ({
+    id,
+    caseId,
+    fileName: file.name,
+    filePath: '',
+    fileType: file.type,
+    fileSize: file.size,
+    uploadedAt: new Date().toISOString(),
+  })), [localFiles, caseId]);
 
   const [results, setResults] = useState<Record<string, FileResult>>({}); // docId -> result
   const [processing, setProcessing] = useState(false);
@@ -87,13 +124,18 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
   /** docIds already written by a (possibly partial/failed) finalize() run — makes retries idempotent. */
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
 
-  const docsById = useMemo(() => new Map(documents.map(d => [d.id, d])), [documents]);
+  const sourceDocs = source === 'local' ? localDocs : documents;
+  const docsById = useMemo(() => new Map([...documents, ...localDocs].map(d => [d.id, d])), [documents, localDocs]);
   const assignedIds = useMemo((): Set<string> => {
     const ids: string[] = [];
     for (const k of Object.keys(assignments)) ids.push(...assignments[k]);
     return new Set(ids);
   }, [assignments]);
-  const unassigned = useMemo(() => documents.filter(d => !assignedIds.has(d.id)), [documents, assignedIds]);
+  const unassigned = useMemo(() => {
+    const pool = sourceDocs.filter(d => !assignedIds.has(d.id));
+    // AP-2: eligible (oversized + supported format) files sort to the top.
+    return [...pool].sort((a, b) => Number(isAutoSelectEligible(b)) - Number(isAutoSelectEligible(a)));
+  }, [sourceDocs, assignedIds]);
   const resultList = useMemo((): FileResult[] => Object.keys(results).map((k: string) => results[k]), [results]);
   const totalAssigned = assignedIds.size;
   const nameErrors = useMemo(
@@ -104,6 +146,47 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
 
   const lastName = (applicant.name || '').trim().split(/\s+/).pop() || 'Applicant';
   const dateStr = format(new Date(), 'yyyyMMdd');
+
+  // ---- AP-2: auto-select eligible Case Files files into the (single, generic) slot ----
+  // Only when there's exactly one slot — with a real checklist template, which
+  // slot an oversized file belongs to can't be guessed, so those cases fall
+  // back to sort-to-top only (see `unassigned` above) and the agent drags it in.
+  const autoAssignedRef = useRef(false);
+  useEffect(() => {
+    if (source !== 'case' || autoAssignedRef.current || slots.length !== 1) return;
+    const eligible = documents.filter(isAutoSelectEligible);
+    if (eligible.length === 0) return;
+    autoAssignedRef.current = true;
+    setAssignments(prev => {
+      const slotId = slots[0].id;
+      const existing = prev[slotId] || [];
+      const toAdd = eligible.map(d => d.id).filter(id => !existing.includes(id));
+      return toAdd.length === 0 ? prev : { ...prev, [slotId]: [...existing, ...toAdd] };
+    });
+  }, [source, documents, slots]);
+
+  // ---- Local file picker (Phase 0, local-PC source) ----
+
+  const handleLocalFilesSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const accepted: { id: string; file: File }[] = [];
+    const rejectedNames: string[] = [];
+    for (const file of Array.from(files)) {
+      if (isSupportedDocumentFile(file)) accepted.push({ id: uuidv4(), file });
+      else rejectedNames.push(file.name);
+    }
+    if (rejectedNames.length > 0) {
+      setLocalFileError(`Auto-Packager can only process the following formats: ${SUPPORTED_FORMATS_LABEL}. Skipped: ${rejectedNames.join(', ')}.`);
+    } else {
+      setLocalFileError(null);
+    }
+    if (accepted.length > 0) setLocalFiles(prev => [...prev, ...accepted]);
+  };
+
+  const removeLocalFile = (id: string) => {
+    setLocalFiles(prev => prev.filter(lf => lf.id !== id));
+    unassignDoc(id);
+  };
 
   // ---- Assignment (Phase 2) ----
 
@@ -153,7 +236,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
       setProcessProgress(`Analysing ${i + 1} of ${assignedDocIds.length} — ${doc.fileName}`);
       try {
         // eslint-disable-next-line no-await-in-loop
-        const blob = await repos.documents.getFileData(doc);
+        const blob = localFileMap.has(docId) ? localFileMap.get(docId)! : await repos.documents.getFileData(doc);
         if (!blob) throw new Error('Could not load file data');
         // eslint-disable-next-line no-await-in-loop
         const outcome = await compressDocument(doc, blob);
@@ -252,6 +335,10 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
             fileType: item.outcome.mimeType,
             fileSize: blob.size,
             uploadedAt: new Date().toISOString(),
+            // A compressed copy is the same document, so it inherits the
+            // source file's Document Type — otherwise the compressed version
+            // (the one a firm actually lodges) would drop out of auto-link.
+            documentTypeCode: doc.documentTypeCode,
             evidenceNote: `Auto-Packager output from "${doc.fileName}"`,
           };
           // eslint-disable-next-line no-await-in-loop
@@ -319,6 +406,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
           </div>
 
           {/* Stepper */}
+          {phase !== 'source' && (
           <div className="mt-4 flex items-center gap-1.5">
             {phases.map((p, i) => {
               const isActive = phase === p.key;
@@ -332,10 +420,39 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
               );
             })}
           </div>
+          )}
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-7 py-6 space-y-5">
+          {phase === 'source' && (
+            <div className="space-y-3">
+              <div className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Where are the files you want to compress?</div>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => { setSource('case'); setPhase('assign'); }}
+                  className="text-left p-4 rounded-xl border border-gray-200 dark:border-white/10 hover:border-edamame-400 dark:hover:border-edamame-700/60 transition-colors"
+                >
+                  <FolderOpen size={18} className="text-edamame-600 dark:text-edamame-400 mb-1.5" />
+                  <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200">Compress files in Case Files</div>
+                  <div className="text-[11.5px] text-gray-500 dark:text-slate-400 mt-0.5">
+                    Files already uploaded to this case — oversized, supported-format files are pre-selected for you.
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setSource('local'); setPhase('assign'); }}
+                  className="text-left p-4 rounded-xl border border-gray-200 dark:border-white/10 hover:border-edamame-400 dark:hover:border-edamame-700/60 transition-colors"
+                >
+                  <Monitor size={18} className="text-edamame-600 dark:text-edamame-400 mb-1.5" />
+                  <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200">Compress files from your local PC</div>
+                  <div className="text-[11.5px] text-gray-500 dark:text-slate-400 mt-0.5">
+                    Pick files straight from your computer — including ones too large to have been uploaded to Case Files.
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
           {phase === 'assign' && (
             <div className="grid grid-cols-2 gap-5">
               {/* Slots */}
@@ -401,15 +518,40 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                 onDrop={handlePoolDrop}
                 className="space-y-2"
               >
-                <div className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Case documents</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">
+                    {source === 'local' ? 'Files from your PC' : 'Case documents'}
+                  </div>
+                  {source === 'local' && (
+                    <label className="inline-flex items-center gap-1 text-[11px] font-bold text-edamame-600 dark:text-edamame-400 cursor-pointer hover:underline">
+                      <Plus size={12} /> Add files
+                      <input
+                        type="file"
+                        multiple
+                        accept={ACCEPTED_DOCUMENT_EXTENSIONS.join(',')}
+                        className="hidden"
+                        onChange={(e) => { handleLocalFilesSelected(e.target.files); e.target.value = ''; }}
+                      />
+                    </label>
+                  )}
+                </div>
+                {localFileError && source === 'local' && (
+                  <div className="flex items-start gap-1.5 text-[11px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-2.5 py-2">
+                    <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                    {localFileError}
+                  </div>
+                )}
                 <div className="rounded-xl border border-gray-150 dark:border-white/[0.06] bg-gray-50/40 dark:bg-white/[0.015] p-2 min-h-[120px] space-y-1">
                   {unassigned.length === 0 ? (
                     <div className="text-[11.5px] text-gray-400 dark:text-slate-500 italic text-center py-6">
-                      {documents.length === 0 ? 'No documents uploaded for this case yet.' : 'All documents assigned.'}
+                      {sourceDocs.length === 0
+                        ? (source === 'local' ? 'Add files from your computer to get started.' : 'No documents uploaded for this case yet.')
+                        : 'All documents assigned.'}
                     </div>
                   ) : unassigned.map(doc => {
                     const kind = classifyKind(doc);
                     const oversized = doc.fileSize > DOHA_MAX_BYTES;
+                    const eligible = isAutoSelectEligible(doc);
                     return (
                       <div
                         key={doc.id}
@@ -419,10 +561,20 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                       >
                         <GripVertical size={12} className="flex-shrink-0 text-gray-300 dark:text-slate-600" />
                         <span className="truncate flex-1 text-gray-700 dark:text-slate-300">{doc.fileName}</span>
+                        {eligible && (
+                          <span className="flex-shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-edamame-100 dark:bg-edamame-500/15 text-edamame-700 dark:text-edamame-400">
+                            Ready to compress
+                          </span>
+                        )}
                         <span className="flex-shrink-0 text-[9.5px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{kindLabel(kind)}</span>
                         <span className={`font-mono flex-shrink-0 ${oversized ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-400 dark:text-slate-500'}`}>
                           {formatBytes(doc.fileSize)}
                         </span>
+                        {source === 'local' && (
+                          <button onClick={() => removeLocalFile(doc.id)} title="Remove" className="flex-shrink-0 text-gray-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400">
+                            <X size={12} />
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -523,7 +675,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                   className={`text-left p-4 rounded-xl border transition-colors ${outputMode === 'save' ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-500/10' : 'border-gray-200 dark:border-white/10 hover:border-edamame-300'}`}
                 >
                   <Save size={16} className="text-edamame-600 dark:text-edamame-400 mb-1.5" />
-                  <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200">Save into this case</div>
+                  <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200">Add to Case Files</div>
                   <div className="text-[11.5px] text-gray-500 dark:text-slate-400 mt-0.5">
                     Writes to the client's linked folder (local mode) or cloud storage (cloud mode) via the case's Documents tab — nothing leaves the machine unless cloud sync is enabled.
                   </div>
@@ -566,6 +718,14 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
             >
               <ArrowLeft size={14} /> Back
+            </button>
+          )}
+          {phase === 'assign' && !hasInitialLocalFiles && (
+            <button
+              onClick={() => setPhase('source')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+            >
+              <ArrowLeft size={14} /> Change source
             </button>
           )}
           <div className="flex-1" />

@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RepositoryProvider, useRepositories } from './contexts/RepositoryContext';
+import { DocumentTypeProvider } from './contexts/DocumentTypeContext';
 import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
 import { CaseDetails } from './pages/CaseDetails';
@@ -19,7 +20,7 @@ import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent } from './types';
+import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote } from './types';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
@@ -325,6 +326,16 @@ const AppShell: React.FC = () => {
     }));
     await repos.cases.create(caseWithOwner);
     await repos.tasks.createMany(tasksWithAssignee);
+    if (caseWithOwner.description.trim()) {
+      const intakeNote: CaseNote = {
+        id: uuidv4(),
+        caseId: caseWithOwner.id,
+        content: caseWithOwner.description.trim(),
+        createdAt: caseWithOwner.createdAt,
+        userId: currentUserId,
+      };
+      await repos.caseNotes.create(intakeNote);
+    }
     setCases(prev => [...prev, caseWithOwner]);
     setTasks(prev => [...prev, ...tasksWithAssignee]);
     toast.success(`Case created: ${caseWithOwner.title}`);
@@ -696,9 +707,11 @@ const StorageGate: React.FC = () => {
   if (profile.storageMode === 'cloud') {
     return (
       <RepositoryProvider storageMode={profile.storageMode}>
-        <SidebarProvider>
-          <AppShell />
-        </SidebarProvider>
+        <DocumentTypeProvider>
+          <SidebarProvider>
+            <AppShell />
+          </SidebarProvider>
+        </DocumentTypeProvider>
       </RepositoryProvider>
     );
   }
@@ -718,9 +731,11 @@ const StorageGate: React.FC = () => {
 
   return (
     <RepositoryProvider storageMode={profile.storageMode}>
-      <SidebarProvider>
-        <AppShell />
-      </SidebarProvider>
+      <DocumentTypeProvider>
+        <SidebarProvider>
+          <AppShell />
+        </SidebarProvider>
+      </DocumentTypeProvider>
     </RepositoryProvider>
   );
 };

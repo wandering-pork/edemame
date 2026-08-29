@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRepositories } from '@/contexts/RepositoryContext';
 import { format } from 'date-fns';
-import { FileText, Image, Download, Trash2, File, Eye } from 'lucide-react';
+import { FileText, Image, Download, Trash2, File, Eye, AlertTriangle } from 'lucide-react';
 import type { Document, Aspect820 } from '../types';
 import { ASPECTS_820, ASPECT_ORDER_820 } from '../lib/aspects820';
+import { DocumentTypeBadge } from './DocumentTypePicker';
+import { DOHA_MAX_BYTES } from '../lib/autoPackager';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -33,9 +35,11 @@ interface DocumentListProps {
   visaSubclass?: string;
   /** Document ids to hide — e.g. files already attached to a checklist item elsewhere on the page. */
   excludeIds?: string[];
+  /** Called after a document is deleted, so a caller keeping its own document list in state (e.g. the case-details rail) can stay in sync. */
+  onDeleted?: (id: string) => void;
 }
 
-export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, visaSubclass, excludeIds }) => {
+export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, visaSubclass, excludeIds, onDeleted }) => {
   const repos = useRepositories();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,6 +123,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, 
     await repos.documents.delete(id);
     setDocuments(prev => prev.filter(d => d.id !== id));
     setConfirmDeleteId(null);
+    onDeleted?.(id);
     // Cleanup thumbnail if exists
     if (thumbnails[id]) {
       URL.revokeObjectURL(thumbnails[id]);
@@ -155,6 +160,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, 
       {visibleDocuments.map(doc => {
         const IconComponent = getFileIcon(doc.fileType);
         const canPreview = isImage(doc.fileType) || isPdf(doc.fileType);
+        const oversized = doc.fileSize > DOHA_MAX_BYTES;
 
         return (
           <div
@@ -179,9 +185,19 @@ export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, 
               <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                 {doc.fileName}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                {formatFileSize(doc.fileSize)} &middot; {format(new Date(doc.uploadedAt), 'dd MMM yyyy, h:mm a')}
+              <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                <DocumentTypeBadge code={doc.documentTypeCode} />
+                <span>{formatFileSize(doc.fileSize)} &middot; {format(new Date(doc.uploadedAt), 'dd MMM yyyy, h:mm a')}</span>
               </p>
+              {oversized && (
+                <p
+                  title="This file is over 5MB and will be rejected by the Department of Home Affairs."
+                  className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400"
+                >
+                  <AlertTriangle className="w-3 h-3 shrink-0" />
+                  Over 5MB — will be rejected by DoHA. Use Auto-Packager to compress.
+                </p>
+              )}
               {show820Tags && (
                 editingTagId === doc.id ? (
                   <select

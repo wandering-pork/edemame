@@ -1,4 +1,4 @@
-import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, FocusConversation } from '../types';
+import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation } from '../types';
 
 // Generic CRUD interface
 export interface IRepository<T> {
@@ -62,6 +62,16 @@ export interface IChecklistRepository {
   setForCase(caseId: string, items: DocumentChecklistItem[]): Promise<void>;
 }
 
+/**
+ * Account-level Document Type reference list — not scoped to a case.
+ * System-default rows are seeded by `lib/documentTypes.ts`'s
+ * `ensureSystemDocumentTypes()`; the repository itself enforces no locking,
+ * that's an application-layer rule (see `contexts/DocumentTypeContext.tsx`).
+ */
+export interface IDocumentTypeRepository extends IRepository<DocumentType> {
+  createMany(items: DocumentType[]): Promise<DocumentType[]>;
+}
+
 export interface IChatRepository {
   getByCaseId(caseId: string): Promise<FocusConversation[]>;
   setForCase(caseId: string, conversations: FocusConversation[]): Promise<void>;
@@ -78,5 +88,6 @@ export interface Repositories {
   teamMembers: ITeamMemberRepository;
   activity: IActivityRepository;
   checklist: IChecklistRepository;
+  documentTypes: IDocumentTypeRepository;
   chat: IChatRepository;
 }
