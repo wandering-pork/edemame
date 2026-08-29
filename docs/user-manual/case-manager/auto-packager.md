@@ -63,6 +63,48 @@ From there it walks through four steps:
 - **Run Crusher** (5MB Crusher) — a quicker path for a straight PDF merge-and-compress when you
   don't need the checklist/drag-drop flow. Pick which uploaded PDFs to bundle, then download the
   merged file — it always targets the DoHA 5 MB ceiling.
-- **820 bundle builder** — for Partner (820/801) cases specifically, builds one PDF per "aspect of
-  the relationship" (financial, household, social, commitment, etc.) from documents already tagged
-  with that aspect in the Documents tab, auto-splitting any aspect whose evidence exceeds 5 MB.
+
+## 820 Submission Bundle Builder
+
+For Partner (820/801) cases specifically, the **820 bundle builder** packages your evidence into
+the seven ImmiAccount attachment fields: Financial, Household, Social, Commitment, Identity,
+Sponsor, and Police & Health. It works from the aspect tag on each file in the Documents tab
+(auto-suggested from the filename at upload, changeable at any time). Any untagged file blocks
+bundling until you tag it, or sweep the lot into Commitment with one click.
+
+**What goes in.** Every supported format, not just PDFs:
+
+- **PDFs** are merged in order into that aspect's output PDF. A PDF that's already over the 5 MB
+  working target gets a lossless compression pass first.
+- **Photos and scans** (JPG, PNG, and legacy BMP/GIF) are compressed the same way the
+  Auto-Packager does — resized and re-encoded as JPG at around 500 KB — and then placed as a
+  full page inside the aspect's output PDF. You don't upload them separately.
+- **Word documents, spreadsheets, HEIC/TIFF images** can't be converted to PDF pages in the
+  browser, so they ride along as **separate attachments** for the same ImmiAccount field. They're
+  marked "separate" in the results list and filed under an `unmerged/` folder in the download.
+
+Any aspect whose evidence exceeds the 5 MB ceiling is split into parts (`_Pt1of2`, `_Pt2of2`) on
+document boundaries — never mid-document. Anything still over 5 MB after compression is flagged in
+amber with a note explaining what to do (usually re-scan at 150 DPI, which is plenty for
+ImmiAccount).
+
+**Two ways to build:**
+
+- **Build / Rebuild on a single aspect** — work one section at a time and download just that
+  aspect's PDF. Useful when you're still gathering evidence for the other slots.
+- **Generate Submission Bundle** — one click builds every populated aspect, then downloads a
+  single ZIP containing:
+  - `00_Submission_Index.pdf` — a cover sheet listing every aspect, the ImmiAccount field it goes
+    into, each output file with its size and part number, and the source documents folded into it.
+  - `00_Upload_Manifest.csv` — a checklist you can keep open next to ImmiAccount while uploading.
+    One row per attachment, numbered in upload order, with the ImmiAccount field, file name, part
+    number, size, whether it's a merged PDF or a separate attachment, and any compression notes.
+    Opens in Excel or Google Sheets so you can tick rows off as you go.
+  - Every aspect PDF, numbered in the same upload order as the manifest, plus an `unmerged/`
+    folder for the separate attachments.
+
+  **Build All** still exists if you'd rather have the individual files downloaded one at a time
+  without the ZIP, index, or manifest.
+
+Note: the ImmiAccount field names shown are our best reading of the current lodgement form — check
+them against the live form if the labels have moved.

@@ -1,19 +1,21 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { X, Layers, Loader2, AlertCircle, CheckCircle, Download, FileWarning } from 'lucide-react';
+import { X, Layers, Loader2, AlertCircle, CheckCircle, Download, FileWarning, Package, FileText } from 'lucide-react';
 import type { Document, Aspect820, Client } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
-import { ASPECTS_820, ASPECT_ORDER_820, aspectFilenameToken } from '../lib/aspects820';
+import { ASPECTS_820, ASPECT_ORDER_820 } from '../lib/aspects820';
+import { formatBytes, triggerDownload } from '../lib/pdfBundle';
 import {
-  loadPdf,
-  mergePdfs,
-  splitIntoGroups,
-  formatBytes,
-  createDownloadUrl,
-  triggerDownload,
-} from '../lib/pdfBundle';
+  BUNDLE_TARGET_BYTES,
+  buildSlotOutputs,
+  buildIndexPdf,
+  buildManifestCsv,
+  buildBundleZip,
+  createBlobUrl,
+  type SlotBuildResult,
+} from '../lib/bundleAssembly';
 
-const TARGET_BYTES = 4.9 * 1024 * 1024;
+const TARGET_BYTES = BUNDLE_TARGET_BYTES;
 
 interface BundleBuilder820Props {
   caseId: string;
@@ -27,12 +29,24 @@ interface SlotResult {
   filename: string;
   url: string;
   size: number;
+  standalone: boolean;
+  flagged: boolean;
 }
 
 interface SlotState {
   status: 'idle' | 'processing' | 'done' | 'error';
   progress?: string;
   results?: SlotResult[];
+  warnings?: string[];
+  error?: string;
+}
+
+interface PackageState {
+  status: 'idle' | 'processing' | 'done' | 'error';
+  progress?: string;
+  url?: string;
+  filename?: string;
+  size?: number;
   error?: string;
 }
 
@@ -48,13 +62,17 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
     return initial as Record<Aspect820, SlotState>;
   });
 
+  const [packageState, setPackageState] = useState<PackageState>({ status: 'idle' });
+  const packageUrlRef = useRef<string | undefined>(undefined);
+
   const { grouped, untagged } = useMemo(() => {
-    const pdfs = documents.filter(d => d.fileType === 'application/pdf');
+    // Every uploaded format is bundlable now — PDFs and images merge into the
+    // slot PDF, everything else rides along as a separate attachment.
     const grouped: Record<Aspect820, Document[]> = {} as any;
     for (const k of ASPECT_ORDER_820) grouped[k] = [];
     const untagged: Document[] = [];
 
-    for (const d of pdfs) {
+    for (const d of documents) {
       if (d.aspectTag) grouped[d.aspectTag].push(d);
       else untagged.push(d);
     }
@@ -66,11 +84,16 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
   const lastName = applicant.name.split(/\s+/).pop() || 'Applicant';
   const dateStr = format(new Date(), 'yyyyMMdd');
 
+  const slotStateRef = useRef(slotState);
+  slotStateRef.current = slotState;
+
   useEffect(() => {
     return () => {
-      (Object.values(slotState) as SlotState[]).forEach(s => s.results?.forEach(r => URL.revokeObjectURL(r.url)));
+      (Object.values(slotStateRef.current) as SlotState[]).forEach(s =>
+        s.results?.forEach(r => URL.revokeObjectURL(r.url)),
+      );
+      if (packageUrlRef.current) URL.revokeObjectURL(packageUrlRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const tagAllUntaggedAsMisc = async () => {
@@ -80,52 +103,107 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
     onClose();
   };
 
-  const buildSlot = async (aspect: Aspect820) => {
-    const docs = grouped[aspect];
-    if (docs.length === 0) return;
+  const loadBlob = async (doc: Document) => repos.documents.getFileData(doc);
 
-    setSlotState(s => ({ ...s, [aspect]: { status: 'processing', progress: `Loading ${docs.length} PDF${docs.length === 1 ? '' : 's'}…` } }));
+  /** Run one slot's assembly, publishing progress/results into slotState. */
+  const runSlot = async (aspect: Aspect820): Promise<SlotBuildResult | null> => {
+    const docs = grouped[aspect];
+    if (docs.length === 0) return null;
+
+    setSlotState(s => ({
+      ...s,
+      [aspect]: { status: 'processing', progress: `Preparing ${docs.length} file${docs.length === 1 ? '' : 's'}…` },
+    }));
+
+    // Drop any object URLs from a previous build of this slot.
+    slotStateRef.current[aspect]?.results?.forEach(r => URL.revokeObjectURL(r.url));
 
     try {
-      const loaded = [];
-      for (const doc of docs) {
-        const blob = await repos.documents.getFileData(doc);
-        if (!blob) throw new Error(`Could not load "${doc.fileName}"`);
-        loaded.push(await loadPdf(doc, blob));
-      }
+      const result = await buildSlotOutputs(
+        aspect,
+        docs,
+        loadBlob,
+        { lastName, dateStr },
+        progress => setSlotState(s => ({ ...s, [aspect]: { status: 'processing', progress } })),
+      );
 
-      const groups = splitIntoGroups(loaded, TARGET_BYTES);
-      const total = groups.length;
-      const results: SlotResult[] = [];
-      const aspectToken = aspectFilenameToken(aspect);
+      const results: SlotResult[] = result.files.map(f => ({
+        filename: f.filename,
+        url: createBlobUrl(f.bytes, f.mimeType),
+        size: f.size,
+        standalone: f.standalone,
+        flagged: f.flagged,
+      }));
 
-      for (let i = 0; i < groups.length; i++) {
-        setSlotState(s => ({
-          ...s,
-          [aspect]: { status: 'processing', progress: `Merging part ${i + 1} of ${total}…` },
-        }));
-        const { bytes } = await mergePdfs(groups[i]);
-        const partSuffix = total > 1 ? `_Pt${i + 1}of${total}` : '';
-        const filename = `820_${aspectToken}_${lastName}_${dateStr}${partSuffix}.pdf`;
-        const { url } = createDownloadUrl(bytes, filename);
-        results.push({ filename, url, size: bytes.length });
-      }
-
-      setSlotState(s => ({ ...s, [aspect]: { status: 'done', results } }));
+      setSlotState(s => ({ ...s, [aspect]: { status: 'done', results, warnings: result.warnings } }));
+      return result;
     } catch (err) {
       setSlotState(s => ({
         ...s,
         [aspect]: { status: 'error', error: err instanceof Error ? err.message : 'Bundle failed' },
       }));
+      return null;
     }
   };
+
+  const buildSlot = (aspect: Aspect820) => runSlot(aspect);
 
   const buildAll = async () => {
     for (const aspect of ASPECT_ORDER_820) {
       if (grouped[aspect].length > 0) {
         // eslint-disable-next-line no-await-in-loop
-        await buildSlot(aspect);
+        await runSlot(aspect);
       }
+    }
+  };
+
+  /**
+   * One-click packaging: build every populated slot, generate the master index
+   * PDF + upload manifest CSV, and zip the lot into a single download.
+   */
+  const generateSubmissionBundle = async () => {
+    if (packageUrlRef.current) {
+      URL.revokeObjectURL(packageUrlRef.current);
+      packageUrlRef.current = undefined;
+    }
+    setPackageState({ status: 'processing', progress: 'Starting…' });
+
+    try {
+      const populated = ASPECT_ORDER_820.filter(a => grouped[a].length > 0);
+      const results: SlotBuildResult[] = [];
+
+      for (let i = 0; i < populated.length; i++) {
+        const aspect = populated[i];
+        setPackageState({
+          status: 'processing',
+          progress: `Building ${ASPECTS_820[aspect].label} (${i + 1} of ${populated.length})…`,
+        });
+        // eslint-disable-next-line no-await-in-loop
+        const result = await runSlot(aspect);
+        if (!result) throw new Error(`${ASPECTS_820[aspect].label} failed to build — fix it and retry.`);
+        results.push(result);
+      }
+
+      if (results.length === 0) throw new Error('Nothing to package — tag some documents first.');
+
+      setPackageState({ status: 'processing', progress: 'Generating submission index…' });
+      const indexPdf = await buildIndexPdf(results, { applicantName: applicant.name, dateStr });
+
+      setPackageState({ status: 'processing', progress: 'Generating upload manifest…' });
+      const manifestCsv = buildManifestCsv(results, { applicantName: applicant.name, dateStr });
+
+      setPackageState({ status: 'processing', progress: 'Zipping bundle…' });
+      const { bytes, filename } = buildBundleZip(results, indexPdf, manifestCsv, { lastName, dateStr });
+      const url = createBlobUrl(bytes, 'application/zip');
+      packageUrlRef.current = url;
+
+      setPackageState({ status: 'done', url, filename, size: bytes.length });
+      triggerDownload(url, filename);
+    } catch (err) {
+      setPackageState({
+        status: 'error',
+        error: err instanceof Error ? err.message : 'Could not generate the submission bundle',
+      });
     }
   };
 
@@ -149,7 +227,7 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                 Per-slot ImmiAccount packages
               </h2>
               <p className="mt-1 text-[13px] text-gray-500 dark:text-slate-400">
-                One PDF per aspect of the relationship · auto-split at 5 MB · never mid-document
+                One PDF per aspect · photos folded in · auto-compressed · auto-split at 5 MB
               </p>
             </div>
             <button
@@ -169,9 +247,10 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
               <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center text-gray-300 dark:text-slate-600">
                 <Layers size={20} strokeWidth={1.5} />
               </div>
-              <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">No PDFs to bundle yet</p>
+              <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">Nothing to bundle yet</p>
               <p className="text-[13px] text-gray-400 dark:text-slate-500 mt-1">
-                Upload PDFs from the Documents tab — filenames are auto-tagged where possible.
+                Upload PDFs, photos or Word documents from the Documents tab — filenames are auto-tagged
+                where possible.
               </p>
             </div>
           )}
@@ -188,7 +267,7 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                       {untagged.length} document{untagged.length === 1 ? '' : 's'} need a tag before bundling
                     </p>
                     <p className="text-xs text-amber-800/80 dark:text-amber-200/70 mt-0.5 leading-relaxed">
-                      Tag each PDF with an aspect from the Documents tab, or sweep them all into Commitment for now.
+                      Tag each file with an aspect from the Documents tab, or sweep them all into Commitment for now.
                     </p>
                     <ul className="mt-2.5 space-y-0.5 font-mono text-[11px] text-amber-900/80 dark:text-amber-200/80">
                       {untagged.slice(0, 4).map(d => (
@@ -268,8 +347,8 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                             </span>
                           )}
                           {overTarget && !willSplit && (
-                            <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300">
-                              single doc &gt; 5 MB
+                            <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                              auto-compress
                             </span>
                           )}
                         </div>
@@ -321,10 +400,19 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                               idx > 0 ? 'border-t border-gray-100 dark:border-white/5' : ''
                             }`}
                           >
-                            <CheckCircle size={12} className="text-edamame-500 flex-shrink-0" strokeWidth={2.5} />
+                            {r.flagged ? (
+                              <AlertCircle size={12} className="text-amber-500 flex-shrink-0" strokeWidth={2.5} />
+                            ) : (
+                              <CheckCircle size={12} className="text-edamame-500 flex-shrink-0" strokeWidth={2.5} />
+                            )}
                             <span className="font-mono text-[11.5px] text-gray-700 dark:text-slate-200 truncate flex-1">
                               {r.filename}
                             </span>
+                            {r.standalone && (
+                              <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-slate-400 flex-shrink-0">
+                                separate
+                              </span>
+                            )}
                             <span className="font-mono text-[11px] text-gray-400 dark:text-slate-500 flex-shrink-0 tabular-nums">
                               {formatBytes(r.size)}
                             </span>
@@ -338,6 +426,19 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                             </button>
                           </div>
                         ))}
+                        {state.warnings && state.warnings.length > 0 && (
+                          <ul className="mt-1.5 pt-1.5 border-t border-gray-100 dark:border-white/5 space-y-1">
+                            {state.warnings.map((w, i) => (
+                              <li
+                                key={i}
+                                className="text-[11px] text-amber-700 dark:text-amber-300/90 flex items-start gap-1.5"
+                              >
+                                <AlertCircle size={11} className="flex-shrink-0 mt-0.5" />
+                                {w}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     )}
                   </div>
@@ -349,8 +450,41 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
 
         {/* Footer */}
         {!empty && (
-          <div className="px-7 py-4 border-t border-gray-100 dark:border-white/5 bg-gray-50/60 dark:bg-black/20 backdrop-blur-sm">
-            <div className="flex items-center gap-4">
+          <div className="px-7 py-4 border-t border-gray-100 dark:border-white/5 bg-gray-50/60 dark:bg-black/20 backdrop-blur-sm space-y-3">
+            {/* One-click package state strip */}
+            {packageState.status === 'processing' && (
+              <div className="flex items-center gap-2 text-[11.5px] font-mono text-gray-600 dark:text-slate-300">
+                <Loader2 size={12} className="animate-spin text-edamame-500" />
+                {packageState.progress}
+              </div>
+            )}
+            {packageState.status === 'error' && packageState.error && (
+              <div className="flex items-start gap-2 text-[11.5px] text-red-600 dark:text-red-400">
+                <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                {packageState.error}
+              </div>
+            )}
+            {packageState.status === 'done' && packageState.url && packageState.filename && (
+              <div className="flex items-center gap-3 rounded-lg border border-edamame-200 dark:border-edamame-700/40 bg-white dark:bg-[#13161A] px-3 py-2">
+                <FileText size={13} className="text-edamame-500 flex-shrink-0" />
+                <span className="font-mono text-[11.5px] text-gray-700 dark:text-slate-200 truncate flex-1">
+                  {packageState.filename}
+                </span>
+                <span className="font-mono text-[11px] text-gray-400 dark:text-slate-500 tabular-nums flex-shrink-0">
+                  {formatBytes(packageState.size ?? 0)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => triggerDownload(packageState.url!, packageState.filename!)}
+                  title="Download again"
+                  className="p-1.5 rounded text-gray-400 hover:text-edamame-600 dark:hover:text-edamame-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                >
+                  <Download size={13} />
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-slate-500">
                   Ready to package
@@ -362,19 +496,37 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="text-[12px] font-semibold px-3.5 py-2 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                className="text-[12px] font-semibold px-3 py-2 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
               >
                 Close
               </button>
               <button
                 type="button"
                 onClick={buildAll}
-                disabled={blocked || totalTagged === 0}
-                className="inline-flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.08em] px-4 py-2 rounded-lg bg-edamame-500 text-white hover:bg-edamame-600 disabled:bg-gray-200 dark:disabled:bg-white/[0.04] disabled:text-gray-400 dark:disabled:text-slate-600 disabled:cursor-not-allowed transition-colors shadow-sm shadow-edamame-500/25 disabled:shadow-none"
-                title={blocked ? 'Resolve untagged documents first' : 'Build a bundle for every populated slot in sequence'}
+                disabled={blocked || totalTagged === 0 || packageState.status === 'processing'}
+                className="inline-flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.08em] px-3.5 py-2 rounded-lg border border-gray-300 dark:border-white/15 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-white/5 disabled:text-gray-300 dark:disabled:text-slate-600 disabled:cursor-not-allowed transition-colors"
+                title={blocked ? 'Resolve untagged documents first' : 'Build each populated slot separately, downloading one at a time'}
               >
                 <Layers size={13} strokeWidth={2.25} />
                 Build All
+              </button>
+              <button
+                type="button"
+                onClick={generateSubmissionBundle}
+                disabled={blocked || totalTagged === 0 || packageState.status === 'processing'}
+                className="inline-flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.08em] px-4 py-2 rounded-lg bg-edamame-500 text-white hover:bg-edamame-600 disabled:bg-gray-200 dark:disabled:bg-white/[0.04] disabled:text-gray-400 dark:disabled:text-slate-600 disabled:cursor-not-allowed transition-colors shadow-sm shadow-edamame-500/25 disabled:shadow-none"
+                title={
+                  blocked
+                    ? 'Resolve untagged documents first'
+                    : 'Build every slot, generate the index + upload manifest, and download it all as one ZIP'
+                }
+              >
+                {packageState.status === 'processing' ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Package size={13} strokeWidth={2.25} />
+                )}
+                Generate Submission Bundle
               </button>
             </div>
           </div>
