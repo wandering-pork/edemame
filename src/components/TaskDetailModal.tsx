@@ -80,13 +80,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         false,
         textChanged ? { title: trimmedTitle, description } : undefined,
       );
-    } else {
-      if (textChanged) {
-        onUpdateTask?.({ ...task, title: trimmedTitle, description });
-      }
-      if (dateChanged) {
-        onUpdateTask?.({ ...task, title: trimmedTitle, description, date });
-      }
+    } else if (textChanged || dateChanged) {
+      onUpdateTask?.({ ...task, title: trimmedTitle, description, date });
     }
     onClose();
   };
@@ -183,6 +178,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             {task.caseId && (
               <button
                 onClick={() => {
+                  if (isDirty && !window.confirm('You have unsaved changes to this task. Discard them and go to the case?')) {
+                    return;
+                  }
                   navigate(`/cases/${task.caseId}`);
                   onClose();
                   onNavigateAway?.();

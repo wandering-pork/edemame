@@ -35,6 +35,60 @@ export interface SearchResults {
 
 const EMPTY: SearchResults = { clients: [], cases: [], tasks: [], isEmpty: true };
 
+interface CaseIndexEntry {
+  caseItem: Case;
+  caseNumber: string;
+  title: string;
+}
+
+/** Pre-built Fuse indexes for one corpus snapshot. Rebuild only when the underlying data changes. */
+export interface SearchIndex {
+  clientFuse: Fuse<Client>;
+  caseFuse: Fuse<CaseIndexEntry>;
+  taskFuse: Fuse<Task>;
+}
+
+/**
+ * Builds the fuzzy-search indexes used by `smartSearch`. Index construction
+ * (tokenizing/scoring setup) is the expensive part of using Fuse, so callers
+ * should memoize this keyed on `clients`/`cases`/`tasks` and pass the result
+ * into `smartSearch` on every keystroke rather than rebuilding per query.
+ */
+export function buildSearchIndex(corpus: Pick<SearchCorpus, 'clients' | 'cases' | 'tasks'>): SearchIndex {
+  const { clients, cases, tasks } = corpus;
+
+  const clientFuse = new Fuse(clients, {
+    keys: [
+      { name: 'name', weight: 0.8 },
+      { name: 'email', weight: 0.15 },
+      { name: 'passportNumber', weight: 0.05 },
+    ],
+    threshold: 0.38,
+    ignoreLocation: true,
+    minMatchCharLength: 2,
+  });
+
+  const caseIndex: CaseIndexEntry[] = cases.map(c => ({ caseItem: c, caseNumber: displayCaseNumber(c), title: c.title }));
+  const caseFuse = new Fuse(caseIndex, {
+    keys: [
+      { name: 'caseNumber', weight: 0.5 },
+      { name: 'title', weight: 0.5 },
+    ],
+    threshold: 0.32,
+    ignoreLocation: true,
+    minMatchCharLength: 2,
+  });
+
+  const taskFuse = new Fuse(tasks, {
+    keys: ['title', 'description'],
+    threshold: 0.32,
+    ignoreLocation: true,
+    minMatchCharLength: 2,
+  });
+
+  return { clientFuse, caseFuse, taskFuse };
+}
+
 const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 
 /**
@@ -75,8 +129,12 @@ function caseSubclass(caseItem: Case, templates: WorkflowTemplate[]): string | u
  * every record containing the word "work".
  *
  * Everything runs in-memory on the caller's own data; nothing is sent anywhere.
+ *
+ * `index` holds the pre-built Fuse instances for this corpus (see
+ * `buildSearchIndex`) — callers should memoize it separately from the query
+ * so fuzzy indexes aren't rebuilt on every keystroke.
  */
-export function smartSearch(rawQuery: string, corpus: SearchCorpus, now: Date = new Date()): SearchResults {
+export function smartSearch(rawQuery: string, corpus: SearchCorpus, index: SearchIndex, now: Date = new Date()): SearchResults {
   const query = rawQuery.trim();
   if (query.length < 2) return EMPTY;
 
@@ -89,17 +147,7 @@ export function smartSearch(rawQuery: string, corpus: SearchCorpus, now: Date = 
   if (freeText) {
     matchedClients = exactMatches(clients, freeText, c => [c.name, c.email, c.passportNumber]);
     if (matchedClients.length === 0) {
-      const clientFuse = new Fuse(clients, {
-        keys: [
-          { name: 'name', weight: 0.8 },
-          { name: 'email', weight: 0.15 },
-          { name: 'passportNumber', weight: 0.05 },
-        ],
-        threshold: 0.38,
-        ignoreLocation: true,
-        minMatchCharLength: 2,
-      });
-      matchedClients = clientFuse.search(freeText).map(r => r.item);
+      matchedClients = index.clientFuse.search(freeText).map(r => r.item);
     }
   }
   const matchedClientIds = new Set(matchedClients.map(c => c.id));
@@ -139,28 +187,12 @@ export function smartSearch(rawQuery: string, corpus: SearchCorpus, now: Date = 
   if (matchedClients.length === 0 && matchedCases.length === 0) {
     matchedCases = exactMatches(cases, query, c => [c.title, displayCaseNumber(c)]);
     if (matchedCases.length === 0) {
-      const caseIndex = cases.map(c => ({ caseItem: c, caseNumber: displayCaseNumber(c), title: c.title }));
-      const caseFuse = new Fuse(caseIndex, {
-        keys: [
-          { name: 'caseNumber', weight: 0.5 },
-          { name: 'title', weight: 0.5 },
-        ],
-        threshold: 0.32,
-        ignoreLocation: true,
-        minMatchCharLength: 2,
-      });
-      matchedCases = caseFuse.search(query).map(r => r.item.caseItem);
+      matchedCases = index.caseFuse.search(query).map(r => r.item.caseItem);
     }
 
     directTasks = exactMatches(tasks, query, t => [t.title]);
     if (directTasks.length === 0) {
-      const taskFuse = new Fuse(tasks, {
-        keys: ['title', 'description'],
-        threshold: 0.32,
-        ignoreLocation: true,
-        minMatchCharLength: 2,
-      });
-      directTasks = taskFuse.search(query).map(r => r.item);
+      directTasks = index.taskFuse.search(query).map(r => r.item);
     }
   }
 

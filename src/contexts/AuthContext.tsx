@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
+import { readValidatedJson, writeLocalJson } from '@/lib/devLocalStorage';
 
 type AuthUser = Pick<User, 'id' | 'email' | 'user_metadata'>;
 
@@ -21,7 +22,11 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const DEV_OFFLINE_AUTH = import.meta.env.VITE_DEV_OFFLINE_AUTH === 'true';
+// `import.meta.env.DEV` is statically false in production builds, so Vite can
+// dead-code-eliminate the dev-offline branches (and the hardcoded test
+// password) from the shipped client JS — VITE_DEV_OFFLINE_AUTH alone is not
+// enough of a guard since env vars can be set on Preview/Production too.
+const DEV_OFFLINE_AUTH = import.meta.env.DEV && import.meta.env.VITE_DEV_OFFLINE_AUTH === 'true';
 const DEV_TEST_EMAIL = (import.meta.env.VITE_DEV_AUTH_EMAIL as string | undefined)?.trim().toLowerCase() || 'test@edamame.local';
 const DEV_TEST_PASSWORD = import.meta.env.VITE_DEV_AUTH_PASSWORD as string | undefined;
 const DEV_TEST_USER_ID = '00000000-0000-4000-8000-000000000001';
@@ -41,30 +46,22 @@ function toAuthUser(record: DevOfflineUserRecord): AuthUser {
   };
 }
 
+function isDevOfflineUserRecord(value: unknown): value is DevOfflineUserRecord {
+  const parsed = value as Partial<DevOfflineUserRecord> | null;
+  return (
+    !!parsed &&
+    typeof parsed.id === 'string' &&
+    typeof parsed.email === 'string' &&
+    typeof parsed.fullName === 'string'
+  );
+}
+
 function readDevOfflineUser(): DevOfflineUserRecord | null {
-  const raw = localStorage.getItem(DEV_OFFLINE_USER_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<DevOfflineUserRecord>;
-    if (
-      typeof parsed.id === 'string' &&
-      typeof parsed.email === 'string' &&
-      typeof parsed.fullName === 'string'
-    ) {
-      return { id: parsed.id, email: parsed.email, fullName: parsed.fullName };
-    }
-    console.error('Invalid dev offline auth payload in localStorage.');
-    localStorage.removeItem(DEV_OFFLINE_USER_KEY);
-    return null;
-  } catch (error) {
-    console.error('Failed to parse dev offline auth payload.', error);
-    localStorage.removeItem(DEV_OFFLINE_USER_KEY);
-    return null;
-  }
+  return readValidatedJson(DEV_OFFLINE_USER_KEY, isDevOfflineUserRecord);
 }
 
 function saveDevOfflineUser(record: DevOfflineUserRecord): void {
-  localStorage.setItem(DEV_OFFLINE_USER_KEY, JSON.stringify(record));
+  writeLocalJson(DEV_OFFLINE_USER_KEY, record);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

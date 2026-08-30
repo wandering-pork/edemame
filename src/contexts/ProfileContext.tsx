@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { useAuth } from './AuthContext';
 import { getProfile, createProfile, updateProfile as updateProfileRow, type Profile, type ProfileUpdate } from '@/services/profileService';
 import type { StorageMode } from '@/types';
+import { readValidatedJson, writeLocalJson } from '@/lib/devLocalStorage';
 
 interface ProfileContextValue {
   profile: Profile | null;
@@ -12,44 +13,48 @@ interface ProfileContextValue {
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
-const DEV_OFFLINE_AUTH = import.meta.env.VITE_DEV_OFFLINE_AUTH === 'true';
+// Gated transitively by `import.meta.env.DEV` (see AuthContext.tsx's
+// DEV_OFFLINE_AUTH) — this whole branch, including the localStorage use
+// below, is dead-code-eliminated from production builds.
+const DEV_OFFLINE_AUTH = import.meta.env.DEV && import.meta.env.VITE_DEV_OFFLINE_AUTH === 'true';
 
 function devProfileStorageKey(userId: string): string {
   return `edamame:dev-offline-profile:${userId}`;
 }
 
-function readDevProfile(userId: string): Profile | null {
-  const raw = localStorage.getItem(devProfileStorageKey(userId));
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<Profile>;
-    if (
+function isDevProfile(userId: string): (value: unknown) => value is Profile {
+  return (value: unknown): value is Profile => {
+    const parsed = value as Partial<Profile> | null;
+    return (
+      !!parsed &&
       parsed.userId === userId &&
       (parsed.storageMode === 'local' || parsed.storageMode === 'cloud') &&
       (parsed.theme === 'classic' || parsed.theme === 'dark') &&
-      typeof parsed.sidebarCollapsed === 'boolean'
-    ) {
-      return {
-        userId,
-        storageMode: parsed.storageMode,
-        theme: parsed.theme,
-        sidebarCollapsed: parsed.sidebarCollapsed,
-        linkedFolderName: parsed.linkedFolderName ?? null,
-        linkedAt: parsed.linkedAt ?? null,
-      };
-    }
-    console.error('Invalid dev offline profile payload in localStorage.');
-    localStorage.removeItem(devProfileStorageKey(userId));
-    return null;
-  } catch (error) {
-    console.error('Failed to parse dev offline profile payload.', error);
-    localStorage.removeItem(devProfileStorageKey(userId));
-    return null;
-  }
+      typeof parsed.sidebarCollapsed === 'boolean' &&
+      (parsed.linkedFolderName === undefined || parsed.linkedFolderName === null || typeof parsed.linkedFolderName === 'string') &&
+      (parsed.linkedAt === undefined || parsed.linkedAt === null || typeof parsed.linkedAt === 'string')
+    );
+  };
 }
 
+function readDevProfile(userId: string): Profile | null {
+  const profile = readValidatedJson(devProfileStorageKey(userId), isDevProfile(userId));
+  if (!profile) return null;
+  // Normalize omitted optional fields to `null` to match the Profile shape.
+  return {
+    ...profile,
+    linkedFolderName: profile.linkedFolderName ?? null,
+    linkedAt: profile.linkedAt ?? null,
+  };
+}
+
+// Deliberate, narrow exception to root CLAUDE.md's "no app data lives in the
+// browser" policy: this is dev-only tooling, never active in a production
+// build (see the DEV_OFFLINE_AUTH guard above), used purely to let local dev
+// work without a live Supabase project. Real user profiles always go through
+// services/profileService.ts to the `profiles` table.
 function saveDevProfile(profile: Profile): void {
-  localStorage.setItem(devProfileStorageKey(profile.userId), JSON.stringify(profile));
+  writeLocalJson(devProfileStorageKey(profile.userId), profile);
 }
 
 function defaultDevProfile(userId: string, storageMode: StorageMode): Profile {
@@ -101,13 +106,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = useCallback(async (update: ProfileUpdate) => {
     if (DEV_OFFLINE_AUTH) {
       const current = readDevProfile(userId) ?? defaultDevProfile(userId, 'local');
+      // Mirrors services/profileService.ts's `!== undefined` checks exactly:
+      // `??` would treat an explicit `null` (clearing a field) the same as
+      // `undefined` (field not touched) and silently drop the clear.
       const updated: Profile = {
         userId,
-        storageMode: update.storageMode ?? current.storageMode,
-        theme: update.theme ?? current.theme,
-        sidebarCollapsed: update.sidebarCollapsed ?? current.sidebarCollapsed,
-        linkedFolderName: update.linkedFolderName ?? current.linkedFolderName,
-        linkedAt: update.linkedAt ?? current.linkedAt,
+        storageMode: update.storageMode !== undefined ? update.storageMode : current.storageMode,
+        theme: update.theme !== undefined ? update.theme : current.theme,
+        sidebarCollapsed: update.sidebarCollapsed !== undefined ? update.sidebarCollapsed : current.sidebarCollapsed,
+        linkedFolderName: update.linkedFolderName !== undefined ? update.linkedFolderName : current.linkedFolderName,
+        linkedAt: update.linkedAt !== undefined ? update.linkedAt : current.linkedAt,
       };
       saveDevProfile(updated);
       setProfile(updated);

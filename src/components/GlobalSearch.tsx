@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { format, isValid, parseISO } from 'date-fns';
 import type { Case, Client, Task, WorkflowTemplate } from '../types';
-import { smartSearch } from '../lib/search/smartSearch';
+import { smartSearch, buildSearchIndex } from '../lib/search/smartSearch';
 import { TaskDetailModal } from './TaskDetailModal';
 
 interface GlobalSearchProps {
@@ -98,9 +98,16 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [openTaskId]);
 
+  // Rebuild the fuzzy indexes only when the underlying data changes, not on
+  // every keystroke — query execution (below) is cheap, index construction isn't.
+  const searchIndex = useMemo(
+    () => buildSearchIndex({ clients, cases, tasks }),
+    [clients, cases, tasks]
+  );
+
   const results = useMemo(
-    () => smartSearch(debouncedQuery, { clients, cases, tasks, templates }),
-    [debouncedQuery, clients, cases, tasks, templates]
+    () => smartSearch(debouncedQuery, { clients, cases, tasks, templates }, searchIndex),
+    [debouncedQuery, clients, cases, tasks, templates, searchIndex]
   );
 
   const openTask = openTaskId ? tasks.find(t => t.id === openTaskId) ?? null : null;
