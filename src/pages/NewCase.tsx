@@ -97,6 +97,7 @@ const REVEAL_DELAY_MS = 220;
 export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedTemplateKeyword, onTasksConfirmed, onChangeView: onGoBack }) => {
   const [step, setStep] = useState<'input' | 'generating' | 'review'>('input');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Form State
@@ -236,7 +237,11 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
   };
 
   const handleConfirm = () => {
-    if (!selectedClient) return;
+    // Guards against a rapid double-click firing this handler twice before
+    // the case-creation state update commits, which would otherwise produce
+    // two cases sharing the same auto-generated case number.
+    if (!selectedClient || isSubmitting) return;
+    setIsSubmitting(true);
 
     const newCaseId = uuidv4();
 
@@ -676,10 +681,11 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
               </button>
               <button
                 onClick={handleConfirm}
-                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-lg bg-edamame-500 hover:bg-edamame-700 text-white text-[13.5px] font-bold transition-colors shadow-sm"
+                disabled={isSubmitting}
+                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-lg bg-edamame-500 hover:bg-edamame-700 text-white text-[13.5px] font-bold transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save size={16} />
-                Save case
+                {isSubmitting ? 'Saving…' : 'Save case'}
               </button>
             </div>
           </div>

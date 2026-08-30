@@ -3,16 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { Task, Case, Client, TeamMember, ActivityEvent, DocumentChecklistItem } from '../types';
 import {
   format,
-  addDays,
   isSameDay,
   isSameMonth,
   isBefore,
   startOfDay,
-  startOfWeek,
   differenceInCalendarDays,
 } from 'date-fns';
-import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight, ArrowRight, Trash2, CheckCircle2, Circle } from 'lucide-react';
+import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight, SkipBack, SkipForward } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { buildWindow, computeAutoWindowStart, jumpWeek, stepDay } from '../lib/calendarWindow';
+import { TaskDetailModal } from '../components/TaskDetailModal';
 
 interface DashboardProps {
   tasks: Task[];
@@ -23,7 +23,12 @@ interface DashboardProps {
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onMoveTaskOrder: (taskId: string, direction: 'up' | 'down') => void;
-  onMoveTaskDate: (taskId: string, newDate: string, offsetFuture: boolean) => void;
+  onMoveTaskDate: (
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean,
+    taskPatch?: { title?: string; description?: string },
+  ) => void;
   onAddTask: (task: Task) => void;
   /**
    * Optional — App.tsx already tracks an `activity: ActivityEvent[]` state (see
@@ -101,7 +106,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [newTask, setNewTask] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), caseId: '' });
   const [caseSearchTerm, setCaseSearchTerm] = useState('');
   const [isCaseDropdownOpen, setIsCaseDropdownOpen] = useState(false);
-  const [weekAnchor, setWeekAnchor] = useState<Date>(new Date());
+  /**
+   * `null` = auto mode: the window start is recomputed from TODAY on every
+   * render (see computeAutoWindowStart). The first click on any nav arrow
+   * pins an explicit start here, suspending auto-calibration until the user
+   * clicks "Today" or re-enters the Dashboard.
+   */
+  const [manualWindowStart, setManualWindowStart] = useState<Date | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [dragOverDayKey, setDragOverDayKey] = useState<string | null>(null);
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
@@ -298,9 +309,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [activity, tasks, cases, clients]);
 
   // ── This week board ───────────────────────────────────────────────────
-  const weekStart = startOfWeek(weekAnchor, { weekStartsOn: 1 });
-  const weekDays = useMemo(() => Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const isCurrentWeek = isSameDay(weekStart, startOfWeek(now, { weekStartsOn: 1 }));
+  const autoWindowStart = useMemo(() => computeAutoWindowStart(today), [today.getTime()]);
+  const windowStart = manualWindowStart ?? autoWindowStart;
+  const windowDays = useMemo(() => buildWindow(windowStart), [windowStart.getTime()]);
+  const windowContainsToday = windowDays.some(d => isSameDay(d, today));
+  const isAutoWindow = manualWindowStart === null;
 
   const boardTasks = scopeTasks(boardScope, tasks);
   const getTasksForDay = (day: Date) =>
@@ -451,29 +464,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-7 mb-3">
           <div className="flex items-center gap-3">
             <h3 className="text-base font-bold tracking-[-0.015em] text-slate-900 dark:text-white">
-              {isCurrentWeek ? 'This week' : 'Week of'}
+              {windowContainsToday ? 'This week' : 'Week of'}
             </h3>
             <span className="text-xs text-slate-400 dark:text-slate-500">
-              {format(weekDays[0], 'MMM d')} – {format(weekDays[4], 'MMM d, yyyy')}
+              {format(windowDays[0], 'MMM d')} – {format(windowDays[windowDays.length - 1], 'MMM d, yyyy')}
             </span>
             <div className="flex items-center gap-0.5">
               <button
-                onClick={() => setWeekAnchor(d => addDays(d, -7))}
+                onClick={() => setManualWindowStart(jumpWeek(windowStart, -1))}
                 aria-label="Previous week"
+                title="Previous week"
+                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              >
+                <SkipBack size={15} />
+              </button>
+              <button
+                onClick={() => setManualWindowStart(stepDay(windowStart, -1))}
+                aria-label="Previous day"
+                title="Previous day"
                 className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
-                onClick={() => setWeekAnchor(d => addDays(d, 7))}
-                aria-label="Next week"
+                onClick={() => setManualWindowStart(stepDay(windowStart, 1))}
+                aria-label="Next day"
+                title="Next day"
                 className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
               >
                 <ChevronRight size={16} />
               </button>
-              {!isCurrentWeek && (
+              <button
+                onClick={() => setManualWindowStart(jumpWeek(windowStart, 1))}
+                aria-label="Next week"
+                title="Next week"
+                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              >
+                <SkipForward size={15} />
+              </button>
+              {!isAutoWindow && (
                 <button
-                  onClick={() => setWeekAnchor(new Date())}
+                  onClick={() => setManualWindowStart(null)}
                   className="ml-1 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase text-edamame-600 dark:text-edamame-400 hover:bg-edamame/10 transition-colors"
                 >
                   Today
@@ -500,7 +531,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         <div className="overflow-x-auto pb-1">
           <div className="grid grid-cols-5 gap-2.5 items-stretch min-w-[700px]">
-            {weekDays.map(day => {
+            {windowDays.map(day => {
               const isToday = isSameDay(day, today);
               const dayTasks = getTasksForDay(day);
               const dayKey = day.toISOString();
@@ -737,100 +768,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* ── Task detail modal ─────────────────────────────────────────── */}
+      {/* ── Task detail popup — shared with the global search bar ─────── */}
       {selectedTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-slate-800">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
-              <h3 className="font-bold text-[15px] text-slate-900 dark:text-white">Task Details</h3>
-              <button
-                onClick={() => setSelectedTaskId(null)}
-                className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="flex items-start gap-2.5">
-                <button
-                  onClick={() => onUpdateTask?.({ ...selectedTask, isCompleted: !selectedTask.isCompleted })}
-                  className="mt-0.5 text-edamame-500 flex-shrink-0"
-                  aria-label={selectedTask.isCompleted ? 'Mark incomplete' : 'Mark complete'}
-                >
-                  {selectedTask.isCompleted ? <CheckCircle2 size={20} /> : <Circle size={20} className="text-slate-300 dark:text-slate-600" />}
-                </button>
-                <div
-                  className={`text-[15px] font-bold text-slate-900 dark:text-white ${
-                    selectedTask.isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : ''
-                  }`}
-                >
-                  {selectedTask.title}
-                </div>
-              </div>
-
-              {selectedTask.description && (
-                <div className="text-[13px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
-                  {selectedTask.description}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Due Date
-                </label>
-                <input
-                  type="date"
-                  value={selectedTask.date}
-                  onChange={e => onMoveTaskDate?.(selectedTask.id, e.target.value, false)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-slate-900 dark:text-white outline-none text-[13.5px]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Case
-                </label>
-                {selectedTaskCaseAndClient.case ? (
-                  <div className="text-[13px] text-slate-700 dark:text-slate-300">
-                    {selectedTaskCaseAndClient.case.title}
-                    {selectedTaskCaseAndClient.client && ` — ${selectedTaskCaseAndClient.client.name}`}
-                  </div>
-                ) : (
-                  <div className="text-[13px] text-slate-400 dark:text-slate-500 italic">Not linked to a case</div>
-                )}
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2">
-              <button
-                onClick={() => {
-                  if (!onDeleteTask) return;
-                  onDeleteTask(selectedTask.id);
-                  setSelectedTaskId(null);
-                }}
-                className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
-                aria-label="Delete task"
-              >
-                <Trash2 size={16} />
-              </button>
-              <div className="flex items-center gap-2">
-                {selectedTask.caseId && (
-                  <button
-                    onClick={() => {
-                      navigate(`/cases/${selectedTask.caseId}`);
-                      setSelectedTaskId(null);
-                    }}
-                    className="btn-press flex items-center gap-1.5 px-4 py-2 text-[13px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg shadow-sm transition-all"
-                  >
-                    Go to Case
-                    <ArrowRight size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TaskDetailModal
+          task={selectedTask}
+          caseItem={selectedTaskCaseAndClient.case}
+          client={selectedTaskCaseAndClient.client}
+          onClose={() => setSelectedTaskId(null)}
+          onUpdateTask={onUpdateTask}
+          onDeleteTask={onDeleteTask}
+          onMoveTaskDate={onMoveTaskDate}
+        />
       )}
     </div>
   );

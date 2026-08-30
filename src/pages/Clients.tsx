@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Client, Case, Task } from '../types';
 import { Search, Plus, User, Users, Phone, Mail, MapPin, ChevronDown, ChevronUp, Briefcase, Upload, Globe, FileText, Scan, Check } from 'lucide-react';
 import { CsvImport } from '../components/CsvImport';
@@ -37,6 +37,25 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   const [isPassportScannerOpen, setIsPassportScannerOpen] = useState(false);
   const [justScanned, setJustScanned] = useState(false);
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Deep link from the global search bar: /clients with { focusClientId }.
+  const location = useLocation();
+  const focusClientId = (location.state as { focusClientId?: string } | null)?.focusClientId;
+  useEffect(() => {
+    if (!focusClientId) return;
+    if (!clients.some(c => c.id === focusClientId)) return;
+    setSearchTerm('');
+    setExpandedClientId(focusClientId);
+    // Let the expanded row render before scrolling to it. The router state is
+    // cleared only afterwards — clearing it up front would change
+    // `focusClientId`, re-run this effect and cancel the timer before it fires.
+    const id = window.setTimeout(() => {
+      rowRefs.current[focusClientId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      navigate('.', { replace: true, state: null });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [focusClientId, clients]);
 
   const filteredClients = clients.filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -212,7 +231,11 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
               const verified = Boolean(client.passportNumber && client.passportExpiry);
 
               return (
-                <div key={client.id} className="border-t border-gray-100 dark:border-slate-800/80">
+                <div
+                  key={client.id}
+                  ref={el => { rowRefs.current[client.id] = el; }}
+                  className="border-t border-gray-100 dark:border-slate-800/80"
+                >
                   <div
                     className="table-row-hover grid grid-cols-12 gap-3 px-5 py-[13px] items-center hover:bg-gray-50/80 dark:hover:bg-slate-800/40"
                     onClick={() => toggleExpand(client.id)}

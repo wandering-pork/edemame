@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
+import { readValidatedJson, writeLocalJson } from '@/lib/devLocalStorage';
+
+type AuthUser = Pick<User, 'id' | 'email' | 'user_metadata'>;
 
 interface AuthContextValue {
-  user: User | null;
+  user: AuthUser | null;
   session: Session | null;
   loading: boolean;
   signUp: (
@@ -19,18 +22,71 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// `import.meta.env.DEV` is statically false in production builds, so Vite can
+// dead-code-eliminate the dev-offline branches (and the hardcoded test
+// password) from the shipped client JS — VITE_DEV_OFFLINE_AUTH alone is not
+// enough of a guard since env vars can be set on Preview/Production too.
+const DEV_OFFLINE_AUTH = import.meta.env.DEV && import.meta.env.VITE_DEV_OFFLINE_AUTH === 'true';
+const DEV_TEST_EMAIL = (import.meta.env.VITE_DEV_AUTH_EMAIL as string | undefined)?.trim().toLowerCase() || 'test@edamame.local';
+const DEV_TEST_PASSWORD = import.meta.env.VITE_DEV_AUTH_PASSWORD as string | undefined;
+const DEV_TEST_USER_ID = '00000000-0000-4000-8000-000000000001';
+const DEV_OFFLINE_USER_KEY = 'edamame:dev-offline-auth-user';
+
+interface DevOfflineUserRecord {
+  id: string;
+  email: string;
+  fullName: string;
+}
+
+function toAuthUser(record: DevOfflineUserRecord): AuthUser {
+  return {
+    id: record.id,
+    email: record.email,
+    user_metadata: { full_name: record.fullName },
+  };
+}
+
+function isDevOfflineUserRecord(value: unknown): value is DevOfflineUserRecord {
+  const parsed = value as Partial<DevOfflineUserRecord> | null;
+  return (
+    !!parsed &&
+    typeof parsed.id === 'string' &&
+    typeof parsed.email === 'string' &&
+    typeof parsed.fullName === 'string'
+  );
+}
+
+function readDevOfflineUser(): DevOfflineUserRecord | null {
+  return readValidatedJson(DEV_OFFLINE_USER_KEY, isDevOfflineUserRecord);
+}
+
+function saveDevOfflineUser(record: DevOfflineUserRecord): void {
+  writeLocalJson(DEV_OFFLINE_USER_KEY, record);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (DEV_OFFLINE_AUTH) {
+      const stored = readDevOfflineUser();
+      setSession(null);
+      setUser(stored ? toAuthUser(stored) : null);
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
+      setUser(data.session?.user ?? null);
       setLoading(false);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
+      setUser(newSession?.user ?? null);
       setLoading(false);
     });
 
@@ -38,6 +94,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp: AuthContextValue['signUp'] = async (email, password, fullName, extraMetadata) => {
+    if (DEV_OFFLINE_AUTH) {
+      if (!DEV_TEST_PASSWORD) {
+        return {
+          error: 'Dev offline mode requires VITE_DEV_AUTH_PASSWORD to be set in local env.',
+          needsEmailConfirmation: false,
+        };
+      }
+      if (email.trim().toLowerCase() !== DEV_TEST_EMAIL || password !== DEV_TEST_PASSWORD) {
+        return {
+          error: `Dev offline mode allows only ${DEV_TEST_EMAIL} with the configured test password.`,
+          needsEmailConfirmation: false,
+        };
+      }
+      const company = typeof extraMetadata?.company === 'string' ? extraMetadata.company : undefined;
+      const displayName = fullName.trim() || 'Edamame Test User';
+      const record: DevOfflineUserRecord = {
+        id: DEV_TEST_USER_ID,
+        email: DEV_TEST_EMAIL,
+        fullName: company ? `${displayName} (${company})` : displayName,
+      };
+      saveDevOfflineUser(record);
+      setSession(null);
+      setUser(toAuthUser(record));
+      return { error: null, needsEmailConfirmation: false };
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -50,22 +132,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn: AuthContextValue['signIn'] = async (email, password) => {
+    if (DEV_OFFLINE_AUTH) {
+      if (!DEV_TEST_PASSWORD) {
+        return { error: 'Dev offline mode requires VITE_DEV_AUTH_PASSWORD to be set in local env.' };
+      }
+      if (email.trim().toLowerCase() !== DEV_TEST_EMAIL || password !== DEV_TEST_PASSWORD) {
+        return { error: 'Invalid email or password.' };
+      }
+      const existing = readDevOfflineUser();
+      const record: DevOfflineUserRecord = existing ?? {
+        id: DEV_TEST_USER_ID,
+        email: DEV_TEST_EMAIL,
+        fullName: 'Edamame Test User',
+      };
+      saveDevOfflineUser(record);
+      setSession(null);
+      setUser(toAuthUser(record));
+      return { error: null };
+    }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error ? error.message : null };
   };
 
   const signOut = async () => {
+    if (DEV_OFFLINE_AUTH) {
+      localStorage.removeItem(DEV_OFFLINE_USER_KEY);
+      setSession(null);
+      setUser(null);
+      return;
+    }
     await supabase.auth.signOut();
   };
 
   const resetPassword: AuthContextValue['resetPassword'] = async (email) => {
+    if (DEV_OFFLINE_AUTH) {
+      return { error: `Password reset is unavailable in dev offline mode. Use ${DEV_TEST_EMAIL}.` };
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     return { error: error ? error.message : null };
   };
 
   return (
     <AuthContext.Provider
-      value={{ user: session?.user ?? null, session, loading, signUp, signIn, signOut, resetPassword }}
+      value={{ user, session, loading, signUp, signIn, signOut, resetPassword }}
     >
       {children}
     </AuthContext.Provider>

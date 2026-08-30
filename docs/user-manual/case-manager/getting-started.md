@@ -10,6 +10,11 @@ decision.
    template (e.g. Student 500, Skilled 190, Partner 820/801).
 3. Set the application start date. This is used to calculate due dates for every generated task.
 
+Each new case is automatically given a **case number** in the form `EDM-2026-0001` (the year, plus
+a running number for that year). It's the reference to quote when discussing a file, and you can
+type it straight into the search bar at the top of the screen to jump to the case. Cases created
+before case numbers were introduced show a reference derived from their internal id instead.
+
 ## Landing on the Workspace tab
 
 Every time you open a case, you land on the **Workspace** tab. This is the AI-assisted entry point

@@ -1,8 +1,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Sun, Moon } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
-import type { Notification, Theme } from '../types';
+import { GlobalSearch } from './GlobalSearch';
+import type { Notification, Theme, Client, Case, Task, WorkflowTemplate } from '../types';
 
 interface HeaderProps {
   theme: Theme;
@@ -13,6 +14,19 @@ interface HeaderProps {
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
   onDeleteNotification: (id: string) => void;
+  // Global search corpus + task mutations, threaded from App state.
+  clients: Client[];
+  cases: Case[];
+  tasks: Task[];
+  templates: WorkflowTemplate[];
+  onUpdateTask?: (task: Task) => void;
+  onDeleteTask?: (id: string) => void;
+  onMoveTaskDate?: (
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean,
+    taskPatch?: { title?: string; description?: string },
+  ) => void;
 }
 
 const initials = (name: string) =>
@@ -32,23 +46,28 @@ export const Header: React.FC<HeaderProps> = ({
   onMarkAsRead,
   onMarkAllAsRead,
   onDeleteNotification,
+  clients,
+  cases,
+  tasks,
+  templates,
+  onUpdateTask,
+  onDeleteTask,
+  onMoveTaskDate,
 }) => {
   const navigate = useNavigate();
 
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 px-6 py-3 bg-white/85 dark:bg-slate-900/85 backdrop-blur-sm border-b border-gray-100 dark:border-slate-800">
-      {/* Global search */}
-      <div className="relative flex-1 max-w-[420px]">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
-        <input
-          type="search"
-          placeholder="Search cases, clients, tasks…"
-          className="w-full pl-9 pr-3 py-2 text-[13px] rounded-lg bg-gray-100 dark:bg-slate-800 border border-transparent
-                     text-gray-700 dark:text-slate-200 placeholder:text-gray-400 dark:placeholder:text-slate-500
-                     focus:outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-edamame-300 dark:focus:border-edamame-700
-                     focus:ring-[3px] focus:ring-edamame-500/[.18] transition-colors"
-        />
-      </div>
+      {/* Global search — available from every module. */}
+      <GlobalSearch
+        clients={clients}
+        cases={cases}
+        tasks={tasks}
+        templates={templates}
+        onUpdateTask={onUpdateTask}
+        onDeleteTask={onDeleteTask}
+        onMoveTaskDate={onMoveTaskDate}
+      />
 
       <div className="flex-1" />
 

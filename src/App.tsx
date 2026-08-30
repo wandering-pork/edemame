@@ -22,6 +22,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote } from './types';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
+import { generateCaseNumber } from './lib/caseNumber';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
@@ -263,7 +264,12 @@ const AppShell: React.FC = () => {
     });
   }, [repos]);
 
-  const handleMoveTaskDate = useCallback((taskId: string, newDate: string, offsetFuture: boolean = false) => {
+  const handleMoveTaskDate = useCallback((
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean = false,
+    taskPatch?: { title?: string; description?: string },
+  ) => {
     setTasks(prev => {
       const task = prev.find(t => t.id === taskId);
       if (!task) return prev;
@@ -273,7 +279,7 @@ const AppShell: React.FC = () => {
       const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
       const updated = prev.map(t => {
-        if (t.id === taskId) return { ...t, date: newDate, priorityOrder: 999 };
+        if (t.id === taskId) return { ...t, ...taskPatch, date: newDate, priorityOrder: 999 };
         if (offsetFuture && t.caseId === task.caseId && !t.isCompleted) {
           const tDate = new Date(t.date);
           if (tDate > oldDate) {
@@ -312,6 +318,7 @@ const AppShell: React.FC = () => {
     const caseWithOwner: Case = {
       ...newCase,
       caseOwner: newCase.caseOwner || currentUserId,
+      caseNumber: newCase.caseNumber || generateCaseNumber(cases),
     };
     const tasksWithAssignee = newTasks.map(t => ({
       ...t,
@@ -341,7 +348,7 @@ const AppShell: React.FC = () => {
       subjectId: caseWithOwner.id,
       summary: `New case created: "${caseWithOwner.title}".`,
     });
-  }, [repos, currentUserId, pushActivity]);
+  }, [repos, currentUserId, pushActivity, cases]);
 
   // --- Template Actions ---
   const handleAddTemplate = useCallback(async (template: WorkflowTemplate) => {
@@ -457,6 +464,13 @@ const AppShell: React.FC = () => {
             onMarkAsRead={handleMarkAsRead}
             onMarkAllAsRead={handleMarkAllAsRead}
             onDeleteNotification={handleDeleteNotification}
+            clients={clients}
+            cases={cases}
+            tasks={tasks}
+            templates={templates}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onMoveTaskDate={handleMoveTaskDate}
           />
           {loadWarning && (
             <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
@@ -578,7 +592,12 @@ interface CaseDetailsRouteProps {
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onAddTask: (task: Task) => void;
-  onMoveTaskDate: (taskId: string, newDate: string, offsetFuture: boolean) => void;
+  onMoveTaskDate: (
+    taskId: string,
+    newDate: string,
+    offsetFuture: boolean,
+    taskPatch?: { title?: string; description?: string },
+  ) => void;
 }
 
 const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {

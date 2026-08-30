@@ -103,6 +103,12 @@ export interface Case {
   assignmentHistory?: CaseAssignmentEvent[];
   /** ID of the visa applicant — falls back to clientId if unset. clientId = engaging/paying party. */
   applicantId?: string;
+  /**
+   * Human-readable file reference, e.g. "EDM-2026-0001". Assigned on creation.
+   * Optional because cases created before this field existed have none — use
+   * `displayCaseNumber()` from lib/caseNumber.ts to render a stable fallback.
+   */
+  caseNumber?: string;
 }
 
 export interface CaseNote {
