@@ -670,11 +670,28 @@ const Spinner: React.FC = () => (
  * folder link (the browser-side permission handle to reconnect to it).
  */
 const StorageGate: React.FC = () => {
-  const { profile, loading: profileLoading, completeOnboarding } = useProfile();
+  const { profile, loading: profileLoading, completeOnboarding, updateProfile } = useProfile();
   const { status: folderStatus, supported, linkFolder, reconnect } = useLocalFolder();
+  const [switchingToLocal, setSwitchingToLocal] = useState(false);
 
   const handleOnboardingComplete = async (mode: StorageMode) => {
     await completeOnboarding(mode);
+  };
+
+  // Escape hatch for the "cloud isn't configured" dead end below: cloud is
+  // unreachable here, so there's no data to migrate — this just flips
+  // storageMode back to local and drops the user into folder-linking. The
+  // orphaned cloud rows (if any exist from before) are left untouched; they
+  // become reachable again if the deployment's Supabase config is fixed and
+  // the user switches back to cloud from Settings.
+  const handleSwitchToLocal = async () => {
+    setSwitchingToLocal(true);
+    try {
+      await updateProfile({ storageMode: 'local' });
+      window.location.reload();
+    } catch {
+      setSwitchingToLocal(false);
+    }
   };
 
   if (profileLoading) return <Spinner />;
@@ -697,8 +714,15 @@ const StorageGate: React.FC = () => {
           <h1 className="text-lg font-bold text-gray-900 dark:text-white">Cloud storage isn't configured</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
             This deployment is missing its Supabase configuration, so your cloud data can't be loaded or saved.
-            Contact your administrator.
+            Contact your administrator, or switch to local storage to keep working.
           </p>
+          <button
+            onClick={handleSwitchToLocal}
+            disabled={switchingToLocal}
+            className="btn-press mt-5 px-5 py-2.5 rounded-xl font-semibold text-sm bg-edamame-500 hover:bg-edamame-600 text-white transition-all disabled:opacity-50"
+          >
+            {switchingToLocal ? 'Switching...' : 'Switch to Local Storage'}
+          </button>
         </div>
       </div>
     );

@@ -8,10 +8,9 @@ import { useLocalFolder } from '@/contexts/LocalFolderContext';
 import { useRepositories } from '@/contexts/RepositoryContext';
 import { createCloudRepositories } from '@/repositories/cloud';
 import { createFilesystemRepositories } from '@/repositories/filesystem';
-import { copyAllData } from '@/repositories/migrate';
+import { copyAllData, clearAll } from '@/repositories/migrate';
 import type { Repositories } from '@/repositories/types';
 import { isSupabaseConfigured } from '@/lib/supabaseClient';
-import { isEmpty } from '@/lib/fsStorage';
 import { saveHandle } from '@/lib/folderHandleStore';
 
 const initialsOf = (s: string) =>
@@ -67,12 +66,13 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
       setSwitchError("Cloud storage isn't configured for this deployment. Contact your administrator.");
       return;
     }
-    if (!window.confirm('This copies all your data to the cloud. Your local folder is left untouched as a backup. Continue?')) return;
+    if (!window.confirm('This replaces any data currently in your cloud account with a fresh copy of your local folder. Your local folder is left untouched as a backup. Continue?')) return;
     setSwitchError(null);
     setSwitchingMode(true);
     setSwitchProgress('Preparing...');
     try {
       const cloudRepos = createCloudRepositories(user!.id);
+      await clearAll(cloudRepos, entity => setSwitchProgress(`Clearing ${entity}...`));
       await copyAllData(repositories, cloudRepos, entity => setSwitchProgress(`Copying ${entity}...`));
 
       setSwitchProgress('Verifying...');
@@ -90,7 +90,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
         await updateProfile({ storageMode: 'cloud' });
       } catch (err) {
         console.error('Copied all data to cloud but failed to update storageMode on the profile:', err);
-        setSwitchError('Your data was copied to the cloud, but we could not finish switching modes. Please try again — already-copied records are reused, not duplicated.');
+        setSwitchError('Your data was copied to the cloud, but we could not finish switching modes. Please try again — a retry clears and recopies cleanly.');
         setSwitchingMode(false);
         setSwitchProgress(null);
         return;
@@ -98,7 +98,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
       window.location.reload();
     } catch (err) {
       console.error('Failed to switch storage mode to cloud:', err);
-      setSwitchError('Could not switch to cloud storage. Please try again — already-copied records are reused, not duplicated.');
+      setSwitchError('Could not switch to cloud storage. Please try again — a retry clears and recopies cleanly.');
       setSwitchingMode(false);
       setSwitchProgress(null);
     }
@@ -115,23 +115,20 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
     } catch {
       return; // user cancelled the picker
     }
-    if (!(await isEmpty(handle))) {
-      setSwitchError('Please pick an empty folder — switching to local storage writes a fresh copy of your cloud data there.');
-      return;
-    }
-    if (!window.confirm(`This copies all your cloud data into "${handle.name}". Continue?`)) return;
+    if (!window.confirm(`This replaces any Edamame data already in "${handle.name}" with a fresh copy of your cloud data. Any other files in the folder are left alone. Continue?`)) return;
     setSwitchError(null);
     setSwitchingMode(true);
     setSwitchProgress('Preparing...');
     try {
       const fsRepos = createFilesystemRepositories(handle);
+      await clearAll(fsRepos, entity => setSwitchProgress(`Clearing ${entity}...`));
       await copyAllData(repositories, fsRepos, entity => setSwitchProgress(`Copying ${entity}...`));
 
       setSwitchProgress('Verifying...');
       const mismatch = await verifyCopiedCounts(repositories, fsRepos);
       if (mismatch) {
         console.error('Storage mode switch to local aborted — copy verification failed:', mismatch);
-        setSwitchError(`${mismatch} Pick a fresh empty folder when you retry.`);
+        setSwitchError(`${mismatch} Please try again.`);
         setSwitchingMode(false);
         setSwitchProgress(null);
         return;
@@ -143,7 +140,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
         await updateProfile({ storageMode: 'local', linkedFolderName: handle.name, linkedAt: new Date().toISOString() });
       } catch (err) {
         console.error(`Copied all data into "${handle.name}" but failed to finish switching storageMode to local:`, err);
-        setSwitchError(`Your data was copied into "${handle.name}", but we could not finish switching modes. Please try again with a fresh empty folder.`);
+        setSwitchError(`Your data was copied into "${handle.name}", but we could not finish switching modes. Please try again.`);
         setSwitchingMode(false);
         setSwitchProgress(null);
         return;
@@ -151,7 +148,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
       window.location.reload();
     } catch (err) {
       console.error('Failed to switch storage mode to local:', err);
-      setSwitchError('Could not switch to local storage. Please try again with a fresh empty folder.');
+      setSwitchError('Could not switch to local storage. Please try again.');
       setSwitchingMode(false);
       setSwitchProgress(null);
     }
@@ -405,8 +402,8 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
           <div className="p-6 flex items-center justify-between gap-4">
             <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm">
               {profile?.storageMode === 'local'
-                ? 'Switch to cloud storage to access your data from any device without a linked folder.'
-                : 'Switch to local storage to keep your data as files in a folder you control (e.g. inside Dropbox or OneDrive).'}
+                ? 'Switch to cloud storage to access your data from any device without a linked folder. This overwrites any existing data in your cloud account with your local copy.'
+                : 'Switch to local storage to keep your data as files in a folder you control (e.g. inside Dropbox or OneDrive). This overwrites any existing Edamame data in the folder you pick with your cloud copy.'}
             </p>
             {profile?.storageMode === 'local' ? (
               <button

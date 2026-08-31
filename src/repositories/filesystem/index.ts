@@ -337,6 +337,12 @@ class FsActivityRepository implements IActivityRepository {
     await writeJson(this.root, `activity-events/${event.createdAt}-${event.id}.json`, event);
     return event;
   }
+
+  async delete(id: string): Promise<void> {
+    const files = await listFiles(this.root, 'activity-events');
+    const match = files.find(f => f.endsWith(`-${id}.json`));
+    if (match) await deleteEntry(this.root, `activity-events/${match}`);
+  }
 }
 
 // ---------------------------------------------------------------------------

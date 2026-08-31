@@ -670,6 +670,11 @@ class CloudActivityRepository implements IActivityRepository {
     if (error) throw error;
     return event;
   }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('activity_events').delete().eq('user_id', this.userId).eq('id', id);
+    if (error) throw error;
+  }
 }
 
 // ---------------------------------------------------------------------------
