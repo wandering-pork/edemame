@@ -55,6 +55,7 @@ export interface ITeamMemberRepository extends IRepository<TeamMember> {}
 export interface IActivityRepository {
   getAll(): Promise<ActivityEvent[]>;
   create(event: ActivityEvent): Promise<ActivityEvent>;
+  delete(id: string): Promise<void>;
 }
 
 export interface IChecklistRepository {
