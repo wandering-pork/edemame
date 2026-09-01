@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, Briefcase, FileText, ScanLine, Users, Globe, ArrowRight } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const problems = [
   { title: 'Fragmented Tools', text: 'Immigration practitioners juggle multiple disconnected systems with no single source of truth.' },
@@ -24,6 +25,8 @@ const hiw = [
 ];
 
 export default function LandingPage() {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
       {/* Navbar */}
@@ -34,20 +37,29 @@ export default function LandingPage() {
           </div>
           <span className="font-black text-sm tracking-tight">EDAMAME</span>
         </div>
-        <div className="flex items-center gap-4">
+        {user ? (
           <Link
-            to="/login"
-            className="text-[12.5px] font-semibold text-gray-600 hover:text-edamame-600 transition-colors"
-          >
-            Log in
-          </Link>
-          <Link
-            to="/register"
+            to="/dashboard"
             className="btn-press px-4 py-2 rounded-[9px] bg-edamame-500 hover:bg-edamame-600 text-white text-[12.5px] font-bold transition-colors"
           >
-            Sign Up
+            Go to Dashboard
           </Link>
-        </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <Link
+              to="/login"
+              className="text-[12.5px] font-semibold text-gray-600 hover:text-edamame-600 transition-colors"
+            >
+              Log in
+            </Link>
+            <Link
+              to="/register"
+              className="btn-press px-4 py-2 rounded-[9px] bg-edamame-500 hover:bg-edamame-600 text-white text-[12.5px] font-bold transition-colors"
+            >
+              Sign Up
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Hero */}
@@ -60,10 +72,10 @@ export default function LandingPage() {
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
           <Link
-            to="/register"
+            to={user ? '/dashboard' : '/register'}
             className="btn-press px-6 py-3 rounded-[11px] bg-edamame-500 hover:bg-edamame-600 text-white text-sm font-bold transition-colors inline-flex items-center gap-2"
           >
-            Get Started <ArrowRight className="w-4 h-4" />
+            {user ? 'Go to Dashboard' : 'Get Started'} <ArrowRight className="w-4 h-4" />
           </Link>
           <a
             href="#features"
@@ -144,10 +156,10 @@ export default function LandingPage() {
           Join immigration professionals who are saving hours every week with AI-powered task management.
         </p>
         <Link
-          to="/register"
+          to={user ? '/dashboard' : '/register'}
           className="btn-press mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-[11px] bg-white hover:bg-edamame-50 text-edamame-600 text-sm font-bold transition-colors"
         >
-          Get Started <ArrowRight className="w-4 h-4" />
+          {user ? 'Go to Dashboard' : 'Get Started'} <ArrowRight className="w-4 h-4" />
         </Link>
       </section>
 
