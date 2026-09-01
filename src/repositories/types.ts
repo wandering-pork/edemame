@@ -1,4 +1,4 @@
-import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation } from '../types';
+import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation, UsageEvent } from '../types';
 
 // Generic CRUD interface
 export interface IRepository<T> {
@@ -58,6 +58,12 @@ export interface IActivityRepository {
   delete(id: string): Promise<void>;
 }
 
+export interface IUsageRepository {
+  getAll(): Promise<UsageEvent[]>;
+  create(event: UsageEvent): Promise<UsageEvent>;
+  delete(id: string): Promise<void>;
+}
+
 export interface IChecklistRepository {
   getByCaseId(caseId: string): Promise<DocumentChecklistItem[]>;
   setForCase(caseId: string, items: DocumentChecklistItem[]): Promise<void>;
@@ -88,6 +94,7 @@ export interface Repositories {
   notifications: INotificationRepository;
   teamMembers: ITeamMemberRepository;
   activity: IActivityRepository;
+  usage: IUsageRepository;
   checklist: IChecklistRepository;
   documentTypes: IDocumentTypeRepository;
   chat: IChatRepository;

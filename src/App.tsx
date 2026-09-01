@@ -20,7 +20,7 @@ import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote } from './types';
+import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote, UsageEvent } from './types';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
@@ -60,6 +60,10 @@ const AppShell: React.FC = () => {
     });
     setActivity(prev => [...prev, created]);
   }, [repos]);
+
+  const pushUsageEvent = useCallback(async (ev: Omit<UsageEvent, 'id' | 'createdAt' | 'userId'>) => {
+    await repos.usage.create({ ...ev, id: uuidv4(), userId: currentUserId, createdAt: new Date().toISOString() });
+  }, [repos, currentUserId]);
 
   // First-launch backfill: spread any unowned cases/tasks across the seeded team
   // so the Team Dashboard has meaningful distribution on first load.
@@ -348,7 +352,9 @@ const AppShell: React.FC = () => {
       subjectId: caseWithOwner.id,
       summary: `New case created: "${caseWithOwner.title}".`,
     });
-  }, [repos, currentUserId, pushActivity, cases]);
+    const visaSubclass = templates.find(t => t.id === caseWithOwner.templateId)?.visaSubclass;
+    pushUsageEvent({ type: 'case_created', metadata: { visaSubclass, templateId: caseWithOwner.templateId } });
+  }, [repos, currentUserId, pushActivity, pushUsageEvent, cases, templates]);
 
   // --- Template Actions ---
   const handleAddTemplate = useCallback(async (template: WorkflowTemplate) => {
@@ -371,8 +377,9 @@ const AppShell: React.FC = () => {
       subjectId: member.id,
       summary: `${member.name} joined the team as ${member.role}.`,
     });
+    pushUsageEvent({ type: 'team_member_added' });
     toast.success(`${member.name} added to the team`);
-  }, [repos, pushActivity, currentUserId]);
+  }, [repos, pushActivity, pushUsageEvent, currentUserId]);
 
   const handleUpdateTeamMember = useCallback(async (member: TeamMember) => {
     await repos.teamMembers.update(member);
@@ -432,7 +439,20 @@ const AppShell: React.FC = () => {
   const handleAddClient = useCallback(async (client: Client) => {
     await repos.clients.create(client);
     setClients(prev => [...prev, client]);
-  }, [repos]);
+    pushUsageEvent({ type: 'client_created' });
+  }, [repos, pushUsageEvent]);
+
+  const handleEligibilityChecked = useCallback((usage: { promptTokens: number; candidatesTokens: number; totalTokens: number; estimatedCostUsd: number }) => {
+    pushUsageEvent({
+      type: 'eligibility_check',
+      metadata: {
+        promptTokens: usage.promptTokens,
+        candidatesTokens: usage.candidatesTokens,
+        totalTokens: usage.totalTokens,
+        estimatedCostUsd: usage.estimatedCostUsd,
+      },
+    });
+  }, [pushUsageEvent]);
 
   const handleUpdateClient = useCallback(async (updatedClient: Client) => {
     await repos.clients.update(updatedClient);
@@ -533,6 +553,7 @@ const AppShell: React.FC = () => {
               <VisaAdvisorRoute
                 clients={clients}
                 templates={templates}
+                onEligibilityChecked={handleEligibilityChecked}
               />
             } />
             <Route path="/cases" element={
@@ -636,6 +657,7 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
 interface VisaAdvisorRouteProps {
   clients: Client[];
   templates: WorkflowTemplate[];
+  onEligibilityChecked: (usage: { promptTokens: number; candidatesTokens: number; totalTokens: number; estimatedCostUsd: number }) => void;
 }
 
 const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
@@ -650,6 +672,7 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
       clients={props.clients}
       templates={props.templates}
       onOpenNewCase={handleOpenNewCase}
+      onEligibilityChecked={props.onEligibilityChecked}
     />
   );
 };

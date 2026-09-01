@@ -12,6 +12,7 @@ import type {
   DocumentChecklistItem,
   DocumentType,
   FocusConversation,
+  UsageEvent,
 } from '@/types';
 import type {
   IClientRepository,
@@ -23,6 +24,7 @@ import type {
   INotificationRepository,
   ITeamMemberRepository,
   IActivityRepository,
+  IUsageRepository,
   IChecklistRepository,
   IDocumentTypeRepository,
   IChatRepository,
@@ -678,6 +680,50 @@ class CloudActivityRepository implements IActivityRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Usage — append-only
+// ---------------------------------------------------------------------------
+
+function usageEventToRow(userId: string, e: UsageEvent) {
+  return {
+    id: e.id,
+    user_id: userId,
+    type: e.type,
+    metadata: e.metadata ?? null,
+    created_at: e.createdAt,
+  };
+}
+
+function rowToUsageEvent(row: any): UsageEvent {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    metadata: row.metadata ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+class CloudUsageRepository implements IUsageRepository {
+  constructor(private userId: string) {}
+
+  async getAll(): Promise<UsageEvent[]> {
+    const rows = await fetchAllRows('usage_events', q => q.eq('user_id', this.userId).order('created_at', { ascending: true }));
+    return rows.map(rowToUsageEvent);
+  }
+
+  async create(event: UsageEvent): Promise<UsageEvent> {
+    const { error } = await supabase.from('usage_events').upsert(usageEventToRow(this.userId, event), { onConflict: 'id' });
+    if (error) throw error;
+    return event;
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('usage_events').delete().eq('user_id', this.userId).eq('id', id);
+    if (error) throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Checklist
 // ---------------------------------------------------------------------------
 
@@ -875,6 +921,7 @@ export function createCloudRepositories(userId: string): Repositories {
     notifications: new CloudNotificationRepository(userId),
     teamMembers: new CloudTeamMemberRepository(userId),
     activity: new CloudActivityRepository(userId),
+    usage: new CloudUsageRepository(userId),
     checklist: new CloudChecklistRepository(userId),
     documentTypes: new CloudDocumentTypeRepository(userId),
     chat: new CloudChatRepository(userId),

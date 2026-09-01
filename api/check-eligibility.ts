@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "http";
+import { estimateCostUsd } from "./_lib/aiPricing";
 
 interface VercelRequest extends IncomingMessage {
   method: string;
@@ -69,16 +70,30 @@ Assess: 189, 190, 482, 186, 500, 820, 485, 600, 417`;
     if (!response.ok) {
       console.error("API error:", response.status);
       return res.status(200).json({
-        visaOptions: [],
-        summary: "Unable to assess eligibility",
-        primaryRecommendation: "Please try again",
-        suggestedTemplateKeyword: "",
+        result: {
+          visaOptions: [],
+          summary: "Unable to assess eligibility",
+          primaryRecommendation: "Please try again",
+          suggestedTemplateKeyword: "",
+        },
+        usage: null,
       });
     }
 
     const data = await response.json();
     const responseText =
       data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const usageMetadata = data.usageMetadata;
+    const promptTokens = usageMetadata?.promptTokenCount ?? 0;
+    const candidatesTokens = usageMetadata?.candidatesTokenCount ?? 0;
+    const usage = usageMetadata
+      ? {
+          promptTokens,
+          candidatesTokens,
+          totalTokens: usageMetadata?.totalTokenCount ?? promptTokens + candidatesTokens,
+          estimatedCostUsd: estimateCostUsd(promptTokens, candidatesTokens),
+        }
+      : null;
 
     let result;
     try {
@@ -88,21 +103,25 @@ Assess: 189, 190, 482, 186, 500, 820, 485, 600, 417`;
       result = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
     }
 
-    return res.status(200).json(
-      result || {
+    return res.status(200).json({
+      result: result || {
         visaOptions: [],
         summary: "Unable to parse response",
         primaryRecommendation: "Please try again",
         suggestedTemplateKeyword: "",
-      }
-    );
+      },
+      usage,
+    });
   } catch (error) {
     console.error("Error:", error);
     return res.status(200).json({
-      visaOptions: [],
-      summary: "An error occurred",
-      primaryRecommendation: "Please try again",
-      suggestedTemplateKeyword: "",
+      result: {
+        visaOptions: [],
+        summary: "An error occurred",
+        primaryRecommendation: "Please try again",
+        suggestedTemplateKeyword: "",
+      },
+      usage: null,
     });
   }
 }
