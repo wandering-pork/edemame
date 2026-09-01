@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, Briefcase, FileText, ScanLine, Users, Globe, Check, ArrowRight } from 'lucide-react';
+import { Sparkles, Briefcase, FileText, ScanLine, Users, Globe, ArrowRight } from 'lucide-react';
 
 const problems = [
   { title: 'Fragmented Tools', text: 'Immigration practitioners juggle multiple disconnected systems with no single source of truth.' },
@@ -23,30 +23,6 @@ const hiw = [
   { n: 3, title: 'AI Generates Tasks', text: 'AI creates a structured task schedule with dates and priorities.' },
 ];
 
-const tiers = [
-  {
-    name: 'Essentials',
-    price: 65,
-    who: 'For sole practitioners',
-    feats: ['Case management', '5 workflow templates', 'Local storage', 'Email support'],
-    rec: false,
-  },
-  {
-    name: 'Professional',
-    price: 95,
-    who: 'For growing firms',
-    feats: ['Everything in Essentials', 'Unlimited templates', 'AI task generation', 'Client portal', 'Cloud storage'],
-    rec: true,
-  },
-  {
-    name: 'Enterprise',
-    price: 135,
-    who: 'For large firms',
-    feats: ['Everything in Professional', 'Multi-jurisdiction', 'API access', 'Priority support', 'Custom integrations'],
-    rec: false,
-  },
-];
-
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -58,12 +34,20 @@ export default function LandingPage() {
           </div>
           <span className="font-black text-sm tracking-tight">EDAMAME</span>
         </div>
-        <Link
-          to="/onboarding"
-          className="btn-press px-4 py-2 rounded-[9px] bg-edamame-500 hover:bg-edamame-600 text-white text-[12.5px] font-bold transition-colors"
-        >
-          Get Started
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            to="/login"
+            className="text-[12.5px] font-semibold text-gray-600 hover:text-edamame-600 transition-colors"
+          >
+            Log in
+          </Link>
+          <Link
+            to="/register"
+            className="btn-press px-4 py-2 rounded-[9px] bg-edamame-500 hover:bg-edamame-600 text-white text-[12.5px] font-bold transition-colors"
+          >
+            Sign Up
+          </Link>
+        </div>
       </nav>
 
       {/* Hero */}
@@ -76,7 +60,7 @@ export default function LandingPage() {
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
           <Link
-            to="/onboarding"
+            to="/register"
             className="btn-press px-6 py-3 rounded-[11px] bg-edamame-500 hover:bg-edamame-600 text-white text-sm font-bold transition-colors inline-flex items-center gap-2"
           >
             Get Started <ArrowRight className="w-4 h-4" />
@@ -151,54 +135,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section className="py-16 md:py-[70px] px-6 md:px-8">
-        <div className="max-w-[940px] mx-auto">
-          <h2 className="text-2xl md:text-[30px] font-extrabold tracking-[-0.03em] text-center text-gray-900">Simple, Transparent Pricing</h2>
-          <p className="text-[13.5px] text-gray-500 text-center mt-2">No hidden fees. Cancel anytime.</p>
-          <div className="grid md:grid-cols-3 gap-4 mt-10 items-stretch">
-            {tiers.map((tier) => (
-              <div
-                key={tier.name}
-                className={`card-lift relative bg-white rounded-2xl shadow-sm p-[26px] flex flex-col ${
-                  tier.rec ? 'border-2 border-edamame-500' : 'border border-gray-200'
-                }`}
-              >
-                {tier.rec && (
-                  <span className="absolute -top-[11px] left-1/2 -translate-x-1/2 text-[10px] font-bold tracking-[0.05em] px-3 py-1 rounded-full bg-edamame-500 text-white">
-                    Recommended
-                  </span>
-                )}
-                <div className="text-base font-bold tracking-[-0.02em] text-gray-900">{tier.name}</div>
-                <div className="text-[11.5px] text-gray-400 mt-1">{tier.who}</div>
-                <div className="flex items-baseline gap-1 mt-4">
-                  <span className="text-[32px] font-extrabold tracking-[-0.03em] text-gray-900">${tier.price}</span>
-                  <span className="text-xs text-gray-400">/user/mo</span>
-                </div>
-                <div className="flex flex-col gap-2 mt-[18px] flex-1">
-                  {tier.feats.map((f) => (
-                    <div key={f} className="flex items-center gap-2 text-[12.5px] text-gray-500">
-                      <Check className="w-[15px] h-[15px] text-edamame-500 flex-shrink-0" strokeWidth={1.8} />
-                      {f}
-                    </div>
-                  ))}
-                </div>
-                <Link
-                  to="/onboarding"
-                  className={`btn-press mt-[22px] text-center rounded-[10px] py-2.5 text-[13px] font-bold transition-colors ${
-                    tier.rec
-                      ? 'bg-edamame-500 hover:bg-edamame-600 text-white'
-                      : 'border border-edamame-500 text-edamame-600 hover:bg-edamame-50'
-                  }`}
-                >
-                  Get Started
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* CTA Band */}
       <section className="bg-edamame-500 py-16 md:py-[70px] px-6 md:px-8 text-center">
         <h2 className="text-2xl md:text-[30px] font-extrabold tracking-[-0.03em] text-white">
@@ -208,10 +144,10 @@ export default function LandingPage() {
           Join immigration professionals who are saving hours every week with AI-powered task management.
         </p>
         <Link
-          to="/onboarding"
+          to="/register"
           className="btn-press mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-[11px] bg-white hover:bg-edamame-50 text-edamame-600 text-sm font-bold transition-colors"
         >
-          Get Started Free <ArrowRight className="w-4 h-4" />
+          Get Started <ArrowRight className="w-4 h-4" />
         </Link>
       </section>
 
