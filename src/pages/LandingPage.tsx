@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Sparkles, Briefcase, FileText, ScanLine, Users, Globe, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -49,11 +49,168 @@ const hiw = [
   { n: 3, title: 'AI Generates Tasks', text: 'AI creates a structured task schedule with dates and priorities.' },
 ];
 
+// Illustrative recreations of the real Dashboard and Visa Advisor screens (not
+// live screenshots — this app requires a real login, so there's nothing to
+// screenshot from a marketing page). Sample data only: case numbers instead
+// of client names, no fabricated stats.
+const weekBoard: { day: string; date: string; today?: boolean; task: { kind: string; title: string; tone: 'blue' | 'green' | 'red' } | null }[] = [
+  { day: 'MON', date: '1', task: { kind: 'Task', title: 'Collect employment references', tone: 'blue' } },
+  { day: 'TUE', date: '2', task: { kind: 'Filing', title: 'Lodge Form 47SP', tone: 'green' } },
+  { day: 'WED', date: '3', today: true, task: { kind: 'Deadline', title: 'Submit medical exam', tone: 'red' } },
+  { day: 'THU', date: '4', task: null },
+  { day: 'FRI', date: '5', task: { kind: 'Filing', title: 'Biometrics appointment', tone: 'green' } },
+];
+
+const taskCardTone: Record<'blue' | 'green' | 'red', string> = {
+  blue: 'bg-blue-50 border-blue-500',
+  green: 'bg-edamame-50 border-edamame-500',
+  red: 'bg-red-50 border-red-500',
+};
+
+function DashboardPreview() {
+  return (
+    <div className="min-w-[860px] flex">
+      <div className="w-16 bg-edamame-sidebar flex flex-col items-center py-4 gap-3 flex-shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-white font-black text-xs">E</div>
+        <div className="w-6 h-6 rounded-md bg-white/25" />
+        <div className="w-6 h-6 rounded-md bg-white/10" />
+        <div className="w-6 h-6 rounded-md bg-white/10" />
+        <div className="w-6 h-6 rounded-md bg-white/10" />
+      </div>
+      <div className="flex-1 p-6 bg-white">
+        <div className="flex items-end justify-between">
+          <div>
+            <div className="text-[9px] font-bold uppercase tracking-[0.11em] text-gray-400">Tuesday, 1 September</div>
+            <div className="text-[19px] font-extrabold tracking-[-0.03em] text-gray-900 mt-1">Good morning, Alex</div>
+          </div>
+          <div className="text-[11px] font-bold bg-edamame-500 text-white px-3 py-1.5 rounded-[8px]">+ New Task</div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2.5 mt-4">
+          {[
+            { label: 'Cases in motion', value: '14', delta: '+3 this month', color: 'text-emerald-600' },
+            { label: 'Due this week', value: '9', delta: '2 today', color: 'text-gray-400' },
+            { label: 'Overdue', value: '2', delta: 'ARC-2291', color: 'text-red-600' },
+            { label: 'Docs outstanding', value: '5', delta: 'Active checklists', color: 'text-amber-600' },
+          ].map((s) => (
+            <div key={s.label} className="border border-gray-100 rounded-lg px-3 py-2.5">
+              <div className="text-[8px] font-bold uppercase tracking-[0.1em] text-gray-400">{s.label}</div>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-[17px] font-extrabold text-gray-900">{s.value}</span>
+                <span className={`text-[9px] font-semibold truncate ${s.color}`}>{s.delta}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-5 gap-2 mt-4">
+          {weekBoard.map((d) => (
+            <div
+              key={d.day}
+              className={`rounded-lg border p-2 min-h-[92px] ${d.today ? 'bg-edamame-50 border-edamame-200' : 'border-gray-100'}`}
+            >
+              <div className="text-[8px] font-bold text-gray-400">
+                {d.day} <span className="text-gray-900">{d.date}</span>
+              </div>
+              {d.task && (
+                <div className={`mt-1.5 rounded px-1.5 py-1 text-[8.5px] font-semibold text-gray-900 border-l-2 ${taskCardTone[d.task.tone]}`}>
+                  {d.task.title}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const visaVerdicts = [
+  {
+    name: 'Student Visa',
+    code: 'SC-500',
+    label: 'Strong match',
+    badge: 'bg-emerald-100 text-emerald-700',
+    border: 'border-emerald-200',
+    bg: 'bg-emerald-50/70',
+    bar: 'bg-emerald-500',
+    width: '88%',
+    why: 'Confirmed enrolment in a CRICOS-registered course',
+  },
+  {
+    name: 'Skilled Independent Visa',
+    code: 'SC-190',
+    label: 'Possible',
+    badge: 'bg-amber-100 text-amber-700',
+    border: 'border-amber-200',
+    bg: 'bg-amber-50/70',
+    bar: 'bg-amber-500',
+    width: '60%',
+    why: 'Occupation appears on the relevant skilled occupation list',
+    gap: 'Points test result not yet confirmed',
+  },
+  {
+    name: 'Partner Visa',
+    code: 'SC-820/801',
+    label: 'Unlikely',
+    badge: 'bg-red-100 text-red-700',
+    border: 'border-red-200',
+    bg: 'bg-red-50/70',
+    bar: 'bg-red-500',
+    width: '25%',
+    gap: 'Relationship does not yet meet minimum duration',
+  },
+];
+
+function VisaAdvisorPreview() {
+  return (
+    <div className="min-w-[860px] p-7 bg-white">
+      <div className="text-center mb-5">
+        <div className="text-[17px] font-extrabold tracking-[-0.02em] text-gray-900">Your Visa Eligibility Results</div>
+        <div className="text-[11.5px] text-gray-500 mt-1">Based on your information, here are the visa pathways you may qualify for</div>
+      </div>
+      <div className="bg-edamame-50 border border-edamame-100 rounded-xl p-4 mb-4">
+        <div className="text-[12px] font-bold text-gray-900">Our Recommendation</div>
+        <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">
+          The Student visa (500) is your strongest immediate pathway, with Skilled Independent (190) worth preparing for once your points assessment is complete.
+        </p>
+      </div>
+      <div className="space-y-2.5">
+        {visaVerdicts.map((v) => (
+          <div key={v.code} className={`rounded-xl border p-4 ${v.bg} ${v.border}`}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[12.5px] font-bold text-gray-900">{v.name}</span>
+              <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{v.code}</span>
+              <span className={`ml-auto text-[9.5px] font-bold px-2 py-0.5 rounded ${v.badge}`}>{v.label}</span>
+            </div>
+            <div className="h-1 rounded-full bg-gray-100 overflow-hidden mt-2">
+              <div className={`h-full rounded-full ${v.bar}`} style={{ width: v.width }} />
+            </div>
+            {v.why && (
+              <div className="text-[11px] text-gray-600 mt-2 flex gap-1.5">
+                <span className="text-edamame-500">·</span>
+                {v.why}
+              </div>
+            )}
+            {v.gap && (
+              <div className="text-[11px] text-gray-600 mt-1 flex gap-1.5">
+                <span className="text-amber-500">!</span>
+                {v.gap}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const audienceParam = searchParams.get('for');
   const { headline, sub } = isAudience(audienceParam) ? AUDIENCE_COPY[audienceParam] : DEFAULT_COPY;
+  const [activePreview, setActivePreview] = useState<'dashboard' | 'advisor'>('dashboard');
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -150,6 +307,41 @@ export default function LandingPage() {
                 <div className="text-[12.5px] text-gray-500 leading-relaxed mt-1.5">{f.text}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* See It In Action */}
+      <section className="py-16 md:py-[70px] px-6 md:px-8">
+        <div className="max-w-[1100px] mx-auto">
+          <h2 className="text-2xl md:text-[30px] font-extrabold tracking-[-0.03em] text-center text-gray-900">See It In Action</h2>
+          <p className="text-[13.5px] text-gray-500 text-center mt-2">A quick look at the workspace your team will actually use.</p>
+
+          <div className="flex items-center justify-center mt-7">
+            <div className="flex gap-1 p-[3px] bg-gray-100 rounded-[10px]">
+              <button
+                onClick={() => setActivePreview('dashboard')}
+                className={`px-4 py-1.5 rounded-[7px] text-xs font-semibold transition-colors ${
+                  activePreview === 'dashboard' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => setActivePreview('advisor')}
+                className={`px-4 py-1.5 rounded-[7px] text-xs font-semibold transition-colors ${
+                  activePreview === 'advisor' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Visa Advisor
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-gray-100 shadow-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              {activePreview === 'dashboard' ? <DashboardPreview /> : <VisaAdvisorPreview />}
+            </div>
           </div>
         </div>
       </section>
