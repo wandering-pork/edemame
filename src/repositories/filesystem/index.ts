@@ -12,6 +12,7 @@ import type {
   DocumentChecklistItem,
   DocumentType,
   FocusConversation,
+  UsageEvent,
 } from '@/types';
 import type {
   IClientRepository,
@@ -23,6 +24,7 @@ import type {
   INotificationRepository,
   ITeamMemberRepository,
   IActivityRepository,
+  IUsageRepository,
   IChecklistRepository,
   IDocumentTypeRepository,
   IChatRepository,
@@ -346,6 +348,30 @@ class FsActivityRepository implements IActivityRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Usage — append-only, one file per event, no cap
+// ---------------------------------------------------------------------------
+
+class FsUsageRepository implements IUsageRepository {
+  constructor(private root: FileSystemDirectoryHandle) {}
+
+  async getAll(): Promise<UsageEvent[]> {
+    const events = await readAllInDir<UsageEvent>(this.root, 'usage-events');
+    return events.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async create(event: UsageEvent): Promise<UsageEvent> {
+    await writeJson(this.root, `usage-events/${event.createdAt}-${event.id}.json`, event);
+    return event;
+  }
+
+  async delete(id: string): Promise<void> {
+    const files = await listFiles(this.root, 'usage-events');
+    const match = files.find(f => f.endsWith(`-${id}.json`));
+    if (match) await deleteEntry(this.root, `usage-events/${match}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Checklist — one array-file per case
 // ---------------------------------------------------------------------------
 
@@ -434,6 +460,7 @@ export function createFilesystemRepositories(root: FileSystemDirectoryHandle): R
     notifications: new FsNotificationRepository(root),
     teamMembers: new FsTeamMemberRepository(root),
     activity: new FsActivityRepository(root),
+    usage: new FsUsageRepository(root),
     checklist: new FsChecklistRepository(root),
     documentTypes: new FsDocumentTypeRepository(root),
     chat: new FsChatRepository(root),

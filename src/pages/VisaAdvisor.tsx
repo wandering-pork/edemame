@@ -51,10 +51,18 @@ interface EligibilityReport {
   suggestedTemplateKeyword: string;
 }
 
+interface EligibilityUsage {
+  promptTokens: number;
+  candidatesTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+}
+
 interface VisaAdvisorProps {
   clients: Client[];
   templates: WorkflowTemplate[];
   onOpenNewCase: (templateKeyword: string) => void;
+  onEligibilityChecked?: (usage: EligibilityUsage) => void;
 }
 
 // Verdict language per design spec: Strong match (green) / Possible (amber) / Unlikely (red),
@@ -133,6 +141,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   clients,
   templates,
   onOpenNewCase,
+  onEligibilityChecked,
 }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -201,9 +210,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
       });
 
       if (!response.ok) throw new Error('Failed to check eligibility');
-      const data: EligibilityReport = await response.json();
-      setReport(data);
+      const data: { result: EligibilityReport; usage: EligibilityUsage | null } = await response.json();
+      setReport(data.result);
       setWizardState((prev) => ({ ...prev, step: 'report' }));
+      if (data.usage) onEligibilityChecked?.(data.usage);
     } catch (error) {
       alert('Error: Could not assess eligibility. Please try again.');
     } finally {

@@ -54,6 +54,23 @@ export interface ActivityEvent {
   createdAt: string; // ISO
 }
 
+export type UsageEventType = 'eligibility_check' | 'case_created' | 'client_created' | 'team_member_added';
+
+export interface UsageEvent {
+  id: string;
+  userId: string;
+  type: UsageEventType;
+  metadata?: {
+    visaSubclass?: string;       // case_created
+    templateId?: string;         // case_created
+    promptTokens?: number;       // eligibility_check
+    candidatesTokens?: number;   // eligibility_check
+    totalTokens?: number;        // eligibility_check
+    estimatedCostUsd?: number;   // eligibility_check (placeholder pricing, see api/_lib/aiPricing.ts)
+  };
+  createdAt: string; // ISO
+}
+
 export interface WorkflowStep {
   title: string;
   description: string;

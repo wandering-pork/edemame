@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Theme } from '../types';
-import { Moon, Sun, Save, Check, Palette, LogOut, FolderCog, AlertTriangle, Cloud, HardDrive } from 'lucide-react';
+import { Theme, UsageEvent } from '../types';
+import { Moon, Sun, Save, Check, Palette, LogOut, FolderCog, AlertTriangle, Cloud, HardDrive, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useLocalFolder } from '@/contexts/LocalFolderContext';
@@ -39,7 +39,31 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
   const [switchingMode, setSwitchingMode] = useState(false);
   const [switchProgress, setSwitchProgress] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
+  const [usageEvents, setUsageEvents] = useState<UsageEvent[] | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    repositories.usage.getAll().then(events => {
+      if (!cancelled) setUsageEvents(events);
+    }).catch(() => {
+      if (!cancelled) setUsageEvents([]);
+    });
+    return () => { cancelled = true; };
+  }, [repositories]);
+
+  const usageStats = React.useMemo(() => {
+    const events = usageEvents ?? [];
+    const eligibilityEvents = events.filter(e => e.type === 'eligibility_check');
+    return {
+      casesCreated: events.filter(e => e.type === 'case_created').length,
+      clientsCreated: events.filter(e => e.type === 'client_created').length,
+      teamMembersAdded: events.filter(e => e.type === 'team_member_added').length,
+      eligibilityChecks: eligibilityEvents.length,
+      totalTokens: eligibilityEvents.reduce((sum, e) => sum + (e.metadata?.totalTokens ?? 0), 0),
+      estimatedCostUsd: eligibilityEvents.reduce((sum, e) => sum + (e.metadata?.estimatedCostUsd ?? 0), 0),
+    };
+  }, [usageEvents]);
 
   // Lightweight post-copy sanity check: the highest-value entities must have the
   // same number of records on both sides before we flip storageMode. Returns an
@@ -431,6 +455,40 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
               <span>{switchError}</span>
             </div>
           )}
+        </div>
+
+        {/* Usage section */}
+        <div className="mt-6 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 dark:text-edamame-400 flex items-center justify-center">
+              <BarChart3 size={16} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white">Usage</h2>
+              <p className="text-xs text-gray-400 dark:text-slate-500">A summary of your activity on this account.</p>
+            </div>
+          </div>
+          <div className="p-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {[
+              { label: 'Cases created', value: usageStats.casesCreated },
+              { label: 'Clients created', value: usageStats.clientsCreated },
+              { label: 'Team members added', value: usageStats.teamMembersAdded },
+              { label: 'Eligibility checks run', value: usageStats.eligibilityChecks },
+              { label: 'Gemini tokens used', value: usageStats.totalTokens.toLocaleString() },
+              { label: 'Estimated AI cost', value: `$${usageStats.estimatedCostUsd.toFixed(2)}` },
+            ].map(stat => (
+              <div key={stat.label} className="rounded-lg bg-gray-50 dark:bg-slate-800/60 p-4">
+                <div className="text-xl font-extrabold text-gray-900 dark:text-white">
+                  {usageEvents === null ? '—' : stat.value}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="px-6 pb-5 -mt-2 flex items-start gap-1.5 text-xs text-gray-400 dark:text-slate-500">
+            <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+            <span>Estimated AI cost is a placeholder ($0.00) until real Gemini pricing is configured — token counts above are accurate.</span>
+          </div>
         </div>
 
         {/* Account section */}
