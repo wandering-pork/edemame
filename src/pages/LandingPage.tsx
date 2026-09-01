@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Sparkles, Briefcase, FileText, ScanLine, Users, Globe, ArrowRight } from 'lucide-react';
+import { Sparkles, Briefcase, FileText, ScanLine, Users, Globe, ArrowRight, Blocks, ClockAlert, UserX } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Lightweight, no-AI personalization: swaps the hero headline/subhead based on
@@ -29,9 +29,9 @@ function isAudience(value: string | null): value is Audience {
 }
 
 const problems = [
-  { title: 'Fragmented Tools', text: 'Immigration practitioners juggle multiple disconnected systems with no single source of truth.' },
-  { title: 'Manual Task Planning', text: 'Hours spent creating task schedules for each case manually, prone to errors and missed deadlines.' },
-  { title: 'No Client Self-Service', text: "Clients can't check their case status or upload documents themselves, creating constant back-and-forth." },
+  { icon: Blocks, title: 'Fragmented Tools', text: 'Immigration practitioners juggle multiple disconnected systems with no single source of truth.' },
+  { icon: ClockAlert, title: 'Manual Task Planning', text: 'Hours spent creating task schedules for each case manually, prone to errors and missed deadlines.' },
+  { icon: UserX, title: 'No Client Self-Service', text: "Clients can't check their case status or upload documents themselves, creating constant back-and-forth." },
 ];
 
 const features = [
@@ -385,11 +385,14 @@ export default function LandingPage() {
       <section className="bg-gray-50 border-y border-gray-100 py-16 md:py-[70px] px-6 md:px-8">
         <div className="max-w-[1040px] mx-auto">
           <h2 className="text-2xl md:text-[30px] font-extrabold tracking-[-0.03em] text-center text-gray-900">The Problem</h2>
-          <div className="grid md:grid-cols-3 gap-4 mt-9">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-9">
             {problems.map((p) => (
-              <div key={p.title} className="bg-white border border-gray-100 rounded-xl shadow-sm p-[22px]">
-                <div className="text-[14.5px] font-bold tracking-[-0.015em] text-gray-900">{p.title}</div>
-                <div className="text-[12.5px] text-gray-500 leading-relaxed mt-2">{p.text}</div>
+              <div key={p.title} className="card-lift bg-white border border-gray-100 rounded-xl shadow-sm p-[22px]">
+                <div className="w-[34px] h-[34px] rounded-[10px] bg-red-50 text-red-500 flex items-center justify-center">
+                  <p.icon className="w-[18px] h-[18px]" strokeWidth={1.8} />
+                </div>
+                <div className="text-[14.5px] font-bold tracking-[-0.015em] text-gray-900 mt-3.5">{p.title}</div>
+                <div className="text-[12.5px] text-gray-500 leading-relaxed mt-1.5">{p.text}</div>
               </div>
             ))}
           </div>
@@ -403,14 +406,21 @@ export default function LandingPage() {
           <p className="text-[13.5px] text-gray-500 text-center mt-2">
             A complete platform built specifically for immigration professionals.
           </p>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mt-9">
-            {features.map((f) => (
-              <div key={f.title} className="card-lift bg-white border border-gray-100 rounded-xl shadow-sm p-[22px]">
-                <div className="w-[34px] h-[34px] rounded-[10px] bg-edamame-50 text-edamame-500 flex items-center justify-center">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-9">
+            {features.map((f, i) => (
+              <div
+                key={f.title}
+                className={`card-lift bg-white border border-gray-100 rounded-xl shadow-sm p-[22px] ${
+                  i === 0 ? 'sm:col-span-2 lg:col-span-2 flex flex-col sm:flex-row sm:items-center gap-4' : ''
+                }`}
+              >
+                <div className="w-[34px] h-[34px] rounded-[10px] bg-edamame-50 text-edamame-500 flex items-center justify-center flex-shrink-0">
                   <f.icon className="w-[18px] h-[18px]" strokeWidth={1.8} />
                 </div>
-                <div className="text-[14.5px] font-bold tracking-[-0.015em] text-gray-900 mt-3.5">{f.title}</div>
-                <div className="text-[12.5px] text-gray-500 leading-relaxed mt-1.5">{f.text}</div>
+                <div>
+                  <div className="text-[14.5px] font-bold tracking-[-0.015em] text-gray-900 mt-3.5 sm:mt-0">{f.title}</div>
+                  <div className="text-[12.5px] text-gray-500 leading-relaxed mt-1.5">{f.text}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -418,8 +428,9 @@ export default function LandingPage() {
       </section>
 
       {/* See It In Action */}
-      <section className="py-16 md:py-[70px] px-6 md:px-8">
-        <div className="max-w-[1100px] mx-auto">
+      <section className="relative overflow-hidden py-16 md:py-[70px] px-6 md:px-8">
+        <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[500px] rounded-full bg-[radial-gradient(ellipse,rgba(41,183,103,0.07)_0%,rgba(41,183,103,0)_65%)]" />
+        <div className="relative max-w-[1100px] mx-auto">
           <h2 className="text-2xl md:text-[30px] font-extrabold tracking-[-0.03em] text-center text-gray-900">See It In Action</h2>
           <p className="text-[13.5px] text-gray-500 text-center mt-2">A quick look at the workspace your team will actually use.</p>
 
@@ -444,7 +455,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-gray-100 shadow-lg overflow-hidden">
+          <div className="mt-6 rounded-2xl shadow-[0_0_0_1px_rgba(41,183,103,0.15),0_24px_60px_-16px_rgba(17,24,39,0.18)] overflow-hidden">
             <div className="overflow-x-auto">
               {activePreview === 'dashboard' ? <DashboardPreview /> : <VisaAdvisorPreview />}
             </div>
@@ -474,23 +485,26 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Band */}
-      <section className="bg-edamame-500 py-16 md:py-[70px] px-6 md:px-8 text-center">
-        <h2 className="text-2xl md:text-[30px] font-extrabold tracking-[-0.03em] text-white">
-          Ready to Transform Your Practice?
-        </h2>
-        <p className="text-sm text-white/85 leading-relaxed max-w-[520px] mx-auto mt-3.5">
-          Join immigration professionals who are saving hours every week with AI-powered task management.
-        </p>
-        <Link
-          to={user ? '/dashboard' : '/register'}
-          className="btn-press mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-[11px] bg-white hover:bg-edamame-50 text-edamame-600 text-sm font-bold transition-colors"
-        >
-          {user ? 'Go to Dashboard' : 'Get Started'} <ArrowRight className="w-4 h-4" />
-        </Link>
+      <section className="relative overflow-hidden bg-[linear-gradient(160deg,#0A0F0C_0%,#0F2118_55%,#0B0C0E_100%)] py-16 md:py-[70px] px-6 md:px-8 text-center">
+        <div className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[640px] h-[420px] rounded-full bg-[radial-gradient(ellipse,rgba(41,183,103,0.3)_0%,rgba(41,183,103,0)_65%)]" />
+        <div className="relative">
+          <h2 className="text-2xl md:text-[30px] font-extrabold tracking-[-0.03em] text-white">
+            Ready to Transform Your Practice?
+          </h2>
+          <p className="text-sm text-white/60 leading-relaxed max-w-[520px] mx-auto mt-3.5">
+            Join immigration professionals who are saving hours every week with AI-powered task management.
+          </p>
+          <Link
+            to={user ? '/dashboard' : '/register'}
+            className="btn-press mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-[11px] bg-edamame-500 hover:bg-edamame-600 text-white text-sm font-bold transition-colors shadow-[0_0_0_1px_rgba(41,183,103,0.4),0_14px_34px_-8px_rgba(41,183,103,0.55)]"
+          >
+            {user ? 'Go to Dashboard' : 'Get Started'} <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-6 px-6 text-center text-[11.5px] text-gray-400">
+      <footer className="bg-[#0B0C0E] py-6 px-6 text-center text-[11.5px] text-white/35 border-t border-white/10">
         &copy; 2026 Edamame Legal Flow. All rights reserved.
       </footer>
     </div>
