@@ -1,7 +1,32 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Sparkles, Briefcase, FileText, ScanLine, Users, Globe, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Lightweight, no-AI personalization: swaps the hero headline/subhead based on
+// a `?for=` query param (e.g. an ad campaign link), so different audiences see
+// copy that speaks to them without any server round-trip.
+type Audience = 'lawyer' | 'agency';
+
+const AUDIENCE_COPY: Record<Audience, { headline: string; sub: string }> = {
+  lawyer: {
+    headline: 'AI-Powered Case Management for Immigration Law Firms',
+    sub: 'Replace fragmented tools with intelligent automation built for AU/NZ practices. Manage cases, generate task schedules, and keep every visa subclass on track.',
+  },
+  agency: {
+    headline: 'AI-Powered Case Management for Study Abroad Agencies',
+    sub: 'Give students a self-service portal while AI handles the task schedules behind the scenes — from application to visa approval.',
+  },
+};
+
+const DEFAULT_COPY = {
+  headline: 'AI-Powered Case Management for Immigration Professionals',
+  sub: 'Replace fragmented tools with intelligent automation. Describe a case, select a workflow, and let AI generate your task schedule.',
+};
+
+function isAudience(value: string | null): value is Audience {
+  return value === 'lawyer' || value === 'agency';
+}
 
 const problems = [
   { title: 'Fragmented Tools', text: 'Immigration practitioners juggle multiple disconnected systems with no single source of truth.' },
@@ -26,6 +51,9 @@ const hiw = [
 
 export default function LandingPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const audienceParam = searchParams.get('for');
+  const { headline, sub } = isAudience(audienceParam) ? AUDIENCE_COPY[audienceParam] : DEFAULT_COPY;
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -65,10 +93,10 @@ export default function LandingPage() {
       {/* Hero */}
       <div className="max-w-[1040px] mx-auto px-6 md:px-8 pt-20 md:pt-[90px] pb-20 md:pb-[100px] text-center">
         <h1 className="text-4xl md:text-[52px] font-extrabold tracking-[-0.04em] leading-[1.06] text-balance text-gray-900">
-          AI-Powered Case Management for Immigration Professionals
+          {headline}
         </h1>
         <p className="text-base text-gray-500 leading-relaxed max-w-[560px] mx-auto mt-5">
-          Replace fragmented tools with intelligent automation. Describe a case, select a workflow, and let AI generate your task schedule.
+          {sub}
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
           <Link
