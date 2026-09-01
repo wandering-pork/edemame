@@ -125,6 +125,74 @@ function DashboardPreview() {
   );
 }
 
+// Denser hero visual (sidebar sliver + stat header + task rows + trend chart +
+// a floating "AI toast" badge) — the same illustrative recreation as
+// DashboardPreview above, purpose-built at hero card size instead of the wide
+// "See It In Action" screenshot width.
+function HeroPreviewCard() {
+  return (
+    <div className="relative w-full max-w-[480px] mx-auto pt-7 sm:pt-8">
+      {/* floating AI-toast badge — decorative, hidden on very small screens to avoid overflow/clutter */}
+      <div className="hidden sm:flex absolute -top-1 left-2 z-10 w-[220px] items-center gap-2.5 rounded-[14px] bg-white p-3 shadow-[0_18px_34px_-10px_rgba(0,0,0,0.5)] ring-1 ring-edamame-500/20 rotate-3">
+        <div className="w-[30px] h-[30px] rounded-[9px] bg-edamame-50 flex items-center justify-center flex-shrink-0">
+          <Sparkles className="w-3.5 h-3.5 text-edamame-500" strokeWidth={2} />
+        </div>
+        <div>
+          <div className="text-[11.5px] font-bold text-gray-900">Tasks generated</div>
+          <div className="text-[10.5px] text-gray-400 mt-0.5">Partner Visa 820 · just now</div>
+        </div>
+      </div>
+
+      <div className="rounded-[20px] bg-white shadow-[0_0_0_1px_rgba(41,183,103,0.25),0_30px_70px_-14px_rgba(0,0,0,0.55),0_0_60px_-10px_rgba(41,183,103,0.35)] -rotate-1 flex overflow-hidden">
+        {/* sidebar sliver */}
+        <div className="w-11 bg-gray-50 border-r border-gray-100 flex flex-col items-center gap-4 py-4 flex-shrink-0">
+          <div className="w-5 h-5 rounded-[6px] bg-edamame-500" />
+          <div className="w-4 h-4 rounded-[5px] bg-gray-200" />
+          <div className="w-4 h-4 rounded-[5px] bg-gray-200" />
+          <div className="w-4 h-4 rounded-[5px] bg-gray-200" />
+        </div>
+
+        <div className="flex-1 p-5">
+          <div className="flex items-center justify-between mb-3.5">
+            <div className="text-[13px] font-bold text-gray-900">Active Cases</div>
+            <div className="text-[11px] font-bold text-amber-700 bg-amber-500/[.14] px-2.5 py-0.5 rounded-full">12 Open</div>
+          </div>
+
+          <div className="flex flex-col">
+            {[
+              { title: 'Partner Visa 820', sub: 'Due in 4 days', pct: '68%', dot: 'bg-edamame-500', pctColor: 'text-edamame-600' },
+              { title: 'Student 500', sub: 'Awaiting documents', pct: '32%', dot: 'bg-amber-500', pctColor: 'text-amber-600' },
+              { title: 'Skilled 190', sub: 'In review', pct: '54%', dot: 'bg-blue-500', pctColor: 'text-blue-600' },
+            ].map((row, i) => (
+              <div key={row.title} className={`flex items-center gap-3 py-2.5 ${i < 2 ? 'border-b border-gray-100' : ''}`}>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${row.dot}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12.5px] font-semibold text-gray-900 truncate">{row.title}</div>
+                  <div className="text-[10.5px] text-gray-400 mt-0.5">{row.sub}</div>
+                </div>
+                <div className={`text-[11.5px] font-bold ${row.pctColor}`}>{row.pct}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 pt-3.5 border-t border-gray-100">
+            <div className="text-[10.5px] font-semibold text-gray-400 mb-2">Tasks completed this week</div>
+            <div className="flex items-end gap-1.5 h-[38px]">
+              {[40, 65, 50, 85, 70, 100, 60].map((h, i) => (
+                <div
+                  key={i}
+                  className="flex-1 rounded-[3px]"
+                  style={{ height: `${h}%`, background: i === 5 ? '#29B767' : i % 2 === 0 ? '#def9e6' : '#8ee4ae' }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const visaVerdicts = [
   {
     name: 'Student Visa',
@@ -215,12 +283,12 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900">
       {/* Navbar */}
-      <nav className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-10 py-3.5 bg-white/90 backdrop-blur border-b border-gray-100">
+      <nav className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 md:px-10 py-3.5 bg-[#0B0C0E]/90 backdrop-blur border-b border-white/10">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-edamame-500 flex items-center justify-center text-white font-black text-[13px]">
             E
           </div>
-          <span className="font-black text-sm tracking-tight">EDAMAME</span>
+          <span className="font-black text-sm tracking-tight text-white">EDAMAME</span>
         </div>
         {user ? (
           <Link
@@ -230,10 +298,10 @@ export default function LandingPage() {
             Go to Dashboard
           </Link>
         ) : (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <Link
               to="/login"
-              className="text-[12.5px] font-semibold text-gray-600 hover:text-edamame-600 transition-colors"
+              className="text-[12.5px] font-semibold text-white/65 hover:text-white transition-colors"
             >
               Log in
             </Link>
@@ -248,30 +316,68 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <div className="max-w-[1040px] mx-auto px-6 md:px-8 pt-20 md:pt-[90px] pb-20 md:pb-[100px] text-center">
-        <h1 className="text-4xl md:text-[52px] font-extrabold tracking-[-0.04em] leading-[1.06] text-balance text-gray-900">
-          {headline}
-        </h1>
-        <p className="text-base text-gray-500 leading-relaxed max-w-[560px] mx-auto mt-5">
-          {sub}
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
-          <Link
-            to={user ? '/dashboard' : '/register'}
-            className="btn-press px-6 py-3 rounded-[11px] bg-edamame-500 hover:bg-edamame-600 text-white text-sm font-bold transition-colors inline-flex items-center gap-2"
-          >
-            {user ? 'Go to Dashboard' : 'Get Started'} <ArrowRight className="w-4 h-4" />
-          </Link>
-          <a
-            href="#features"
-            onClick={(e) => {
-              e.preventDefault();
-              document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="btn-press px-6 py-3 rounded-[11px] border border-gray-200 text-gray-600 hover:border-edamame-500 hover:text-edamame-600 text-sm font-semibold transition-colors"
-          >
-            Learn More
-          </a>
+      <div className="relative overflow-hidden bg-[linear-gradient(160deg,#0A0F0C_0%,#0F2118_55%,#0B0C0E_100%)]">
+        {/* glow mesh */}
+        <div className="pointer-events-none absolute -top-40 -right-32 w-[560px] h-[560px] sm:w-[760px] sm:h-[760px] rounded-full bg-[radial-gradient(circle,rgba(41,183,103,0.38)_0%,rgba(41,183,103,0)_62%)]" />
+        <div className="pointer-events-none absolute -bottom-48 -left-36 w-[500px] h-[500px] sm:w-[680px] sm:h-[680px] rounded-full bg-[radial-gradient(circle,rgba(86,206,133,0.20)_0%,rgba(86,206,133,0)_60%)]" />
+        {/* fine dot-grid texture */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-50"
+          style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '26px 26px' }}
+        />
+
+        <div className="relative grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-14 items-center max-w-[1180px] mx-auto px-6 md:px-10 pt-14 md:pt-24 pb-16 md:pb-24">
+          {/* Left: copy */}
+          <div className="flex flex-col items-center md:items-start text-center md:text-left">
+            <div className="inline-flex items-center gap-[7px] px-3 py-1.5 rounded-full bg-edamame-500/10 border border-edamame-500/30 mb-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#3ECB7A]" />
+              <span className="text-[11px] font-bold tracking-[0.06em] text-[#6EDE9A] uppercase">AI Case Management</span>
+            </div>
+
+            <h1 className="text-4xl md:text-[46px] font-extrabold tracking-[-0.03em] leading-[1.08] text-balance text-white max-w-[560px]">
+              {headline}
+            </h1>
+            <p className="text-base text-white/60 leading-relaxed max-w-[460px] mt-4">
+              {sub}
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 mt-8">
+              <Link
+                to={user ? '/dashboard' : '/register'}
+                className="btn-press px-6 py-3 rounded-[11px] bg-edamame-500 hover:bg-edamame-600 text-white text-sm font-bold transition-colors inline-flex items-center gap-2 shadow-[0_0_0_1px_rgba(41,183,103,0.4),0_14px_34px_-8px_rgba(41,183,103,0.55)]"
+              >
+                {user ? 'Go to Dashboard' : 'Get Started'} <ArrowRight className="w-4 h-4" />
+              </Link>
+              <a
+                href="#features"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="btn-press px-6 py-3 rounded-[11px] border border-white/20 text-white/80 hover:border-white/40 hover:text-white text-sm font-semibold transition-colors"
+              >
+                Learn More
+              </a>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-5 gap-y-2 mt-8 pt-6 border-t border-white/10 w-full">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-[15px] h-[15px] text-[#6EDE9A]" strokeWidth={2} />
+                <span className="text-xs font-semibold text-white/55">AI task generation</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Globe className="w-[15px] h-[15px] text-[#6EDE9A]" strokeWidth={2} />
+                <span className="text-xs font-semibold text-white/55">AU + NZ jurisdictions</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <FileText className="w-[15px] h-[15px] text-[#6EDE9A]" strokeWidth={2} />
+                <span className="text-xs font-semibold text-white/55">5 visa templates</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: product visual */}
+          <HeroPreviewCard />
         </div>
       </div>
 
