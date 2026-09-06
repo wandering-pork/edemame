@@ -10,9 +10,9 @@ import { useRepositories } from '../contexts/RepositoryContext';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
 import {
   classifyKind, kindLabel, compressDocument, suggestOutputName, validateOutputNames,
-  DOHA_MAX_BYTES, formatBytes, type CompressOutcome,
+  DOHA_MAX_BYTES, formatBytes, exceedsCaseFilesLimit, type CompressOutcome,
 } from '../lib/autoPackager';
-import { ACCEPTED_DOCUMENT_EXTENSIONS, SUPPORTED_FORMATS_LABEL, isSupportedDocumentFile } from '../lib/supportedFormats';
+import { ACCEPTED_DOCUMENT_EXTENSIONS, SUPPORTED_FORMATS_LABEL, isSupportedDocumentFile, CASE_FILES_MAX_BYTES } from '../lib/supportedFormats';
 
 /**
  * Auto-Packager — the full flow from issue #2 (extended per the Case Files
@@ -123,6 +123,8 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
   const [finalized, setFinalized] = useState(false);
   /** docIds already written by a (possibly partial/failed) finalize() run — makes retries idempotent. */
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  /** Output names skipped by the last finalize() run because they're still over Case Files' 50 MB ceiling. */
+  const [skippedTooLarge, setSkippedTooLarge] = useState<string[]>([]);
 
   const sourceDocs = source === 'local' ? localDocs : documents;
   const docsById = useMemo(() => new Map([...documents, ...localDocs].map(d => [d.id, d])), [documents, localDocs]);
@@ -299,6 +301,8 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
   }, [results, docsById]);
 
   const flaggedCount = resultList.filter(r => r.outcome.flagged).length;
+  /** Case Files enforces its own 50 MB ceiling on every upload (DocumentUpload.tsx) — never bypass it via the packager's save path. */
+  const oversizedForSave = useMemo(() => resultList.filter(r => exceedsCaseFilesLimit(r.outcome.bytes.length, CASE_FILES_MAX_BYTES)), [resultList]);
 
   // ---- Naming (Phase 4) ----
 
@@ -317,8 +321,10 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
     }
     setFinalizing(true);
     setFinalError(null);
+    setSkippedTooLarge([]);
     try {
       const items = resultList;
+      const skipped: string[] = [];
       for (const item of items) {
         // Idempotency: skip anything a previous (partially-failed) run already
         // wrote, so retrying after an error doesn't duplicate saved files.
@@ -326,6 +332,15 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
         const doc = docsById.get(item.docId);
         if (!doc) continue;
         const blob = new Blob([item.outcome.bytes], { type: item.outcome.mimeType });
+        if (outputMode === 'save' && exceedsCaseFilesLimit(blob.size, CASE_FILES_MAX_BYTES)) {
+          // Case Files rejects anything over 50 MB at the normal upload
+          // dropzone (DocumentUpload.tsx) — a file the packager couldn't
+          // shrink enough must never bypass that gate just by going through
+          // this "save" path instead. Skip it and tell the agent so they can
+          // download it and compress/split it manually.
+          skipped.push(item.outputName);
+          continue;
+        }
         if (outputMode === 'save') {
           const outDoc: Document = {
             id: uuidv4(),
@@ -357,7 +372,8 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
         setCompletedIds(prev => new Set(prev).add(item.docId));
       }
       setFinalized(true);
-      if (outputMode === 'save') onSaved?.();
+      setSkippedTooLarge(skipped);
+      if (outputMode === 'save' && skipped.length < items.length) onSaved?.();
     } catch (err) {
       setFinalError(err instanceof Error ? err.message : 'Packaging failed. Please try again.');
     } finally {
@@ -372,6 +388,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
       setFinalized(false);
       setFinalError(null);
       setCompletedIds(new Set());
+      setSkippedTooLarge([]);
     }
   }, [phase]);
 
@@ -692,6 +709,31 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                 </button>
               </div>
 
+              {outputMode === 'save' && oversizedForSave.length > 0 && !finalized && (
+                <div className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2.5">
+                  <FileWarning size={16} className="flex-shrink-0 mt-0.5" />
+                  <span>
+                    {oversizedForSave.length === 1
+                      ? `"${oversizedForSave[0].outputName}" is`
+                      : `${oversizedForSave.length} files are`}{' '}
+                    still over {formatBytes(CASE_FILES_MAX_BYTES)} after compression — Case Files can't accept{' '}
+                    {oversizedForSave.length === 1 ? 'it' : 'them'}, so {oversizedForSave.length === 1 ? "it'll" : "they'll"} be skipped.
+                    Download {oversizedForSave.length === 1 ? 'it' : 'them'} instead, or go back and split the content further.
+                  </span>
+                </div>
+              )}
+
+              {skippedTooLarge.length > 0 && (
+                <div className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2.5">
+                  <FileWarning size={16} className="flex-shrink-0 mt-0.5" />
+                  <span>
+                    {skippedTooLarge.length === 1 ? `"${skippedTooLarge[0]}" was` : `${skippedTooLarge.length} files were`}{' '}
+                    not added to Case Files — still over {formatBytes(CASE_FILES_MAX_BYTES)}. Switch to "Download to my computer" for{' '}
+                    {skippedTooLarge.length === 1 ? 'it' : 'them'}, or go back and split the content further.
+                  </span>
+                </div>
+              )}
+
               {finalError && (
                 <div className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2.5">
                   <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
@@ -699,10 +741,12 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                 </div>
               )}
 
-              {finalized && (
+              {finalized && skippedTooLarge.length < resultList.length && (
                 <div className="flex items-center gap-2 text-sm text-edamame-700 dark:text-edamame-400 bg-edamame-50 dark:bg-edamame-500/10 rounded-lg px-3 py-2.5">
                   <CheckCircle size={16} className="flex-shrink-0" />
-                  {outputMode === 'save' ? 'All files saved to this case’s Documents tab.' : 'All files downloaded.'}
+                  {skippedTooLarge.length > 0
+                    ? `Remaining files ${outputMode === 'save' ? "saved to this case's Documents tab" : 'downloaded'}.`
+                    : outputMode === 'save' ? 'All files saved to this case’s Documents tab.' : 'All files downloaded.'}
                 </div>
               )}
             </div>
