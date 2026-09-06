@@ -18,8 +18,6 @@ import { TeamDashboard } from './pages/TeamDashboard';
 import { TeamMembers } from './pages/TeamMembers';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
-import Login from './pages/Login';
-import Register from './pages/Register';
 import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote, UsageEvent } from './types';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
@@ -793,8 +791,11 @@ const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
-      <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
+      {/* Auth lives inside the landing page: /login opens its log-in sheet and
+          /register scrolls to the account form. The routes are kept so existing
+          redirects (ProtectedRoute, sign-out) and shared links still work. */}
+      <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+      <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/*" element={
           <ProfileProvider>

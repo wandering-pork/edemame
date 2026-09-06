@@ -49,11 +49,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700;800;900&family=Archivo+Black&display=swap" rel="stylesheet">
-    <!-- Fraunces: display face used only by the LandingPage marketing page
-         (src/pages/LandingPage.tsx), which is set as a chaptered editorial
-         spread. Body copy there uses Archivo, the brand face loaded above, so
-         the page stays at two families. Nothing else in the app loads Fraunces. -->
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet">
+    <!-- Instrument Serif (display) and IBM Plex Mono (data) are used only by the
+         LandingPage marketing page (src/pages/LandingPage.tsx), which is set as a
+         chaptered editorial spread. Its three type roles are deliberate: serif
+         for display, Archivo (the brand face, loaded above) for prose and UI, and
+         mono strictly for machine-readable values — subclass codes, document type
+         codes, day offsets, file paths, docket numbers. Nothing else in the app
+         loads either face. Instrument Serif ships one weight (400) plus italic,
+         so display headings there are set at 400, never synthesised bold. -->
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
       /* Global brand overrides */
       .text-green-600 { color: #29B767 !important; }

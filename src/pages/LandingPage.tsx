@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 /**
@@ -95,10 +95,18 @@ const CHAPTERS: Chapter[] = [
   { id: 'advisor', numeral: 'I', short: 'Advisor', title: 'AI Visa Advisor' },
   { id: 'planner', numeral: 'II', short: 'Planner', title: 'AI Task Planner' },
   { id: 'local', numeral: 'III', short: 'On disk', title: 'Local storage' },
-  { id: 'cloud', numeral: 'IV', short: 'In the cloud', title: 'Cloud storage' },
-  { id: 'team', numeral: 'V', short: 'Together', title: 'Team and attachments' },
-  { id: 'faq', numeral: 'VI', short: 'Questions', title: 'Questions worth asking' },
+  { id: 'cloud', numeral: 'IV', short: 'In cloud', title: 'Cloud storage' },
+  { id: 'team', numeral: 'V', short: 'Your team', title: 'Team and attachments' },
+  { id: 'faq', numeral: 'VI', short: 'Questions', title: 'Common questions' },
 ];
+
+/**
+ * The last chapter is the account form itself, so the page ends where you
+ * start rather than handing off to a separate screen. Hidden once signed in.
+ */
+const START_CHAPTER: Chapter = { id: 'start', numeral: 'VII', short: 'Start', title: 'Create your account' };
+
+const NAME_MAX_LENGTH = 100;
 
 /* ------------------------------------------------------------------ hooks */
 
@@ -120,19 +128,191 @@ function useMediaQuery(query: string) {
 /* -------------------------------------------------------------- component */
 
 export default function LandingPage() {
-  const { user } = useAuth();
+  const { user, signIn, signUp, resetPassword } = useAuth();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const audienceParam = searchParams.get('for');
   const audienceLine = isAudience(audienceParam) ? AUDIENCE_LINE[audienceParam] : DEFAULT_LINE;
 
   const reduced = useMediaQuery('(prefers-reduced-motion: reduce)');
   const finePointer = useMediaQuery('(hover: hover) and (pointer: fine)');
 
-  const ctaHref = user ? '/dashboard' : '/register';
-  const ctaLabel = user ? 'Go to Dashboard' : 'Get started';
+  const chapters = useMemo(() => (user ? CHAPTERS : [...CHAPTERS, START_CHAPTER]), [user]);
 
   const [activeChapter, setActiveChapter] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  /* ---------------------------------------------------------------- auth */
+  // Where ProtectedRoute wanted to send them before it bounced them here.
+  const from = (location.state as { from?: string } | null)?.from || '/dashboard';
+
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const sheetOpenerRef = useRef<HTMLElement | null>(null);
+
+  const [inEmail, setInEmail] = useState('');
+  const [inPassword, setInPassword] = useState('');
+  const [inBusy, setInBusy] = useState(false);
+  const [inError, setInError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
+
+  const [firstName, setFirstName] = useState('');
+  const [surname, setSurname] = useState('');
+  const [company, setCompany] = useState('');
+  const [upEmail, setUpEmail] = useState('');
+  const [upPassword, setUpPassword] = useState('');
+  const [upConfirm, setUpConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [upBusy, setUpBusy] = useState(false);
+  const [upError, setUpError] = useState<string | null>(null);
+  const [confirmSentTo, setConfirmSentTo] = useState<string | null>(null);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+
+  const openSheet = useCallback((e?: React.MouseEvent<HTMLElement>) => {
+    sheetOpenerRef.current = (e?.currentTarget as HTMLElement) ?? null;
+    setInError(null);
+    setResetSent(false);
+    setSheetOpen(true);
+  }, []);
+
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    // hand focus back to whatever opened it
+    sheetOpenerRef.current?.focus();
+    sheetOpenerRef.current = null;
+  }, []);
+
+  const handleLogIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setInError(null);
+    setInBusy(true);
+    const { error } = await signIn(inEmail, inPassword);
+    setInBusy(false);
+    if (error) {
+      setInError(error);
+      return;
+    }
+    navigate(from, { replace: true });
+  };
+
+  const handleResetLink = async () => {
+    if (!inEmail) {
+      setInError('Enter your email address above, then ask for the reset link.');
+      return;
+    }
+    setInError(null);
+    const { error } = await resetPassword(inEmail);
+    if (error) {
+      setInError(error);
+      return;
+    }
+    setResetSent(true);
+  };
+
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpError(null);
+
+    if (upPassword.length < 6) {
+      setUpError('Password must be at least 6 characters.');
+      return;
+    }
+    if (upPassword !== upConfirm) {
+      setUpError('The two passwords do not match.');
+      return;
+    }
+    const trimmedFirst = firstName.trim();
+    const trimmedSurname = surname.trim();
+    if (!trimmedFirst || !trimmedSurname) {
+      setUpError('First name and surname cannot be empty.');
+      return;
+    }
+
+    const fullName = `${trimmedFirst} ${trimmedSurname}`.trim();
+    const trimmedCompany = company.trim();
+
+    setUpBusy(true);
+    const { error, needsEmailConfirmation } = await signUp(upEmail, upPassword, fullName, {
+      company: trimmedCompany || undefined,
+    });
+    setUpBusy(false);
+
+    if (error) {
+      setUpError(error);
+      return;
+    }
+    if (needsEmailConfirmation) {
+      setConfirmSentTo(upEmail);
+      return;
+    }
+    navigate('/dashboard', { replace: true });
+  };
+
+  /* --- /login and /register keep working as deep links into this page --- */
+  useEffect(() => {
+    if (user) return;
+    if (location.pathname === '/login') {
+      sheetOpenerRef.current = null;
+      setSheetOpen(true);
+    } else if (location.pathname === '/register') {
+      const el = document.getElementById('start');
+      // .fl-ch carries scroll-margin-top below 1024px so the chapter clears the
+      // sticky folio strip.
+      el?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+      // preventScroll: focusing would otherwise scroll the field into view and
+      // undo the placement above, dropping the chapter heading under the strip.
+      window.setTimeout(
+        () => firstFieldRef.current?.focus({ preventScroll: true }),
+        reduced ? 0 : 420
+      );
+    }
+  }, [location.pathname, user, reduced]);
+
+  /* --- the sheet is a real dialog: Esc, focus trap, focus restore --- */
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const panel = sheetRef.current;
+    const selector =
+      'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
+    // Array.prototype.slice, not Array.from: under this project's tsconfig the
+    // latter widens a NodeList to unknown[].
+    const focusables = (): HTMLElement[] =>
+      panel ? (Array.prototype.slice.call(panel.querySelectorAll<HTMLElement>(selector)) as HTMLElement[]) : [];
+
+    // land on the first field, not the close button
+    (panel?.querySelector<HTMLElement>('input') ?? focusables()[0])?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSheet();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const nodes = focusables();
+      if (nodes.length === 0) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || !panel?.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [sheetOpen, closeSheet]);
 
   // scroll-driven nodes
   const heroRuleRef = useRef<HTMLSpanElement>(null);
@@ -284,7 +464,7 @@ export default function LandingPage() {
 
   /* --- the folio marks the chapter you are in --- */
   useEffect(() => {
-    const sections = CHAPTERS.map((c) => document.getElementById(c.id)).filter(Boolean) as HTMLElement[];
+    const sections = chapters.map((c) => document.getElementById(c.id)).filter(Boolean) as HTMLElement[];
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -295,7 +475,7 @@ export default function LandingPage() {
     );
     sections.forEach((s) => io.observe(s));
     return () => io.disconnect();
-  }, []);
+  }, [chapters]);
 
   /* --- Chapter V · the one place the page answers the pointer --- */
   const onTilt = useCallback(
@@ -314,6 +494,16 @@ export default function LandingPage() {
     if (tiltRef.current) tiltRef.current.style.transform = 'perspective(900px) rotateY(0deg) rotateX(0deg)';
   }, []);
 
+  // Signed out, every call to action points at the form on this page rather
+  // than at another screen; signed in, it points at the app.
+  const ctaLabel = user ? 'Go to Dashboard' : 'Create account';
+  const renderCta = (className: string) =>
+    user ? (
+      <Link className={className} to="/dashboard">{ctaLabel}</Link>
+    ) : (
+      <a className={className} href="#start">{ctaLabel}</a>
+    );
+
   const fileStyle = (i: number): React.CSSProperties => {
     if (reduced) return {};
     const f = CASE_FILES[i];
@@ -327,19 +517,33 @@ export default function LandingPage() {
     <div className="fl">
       <style>{`
         .fl {
-          --paper: #F4F5F1;
-          --paper-2: #E9ECE4;
-          --ink: #14181A;
-          --ink-soft: #5A6560;
-          --accent: #1E7A46;
-          --accent-2: #29B767;
-          --plate: #142019;
-          --rule: rgba(20,24,26,0.16);
-          --rule-soft: rgba(20,24,26,0.09);
-          --card: #FFFFFF;
-          --shadow: 0 18px 40px -26px rgba(20,32,25,0.45), 0 2px 6px -3px rgba(20,32,25,0.12);
-          --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+          /* Signal palette. The three verdict colours are the product's own
+             vocabulary (qualifies / possibly / unlikely), so they carry the
+             page's colour rather than one green doing every job. Each has a
+             -fill (backgrounds, bars, rules) and an -ink (text) value: the
+             bright greens read at ~2.6:1 as text and would fail, so anything
+             that has to be READ uses the deep variant. */
+          --paper: #F1F3EF;
+          --paper-2: #E7EBE4;
+          --card: #FAFAF7;
+          --ink: #101614;
+          --ink-soft: #56635C;
+          --accent: #12B76A;      /* fills only */
+          --accent-ink: #0B6B3F;  /* 5.9:1 on paper */
+          --accent-press: #0FA35E;
+          --signal-yes-fill: #12B76A;
+          --signal-yes-ink: #0B6B3F;
+          --signal-maybe-fill: #F5B324;
+          --signal-maybe-ink: #8F5A03;
+          --signal-no-fill: #EF5350;
+          --signal-no-ink: #B42318;
+          --plate: #0D1A13;
+          --rule: rgba(16,22,20,0.16);
+          --rule-soft: rgba(16,22,20,0.09);
+          --shadow: 0 18px 40px -26px rgba(16,32,24,0.45), 0 2px 6px -3px rgba(16,32,24,0.12);
+          --display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
           --text: 'Archivo', 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
+          --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
           --ease: cubic-bezier(0.23, 1, 0.32, 1);
           --rail: 208px;
           background: var(--paper);
@@ -348,8 +552,10 @@ export default function LandingPage() {
           position: relative;
         }
         .fl *, .fl *::before, .fl *::after { box-sizing: border-box; }
-        .fl ::selection { background: rgba(41,183,103,0.28); }
-        .fl :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+        .fl ::selection { background: rgba(18,183,106,0.26); }
+        /* focus ring uses the deep green: the bright fill green is 2.6:1 on
+           paper, too weak to be a reliable focus indicator */
+        .fl :focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 3px; border-radius: 3px; }
 
         /* ---------------------------------------------------------- folio */
         .fl-folio {
@@ -359,10 +565,10 @@ export default function LandingPage() {
           background: var(--paper);
         }
         .fl-folio__mark {
-          font-family: var(--display); font-weight: 700; font-size: 17px;
+          font-family: var(--display); font-weight: 400; font-size: 20px;
           letter-spacing: -0.01em; text-decoration: none; color: var(--ink);
         }
-        .fl-folio__mark span { color: var(--accent); }
+        .fl-folio__mark span { color: var(--accent-ink); }
         .fl-folio__list { list-style: none; margin: auto 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
         .fl-folio__link {
           display: grid; grid-template-columns: 26px 1fr; align-items: baseline; gap: 8px;
@@ -371,19 +577,25 @@ export default function LandingPage() {
           transition: color 140ms var(--ease);
         }
         .fl-folio__link em {
-          font-family: var(--display); font-style: normal; font-size: 12px;
-          letter-spacing: 0.06em; color: var(--ink-soft);
+          font-family: var(--mono); font-style: normal; font-size: 11px;
+          letter-spacing: 0.02em; color: var(--ink-soft);
           transition: color 140ms var(--ease);
         }
         .fl-folio__link:hover { color: var(--ink); }
         .fl-folio__link[aria-current="true"] { color: var(--ink); }
-        .fl-folio__link[aria-current="true"] em { color: var(--accent); }
+        .fl-folio__link[aria-current="true"] em { color: var(--accent-ink); }
         .fl-folio__link[aria-current="true"]::after {
-          content: ''; grid-column: 2; display: block; height: 1px; background: var(--accent);
+          content: ''; grid-column: 2; display: block; height: 1px; background: var(--accent-ink);
         }
         .fl-folio__foot { font-size: 12.5px; color: var(--ink-soft); line-height: 1.7; }
         .fl-folio__foot a { color: var(--ink); text-underline-offset: 3px; text-decoration-thickness: 1px; }
-        .fl-folio__foot a:hover { color: var(--accent); }
+        .fl-folio__foot a:hover { color: var(--accent-ink); }
+        .fl-folio__signin {
+          background: none; border: none; padding: 0; cursor: pointer;
+          font-family: var(--text); font-size: 12.5px; color: var(--ink);
+          text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
+        }
+        .fl-folio__signin:hover { color: var(--accent-ink); }
 
         .fl-topfolio { display: none; }
 
@@ -392,26 +604,33 @@ export default function LandingPage() {
         .fl-ch { padding: clamp(84px, 12vh, 150px) clamp(24px, 5vw, 84px); position: relative; }
         .fl-ch--paper { background: var(--paper); }
         .fl-ch--paper2 { background: var(--paper-2); }
+        /* The inverted spread re-points every token, including --accent-ink:
+           the deep green that carries text on paper is unreadable on plate, so
+           the "text" green here is a light one (12.3:1). */
         .fl-ch--plate {
           background: var(--plate);
-          --ink: #EDF2EC; --ink-soft: #9DB2A5; --rule: rgba(237,242,236,0.2);
-          --rule-soft: rgba(237,242,236,0.12); --accent: #55D68B; --card: #1B2A22;
+          --ink: #EDF2EC; --ink-soft: #A2B7AA; --rule: rgba(237,242,236,0.2);
+          --rule-soft: rgba(237,242,236,0.12);
+          --accent: #4FE09A; --accent-ink: #7CEBB4; --card: #17251E;
           color: #EDF2EC;
         }
         .fl-wrap { max-width: 1120px; margin: 0 auto; }
 
         .fl-open { display: flex; align-items: baseline; gap: 16px; margin-bottom: 30px; }
         .fl-open__num {
-          font-family: var(--display); font-size: 13px; letter-spacing: 0.16em;
-          text-transform: uppercase; color: var(--accent); flex-shrink: 0;
+          font-family: var(--text); font-weight: 600; font-size: 11.5px; letter-spacing: 0.16em;
+          text-transform: uppercase; color: var(--accent-ink); flex-shrink: 0;
         }
+        .fl-open__num b { font-family: var(--mono); font-weight: 500; letter-spacing: 0.04em; }
         .fl-open__line { flex: 1; height: 1px; background: var(--rule); }
 
+        /* Instrument Serif ships a single weight; every display size sits at
+           400 so nothing is synthesised into a faux bold. */
         .fl-h2 {
-          font-family: var(--display); font-weight: 600;
-          font-size: clamp(2.05rem, 4.2vw, 3.15rem); line-height: 1.03;
-          letter-spacing: -0.018em; margin: 0 0 20px; text-wrap: balance;
-          max-width: 16ch;
+          font-family: var(--display); font-weight: 400;
+          font-size: clamp(2.25rem, 4.6vw, 3.5rem); line-height: 1.02;
+          letter-spacing: -0.014em; margin: 0 0 20px; text-wrap: balance;
+          max-width: 17ch;
         }
         .fl-lede { font-size: clamp(1.05rem, 1.5vw, 1.22rem); line-height: 1.55; margin: 0 0 18px; max-width: 34ch; }
         .fl-p { font-size: 16px; line-height: 1.68; color: var(--ink-soft); margin: 0 0 16px; max-width: 46ch; text-wrap: pretty; }
@@ -432,11 +651,11 @@ export default function LandingPage() {
           color: var(--ink-soft); margin: 0 0 clamp(24px, 4vh, 44px);
         }
         .fl-h1 {
-          font-family: var(--display); font-weight: 600;
-          font-size: clamp(2.7rem, 7.4vw, 5.6rem); line-height: 0.98;
-          letter-spacing: -0.028em; margin: 0; max-width: 15ch; text-wrap: balance;
+          font-family: var(--display); font-weight: 400;
+          font-size: clamp(2.9rem, 8vw, 6.1rem); line-height: 0.96;
+          letter-spacing: -0.02em; margin: 0; max-width: 15ch; text-wrap: balance;
         }
-        .fl-h1 i { font-style: italic; color: var(--accent); margin-right: 0.14em; }
+        .fl-h1 i { font-style: italic; color: var(--accent-ink); margin-right: 0.1em; }
         .fl-title__track {
           display: block; height: 2px; background: var(--rule-soft);
           margin: clamp(26px, 4vh, 44px) 0 0; max-width: 760px; overflow: hidden;
@@ -452,21 +671,27 @@ export default function LandingPage() {
         .fl-title__sub { font-size: 15px; line-height: 1.6; color: var(--ink-soft); max-width: 46ch; margin: 12px 0 0; }
         .fl-title__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: clamp(28px, 4vh, 42px); }
 
+        /* Ink on the bright green, not white: white reads 2.6:1 there and
+           fails, ink reads 7.0:1. */
         .fl-btn {
-          display: inline-flex; align-items: center; gap: 8px;
+          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
           padding: 12px 24px; border-radius: 2px; border: 1px solid var(--accent);
-          background: var(--accent); color: #FFFFFF; text-decoration: none;
+          background: var(--accent); color: var(--ink); text-decoration: none;
           font-family: var(--text); font-weight: 600; font-size: 15px; letter-spacing: 0.01em;
-          transition: background 150ms var(--ease), transform 110ms var(--ease);
+          cursor: pointer;
+          transition: background 150ms var(--ease), border-color 150ms var(--ease), transform 110ms var(--ease);
         }
-        .fl-btn:hover { background: #196239; }
+        .fl-btn:hover { background: var(--accent-press); border-color: var(--accent-press); }
         .fl-btn:active { transform: translateY(1px); }
+        .fl-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+        .fl-btn[disabled]:hover { background: var(--accent); border-color: var(--accent); }
         .fl-link {
           color: var(--ink); font-size: 15px; font-weight: 500;
+          background: none; border: none; padding: 0; cursor: pointer; font-family: var(--text);
           text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px;
           transition: color 140ms var(--ease);
         }
-        .fl-link:hover { color: var(--accent); }
+        .fl-link:hover { color: var(--accent-ink); }
 
         /* ------------------------------------------------- I · the advisor */
         .fl-advisor__grid { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 76px); align-items: stretch; }
@@ -474,9 +699,9 @@ export default function LandingPage() {
         .fl-advisor__col { position: relative; }
         .fl-advisor__media { position: sticky; top: 11vh; }
         .fl-quote {
-          font-family: var(--display); font-weight: 400; font-size: clamp(1.35rem, 2.3vw, 1.85rem);
-          line-height: 1.28; letter-spacing: -0.012em; margin: 0; max-width: 22ch;
-          border-left: 1px solid var(--accent); padding-left: 20px;
+          font-family: var(--display); font-weight: 400; font-size: clamp(1.5rem, 2.5vw, 2.05rem);
+          line-height: 1.26; letter-spacing: -0.008em; margin: 0; max-width: 22ch;
+          border-left: 2px solid var(--accent); padding-left: 20px;
         }
 
         .fl-stage { position: relative; }
@@ -489,6 +714,7 @@ export default function LandingPage() {
           font-size: 11.5px; letter-spacing: 0.13em; text-transform: uppercase;
           color: var(--ink-soft); border-bottom: 1px solid var(--rule); padding-bottom: 10px; margin-bottom: 12px;
         }
+        .fl-docket__head b { font-family: var(--mono); font-weight: 500; letter-spacing: 0.04em; }
         .fl-rows { position: relative; height: 258px; }
         .fl-rowrule {
           position: absolute; left: 0; right: 0; height: 1px; background: var(--rule-soft);
@@ -501,10 +727,9 @@ export default function LandingPage() {
           padding: 0 12px; box-shadow: 0 8px 20px -14px rgba(20,32,25,0.5);
           will-change: transform, opacity;
         }
-        .fl-file__n { font-family: var(--display); font-size: 12px; color: var(--ink-soft); }
+        .fl-file__n { font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft); }
         .fl-file__label { font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em; }
-        .fl-file__note { font-size: 11px; color: var(--ink-soft); letter-spacing: 0.04em; text-transform: uppercase; }
-        .fl-file__tick { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-2); }
+        .fl-file__note { font-family: var(--mono); font-size: 10.5px; color: var(--ink-soft); letter-spacing: 0.04em; text-transform: uppercase; }
 
         .fl-verdicts { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
         .fl-verdict {
@@ -514,16 +739,21 @@ export default function LandingPage() {
         .fl-verdict__ink { will-change: clip-path, opacity; }
         .fl-verdict__top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; }
         .fl-verdict__name { font-size: 13px; font-weight: 600; }
-        .fl-verdict__code { font-family: var(--display); font-size: 11.5px; color: var(--ink-soft); letter-spacing: 0.06em; }
-        .fl-verdict__status { margin-left: auto; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-        .fl-verdict--good .fl-verdict__status { color: var(--accent); }
-        .fl-verdict--maybe .fl-verdict__status { color: #8F5A03; }
-        .fl-verdict--bad .fl-verdict__status { color: #A32D24; }
+        .fl-verdict__code { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); letter-spacing: 0.02em; }
+        /* the four verdict values are the advisor's own enum, so they are set
+           as values, not prose */
+        .fl-verdict__status {
+          margin-left: auto; font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+          letter-spacing: 0.08em; text-transform: uppercase;
+        }
+        .fl-verdict--good .fl-verdict__status { color: var(--signal-yes-ink); }
+        .fl-verdict--maybe .fl-verdict__status { color: var(--signal-maybe-ink); }
+        .fl-verdict--bad .fl-verdict__status { color: var(--signal-no-ink); }
         .fl-verdict__track { height: 3px; background: var(--rule-soft); border-radius: 2px; overflow: hidden; margin-bottom: 7px; }
         .fl-verdict__bar { display: block; height: 100%; transform-origin: left; will-change: transform; }
-        .fl-verdict--good .fl-verdict__bar { background: var(--accent-2); }
-        .fl-verdict--maybe .fl-verdict__bar { background: #D08A12; }
-        .fl-verdict--bad .fl-verdict__bar { background: #C0453A; }
+        .fl-verdict--good .fl-verdict__bar { background: var(--signal-yes-fill); }
+        .fl-verdict--maybe .fl-verdict__bar { background: var(--signal-maybe-fill); }
+        .fl-verdict--bad .fl-verdict__bar { background: var(--signal-no-fill); }
         .fl-verdict p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
 
         /* ------------------------------------------------- II · the planner */
@@ -542,7 +772,7 @@ export default function LandingPage() {
         }
         .fl-sched__row:last-child { border-bottom: none; }
         [data-in="shown"] .fl-sched__row { opacity: 1; transform: none; }
-        .fl-sched__day { font-family: var(--display); font-size: 12.5px; letter-spacing: 0.05em; color: var(--accent); }
+        .fl-sched__day { font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em; color: var(--accent-ink); }
         .fl-sched__title { font-size: 14.5px; line-height: 1.45; }
 
         /* --------------------------------------------------- III · on disk */
@@ -557,25 +787,28 @@ export default function LandingPage() {
           box-shadow: var(--shadow); padding: 13px 16px;
           font-size: 13px; display: flex; align-items: center; gap: 10px;
         }
-        .fl-chip code { font-family: var(--display); font-size: 12.5px; color: var(--ink-soft); }
+        .fl-chip code { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
         .fl-folder {
           background: var(--card); border: 1px solid var(--rule-soft); border-radius: 4px;
           box-shadow: var(--shadow); padding: 22px 24px;
         }
-        .fl-folder__name { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0 0 4px; }
+        .fl-folder__name { font-family: var(--mono); font-weight: 500; font-size: 16px; margin: 0 0 4px; }
         .fl-folder__meta { font-size: 12.5px; color: var(--ink-soft); margin: 0; }
-        .fl-folder__ic { display: block; width: 34px; height: 34px; color: var(--accent); margin-bottom: 14px; }
+        .fl-folder__ic { display: block; width: 34px; height: 34px; color: var(--accent-ink); margin-bottom: 14px; }
         .fl-folder__ic svg { width: 100%; height: 100%; }
 
         /* ------------------------------------------------ IV · in the cloud */
         .fl-cloud__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
         .fl-cloud__pair { display: grid; grid-template-columns: 1fr 34px 1fr; align-items: center; gap: 10px; }
+        /* min-width:0 or the mono record name sets a floor wider than the
+           column and the second card runs off the spread */
+        .fl-cloud__pair > * { min-width: 0; }
         .fl-device {
           background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 16px;
-          min-height: 148px; display: flex; flex-direction: column; gap: 7px;
+          min-height: 148px; display: flex; flex-direction: column; gap: 7px; min-width: 0;
         }
         .fl-device__tag { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); }
-        .fl-device__name { font-family: var(--display); font-size: 16px; font-weight: 600; }
+        .fl-device__name { font-family: var(--mono); font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
         .fl-device__line { height: 6px; border-radius: 2px; background: var(--rule-soft); }
         .fl-device__line--a { width: 84%; }
         .fl-device__line--b { width: 62%; }
@@ -602,11 +835,11 @@ export default function LandingPage() {
         [data-in="shown"] .fl-doc:nth-child(5) { transition-delay: 140ms; }
         [data-in="shown"] .fl-doc:nth-child(6) { transition-delay: 210ms; }
         .fl-doc__code {
-          font-family: var(--display); font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em;
-          color: var(--accent); background: rgba(41,183,103,0.11); padding: 4px 8px; border-radius: 2px;
+          font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.02em;
+          color: var(--accent-ink); background: rgba(18,183,106,0.13); padding: 4px 8px; border-radius: 2px;
         }
         .fl-doc__label { font-size: 13.5px; }
-        .fl-doc__state { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+        .fl-doc__state { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); }
         .fl-feed { margin: 0 0 18px; padding: 0; list-style: none; }
         .fl-feed li {
           display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: center;
@@ -618,8 +851,8 @@ export default function LandingPage() {
         [data-in="shown"] .fl-feed li:nth-child(2) { transition-delay: 80ms; }
         .fl-feed__who {
           width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
-          background: rgba(41,183,103,0.14); color: var(--accent);
-          font-family: var(--display); font-size: 11px; font-weight: 700;
+          background: rgba(18,183,106,0.15); color: var(--accent-ink);
+          font-family: var(--mono); font-size: 10px; font-weight: 500;
         }
         .fl-feed__what strong { font-weight: 600; }
 
@@ -630,24 +863,97 @@ export default function LandingPage() {
         .fl-faqitem button {
           width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: 20px;
           background: none; border: none; cursor: pointer; padding: 18px 2px; text-align: left;
-          font-family: var(--display); font-weight: 600; font-size: 17px; line-height: 1.35;
-          letter-spacing: -0.01em; color: var(--ink);
+          font-family: var(--display); font-weight: 400; font-size: 20px; line-height: 1.3;
+          letter-spacing: -0.005em; color: var(--ink);
         }
-        .fl-faqitem button:hover { color: var(--accent); }
-        .fl-faqitem__sign { font-family: var(--text); font-size: 16px; color: var(--accent); flex-shrink: 0; }
+        .fl-faqitem button:hover { color: var(--accent-ink); }
+        .fl-faqitem__sign { font-family: var(--text); font-size: 16px; color: var(--accent-ink); flex-shrink: 0; }
         .fl-faqitem__body { overflow: hidden; max-height: 0; transition: max-height 260ms var(--ease); }
         .fl-faqitem[data-open="true"] .fl-faqitem__body { max-height: 260px; }
         .fl-faqitem__body p { margin: 0; padding: 0 2px 20px; font-size: 15px; line-height: 1.65; color: var(--ink-soft); max-width: 58ch; }
+
+        /* ------------------------------------------- VII · the form itself */
+        .fl-start__grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 76px); align-items: start; }
+        .fl-form {
+          background: var(--card); border: 1px solid var(--rule-soft); border-radius: 4px;
+          box-shadow: var(--shadow); padding: clamp(22px, 3vw, 32px);
+        }
+        .fl-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .fl-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+        /* descendant, not child: the password label sits inside a legend row
+           next to its reset-link button and must still look like a label */
+        .fl-field label {
+          font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+          text-transform: uppercase; color: var(--ink-soft);
+        }
+        .fl-field__opt { font-weight: 400; text-transform: none; letter-spacing: 0; }
+        .fl-input {
+          width: 100%; font-family: var(--text); font-size: 15px; color: var(--ink);
+          background: var(--paper); border: 1px solid var(--rule); border-radius: 2px;
+          padding: 11px 13px; transition: border-color 140ms var(--ease);
+        }
+        .fl-input::placeholder { color: var(--ink-soft); opacity: 0.72; }
+        .fl-input:focus { border-color: var(--accent-ink); outline: none; box-shadow: 0 0 0 3px rgba(18,183,106,0.16); }
+        .fl-field__wrap { position: relative; display: flex; }
+        .fl-field__peek {
+          position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+          background: none; border: none; cursor: pointer; padding: 4px 6px;
+          font-family: var(--text); font-size: 11.5px; font-weight: 600;
+          letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft);
+        }
+        .fl-field__peek:hover { color: var(--accent-ink); }
+        .fl-field__hint { font-size: 12px; color: var(--ink-soft); }
+        .fl-note {
+          font-size: 13.5px; line-height: 1.5; border-radius: 2px;
+          padding: 10px 12px; margin: 0 0 14px;
+        }
+        .fl-note--bad { color: var(--signal-no-ink); background: rgba(239,83,80,0.10); border: 1px solid rgba(239,83,80,0.34); }
+        .fl-note--good { color: var(--accent-ink); background: rgba(18,183,106,0.11); border: 1px solid rgba(18,183,106,0.34); }
+        .fl-form__go { width: 100%; margin-top: 4px; }
+        .fl-form__foot { font-size: 13px; color: var(--ink-soft); margin: 14px 0 0; line-height: 1.6; }
+        .fl-sent { display: flex; flex-direction: column; gap: 10px; }
+        .fl-sent__mail { font-family: var(--mono); font-size: 13px; color: var(--ink); word-break: break-all; }
+
+        /* ------------------------------------------------- the login sheet */
+        .fl-sheet {
+          position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
+          padding: 20px; background: rgba(10,16,13,0.52);
+          animation: fl-fade 180ms var(--ease);
+        }
+        @keyframes fl-fade { from { opacity: 0; } to { opacity: 1; } }
+        .fl-sheet__panel {
+          position: relative; width: 100%; max-width: 404px; background: var(--paper);
+          border: 1px solid var(--rule); border-radius: 4px; padding: clamp(24px, 4vw, 34px);
+          box-shadow: 0 40px 90px -40px rgba(10,20,15,0.7);
+          animation: fl-rise 220ms var(--ease);
+        }
+        @keyframes fl-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        .fl-sheet__title { font-family: var(--display); font-weight: 400; font-size: 30px; line-height: 1.1; margin: 0 0 6px; letter-spacing: -0.01em; }
+        .fl-sheet__sub { font-size: 14px; color: var(--ink-soft); margin: 0 0 22px; line-height: 1.55; }
+        .fl-sheet__x {
+          position: absolute; top: 12px; right: 12px; width: 30px; height: 30px;
+          display: grid; place-items: center; background: none; border: none; cursor: pointer;
+          color: var(--ink-soft); font-size: 19px; line-height: 1; border-radius: 2px;
+        }
+        .fl-sheet__x:hover { color: var(--ink); }
+        .fl-sheet__legend { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+        @media (prefers-reduced-motion: reduce) {
+          .fl-sheet, .fl-sheet__panel { animation: none; }
+        }
 
         /* ------------------------------------------------------- colophon */
         .fl-colophon {
           background: var(--paper-2); padding: clamp(70px, 10vh, 120px) clamp(24px, 5vw, 84px) clamp(46px, 6vh, 70px);
         }
         .fl-colophon__rule { display: block; height: 2px; background: var(--ink); transform: scaleX(0); transform-origin: left; will-change: transform; margin-bottom: 26px; }
-        .fl-colophon__mark { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; margin: 0 0 10px; }
+        .fl-colophon__mark { font-family: var(--display); font-weight: 400; font-size: 23px; letter-spacing: -0.01em; margin: 0 0 10px; }
         .fl-colophon__ask { font-size: 16.5px; line-height: 1.7; margin: 0; max-width: 52ch; }
-        .fl-colophon__ask a { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
-        .fl-colophon__ask a:hover { color: var(--ink); }
+        .fl-colophon__ask a, .fl-colophon__ask button {
+          color: var(--accent-ink); font-weight: 600; font-size: inherit; font-family: var(--text);
+          background: none; border: none; padding: 0; cursor: pointer;
+          text-decoration: underline; text-underline-offset: 4px;
+        }
+        .fl-colophon__ask a:hover, .fl-colophon__ask button:hover { color: var(--ink); }
         .fl-colophon__fine { margin: 26px 0 0; font-size: 12px; color: var(--ink-soft); }
 
         /* ------------------------------------------------------ reveal base */
@@ -660,17 +966,23 @@ export default function LandingPage() {
         @media (max-width: 1023px) {
           .fl { --rail: 0px; }
           .fl-folio { display: none; }
+          /* the top strip is sticky here, so anything scrollIntoView() targets
+             has to clear it or the chapter opens with its heading underneath */
+          .fl-ch, .fl-form { scroll-margin-top: 64px; }
           .fl-topfolio {
             display: flex; position: sticky; top: 0; z-index: 40; gap: 12px;
             align-items: baseline; justify-content: space-between;
             padding: 11px clamp(18px, 5vw, 28px);
             background: var(--paper); border-bottom: 1px solid var(--rule-soft);
           }
-          .fl-topfolio__mark { font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--ink); text-decoration: none; }
-          .fl-topfolio__mark span { color: var(--accent); }
-          .fl-topfolio__now { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+          .fl-topfolio__mark { font-family: var(--display); font-weight: 400; font-size: 18px; color: var(--ink); text-decoration: none; }
+          .fl-topfolio__mark span { color: var(--accent-ink); }
+          .fl-topfolio__now { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); }
+          .fl-topfolio__acts { display: flex; align-items: center; gap: 14px; }
           .fl-body { margin-left: 0; }
-          .fl-planner__grid, .fl-local__grid, .fl-cloud__grid, .fl-team__grid { grid-template-columns: minmax(0, 1fr); }
+          .fl-planner__grid, .fl-local__grid, .fl-cloud__grid, .fl-team__grid,
+          .fl-start__grid { grid-template-columns: minmax(0, 1fr); }
+          .fl-start__grid > :first-child { margin-bottom: 30px; }
           .fl-advisor__grid { display: flex; flex-direction: column; }
           .fl-advisor__col { order: -1; }
           .fl-advisor__media { position: static; margin-bottom: 30px; }
@@ -684,6 +996,7 @@ export default function LandingPage() {
           .fl-h1 { font-size: clamp(2.2rem, 10vw, 2.9rem); }
           .fl-title { min-height: 0; padding-top: 54px; padding-bottom: 60px; }
           .fl-cloud__pair { grid-template-columns: 1fr; gap: 14px; }
+          .fl-form__row { grid-template-columns: 1fr; gap: 0; }
           .fl-thread { height: 1px; }
           .fl-rows { height: 258px; }
           .fl-advisor__prose > * + * { margin-top: 28px; }
@@ -712,7 +1025,7 @@ export default function LandingPage() {
       <nav className="fl-folio" aria-label="Contents">
         <a className="fl-folio__mark" href="#top">Edamame<span>.</span></a>
         <ol className="fl-folio__list">
-          {CHAPTERS.map((c) => (
+          {chapters.map((c) => (
             <li key={c.id}>
               <a
                 className="fl-folio__link"
@@ -731,7 +1044,7 @@ export default function LandingPage() {
           ) : (
             <>
               Already have an account?<br />
-              <Link to="/login">Log in</Link>
+              <button type="button" className="fl-folio__signin" onClick={openSheet}>Log in</button>
             </>
           )}
         </p>
@@ -739,10 +1052,17 @@ export default function LandingPage() {
 
       <div className="fl-topfolio">
         <a className="fl-topfolio__mark" href="#top">Edamame<span>.</span></a>
-        <span className="fl-topfolio__now">
-          {activeChapter
-            ? `${CHAPTERS.find((c) => c.id === activeChapter)?.numeral} · ${CHAPTERS.find((c) => c.id === activeChapter)?.short}`
-            : 'Contents'}
+        <span className="fl-topfolio__acts">
+          <span className="fl-topfolio__now">
+            {activeChapter
+              ? `${chapters.find((c) => c.id === activeChapter)?.numeral} · ${chapters.find((c) => c.id === activeChapter)?.short}`
+              : 'Contents'}
+          </span>
+          {user ? (
+            <Link className="fl-link" to="/dashboard">Dashboard</Link>
+          ) : (
+            <button type="button" className="fl-link" onClick={openSheet}>Log in</button>
+          )}
         </span>
       </div>
 
@@ -750,7 +1070,6 @@ export default function LandingPage() {
 
         {/* ------------------------------------------------------ title page */}
         <header className="fl-title">
-          <p className="fl-title__masthead">Edamame Legal Flow</p>
           <h1 className="fl-h1">
             A case system that reads the file <i>before</i> you do.
           </h1>
@@ -758,9 +1077,15 @@ export default function LandingPage() {
             <span ref={heroRuleRef} className="fl-title__rule" />
           </span>
           <p className="fl-title__deck">{audienceLine}</p>
+          <p className="fl-title__sub">
+            Assess a pathway, open the case with its workflow already attached, and
+            keep the file on your own disk or in your account.
+          </p>
           <div className="fl-title__acts">
-            <Link className="fl-btn" to={ctaHref}>{ctaLabel}</Link>
-            {!user && <Link className="fl-link" to="/login">Log in</Link>}
+            {renderCta('fl-btn')}
+            {!user && (
+              <button type="button" className="fl-link" onClick={openSheet}>Log in</button>
+            )}
           </div>
         </header>
 
@@ -773,7 +1098,7 @@ export default function LandingPage() {
         >
           <div className="fl-wrap">
             <div className="fl-open">
-              <span className="fl-open__num">Chapter I</span>
+              <span className="fl-open__num">Chapter <b>I</b></span>
               <span className="fl-open__line" />
             </div>
 
@@ -825,9 +1150,7 @@ export default function LandingPage() {
                     workflow template already selected. The assessment is where the
                     file starts, not a separate errand.
                   </p>
-                  <p style={{ margin: '22px 0 0' }}>
-                    <Link className="fl-btn" to={ctaHref}>{ctaLabel}</Link>
-                  </p>
+                  <p style={{ margin: '22px 0 0' }}>{renderCta('fl-btn')}</p>
                 </div>
               </div>
 
@@ -837,7 +1160,7 @@ export default function LandingPage() {
                   <div className="fl-docket">
                     <div className="fl-docket__head">
                       <span>Docket</span>
-                      <span>5 open</span>
+                      <b>5 open</b>
                     </div>
                     <div className="fl-rows">
                       {CASE_FILES.map((f, i) => (
@@ -910,7 +1233,7 @@ export default function LandingPage() {
         <section id="planner" className="fl-ch fl-ch--paper2" aria-labelledby="planner-title" data-in="">
           <div className="fl-wrap">
             <div className="fl-open">
-              <span className="fl-open__num">Chapter II</span>
+              <span className="fl-open__num">Chapter <b>II</b></span>
               <span className="fl-open__line" />
             </div>
             <div className="fl-planner__grid">
@@ -955,7 +1278,7 @@ export default function LandingPage() {
         <section id="local" className="fl-ch fl-ch--paper" aria-labelledby="local-title" data-in="">
           <div className="fl-wrap">
             <div className="fl-open">
-              <span className="fl-open__num">Chapter III</span>
+              <span className="fl-open__num">Chapter <b>III</b></span>
               <span className="fl-open__line" />
             </div>
             <div className="fl-local__grid">
@@ -1011,7 +1334,7 @@ export default function LandingPage() {
         <section id="cloud" className="fl-ch fl-ch--plate" aria-labelledby="cloud-title" data-in="">
           <div className="fl-wrap">
             <div className="fl-open">
-              <span className="fl-open__num">Chapter IV</span>
+              <span className="fl-open__num">Chapter <b>IV</b></span>
               <span className="fl-open__line" />
             </div>
             <div className="fl-cloud__grid">
@@ -1066,7 +1389,7 @@ export default function LandingPage() {
         <section id="team" className="fl-ch fl-ch--paper2" aria-labelledby="team-title" data-in="">
           <div className="fl-wrap">
             <div className="fl-open">
-              <span className="fl-open__num">Chapter V</span>
+              <span className="fl-open__num">Chapter <b>V</b></span>
               <span className="fl-open__line" />
             </div>
             <div className="fl-team__grid">
@@ -1126,10 +1449,10 @@ export default function LandingPage() {
         <section id="faq" className="fl-ch fl-ch--paper" aria-labelledby="faq-title" data-in="">
           <div className="fl-wrap">
             <div className="fl-open">
-              <span className="fl-open__num">Chapter VI</span>
+              <span className="fl-open__num">Chapter <b>VI</b></span>
               <span className="fl-open__line" />
             </div>
-            <h2 id="faq-title" className="fl-h2 fl-rise">Questions worth asking.</h2>
+            <h2 id="faq-title" className="fl-h2 fl-rise">Common questions.</h2>
             <div className="fl-faq" style={{ marginTop: 30 }}>
               {FAQS.map((item, i) => {
                 const open = openFaq === i;
@@ -1147,6 +1470,166 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ---------------------------------------------------- VII · Start */}
+        {!user && (
+          <section id="start" className="fl-ch fl-ch--paper2" aria-labelledby="start-title" data-in="">
+            <div className="fl-wrap">
+              <div className="fl-open">
+                <span className="fl-open__num">Chapter <b>VII</b></span>
+                <span className="fl-open__line" />
+              </div>
+              <div className="fl-start__grid">
+                <div>
+                  <h2 id="start-title" className="fl-h2 fl-rise">Open your first case.</h2>
+                  <p className="fl-lede fl-rise">
+                    The account is the whole setup. You choose local or cloud storage
+                    on the next screen, and either can be changed later.
+                  </p>
+                  <p className="fl-p fl-rise">
+                    Already have one?{' '}
+                    <button type="button" className="fl-link" onClick={openSheet}>Log in instead</button>.
+                  </p>
+                </div>
+
+                <div className="fl-form">
+                  {confirmSentTo ? (
+                    <div className="fl-sent" aria-live="polite">
+                      <h3 className="fl-sheet__title" style={{ fontSize: 26 }}>Account created.</h3>
+                      <p className="fl-p" style={{ margin: 0 }}>
+                        Confirm your address to finish. The link went to:
+                      </p>
+                      <p className="fl-sent__mail">{confirmSentTo}</p>
+                      <p className="fl-form__foot">
+                        Once it is confirmed,{' '}
+                        <button type="button" className="fl-link" onClick={openSheet}>log in</button>.
+                      </p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleCreateAccount} noValidate>
+                      <div className="fl-form__row">
+                        <div className="fl-field">
+                          <label htmlFor="fl-first">First name</label>
+                          <input
+                            id="fl-first"
+                            ref={firstFieldRef}
+                            className="fl-input"
+                            type="text"
+                            required
+                            autoComplete="given-name"
+                            maxLength={NAME_MAX_LENGTH}
+                            value={firstName}
+                            onChange={(e) => setFirstName(e.target.value)}
+                          />
+                        </div>
+                        <div className="fl-field">
+                          <label htmlFor="fl-surname">Surname</label>
+                          <input
+                            id="fl-surname"
+                            className="fl-input"
+                            type="text"
+                            required
+                            autoComplete="family-name"
+                            maxLength={NAME_MAX_LENGTH}
+                            value={surname}
+                            onChange={(e) => setSurname(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="fl-field">
+                        <label htmlFor="fl-company">
+                          Firm or agency <span className="fl-field__opt">(optional)</span>
+                        </label>
+                        <input
+                          id="fl-company"
+                          className="fl-input"
+                          type="text"
+                          autoComplete="organization"
+                          maxLength={NAME_MAX_LENGTH}
+                          value={company}
+                          onChange={(e) => setCompany(e.target.value)}
+                          placeholder="Or leave blank if it is just you"
+                        />
+                      </div>
+
+                      <div className="fl-field">
+                        <label htmlFor="fl-email">Email</label>
+                        <input
+                          id="fl-email"
+                          className="fl-input"
+                          type="email"
+                          required
+                          autoComplete="email"
+                          value={upEmail}
+                          onChange={(e) => setUpEmail(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="fl-field">
+                        <label htmlFor="fl-pw">Password</label>
+                        <span className="fl-field__wrap">
+                          <input
+                            id="fl-pw"
+                            className="fl-input"
+                            type={showPassword ? 'text' : 'password'}
+                            required
+                            autoComplete="new-password"
+                            minLength={6}
+                            aria-describedby="fl-pw-hint"
+                            value={upPassword}
+                            onChange={(e) => setUpPassword(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="fl-field__peek"
+                            onClick={() => setShowPassword((v) => !v)}
+                          >
+                            {showPassword ? 'Hide' : 'Show'}
+                          </button>
+                        </span>
+                        <span id="fl-pw-hint" className="fl-field__hint">At least 6 characters.</span>
+                      </div>
+
+                      <div className="fl-field">
+                        <label htmlFor="fl-pw2">Confirm password</label>
+                        <span className="fl-field__wrap">
+                          <input
+                            id="fl-pw2"
+                            className="fl-input"
+                            type={showConfirm ? 'text' : 'password'}
+                            required
+                            autoComplete="new-password"
+                            aria-describedby={upError ? 'fl-up-error' : undefined}
+                            value={upConfirm}
+                            onChange={(e) => setUpConfirm(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="fl-field__peek"
+                            onClick={() => setShowConfirm((v) => !v)}
+                          >
+                            {showConfirm ? 'Hide' : 'Show'}
+                          </button>
+                        </span>
+                      </div>
+
+                      <div aria-live="polite">
+                        {upError && (
+                          <p id="fl-up-error" className="fl-note fl-note--bad">{upError}</p>
+                        )}
+                      </div>
+
+                      <button type="submit" className="fl-btn fl-form__go" disabled={upBusy}>
+                        {upBusy ? 'Creating account…' : 'Create account'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* -------------------------------------------------------- colophon */}
         <footer className="fl-colophon">
           <div className="fl-wrap">
@@ -1155,13 +1638,106 @@ export default function LandingPage() {
             <p className="fl-colophon__ask">
               Case and task management for immigration practice in Australia and New
               Zealand. Start with one case:{' '}
-              <Link to={ctaHref}>{ctaLabel.toLowerCase()}</Link>
-              {!user && <>, or <Link to="/login">log in</Link> if you have been here before</>}.
+              {user ? (
+                <Link to="/dashboard">go to dashboard</Link>
+              ) : (
+                <>
+                  <a href="#start">create account</a>, or{' '}
+                  <button type="button" onClick={openSheet}>log in</button> if you have
+                  been here before
+                </>
+              )}.
             </p>
             <p className="fl-colophon__fine">&copy; 2026 Edamame Legal Flow. All rights reserved.</p>
           </div>
         </footer>
       </div>
+
+      {/* --------------------------------------------------- the login sheet */}
+      {sheetOpen && !user && (
+        <div
+          className="fl-sheet"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) closeSheet(); }}
+        >
+          <div
+            className="fl-sheet__panel"
+            ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fl-sheet-title"
+          >
+            <button type="button" className="fl-sheet__x" onClick={closeSheet} aria-label="Close">
+              ×
+            </button>
+            <h2 id="fl-sheet-title" className="fl-sheet__title">Welcome back.</h2>
+            <p className="fl-sheet__sub">Log in to pick up where your files left off.</p>
+
+            <form onSubmit={handleLogIn} noValidate>
+              <div className="fl-field">
+                <label htmlFor="fl-in-email">Email</label>
+                <input
+                  id="fl-in-email"
+                  className="fl-input"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={inEmail}
+                  onChange={(e) => setInEmail(e.target.value)}
+                />
+              </div>
+
+              <div className="fl-field">
+                <span className="fl-sheet__legend">
+                  <label htmlFor="fl-in-pw">Password</label>
+                  <button type="button" className="fl-link" style={{ fontSize: 12.5 }} onClick={handleResetLink}>
+                    Send reset link
+                  </button>
+                </span>
+                <input
+                  id="fl-in-pw"
+                  className="fl-input"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  aria-describedby={inError ? 'fl-in-error' : undefined}
+                  value={inPassword}
+                  onChange={(e) => setInPassword(e.target.value)}
+                />
+              </div>
+
+              <div aria-live="polite">
+                {resetSent && (
+                  <p className="fl-note fl-note--good">
+                    Reset link sent. Check your inbox for the message.
+                  </p>
+                )}
+                {inError && <p id="fl-in-error" className="fl-note fl-note--bad">{inError}</p>}
+              </div>
+
+              <button type="submit" className="fl-btn fl-form__go" disabled={inBusy}>
+                {inBusy ? 'Logging in…' : 'Log in'}
+              </button>
+            </form>
+
+            <p className="fl-form__foot">
+              No account yet?{' '}
+              <button
+                type="button"
+                className="fl-link"
+                onClick={() => {
+                  closeSheet();
+                  document.getElementById('start')?.scrollIntoView({
+                    behavior: reduced ? 'auto' : 'smooth',
+                    block: 'start',
+                  });
+                }}
+              >
+                Create one
+              </button>.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
