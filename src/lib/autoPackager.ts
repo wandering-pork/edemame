@@ -1,6 +1,7 @@
 import type { Document } from '../types';
 import { loadPdf, mergePdfs, sanitiseFilenameSegment } from './pdfBundle';
 import { compressImage, isRasterImage, needsFormatConversion, isUncompressibleImage } from './imageCompress';
+import { rasterizeAndCompressPdf } from './pdfRasterize';
 
 /**
  * Auto-Packager orchestration — classification + per-file compression
@@ -17,6 +18,19 @@ export const SAFE_TARGET_BYTES = 4.9 * 1024 * 1024;
 export const IMAGE_TARGET_BYTES = 500 * 1024;
 
 export type PackagerFileKind = 'pdf' | 'image' | 'docx' | 'spreadsheet' | 'text' | 'other';
+
+/**
+ * Whether a compressed output is still too large to be saved into Case
+ * Files, which enforces its own upload ceiling (`CASE_FILES_MAX_BYTES` in
+ * supportedFormats.ts) independently of the DoHA-lodgement 5 MB target this
+ * module otherwise targets. Centralised here so the Auto-Packager's
+ * pre-flight warning and its finalize() skip check can't drift apart —
+ * a file that fails this must never be written to Case Files (see the
+ * "Auto-Packager Circular Dependency" defect this guards against).
+ */
+export function exceedsCaseFilesLimit(sizeBytes: number, maxBytes: number): boolean {
+  return sizeBytes > maxBytes;
+}
 
 /** Classify a Document for compression-strategy purposes. */
 export function classifyKind(doc: Document): PackagerFileKind {
@@ -77,17 +91,39 @@ export async function compressDocument(doc: Document, blob: Blob): Promise<Compr
     try {
       const loaded = await loadPdf(doc, blob);
       const { bytes } = await mergePdfs([loaded]);
-      const flagged = bytes.length > DOHA_MAX_BYTES;
+      if (bytes.length <= DOHA_MAX_BYTES) {
+        return {
+          bytes,
+          mimeType: 'application/pdf',
+          ext: 'pdf',
+          flagged: false,
+          note: bytes.length < originalBytes.length ? 'Losslessly recompressed.' : 'Already optimal — no further lossless savings available.',
+        };
+      }
+      // Lossless recompression alone rarely helps a scanned PDF — pdf-lib
+      // can't reach into and downsample the embedded page images. Fall back
+      // to rasterizing each page and re-encoding as a reduced-DPI/quality
+      // JPEG (see pdfRasterize.ts) — this loses the text layer, an accepted
+      // tradeoff for what was already just a photo of a document.
+      const rasterized = await rasterizeAndCompressPdf(bytes, SAFE_TARGET_BYTES);
+      if (rasterized && rasterized.length < bytes.length) {
+        const flagged = rasterized.length > DOHA_MAX_BYTES;
+        return {
+          bytes: rasterized,
+          mimeType: 'application/pdf',
+          ext: 'pdf',
+          flagged,
+          note: flagged
+            ? 'Recompressed by flattening pages to lower-resolution images, but still over 5 MB — split into multiple uploads or re-scan at a lower DPI.'
+            : 'Recompressed by flattening scanned pages to lower-resolution JPEGs (page text is no longer selectable).',
+        };
+      }
       return {
         bytes,
         mimeType: 'application/pdf',
         ext: 'pdf',
-        flagged,
-        note: flagged
-          ? 'Still over 5 MB after lossless compression — split into multiple uploads or reduce scan resolution upstream (150 DPI is enough for ImmiAccount).'
-          : bytes.length < originalBytes.length
-            ? 'Losslessly recompressed.'
-            : 'Already optimal — no further lossless savings available.',
+        flagged: true,
+        note: 'Still over 5 MB after lossless compression — split into multiple uploads or reduce scan resolution upstream (150 DPI is enough for ImmiAccount).',
       };
     } catch {
       return {
