@@ -1,0 +1,317 @@
+/* edamame-ascent: bespoke page CSS for the worldflight landing page.
+   Loaded only while LandingPage.tsx is mounted (injected/removed by the
+   component), so its global-looking selectors (body, h1-h6 via .sc-display,
+   :root tokens) never bleed into the rest of the app's routes. */
+:root {
+  --sc-canvas:      #0A0F0C;
+  --sc-surface:     #101A14;
+  --sc-ink:         #F4F1EA;
+  --sc-ink-soft:    #ABB3A9;
+  --sc-accent:      #29B767;
+  --sc-accent-ink:  #06120C;
+  --sc-font-display: "Newsreader", Georgia, serif;
+  --sc-font-text:    "Archivo", system-ui, sans-serif;
+
+  /* Real measured nav height at each breakpoint (padding + line-height),
+     not a guess — this is what the hero/peak top-anchor below is built on. */
+  --sc-nav-h: 3.75rem;
+}
+@media (max-width: 720px) { :root { --sc-nav-h: 3.25rem; } }
+
+/* ---------------------------------------------------------- wordmark -- */
+.mark { display: inline-flex; align-items: center; gap: var(--sc-2); flex-shrink: 0; }
+.mark__box {
+  width: 1.6rem; height: 1.6rem; border-radius: 6px;
+  background: var(--sc-accent); color: var(--sc-accent-ink);
+  display: grid; place-items: center;
+  font-family: var(--sc-font-display); font-weight: 600; font-size: 0.95rem;
+}
+.mark__word {
+  font-family: var(--sc-font-text); font-weight: 700; font-size: 0.82rem;
+  letter-spacing: var(--sc-track-wide); text-transform: uppercase; color: var(--sc-ink);
+}
+
+/* -------------------------------------------------------------- nav --
+   The nav is a map: wordmark + a clickable waypoint list, nothing else
+   persistent. No CTA button here on purpose (Continuous World grammar). */
+.worldnav {
+  position: fixed; inset: 0 0 auto 0; z-index: var(--sc-z-chrome);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sc-5);
+  padding: var(--sc-4) var(--sc-gutter);
+  background: linear-gradient(to bottom, color-mix(in oklab, var(--sc-canvas) 72%, transparent), transparent);
+}
+.waypoints {
+  display: flex; align-items: center; gap: var(--sc-1);
+  list-style: none; margin: 0; padding: 0;
+  /* flex: 1 1 auto + min-width: 0 is what lets this list actually shrink
+     below its content width inside the nav's flex row. Without min-width:
+     0 a flex item never shrinks past its content size, so on a narrow
+     phone the whole nav overflows the viewport instead of this list
+     scrolling internally — and body's overflow-x:clip then silently
+     chops off everything past Planning, with no way to reach it. */
+  flex: 1 1 auto; min-width: 0;
+  overflow-x: auto; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+          mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+.waypoints::-webkit-scrollbar { display: none; }
+.waypoints button {
+  appearance: none; border: none; background: none; cursor: pointer;
+  font-family: var(--sc-font-text); font-size: var(--sc-t-xs); font-weight: 600;
+  letter-spacing: var(--sc-track-wide); text-transform: uppercase;
+  color: color-mix(in oklab, var(--sc-ink) 46%, transparent);
+  padding: var(--sc-2) var(--sc-3); border-radius: var(--sc-r-pill);
+  transition: color var(--sc-d-base) var(--sc-ease-out), background var(--sc-d-base) var(--sc-ease-out);
+  white-space: nowrap;
+}
+.waypoints button:hover { color: var(--sc-ink); }
+.waypoints button[aria-current="true"] {
+  color: var(--sc-canvas); background: var(--sc-accent);
+}
+.waypoints button:focus-visible { outline: 2px solid var(--sc-accent); outline-offset: 2px; }
+.navlogin {
+  font-family: var(--sc-font-text); font-size: var(--sc-t-xs); font-weight: 600;
+  color: color-mix(in oklab, var(--sc-ink) 68%, transparent);
+  white-space: nowrap;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.navlogin:hover { color: var(--sc-ink); }
+@media (max-width: 720px) {
+  /* Wordmark and Log in stay pinned and visible; only the waypoint list
+     (already flex: 1 1 auto + min-width: 0 above) scrolls internally, so
+     every waypoint AND the login link stay reachable on a narrow phone. */
+  .worldnav { padding: var(--sc-3) var(--sc-4); gap: var(--sc-2); }
+  .waypoints { gap: 0; }
+  .waypoints button { padding: var(--sc-2) var(--sc-2); }
+  .mark__word { display: none; }
+}
+
+/* The two tallest legs (Planning's task board, Archive's storage grid)
+   run taller on a narrow phone once their grids stack to one column.
+   Trim the heading rung and the vertical gaps there specifically, so the
+   block's natural top edge clears the fixed nav instead of running under
+   it — a shorter block, not a scrim trying to cover a collision. */
+@media (max-width: 860px) {
+  [data-leg="2"] h2, [data-leg="4"] h2 { font-size: var(--sc-t-xl); }
+  [data-leg="2"] .sub, [data-leg="4"] .sub { margin-top: var(--sc-2); }
+  .taskboard, .rangegrid { margin-top: var(--sc-3); }
+}
+
+/* Hero (Ground) and Peak (Advisory) are taller still — a long heading plus
+   an eyebrow, lede/CTAs or a 3-card scanner — tall enough that bottom-
+   anchoring like every other lead block (growing upward from the bottom)
+   pushes their own top line above the viewport, behind the fixed nav. Every
+   other leg's content is short enough that bottom-anchoring never reaches
+   the nav; these two aren't, so they anchor from the top instead and grow
+   downward into the frame, clear of it by construction at any viewport
+   size or heading line count — not a fixed offset tuned to one screen. */
+[data-sc-window="hero"], [data-leg="3"] {
+  top: calc(var(--sc-nav-h) + var(--sc-5));
+  bottom: auto;
+}
+/* At --sc-t-4xl (clamps up to 7.5rem/120px) the hero's own heading alone
+   ran ~680px tall at a common 1440x900 viewport — before the eyebrow, lede
+   and CTA row even below it, the block already overflowed the fold by
+   ~120px. --sc-t-3xl (clamps to 5rem/80px, the same size every other leg's
+   heading uses) keeps the hero legible and still the largest text on the
+   page relative to its shorter line count, while actually fitting. */
+[data-sc-window="hero"] h1 { font-size: var(--sc-t-3xl); }
+
+/* ------------------------------------------------------- world scrim --
+   One scrim shape for the whole flight: a tall bottom band, transparent
+   above ~42%. Every copy block sits inside the band it darkens. */
+.worldscrim {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background: linear-gradient(to top,
+    color-mix(in oklab, var(--sc-canvas) 97%, transparent) 0%,
+    color-mix(in oklab, var(--sc-canvas) 94%, transparent) 22%,
+    color-mix(in oklab, var(--sc-canvas) 88%, transparent) 42%,
+    color-mix(in oklab, var(--sc-canvas) 72%, transparent) 60%,
+    color-mix(in oklab, var(--sc-canvas) 34%, transparent) 78%,
+    transparent 94%);
+}
+/* Mobile stacks the range/verdict grids into one column, which makes
+   those two copy blocks taller and pushes their top lines higher up the
+   frame than the desktop layout does. Deepen the same single scrim
+   shape's reach on narrow viewports rather than adding a second shape. */
+@media (max-width: 860px) {
+  .worldscrim {
+    background: linear-gradient(to top,
+      color-mix(in oklab, var(--sc-canvas) 98%, transparent) 0%,
+      color-mix(in oklab, var(--sc-canvas) 97%, transparent) 35%,
+      color-mix(in oklab, var(--sc-canvas) 94%, transparent) 62%,
+      color-mix(in oklab, var(--sc-canvas) 78%, transparent) 78%,
+      color-mix(in oklab, var(--sc-canvas) 38%, transparent) 90%,
+      transparent 99%);
+  }
+}
+
+/* --------------------------------------------------------- copy body -- */
+.eyebrow {
+  display: block; font-size: var(--sc-t-xs); font-weight: 700;
+  letter-spacing: var(--sc-track-wide); text-transform: uppercase;
+  color: var(--sc-accent); margin: 0 0 var(--sc-3);
+}
+.lede { font-size: var(--sc-t-lg); margin: var(--sc-4) 0 0; }
+.sub  { margin: var(--sc-3) 0 0; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: var(--sc-2);
+  font-family: var(--sc-font-text); font-weight: 700; font-size: var(--sc-t-sm);
+  padding: 0.85rem 1.5rem; border-radius: var(--sc-r-pill);
+  text-decoration: none; white-space: nowrap;
+  transition: transform var(--sc-d-fast) var(--sc-ease-out), background var(--sc-d-base) var(--sc-ease-out);
+}
+.btn:active { transform: scale(0.97); }
+.btn--accent { background: var(--sc-accent); color: var(--sc-accent-ink); }
+.btn--accent:hover { background: color-mix(in oklab, var(--sc-accent) 88%, white); }
+.btn--ghost {
+  background: color-mix(in oklab, var(--sc-ink) 8%, transparent);
+  color: var(--sc-ink);
+  border: 1px solid color-mix(in oklab, var(--sc-ink) 22%, transparent);
+}
+.btn--ghost:hover { border-color: color-mix(in oklab, var(--sc-ink) 40%, transparent); }
+.btn:focus-visible { outline: 2px solid var(--sc-accent); outline-offset: 3px; }
+.cta-row { display: flex; gap: var(--sc-3); flex-wrap: wrap; margin-top: var(--sc-5); }
+
+.sc-copy--wide { max-width: min(64rem, 90vw); }
+
+/* Horizontally centred but still bottom-anchored inside the one scrim
+   band every other leg sits in, so the close reads as resolved without
+   relying on a second scrim shape to cover mid-frame text. Centred with
+   margin auto, not transform: the engine writes its own translateY onto
+   this element's inline style every frame, which would otherwise clobber
+   a translateX set here. */
+.sc-copy--finale {
+  inset-inline: 0; margin-inline: auto;
+  width: fit-content; max-width: min(30rem, 86vw);
+  text-align: center;
+  bottom: clamp(3rem, 14vh, 10rem);
+}
+
+/* -------------------------------------------------------------- turn --
+   A small, real recreation of a resolving task row. Not a screenshot. */
+.taskboard {
+  margin-top: var(--sc-5); display: flex; flex-direction: column; gap: var(--sc-2);
+  max-width: 30rem;
+}
+.taskrow {
+  display: flex; align-items: center; gap: var(--sc-3);
+  background: color-mix(in oklab, var(--sc-surface) 74%, transparent);
+  border: 1px solid var(--sc-hairline);
+  border-radius: var(--sc-r-md);
+  padding: var(--sc-3) var(--sc-4);
+  backdrop-filter: blur(6px);
+}
+.taskrow__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.taskrow__dot--a { background: #5B9CF6; }
+.taskrow__dot--b { background: var(--sc-accent); }
+.taskrow__dot--c { background: #E7A33E; }
+.taskrow__title { font-weight: 600; font-size: var(--sc-t-sm); flex: 1; }
+.taskrow__when { font-size: var(--sc-t-xs); color: var(--sc-ink-soft); white-space: nowrap; }
+
+/* -------------------------------------------------------- range grid -- */
+.rangegrid {
+  margin-top: var(--sc-5);
+  display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--sc-3);
+}
+@media (max-width: 860px) { .rangegrid { grid-template-columns: 1fr; gap: var(--sc-2); } }
+.rangecard {
+  background: color-mix(in oklab, var(--sc-surface) 78%, transparent);
+  border: 1px solid var(--sc-hairline);
+  border-radius: var(--sc-r-lg);
+  padding: var(--sc-4);
+  box-shadow: var(--sc-e1);
+}
+@media (max-width: 860px) { .rangecard { padding: var(--sc-3); } }
+.rangecard__icon {
+  width: 1.75rem; height: 1.75rem; color: var(--sc-accent);
+  margin-bottom: var(--sc-2);
+}
+.rangecard h3 {
+  font-family: var(--sc-font-display); font-weight: 500; font-size: var(--sc-t-base);
+  margin: 0 0 var(--sc-1);
+}
+.rangecard p { margin: 0; font-size: var(--sc-t-xs); color: var(--sc-ink-soft); line-height: var(--sc-leading-body); }
+
+/* --------------------------------------------------------- trust row -- */
+.badgerow { display: flex; gap: var(--sc-3); margin-top: var(--sc-4); flex-wrap: wrap; }
+.badge {
+  display: inline-flex; align-items: center; gap: var(--sc-2);
+  font-size: var(--sc-t-xs); font-weight: 600;
+  padding: var(--sc-2) var(--sc-4);
+  border: 1px solid var(--sc-hairline-strong);
+  border-radius: var(--sc-r-pill);
+  color: var(--sc-ink-soft);
+}
+.badge svg { width: 14px; height: 14px; color: var(--sc-accent); }
+
+/* ============================================================= peak ==
+   The Verdict Scanner: real markup, driven off this leg's own progress. */
+.scanner { margin-top: var(--sc-6); }
+.scanner__track {
+  position: relative; height: 2px; border-radius: 1px;
+  background: color-mix(in oklab, var(--sc-ink) 14%, transparent);
+  margin-bottom: var(--sc-6);
+  overflow: hidden;
+}
+.scanner__beam {
+  position: absolute; top: 0; left: 0; height: 100%; width: 22%;
+  background: linear-gradient(90deg, transparent, var(--sc-accent), transparent);
+  transform: translateX(-30%);
+  will-change: transform;
+}
+.verdicts { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--sc-3); }
+@media (max-width: 860px) { .verdicts { grid-template-columns: 1fr; } }
+.verdict-card {
+  background: color-mix(in oklab, var(--sc-surface) 80%, transparent);
+  border: 1px solid var(--sc-hairline);
+  border-radius: var(--sc-r-lg);
+  padding: var(--sc-4);
+  transition: border-color var(--sc-d-slow) var(--sc-ease-out),
+              background var(--sc-d-slow) var(--sc-ease-out);
+}
+.verdict-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sc-2); }
+.verdict-card__name { font-family: var(--sc-font-display); font-size: var(--sc-t-base); font-weight: 500; }
+.verdict-card__code {
+  font-family: var(--sc-font-text); font-size: 0.66rem; font-weight: 700;
+  letter-spacing: var(--sc-track-wide); text-transform: uppercase;
+  color: var(--sc-ink-soft); white-space: nowrap;
+}
+.verdict-card__status {
+  margin-top: var(--sc-3); font-size: var(--sc-t-xs); font-weight: 700;
+  letter-spacing: var(--sc-track-wide); text-transform: uppercase;
+  color: color-mix(in oklab, var(--sc-ink) 40%, transparent);
+  transition: color var(--sc-d-slow) var(--sc-ease-out);
+}
+.verdict-card__bar {
+  margin-top: var(--sc-2); height: 4px; border-radius: 2px;
+  background: color-mix(in oklab, var(--sc-ink) 12%, transparent);
+  overflow: hidden;
+}
+.verdict-card__fill {
+  height: 100%; width: 100%; transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: color-mix(in oklab, var(--sc-ink) 30%, transparent);
+  transition: transform 640ms var(--sc-ease-out), background var(--sc-d-slow) var(--sc-ease-out);
+}
+.verdict-card__reason {
+  margin-top: var(--sc-3); font-size: var(--sc-t-xs); color: var(--sc-ink-soft);
+  line-height: var(--sc-leading-body);
+  opacity: 0; transform: translate3d(0,4px,0);
+  transition: opacity var(--sc-d-slow) var(--sc-ease-out), transform var(--sc-d-slow) var(--sc-ease-out);
+}
+.verdict-card.is-resolved .verdict-card__reason { opacity: 1; transform: none; }
+.verdict-card.is-resolved .verdict-card__status { color: var(--sc-status, var(--sc-accent)); }
+.verdict-card.is-resolved .verdict-card__fill { background: var(--sc-status, var(--sc-accent)); }
+.verdict-card.is-resolved { border-color: color-mix(in oklab, var(--sc-status, var(--sc-accent)) 40%, var(--sc-hairline)); }
+.verdict-card--strong  { --sc-status: #3ECB7A; }
+.verdict-card--maybe   { --sc-status: #E7A33E; }
+.verdict-card--unlikely{ --sc-status: #E15B5B; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scanner__beam { display: none; }
+  .verdict-card, .verdict-card__fill, .verdict-card__reason { transition: none; }
+}
