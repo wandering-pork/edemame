@@ -541,7 +541,7 @@ export default function LandingPage() {
           --rule: rgba(16,22,20,0.16);
           --rule-soft: rgba(16,22,20,0.09);
           --shadow: 0 18px 40px -26px rgba(16,32,24,0.45), 0 2px 6px -3px rgba(16,32,24,0.12);
-          --display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+          --display: 'Fraunces', Georgia, 'Times New Roman', serif;
           --text: 'Archivo', 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
           --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
           --ease: cubic-bezier(0.23, 1, 0.32, 1);
@@ -565,7 +565,7 @@ export default function LandingPage() {
           background: var(--paper);
         }
         .fl-folio__mark {
-          font-family: var(--display); font-weight: 400; font-size: 20px;
+          font-family: var(--display); font-weight: 700; font-size: 17px;
           letter-spacing: -0.01em; text-decoration: none; color: var(--ink);
         }
         .fl-folio__mark span { color: var(--accent-ink); }
@@ -624,13 +624,13 @@ export default function LandingPage() {
         .fl-open__num b { font-family: var(--mono); font-weight: 500; letter-spacing: 0.04em; }
         .fl-open__line { flex: 1; height: 1px; background: var(--rule); }
 
-        /* Instrument Serif ships a single weight; every display size sits at
-           400 so nothing is synthesised into a faux bold. */
+        /* Fraunces is variable on optical size and weight, so headings carry
+           real 600/700 weights and the loaded italic axis covers the hero. */
         .fl-h2 {
-          font-family: var(--display); font-weight: 400;
-          font-size: clamp(2.25rem, 4.6vw, 3.5rem); line-height: 1.02;
-          letter-spacing: -0.014em; margin: 0 0 20px; text-wrap: balance;
-          max-width: 17ch;
+          font-family: var(--display); font-weight: 600;
+          font-size: clamp(2.05rem, 4.2vw, 3.15rem); line-height: 1.03;
+          letter-spacing: -0.018em; margin: 0 0 20px; text-wrap: balance;
+          max-width: 16ch;
         }
         .fl-lede { font-size: clamp(1.05rem, 1.5vw, 1.22rem); line-height: 1.55; margin: 0 0 18px; max-width: 34ch; }
         .fl-p { font-size: 16px; line-height: 1.68; color: var(--ink-soft); margin: 0 0 16px; max-width: 46ch; text-wrap: pretty; }
@@ -651,11 +651,11 @@ export default function LandingPage() {
           color: var(--ink-soft); margin: 0 0 clamp(24px, 4vh, 44px);
         }
         .fl-h1 {
-          font-family: var(--display); font-weight: 400;
-          font-size: clamp(2.9rem, 8vw, 6.1rem); line-height: 0.96;
-          letter-spacing: -0.02em; margin: 0; max-width: 15ch; text-wrap: balance;
+          font-family: var(--display); font-weight: 600;
+          font-size: clamp(2.7rem, 7.4vw, 5.6rem); line-height: 0.98;
+          letter-spacing: -0.028em; margin: 0; max-width: 15ch; text-wrap: balance;
         }
-        .fl-h1 i { font-style: italic; color: var(--accent-ink); margin-right: 0.1em; }
+        .fl-h1 i { font-style: italic; color: var(--accent-ink); margin-right: 0.14em; }
         .fl-title__track {
           display: block; height: 2px; background: var(--rule-soft);
           margin: clamp(26px, 4vh, 44px) 0 0; max-width: 760px; overflow: hidden;
@@ -699,8 +699,8 @@ export default function LandingPage() {
         .fl-advisor__col { position: relative; }
         .fl-advisor__media { position: sticky; top: 11vh; }
         .fl-quote {
-          font-family: var(--display); font-weight: 400; font-size: clamp(1.5rem, 2.5vw, 2.05rem);
-          line-height: 1.26; letter-spacing: -0.008em; margin: 0; max-width: 22ch;
+          font-family: var(--display); font-weight: 400; font-size: clamp(1.35rem, 2.3vw, 1.85rem);
+          line-height: 1.28; letter-spacing: -0.012em; margin: 0; max-width: 22ch;
           border-left: 2px solid var(--accent); padding-left: 20px;
         }
 
@@ -863,8 +863,8 @@ export default function LandingPage() {
         .fl-faqitem button {
           width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: 20px;
           background: none; border: none; cursor: pointer; padding: 18px 2px; text-align: left;
-          font-family: var(--display); font-weight: 400; font-size: 20px; line-height: 1.3;
-          letter-spacing: -0.005em; color: var(--ink);
+          font-family: var(--display); font-weight: 600; font-size: 17px; line-height: 1.35;
+          letter-spacing: -0.01em; color: var(--ink);
         }
         .fl-faqitem button:hover { color: var(--accent-ink); }
         .fl-faqitem__sign { font-family: var(--text); font-size: 16px; color: var(--accent-ink); flex-shrink: 0; }
@@ -928,7 +928,7 @@ export default function LandingPage() {
           animation: fl-rise 220ms var(--ease);
         }
         @keyframes fl-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-        .fl-sheet__title { font-family: var(--display); font-weight: 400; font-size: 30px; line-height: 1.1; margin: 0 0 6px; letter-spacing: -0.01em; }
+        .fl-sheet__title { font-family: var(--display); font-weight: 600; font-size: 27px; line-height: 1.1; margin: 0 0 6px; letter-spacing: -0.018em; }
         .fl-sheet__sub { font-size: 14px; color: var(--ink-soft); margin: 0 0 22px; line-height: 1.55; }
         .fl-sheet__x {
           position: absolute; top: 12px; right: 12px; width: 30px; height: 30px;
@@ -946,7 +946,7 @@ export default function LandingPage() {
           background: var(--paper-2); padding: clamp(70px, 10vh, 120px) clamp(24px, 5vw, 84px) clamp(46px, 6vh, 70px);
         }
         .fl-colophon__rule { display: block; height: 2px; background: var(--ink); transform: scaleX(0); transform-origin: left; will-change: transform; margin-bottom: 26px; }
-        .fl-colophon__mark { font-family: var(--display); font-weight: 400; font-size: 23px; letter-spacing: -0.01em; margin: 0 0 10px; }
+        .fl-colophon__mark { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; margin: 0 0 10px; }
         .fl-colophon__ask { font-size: 16.5px; line-height: 1.7; margin: 0; max-width: 52ch; }
         .fl-colophon__ask a, .fl-colophon__ask button {
           color: var(--accent-ink); font-weight: 600; font-size: inherit; font-family: var(--text);
@@ -975,7 +975,7 @@ export default function LandingPage() {
             padding: 11px clamp(18px, 5vw, 28px);
             background: var(--paper); border-bottom: 1px solid var(--rule-soft);
           }
-          .fl-topfolio__mark { font-family: var(--display); font-weight: 400; font-size: 18px; color: var(--ink); text-decoration: none; }
+          .fl-topfolio__mark { font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--ink); text-decoration: none; }
           .fl-topfolio__mark span { color: var(--accent-ink); }
           .fl-topfolio__now { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); }
           .fl-topfolio__acts { display: flex; align-items: center; gap: 14px; }
