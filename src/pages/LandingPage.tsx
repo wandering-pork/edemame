@@ -675,6 +675,38 @@ export default function LandingPage() {
         .fl-title__sub { font-size: 15px; line-height: 1.6; color: var(--ink-soft); max-width: 46ch; margin: 12px 0 0; }
         .fl-title__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: clamp(28px, 4vh, 42px); }
 
+        .fl-title__grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+        .fl-title__figure {
+          margin: clamp(56px, 8vh, 76px) 0 0; max-width: 380px;
+          animation: fl-docket-in 700ms var(--ease) 260ms both;
+        }
+        .fl-title__docket {
+          background: var(--card); border: 1px solid var(--rule-soft); border-radius: 4px;
+          box-shadow: var(--shadow); padding: 18px 20px 20px; transform: rotate(-1.6deg);
+        }
+        .fl-title__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+        .fl-title__row {
+          display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 12px;
+          background: var(--paper); border: 1px solid var(--rule-soft); border-radius: 3px; padding: 10px 12px;
+        }
+        .fl-title__rowN { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+        .fl-title__rowLabel { font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em; }
+        .fl-title__rowTag {
+          font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase;
+          color: var(--accent-ink); white-space: nowrap;
+        }
+        @keyframes fl-docket-in {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .fl-title__figure { animation: none; }
+        }
+        @media (min-width: 1024px) {
+          .fl-title__grid { grid-template-columns: minmax(0, 1fr) minmax(280px, 380px); gap: clamp(32px, 6vw, 96px); align-items: center; }
+          .fl-title__figure { margin: 0; }
+        }
+
         /* Ink on the bright green, not white: white reads 2.6:1 there and
            fails, ink reads 7.0:1. */
         .fl-btn {
@@ -1076,23 +1108,48 @@ export default function LandingPage() {
 
         {/* ------------------------------------------------------ title page */}
         <header className="fl-title">
-          <h1 className="fl-h1">
-            Your immigration case, sorted.
-          </h1>
-          <span className="fl-title__track" aria-hidden="true">
-            <span ref={heroRuleRef} className="fl-title__rule" />
-          </span>
-          <p className="fl-title__deck">{audienceLine}</p>
-          <p className="fl-title__sub">
-            Assess a pathway and open the case with its workflow already attached.
-            Keep every file on your own disk, or sync it to your account — your
-            choice.
-          </p>
-          <div className="fl-title__acts">
-            {renderCta('fl-btn')}
-            {!user && (
-              <button type="button" className="fl-link" onClick={openSheet}>Log in</button>
-            )}
+          <div className="fl-title__grid">
+            <div>
+              <h1 className="fl-h1">
+                Your immigration case, sorted.
+              </h1>
+              <span className="fl-title__track" aria-hidden="true">
+                <span ref={heroRuleRef} className="fl-title__rule" />
+              </span>
+              <p className="fl-title__deck">{audienceLine}</p>
+              <p className="fl-title__sub">
+                Assess a pathway and open the case with its workflow already attached.
+                Keep every file on your own disk, or sync it to your account — your
+                choice.
+              </p>
+              <div className="fl-title__acts">
+                {renderCta('fl-btn')}
+                {!user && (
+                  <button type="button" className="fl-link" onClick={openSheet}>Log in</button>
+                )}
+              </div>
+            </div>
+
+            <figure className="fl-title__figure">
+              <div className="fl-title__docket">
+                <div className="fl-docket__head">
+                  <span>Docket</span>
+                  <b>3 open</b>
+                </div>
+                <ul className="fl-title__rows">
+                  {CASE_FILES.slice(0, 3).map((f, i) => (
+                    <li key={f.label} className="fl-title__row">
+                      <span className="fl-title__rowN">{i + 1}</span>
+                      <span className="fl-title__rowLabel">{f.label}</span>
+                      <span className="fl-title__rowTag">Workflow attached</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <figcaption className="fl-cap">
+                Three pathways, each opened with its workflow already in place.
+              </figcaption>
+            </figure>
           </div>
         </header>
 
