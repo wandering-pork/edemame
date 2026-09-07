@@ -546,6 +546,11 @@ export default function LandingPage() {
           --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
           --ease: cubic-bezier(0.23, 1, 0.32, 1);
           --rail: 208px;
+          /* A near-invisible fiber grain, layered with multiply so the flat
+             --paper/--paper-2 fills read as real stock rather than a CSS
+             color. Never applied to --ch--plate: that chapter is deliberately
+             a dark screen, not paper. */
+          --grain: url('/images/paper-grain.webp');
           background: var(--paper);
           color: var(--ink);
           font-family: var(--text);
@@ -602,8 +607,14 @@ export default function LandingPage() {
         /* ---------------------------------------------------------- shell */
         .fl-body { margin-left: var(--rail); }
         .fl-ch { padding: clamp(84px, 12vh, 150px) clamp(24px, 5vw, 84px); position: relative; }
-        .fl-ch--paper { background: var(--paper); }
-        .fl-ch--paper2 { background: var(--paper-2); }
+        .fl-ch--paper {
+          background-color: var(--paper); background-image: var(--grain);
+          background-size: 480px 480px; background-blend-mode: multiply;
+        }
+        .fl-ch--paper2 {
+          background-color: var(--paper-2); background-image: var(--grain);
+          background-size: 480px 480px; background-blend-mode: multiply;
+        }
         /* The inverted spread re-points every token, including --accent-ink:
            the deep green that carries text on paper is unreadable on plate, so
            the "text" green here is a light one (12.3:1). */
@@ -648,7 +659,8 @@ export default function LandingPage() {
         .fl-title {
           min-height: 100svh; display: flex; flex-direction: column; justify-content: center;
           padding: clamp(96px, 14vh, 170px) clamp(24px, 5vw, 84px) clamp(60px, 9vh, 110px);
-          background: var(--paper);
+          background-color: var(--paper); background-image: var(--grain);
+          background-size: 480px 480px; background-blend-mode: multiply;
         }
         .fl-title__masthead {
           font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase;
@@ -681,8 +693,19 @@ export default function LandingPage() {
           animation: fl-docket-in 700ms var(--ease) 260ms both;
         }
         .fl-title__docket {
+          position: relative;
           background: var(--card); border: 1px solid var(--rule-soft); border-radius: 4px;
           box-shadow: var(--shadow); padding: 18px 20px 20px; transform: rotate(-1.6deg);
+        }
+        .fl-title__stamp {
+          position: absolute; bottom: -22px; right: -22px; width: 68px; height: 68px;
+          color: var(--accent-ink); transform: rotate(9deg);
+          filter: drop-shadow(0 2px 3px rgba(16,32,24,0.18));
+        }
+        .fl-title__stamp svg { width: 100%; height: 100%; overflow: visible; }
+        .fl-title__stamp text {
+          font-family: var(--mono); font-weight: 500; font-size: 15px; letter-spacing: 0.02em;
+          fill: currentColor; text-anchor: middle; text-transform: uppercase;
         }
         .fl-title__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
         .fl-title__row {
@@ -825,7 +848,13 @@ export default function LandingPage() {
         }
         .fl-chip code { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
         .fl-folder {
-          background: var(--card); border: 1px solid var(--rule-soft); border-radius: 4px;
+          background-color: var(--card);
+          background-image:
+            linear-gradient(100deg, var(--card) 42%, rgba(250,250,247,0.5) 76%, rgba(250,250,247,0.08) 100%),
+            url('/images/folder-texture.webp');
+          background-size: cover, cover; background-position: left, right;
+          background-repeat: no-repeat, no-repeat;
+          border: 1px solid var(--rule-soft); border-radius: 4px;
           box-shadow: var(--shadow); padding: 22px 24px;
         }
         .fl-folder__name { font-family: var(--mono); font-weight: 500; font-size: 16px; margin: 0 0 4px; }
@@ -1132,6 +1161,16 @@ export default function LandingPage() {
 
             <figure className="fl-title__figure">
               <div className="fl-title__docket">
+                <div className="fl-title__stamp" aria-hidden="true">
+                  <svg viewBox="0 0 100 100">
+                    <filter id="fl-stamp-rough">
+                      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="noise" />
+                      <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" />
+                    </filter>
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="5" filter="url(#fl-stamp-rough)" />
+                    <text x="50" y="55">Filed</text>
+                  </svg>
+                </div>
                 <div className="fl-docket__head">
                   <span>Docket</span>
                   <b>3 open</b>
