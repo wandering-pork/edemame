@@ -198,7 +198,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/login', { replace: true });
+    navigate('/', { replace: true });
   };
 
   useEffect(() => {

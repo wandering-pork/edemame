@@ -49,6 +49,19 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700;800;900&family=Archivo+Black&display=swap" rel="stylesheet">
+    <!-- Fraunces (display), IBM Plex Mono (data) and JetBrains Mono (AI accent)
+         are used only by the LandingPage marketing page
+         (src/pages/LandingPage.tsx), which is set as a chaptered editorial
+         spread. Its type roles are deliberate: serif for display, Archivo
+         (the brand face, loaded above) for prose and UI, IBM Plex Mono
+         strictly for machine-readable values — subclass codes, document type
+         codes, day offsets, file paths, docket numbers — and JetBrains Mono
+         (the typeface most associated with AI coding tools, e.g. GitHub
+         Copilot/Cursor) for the single word that names what the AI actually
+         did to the case. Nothing else in the app loads any of these faces.
+         Fraunces is variable on optical size and weight, so headings carry
+         real 600/700 weights rather than a synthesised bold. -->
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
     <style>
       /* Global brand overrides */
       .text-green-600 { color: #29B767 !important; }
