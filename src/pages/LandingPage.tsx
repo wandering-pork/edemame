@@ -622,6 +622,10 @@ export default function LandingPage() {
           text-transform: uppercase; color: var(--accent-ink); flex-shrink: 0;
         }
         .fl-open__num b { font-family: var(--mono); font-weight: 500; letter-spacing: 0.04em; }
+        .fl-open__sub {
+          font-family: var(--text); font-weight: 500; font-size: 13px; letter-spacing: 0.01em;
+          color: var(--ink-soft); flex-shrink: 0;
+        }
         .fl-open__line { flex: 1; height: 1px; background: var(--rule); }
 
         /* Fraunces is variable on optical size and weight, so headings carry
@@ -993,6 +997,8 @@ export default function LandingPage() {
           .fl-plates { height: 330px; }
         }
         @media (max-width: 640px) {
+          .fl-open { flex-wrap: wrap; row-gap: 6px; }
+          .fl-open__sub { order: 3; flex-basis: 100%; }
           .fl-h1 { font-size: clamp(2.2rem, 10vw, 2.9rem); }
           .fl-title { min-height: 0; padding-top: 54px; padding-bottom: 60px; }
           .fl-cloud__pair { grid-template-columns: 1fr; gap: 14px; }
@@ -1071,15 +1077,16 @@ export default function LandingPage() {
         {/* ------------------------------------------------------ title page */}
         <header className="fl-title">
           <h1 className="fl-h1">
-            A case system that reads the file <i>before</i> you do.
+            Your immigration case, sorted.
           </h1>
           <span className="fl-title__track" aria-hidden="true">
             <span ref={heroRuleRef} className="fl-title__rule" />
           </span>
           <p className="fl-title__deck">{audienceLine}</p>
           <p className="fl-title__sub">
-            Assess a pathway, open the case with its workflow already attached, and
-            keep the file on your own disk or in your account.
+            Assess a pathway and open the case with its workflow already attached.
+            Keep every file on your own disk, or sync it to your account — your
+            choice.
           </p>
           <div className="fl-title__acts">
             {renderCta('fl-btn')}
@@ -1099,6 +1106,7 @@ export default function LandingPage() {
           <div className="fl-wrap">
             <div className="fl-open">
               <span className="fl-open__num">Chapter <b>I</b></span>
+              <span className="fl-open__sub">Check eligibility before you open a case</span>
               <span className="fl-open__line" />
             </div>
 
@@ -1152,6 +1160,12 @@ export default function LandingPage() {
                   </p>
                   <p style={{ margin: '22px 0 0' }}>{renderCta('fl-btn')}</p>
                 </div>
+
+                <p className="fl-cap" style={{ marginTop: 8, maxWidth: '46ch' }}>
+                  Built for registered migration agents and immigration lawyers.
+                  It is not a substitute for professional migration advice —
+                  AU and NZ immigration advice is regulated.
+                </p>
               </div>
 
               <div className="fl-advisor__col">
@@ -1234,6 +1248,7 @@ export default function LandingPage() {
           <div className="fl-wrap">
             <div className="fl-open">
               <span className="fl-open__num">Chapter <b>II</b></span>
+              <span className="fl-open__sub">Turn a case into a dated task schedule</span>
               <span className="fl-open__line" />
             </div>
             <div className="fl-planner__grid">
@@ -1279,13 +1294,14 @@ export default function LandingPage() {
           <div className="fl-wrap">
             <div className="fl-open">
               <span className="fl-open__num">Chapter <b>III</b></span>
+              <span className="fl-open__sub">Your data, one file per case</span>
               <span className="fl-open__line" />
             </div>
             <div className="fl-local__grid">
               <figure ref={localMediaRef} style={{ margin: 0 }}>
                 <div className="fl-plates">
                   <div className="fl-plate fl-plate--back" ref={(el) => { plateRefs.current[0] = el; }}>
-                    <div className="fl-chip"><code>cases/</code> one file per matter</div>
+                    <div className="fl-chip">Your data, one file per case</div>
                   </div>
                   <div className="fl-plate fl-plate--mid" ref={(el) => { plateRefs.current[1] = el; }}>
                     <div className="fl-folder">
@@ -1303,8 +1319,8 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <figcaption className="fl-cap">
-                  Local mode uses the File System Access API, so it needs Chrome or
-                  Edge.
+                  Local mode links a folder directly on your computer — currently
+                  requires Chrome or Edge.
                 </figcaption>
               </figure>
               <div>
@@ -1335,6 +1351,7 @@ export default function LandingPage() {
           <div className="fl-wrap">
             <div className="fl-open">
               <span className="fl-open__num">Chapter <b>IV</b></span>
+              <span className="fl-open__sub">Access the same case from any device</span>
               <span className="fl-open__line" />
             </div>
             <div className="fl-cloud__grid">
@@ -1345,9 +1362,10 @@ export default function LandingPage() {
                   documents in a private bucket.
                 </p>
                 <p className="fl-p fl-rise">
-                  Every row carries your account id, and row-level security scopes
-                  reads and writes to it. Document files are stored under your own
-                  path prefix, with the same rule applied at the storage layer.
+                  Every case is scoped to your account at the database level, so
+                  no other firm can read or write it. Document files are stored
+                  under your own path prefix, with the same rule applied at the
+                  storage layer.
                 </p>
                 <p className="fl-p fl-rise">
                   Choose either mode at sign-up and change your mind later. Switching
@@ -1390,6 +1408,7 @@ export default function LandingPage() {
           <div className="fl-wrap">
             <div className="fl-open">
               <span className="fl-open__num">Chapter <b>V</b></span>
+              <span className="fl-open__sub">Share cases and track who did what</span>
               <span className="fl-open__line" />
             </div>
             <div className="fl-team__grid">
@@ -1450,6 +1469,7 @@ export default function LandingPage() {
           <div className="fl-wrap">
             <div className="fl-open">
               <span className="fl-open__num">Chapter <b>VI</b></span>
+              <span className="fl-open__sub">Answers to what people ask first</span>
               <span className="fl-open__line" />
             </div>
             <h2 id="faq-title" className="fl-h2 fl-rise">Common questions.</h2>
@@ -1476,6 +1496,7 @@ export default function LandingPage() {
             <div className="fl-wrap">
               <div className="fl-open">
                 <span className="fl-open__num">Chapter <b>VII</b></span>
+                <span className="fl-open__sub">Set up storage and open your first case</span>
                 <span className="fl-open__line" />
               </div>
               <div className="fl-start__grid">
