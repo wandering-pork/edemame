@@ -658,6 +658,7 @@ export default function LandingPage() {
 
         /* ------------------------------------------------------ title page */
         .fl-title {
+          position: relative; overflow: hidden;
           min-height: 100svh; display: flex; flex-direction: column; justify-content: center;
           padding: clamp(96px, 14vh, 170px) clamp(24px, 5vw, 84px) clamp(60px, 9vh, 110px);
           background-color: var(--paper); background-image: var(--grain);
@@ -667,13 +668,16 @@ export default function LandingPage() {
           font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase;
           color: var(--ink-soft); margin: 0 0 clamp(24px, 4vh, 44px);
         }
+        .fl-title__prose { position: relative; z-index: 1; }
         .fl-h1 {
           font-family: var(--display); font-weight: 600;
           font-size: clamp(2.7rem, 7.4vw, 5.6rem); line-height: 0.98;
           letter-spacing: -0.028em; margin: 0; max-width: 15ch; text-wrap: balance;
         }
         .fl-h1 i { font-style: italic; color: var(--accent-ink); margin-right: 0.14em; }
-        .fl-h1__accent { color: var(--accent-ink); }
+        /* Fraunces at this size/weight lets the r and t collide at the
+           headline's tight -0.028em tracking; ease off just for this word. */
+        .fl-h1__accent { color: var(--accent-ink); letter-spacing: -0.005em; }
         .fl-title__track {
           display: block; height: 2px; background: var(--rule-soft);
           margin: clamp(26px, 4vh, 44px) 0 0; max-width: 760px; overflow: hidden;
@@ -689,41 +693,47 @@ export default function LandingPage() {
         .fl-title__sub { font-size: 15px; line-height: 1.6; color: var(--ink-soft); max-width: 46ch; margin: 12px 0 0; }
         .fl-title__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: clamp(28px, 4vh, 42px); }
 
-        .fl-title__grid { display: grid; grid-template-columns: minmax(0, 1fr); }
-        .fl-title__figure {
-          margin: clamp(48px, 7vh, 64px) 0 0; max-width: 560px;
-          animation: fl-hero-figure-in 800ms var(--ease) 260ms both;
+        /* An ambient, oversized globe bleeding off the right edge, rather
+           than a small contained diagram — flat ink line-art (graticule +
+           silhouette only, no shading/gradient) so it reads as a schematic
+           drawing, not the generic 3D SaaS-hero globe. One accent-colored
+           marker for AU/NZ is the only thing it calls out by name. */
+        .fl-title__globe {
+          position: absolute; z-index: 0; inset: 0 auto 0 auto; margin: auto 0;
+          top: 0; bottom: 0; right: clamp(-200px, -14vw, -40px);
+          width: clamp(520px, 58vw, 900px); aspect-ratio: 1;
+          pointer-events: none;
+          animation: fl-globe-in 1100ms var(--ease) 200ms both;
         }
-        .fl-title__map { display: block; width: 100%; height: auto; overflow: visible; }
-        .fl-title__mapRoutes {
-          fill: none; stroke: var(--ink-soft); stroke-width: 1;
-          stroke-dasharray: 1 5; stroke-linecap: round; opacity: 0.8;
-        }
-        .fl-title__mapPins { fill: var(--ink-soft); }
-        .fl-title__mapPins text {
-          font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em;
-          fill: var(--ink-soft); text-transform: uppercase;
-        }
-        .fl-title__mapDest { fill: var(--accent-ink); }
-        .fl-title__mapStampRing { fill: none; stroke: var(--accent-ink); }
-        .fl-title__mapDest text {
-          font-family: var(--mono); font-weight: 600; font-size: 12px; letter-spacing: 0.04em;
+        .fl-title__globeSvg { display: block; width: 100%; height: 100%; overflow: visible; }
+        .fl-title__globeGrid { fill: none; stroke: var(--ink-soft); stroke-width: 1; opacity: 0.5; }
+        .fl-title__globeOutline { fill: none; stroke: var(--ink-soft); stroke-width: 1.4; opacity: 0.75; }
+        .fl-title__globeRing { fill: none; stroke: var(--accent-ink); stroke-width: 1.6; opacity: 0.55; }
+        .fl-title__globeDot { fill: var(--accent-ink); }
+        .fl-title__globeLabel {
+          font-family: var(--mono); font-weight: 600; font-size: 13px; letter-spacing: 0.04em;
           fill: var(--accent-ink); text-transform: uppercase;
         }
-        .fl-title__mapStamp {
-          font-family: var(--mono); font-weight: 500; font-size: 9px; letter-spacing: 0.03em;
+        .fl-title__globeStampRing { fill: none; stroke: var(--accent-ink); }
+        .fl-title__globeStamp {
+          font-family: var(--mono); font-weight: 500; font-size: 9.5px; letter-spacing: 0.03em;
           fill: var(--accent-ink); text-transform: uppercase;
         }
-        @keyframes fl-hero-figure-in {
-          from { opacity: 0; transform: translateY(16px); }
+        @keyframes fl-globe-in {
+          from { opacity: 0; transform: translateX(28px); }
           to { opacity: 1; transform: none; }
         }
         @media (prefers-reduced-motion: reduce) {
-          .fl-title__figure { animation: none; }
+          .fl-title__globe { animation: none; }
         }
-        @media (min-width: 1024px) {
-          .fl-title__grid { grid-template-columns: minmax(0, 0.95fr) minmax(360px, 620px); gap: clamp(32px, 6vw, 96px); align-items: center; }
-          .fl-title__figure { margin: 0; }
+        @media (max-width: 1023px) {
+          .fl-title { overflow: visible; }
+          .fl-title__prose { order: 1; }
+          .fl-title__globe {
+            position: static; order: 2; inset: auto;
+            margin: clamp(48px, 8vh, 64px) auto 0;
+            width: min(82vw, 440px); opacity: 1;
+          }
         }
 
         /* Ink on the bright green, not white: white reads 2.6:1 there and
@@ -1133,68 +1143,61 @@ export default function LandingPage() {
 
         {/* ------------------------------------------------------ title page */}
         <header className="fl-title">
-          <div className="fl-title__grid">
-            <div>
-              <h1 className="fl-h1">
-                Your immigration case, <span className="fl-h1__accent">sorted.</span>
-              </h1>
-              <span className="fl-title__track" aria-hidden="true">
-                <span ref={heroRuleRef} className="fl-title__rule" />
-              </span>
-              <p className="fl-title__deck">{audienceLine}</p>
-              <p className="fl-title__sub">
-                Assess a pathway and open the case with its workflow already attached.
-                Keep every file on your own disk, or sync it to your account — your
-                choice.
-              </p>
-              <div className="fl-title__acts">
-                {renderCta('fl-btn')}
-                {!user && (
-                  <button type="button" className="fl-link" onClick={openSheet}>Log in</button>
-                )}
-              </div>
+          <div className="fl-title__globe" aria-hidden="true">
+            <svg className="fl-title__globeSvg" viewBox="0 0 700 700">
+              <defs>
+                <clipPath id="fl-globe-clip">
+                  <circle cx="350" cy="350" r="280" />
+                </clipPath>
+                <filter id="fl-stamp-rough">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="noise" />
+                  <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" />
+                </filter>
+              </defs>
+
+              <g className="fl-title__globeGrid" clipPath="url(#fl-globe-clip)">
+                <ellipse cx="350" cy="350" rx="210" ry="280" />
+                <ellipse cx="350" cy="350" rx="130" ry="280" />
+                <ellipse cx="350" cy="350" rx="45" ry="280" />
+                <line x1="70" y1="190" x2="630" y2="190" />
+                <line x1="70" y1="270" x2="630" y2="270" />
+                <line x1="70" y1="350" x2="630" y2="350" />
+                <line x1="70" y1="430" x2="630" y2="430" />
+                <line x1="70" y1="510" x2="630" y2="510" />
+              </g>
+              <circle cx="350" cy="350" r="280" className="fl-title__globeOutline" />
+
+              <g transform="translate(470,430)">
+                <circle r="18" className="fl-title__globeRing" />
+                <circle r="4.5" className="fl-title__globeDot" />
+                <text x="-14" y="-22" textAnchor="end" className="fl-title__globeLabel">AU / NZ</text>
+                <g transform="translate(38,30) rotate(-7)">
+                  <circle cx="0" cy="0" r="24" className="fl-title__globeStampRing" strokeWidth="3" filter="url(#fl-stamp-rough)" />
+                  <text x="0" y="4" textAnchor="middle" className="fl-title__globeStamp">Filed</text>
+                </g>
+              </g>
+            </svg>
+          </div>
+
+          <div className="fl-title__prose">
+            <h1 className="fl-h1">
+              Your immigration case, <span className="fl-h1__accent">sorted.</span>
+            </h1>
+            <span className="fl-title__track" aria-hidden="true">
+              <span ref={heroRuleRef} className="fl-title__rule" />
+            </span>
+            <p className="fl-title__deck">{audienceLine}</p>
+            <p className="fl-title__sub">
+              Assess a pathway and open the case with its workflow already attached.
+              Keep every file on your own disk, or sync it to your account — your
+              choice.
+            </p>
+            <div className="fl-title__acts">
+              {renderCta('fl-btn')}
+              {!user && (
+                <button type="button" className="fl-link" onClick={openSheet}>Log in</button>
+              )}
             </div>
-
-            <figure className="fl-title__figure">
-              <svg className="fl-title__map" viewBox="0 0 520 400" aria-hidden="true">
-                <defs>
-                  <filter id="fl-stamp-rough">
-                    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="noise" />
-                    <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" />
-                  </filter>
-                </defs>
-
-                <g className="fl-title__mapRoutes">
-                  <path d="M50,70 Q235,110 420,300" />
-                  <path d="M330,60 Q400,120 420,300" />
-                  <path d="M200,130 Q330,150 420,300" />
-                  <path d="M360,150 Q410,180 420,300" />
-                </g>
-
-                <g className="fl-title__mapPins">
-                  <circle cx="50" cy="70" r="3" />
-                  <circle cx="330" cy="60" r="3" />
-                  <circle cx="200" cy="130" r="3" />
-                  <circle cx="360" cy="150" r="3" />
-                  <text x="58" y="66">London</text>
-                  <text x="338" y="56">Guangzhou</text>
-                  <text x="192" y="150" textAnchor="end">Mumbai</text>
-                  <text x="368" y="144">Manila</text>
-                </g>
-
-                <g className="fl-title__mapDest">
-                  <circle cx="420" cy="300" r="4.5" />
-                  <text x="432" y="296">AU / NZ</text>
-                  <g transform="translate(462,338) rotate(-8)">
-                    <circle cx="0" cy="0" r="24" className="fl-title__mapStampRing" strokeWidth="3" filter="url(#fl-stamp-rough)" />
-                    <text x="0" y="4" textAnchor="middle" className="fl-title__mapStamp">Filed</text>
-                  </g>
-                </g>
-              </svg>
-              <figcaption className="fl-cap">
-                Every case starts somewhere. This is where it's going.
-              </figcaption>
-            </figure>
           </div>
         </header>
 
