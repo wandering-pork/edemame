@@ -79,6 +79,9 @@ const TASK_ROWS = [
   { day: 'Day 26', title: 'Assemble and lodge the application' },
 ];
 
+/** Tasks shown circulating across the roster in Chapter IV. */
+const ROSTER_CHIPS = ['Medical exam', 'Checklist', 'Lodgement'];
+
 /** Real seeded document-type codes from src/lib/documentTypes.ts. */
 const FAQS = [
   { q: 'Can I keep my data on my own machine?', a: 'Yes. Local mode links a real folder on disk (works well inside Dropbox, OneDrive or iCloud Drive) and every case is a plain file in it. Nothing is uploaded unless you switch to cloud mode.' },
@@ -331,6 +334,9 @@ export default function LandingPage() {
   const tiltRef = useRef<HTMLDivElement>(null);
   const globeCanvasRef = useRef<HTMLCanvasElement>(null);
   const globeWrapRef = useRef<HTMLDivElement>(null);
+  const podMarkerRef = useRef<HTMLImageElement>(null);
+  const rosterTrackRef = useRef<HTMLDivElement>(null);
+  const rosterChipRefs = useRef<Array<HTMLSpanElement | null>>([]);
 
   /* --- the scroll spine: ordinary vertical scroll, read, never hijacked --- */
   useEffect(() => {
@@ -351,6 +357,12 @@ export default function LandingPage() {
     };
 
     const paint = () => {
+      // the sidebar pod slides down (or back up) the vine as a direct
+      // function of how far through the whole page you are
+      if (podMarkerRef.current) {
+        const total = Math.max(document.documentElement.scrollHeight - innerHeight, 1);
+        podMarkerRef.current.style.top = `${(clamp(scrollY / total) * 100).toFixed(2)}%`;
+      }
       // hero rule draws as the first screen is left behind
       if (heroRuleRef.current) {
         const p = clamp(scrollY / (innerHeight * 0.65));
@@ -444,6 +456,19 @@ export default function LandingPage() {
           packetInRef.current.style.left = `${((1 - t) * 100).toFixed(2)}%`;
           packetInRef.current.style.opacity = (0.15 + 0.85 * Math.sin(t * Math.PI)).toFixed(3);
         }
+      }
+
+      /* ---- Chapter IV · tasks circulating across the roster ---- */
+      if (rosterTrackRef.current) {
+        const p = viewProgress(rosterTrackRef.current);
+        const n = rosterChipRefs.current.length || 1;
+        rosterChipRefs.current.forEach((el, i) => {
+          if (!el) return;
+          const t = (p * 1.7 + i / n) % 1;
+          el.style.left = `${(t * 100).toFixed(2)}%`;
+          const edge = Math.min(t, 1 - t);
+          el.style.opacity = clamp(edge / 0.1, 0.1, 1).toFixed(3);
+        });
       }
     };
 
@@ -704,7 +729,22 @@ export default function LandingPage() {
           letter-spacing: -0.01em; text-decoration: none; color: var(--ink);
         }
         .fl-folio__mark span { color: var(--accent-ink); }
-        .fl-folio__list { list-style: none; margin: auto 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+        /* The pod is the sidebar's own scroll-progress marker — an edamame
+           pod sliding down a vine beside the chapter list, in place of a
+           plain progress bar. Generated locally (Fooocus), no alpha channel,
+           so it sits on white and relies on multiply blend to disappear
+           against the paper background (same trick as the paper grain and
+           the hero's stamp texture). */
+        .fl-folio__railwrap { position: relative; margin: auto 0; padding-left: 18px; }
+        .fl-folio__rail {
+          position: absolute; left: 3px; top: 2px; bottom: 2px; width: 1px; background: var(--rule-soft);
+        }
+        .fl-folio__pod {
+          position: absolute; left: 3px; top: 0; width: 15px; max-width: none; height: auto;
+          transform: translate(-50%, -50%); mix-blend-mode: multiply;
+          pointer-events: none; will-change: top;
+        }
+        .fl-folio__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
         .fl-folio__link {
           display: grid; grid-template-columns: 26px 1fr; align-items: baseline; gap: 8px;
           padding: 6px 0; text-decoration: none; color: var(--ink-soft);
@@ -1043,26 +1083,19 @@ export default function LandingPage() {
         .fl-roster__taskrow { display: flex; align-items: center; justify-content: center; gap: 5px; }
         .fl-roster__taskicon { width: 13px; height: 13px; color: var(--accent-ink); flex-shrink: 0; }
         .fl-roster__task { font-size: 11px; line-height: 1.3; color: var(--ink-soft); text-align: left; }
-        .fl-roster__lines { position: relative; height: 30px; margin: 0 16%; }
-        .fl-roster__lines::before {
-          content: ''; position: absolute; top: 12px; left: 0; right: 0; height: 1px; background: var(--rule);
+        /* Tasks glide continuously left-to-right across the three staff and
+           wrap back to the start — always in motion, a pure function of
+           scroll position like Chapter III's flow packets, just carrying a
+           label instead of being a plain dot. */
+        .fl-roster__track { position: relative; height: 84px; margin-top: 10px; }
+        .fl-roster__trackline { position: absolute; left: 18px; right: 18px; top: 6px; height: 1px; background: var(--rule); }
+        .fl-roster__chip {
+          position: absolute; top: 0; transform: translateX(-50%);
+          background: var(--paper); border: 1px solid var(--rule-soft); border-radius: 999px;
+          padding: 5px 11px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.01em;
+          color: var(--accent-ink); white-space: nowrap; box-shadow: var(--shadow);
+          will-change: left, opacity;
         }
-        .fl-roster__lines::after {
-          content: ''; position: absolute; top: 12px; bottom: 0; left: 50%; width: 1px;
-          background: var(--rule); transform: translateX(-50%);
-        }
-        .fl-roster__lines span { position: absolute; top: 0; height: 12px; width: 1px; background: var(--rule); }
-        .fl-roster__lines span:nth-child(1) { left: 0; }
-        .fl-roster__lines span:nth-child(2) { left: 50%; transform: translateX(-50%); }
-        .fl-roster__lines span:nth-child(3) { right: 0; }
-        .fl-roster__case {
-          text-align: center; background: var(--paper); border: 1px solid var(--rule-soft);
-          border-radius: 4px; padding: 16px;
-        }
-        .fl-roster__cloud { display: inline-flex; width: 26px; height: 26px; color: var(--accent-ink); margin-bottom: 8px; }
-        .fl-roster__cloud svg { width: 100%; height: 100%; }
-        .fl-roster__name { font-family: var(--mono); font-weight: 500; font-size: 13.5px; margin: 0 0 2px; }
-        .fl-roster__meta { font-size: 11px; color: var(--ink-soft); margin: 0; }
 
         /* --------------------------------------------------- VI · questions */
         .fl-faq { max-width: 700px; }
@@ -1224,6 +1257,7 @@ export default function LandingPage() {
           .fl-verdict__status { opacity: 1 !important; }
           .fl-flow__packet { display: none; }
           .fl-roster { transform: none !important; }
+          .fl-roster__chip { display: none; }
           /* keep the opacity that carries comprehension, drop position changes */
           .fl-mask > span { transform: none; transition: none; }
           [data-in] .fl-rise { transform: none !important; transition: opacity 400ms linear; }
@@ -1233,20 +1267,24 @@ export default function LandingPage() {
       {/* ------------------------------------------------------------ folio */}
       <nav className="fl-folio" aria-label="Contents">
         <a className="fl-folio__mark" href="#top">Edamame<span>.</span></a>
-        <ol className="fl-folio__list">
-          {chapters.map((c) => (
-            <li key={c.id}>
-              <a
-                className="fl-folio__link"
-                href={`#${c.id}`}
-                aria-current={activeChapter === c.id}
-              >
-                <em>{c.numeral}</em>
-                {c.short}
-              </a>
-            </li>
-          ))}
-        </ol>
+        <div className="fl-folio__railwrap">
+          <span className="fl-folio__rail" aria-hidden="true" />
+          <img ref={podMarkerRef} src="/images/pod-marker.webp" alt="" className="fl-folio__pod" />
+          <ol className="fl-folio__list">
+            {chapters.map((c) => (
+              <li key={c.id}>
+                <a
+                  className="fl-folio__link"
+                  href={`#${c.id}`}
+                  aria-current={activeChapter === c.id}
+                >
+                  <em>{c.numeral}</em>
+                  {c.short}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </div>
         <p className="fl-folio__foot">
           {user ? (
             <Link to="/dashboard">Dashboard</Link>
@@ -1654,23 +1692,24 @@ export default function LandingPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="fl-roster__lines" aria-hidden="true">
-                    <span /><span /><span />
-                  </div>
-                  <div className="fl-roster__case">
-                    <span className="fl-roster__cloud" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M7 18a4 4 0 0 1-.6-7.96A5 5 0 0 1 16 8a3.5 3.5 0 0 1 1 6.9" />
-                        <path d="M7 18h10" />
-                      </svg>
-                    </span>
-                    <p className="fl-roster__name">Chen, Skilled 190</p>
-                    <p className="fl-roster__meta">One case, one live version</p>
+                  <div ref={rosterTrackRef} className="fl-roster__track" aria-hidden="true">
+                    <span className="fl-roster__trackline" />
+                    {ROSTER_CHIPS.map((label, i) => (
+                      <span
+                        key={label}
+                        ref={(el) => { rosterChipRefs.current[i] = el; }}
+                        className="fl-roster__chip"
+                        style={{ top: i * 24 }}
+                      >
+                        {label}
+                      </span>
+                    ))}
                   </div>
                 </div>
                 <figcaption className="fl-cap">
-                  Three staff, one case, always the same version — as long as the
-                  practice is on cloud storage.
+                  Chen, Skilled 190: tasks move between staff as work is picked
+                  up and handed off — the same case, always the same version, as
+                  long as the practice is on cloud storage.
                 </figcaption>
               </figure>
             </div>
