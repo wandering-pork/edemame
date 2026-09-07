@@ -362,12 +362,13 @@ export default function LandingPage() {
         const p = clamp(scrollY / (innerHeight * 0.65));
         heroRuleRef.current.style.transform = `scaleX(${p})`;
       }
-      // the globe slides up and out as the hero is left behind, faster than
-      // the page itself scrolls — a light parallax exit rather than a hard cut
+      // the globe slides up and out well before the hero itself is gone —
+      // it's much bigger than the viewport, so a subtle shift reads as
+      // nothing; this needs to be an obvious, fast exit
       if (globeWrapRef.current) {
-        const p = clamp(scrollY / (innerHeight * 0.9));
-        globeWrapRef.current.style.transform = `translateY(${(p * -22).toFixed(2)}%)`;
-        globeWrapRef.current.style.opacity = String(clamp(1 - p * 1.15, 0, 1));
+        const p = clamp(scrollY / (innerHeight * 0.5));
+        globeWrapRef.current.style.transform = `translate3d(${(p * 6).toFixed(2)}%, ${(p * -85).toFixed(2)}%, 0)`;
+        globeWrapRef.current.style.opacity = String(clamp(1 - p * 1.3, 0, 1));
       }
       if (colophonRuleRef.current) {
         const p = viewProgress(colophonRuleRef.current.parentElement as HTMLElement);
