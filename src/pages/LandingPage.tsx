@@ -330,6 +330,7 @@ export default function LandingPage() {
   const cloudWipeRef = useRef<HTMLDivElement>(null);
   const cloudThreadRef = useRef<HTMLSpanElement>(null);
   const tiltRef = useRef<HTMLDivElement>(null);
+  const globeCanvasRef = useRef<HTMLCanvasElement>(null);
 
   /* --- the scroll spine: ordinary vertical scroll, read, never hijacked --- */
   useEffect(() => {
@@ -461,6 +462,99 @@ export default function LandingPage() {
     nodes.forEach((n) => io.observe(n));
     return () => io.disconnect();
   }, []);
+
+  /* --- hero · a slowly rotating dot-matrix globe, drawn on canvas ---
+     A Fibonacci sphere (even point spread, no pole clustering) rotated
+     around its vertical axis. Each point's size/opacity is scaled by how
+     much it faces the camera, so the sphere reads as lit/dimensional from
+     dot density alone — a halftone-print technique, not a gradient — and
+     stays inside the page's flat ink-on-paper palette instead of the
+     glowing neon-on-black look of a typical SaaS hero globe. */
+  useEffect(() => {
+    const canvas = globeCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const styles = getComputedStyle(canvas);
+    const inkSoft = styles.getPropertyValue('--ink-soft').trim() || '#56635C';
+
+    const COUNT = 3200;
+    const points: Array<[number, number, number]> = [];
+    const offset = 2 / COUNT;
+    const increment = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < COUNT; i++) {
+      const y = i * offset - 1 + offset / 2;
+      const r = Math.sqrt(Math.max(0, 1 - y * y));
+      const phi = i * increment;
+      points.push([Math.cos(phi) * r, y, Math.sin(phi) * r]);
+    }
+
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    let width = 0;
+    let height = 0;
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    addEventListener('resize', resize);
+
+    const draw = (theta: number) => {
+      ctx.clearRect(0, 0, width, height);
+      const cx = width / 2;
+      const cy = height / 2;
+      const R = Math.min(width, height) / 2;
+      const cosT = Math.cos(theta);
+      const sinT = Math.sin(theta);
+
+      for (const [x, y, z] of points) {
+        const rz = -x * sinT + z * cosT;
+        if (rz < 0) continue;
+        const rx = x * cosT + z * sinT;
+        const shade = 0.12 + 0.88 * rz;
+        ctx.beginPath();
+        ctx.arc(cx + rx * R, cy - y * R, 0.55 * shade + 0.18, 0, Math.PI * 2);
+        ctx.fillStyle = inkSoft;
+        ctx.globalAlpha = 0.16 + 0.74 * shade;
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, Math.PI * 2);
+      ctx.strokeStyle = inkSoft;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    };
+
+    let raf = 0;
+    if (reduced) {
+      draw(0.6);
+    } else {
+      let last = performance.now();
+      let theta = 0;
+      const speed = (Math.PI * 2) / 90000; // one revolution per 90s — ambient, not showy
+      const tick = (now: number) => {
+        theta += speed * (now - last);
+        last = now;
+        draw(theta);
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    }
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      removeEventListener('resize', resize);
+    };
+  }, [reduced]);
 
   /* --- the folio marks the chapter you are in --- */
   useEffect(() => {
@@ -675,9 +769,16 @@ export default function LandingPage() {
           letter-spacing: -0.028em; margin: 0; max-width: 15ch; text-wrap: balance;
         }
         .fl-h1 i { font-style: italic; color: var(--accent-ink); margin-right: 0.14em; }
-        /* Fraunces at this size/weight lets the r and t collide at the
-           headline's tight -0.028em tracking; ease off just for this word. */
-        .fl-h1__accent { color: var(--accent-ink); letter-spacing: -0.005em; }
+        /* The docket, checklist and folder chips all use mono for a status
+           value ("3 open", "Filed", "Linked") — carry that same device into
+           the headline itself for the one word that IS the case's status,
+           rather than just recoloring it in the same serif. Also sidesteps
+           Fraunces' r/t collision at the headline's tight tracking. */
+        .fl-h1__accent {
+          display: inline-block; font-family: var(--mono); font-weight: 500;
+          font-size: 0.62em; letter-spacing: 0.01em; color: var(--accent-ink);
+          vertical-align: 0.05em;
+        }
         .fl-title__track {
           display: block; height: 2px; background: var(--rule-soft);
           margin: clamp(26px, 4vh, 44px) 0 0; max-width: 760px; overflow: hidden;
@@ -705,9 +806,10 @@ export default function LandingPage() {
           pointer-events: none;
           animation: fl-globe-in 1100ms var(--ease) 200ms both;
         }
-        .fl-title__globeSvg { display: block; width: 100%; height: 100%; overflow: visible; }
-        .fl-title__globeGrid { fill: none; stroke: var(--ink-soft); stroke-width: 1; opacity: 0.5; }
-        .fl-title__globeOutline { fill: none; stroke: var(--ink-soft); stroke-width: 1.4; opacity: 0.75; }
+        .fl-title__globeCanvas { display: block; width: 100%; height: 100%; }
+        .fl-title__globeOverlay {
+          position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
+        }
         .fl-title__globeRing { fill: none; stroke: var(--accent-ink); stroke-width: 1.6; opacity: 0.55; }
         .fl-title__globeDot { fill: var(--accent-ink); }
         .fl-title__globeLabel {
@@ -730,7 +832,7 @@ export default function LandingPage() {
           .fl-title { overflow: visible; }
           .fl-title__prose { order: 1; }
           .fl-title__globe {
-            position: static; order: 2; inset: auto;
+            position: relative; order: 2; inset: auto; top: auto; bottom: auto; right: auto;
             margin: clamp(48px, 8vh, 64px) auto 0;
             width: min(82vw, 440px); opacity: 1;
           }
@@ -1144,28 +1246,14 @@ export default function LandingPage() {
         {/* ------------------------------------------------------ title page */}
         <header className="fl-title">
           <div className="fl-title__globe" aria-hidden="true">
-            <svg className="fl-title__globeSvg" viewBox="0 0 700 700">
+            <canvas ref={globeCanvasRef} className="fl-title__globeCanvas" />
+            <svg className="fl-title__globeOverlay" viewBox="0 0 700 700">
               <defs>
-                <clipPath id="fl-globe-clip">
-                  <circle cx="350" cy="350" r="280" />
-                </clipPath>
                 <filter id="fl-stamp-rough">
                   <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="noise" />
                   <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" />
                 </filter>
               </defs>
-
-              <g className="fl-title__globeGrid" clipPath="url(#fl-globe-clip)">
-                <ellipse cx="350" cy="350" rx="210" ry="280" />
-                <ellipse cx="350" cy="350" rx="130" ry="280" />
-                <ellipse cx="350" cy="350" rx="45" ry="280" />
-                <line x1="70" y1="190" x2="630" y2="190" />
-                <line x1="70" y1="270" x2="630" y2="270" />
-                <line x1="70" y1="350" x2="630" y2="350" />
-                <line x1="70" y1="430" x2="630" y2="430" />
-                <line x1="70" y1="510" x2="630" y2="510" />
-              </g>
-              <circle cx="350" cy="350" r="280" className="fl-title__globeOutline" />
 
               <g transform="translate(470,430)">
                 <circle r="18" className="fl-title__globeRing" />
