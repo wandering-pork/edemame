@@ -80,17 +80,10 @@ const TASK_ROWS = [
 ];
 
 /** Real seeded document-type codes from src/lib/documentTypes.ts. */
-const DOC_CHIPS = [
-  { code: 'PPT', label: 'Passport, all pages' },
-  { code: 'MEDEX', label: 'Medical examination' },
-  { code: 'AFPCHK', label: 'AFP police check' },
-  { code: 'BIRTH', label: 'Birth certificate' },
-];
-
 const FAQS = [
   { q: 'Can I keep my data on my own machine?', a: 'Yes. Local mode links a real folder on disk (works well inside Dropbox, OneDrive or iCloud Drive) and every case is a plain file in it. Nothing is uploaded unless you switch to cloud mode.' },
   { q: 'Does this work for both AU and NZ?', a: 'Yes, both jurisdictions are supported with their own workflow templates and terminology, not one generic template stretched across both.' },
-  { q: 'Can my whole team use one account?', a: 'Yes. Team members share cases, an activity feed, and document checklists, whether you’re on local or cloud storage.' },
+  { q: 'Can my whole team use one account?', a: 'Yes, on cloud storage. Everyone sees the same cases, activity feed, and document checklists update in real time. Local mode links one folder to one person, so team-wide access is what cloud is for.' },
   { q: 'What happens to my local data if I switch to cloud later?', a: 'Switching modes copies every case, client, and document across for you. Your local folder is left untouched afterward, so it stays as a backup.' },
 ];
 
@@ -99,17 +92,16 @@ type Chapter = { id: string; numeral: string; short: string; title: string };
 const CHAPTERS: Chapter[] = [
   { id: 'advisor', numeral: 'I', short: 'Advisor', title: 'AI Visa Advisor' },
   { id: 'planner', numeral: 'II', short: 'Planner', title: 'AI Task Planner' },
-  { id: 'local', numeral: 'III', short: 'On disk', title: 'Local storage' },
-  { id: 'cloud', numeral: 'IV', short: 'In cloud', title: 'Cloud storage' },
-  { id: 'team', numeral: 'V', short: 'Your team', title: 'Team and attachments' },
-  { id: 'faq', numeral: 'VI', short: 'Questions', title: 'Common questions' },
+  { id: 'local', numeral: 'III', short: 'Storage', title: 'Local or cloud storage' },
+  { id: 'team', numeral: 'IV', short: 'Your team', title: 'Team and attachments' },
+  { id: 'faq', numeral: 'V', short: 'Questions', title: 'Common questions' },
 ];
 
 /**
  * The last chapter is the account form itself, so the page ends where you
  * start rather than handing off to a separate screen. Hidden once signed in.
  */
-const START_CHAPTER: Chapter = { id: 'start', numeral: 'VII', short: 'Start', title: 'Create your account' };
+const START_CHAPTER: Chapter = { id: 'start', numeral: 'VI', short: 'Start', title: 'Create your account' };
 
 const NAME_MAX_LENGTH = 100;
 
@@ -329,11 +321,13 @@ export default function LandingPage() {
   const verdictRefs = useRef<Array<HTMLDivElement | null>>([]);
   const verdictBarRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const verdictStatusRefs = useRef<Array<HTMLSpanElement | null>>([]);
-  const localMediaRef = useRef<HTMLDivElement>(null);
-  const plateRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const cloudMediaRef = useRef<HTMLDivElement>(null);
-  const cloudWipeRef = useRef<HTMLDivElement>(null);
-  const cloudThreadRef = useRef<HTMLSpanElement>(null);
+  const plannerMediaRef = useRef<HTMLDivElement>(null);
+  const plannerCheckRefs = useRef<Array<SVGPathElement | null>>([]);
+  const plannerBoxRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const plannerTitleRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const storageMediaRef = useRef<HTMLDivElement>(null);
+  const packetOutRef = useRef<HTMLSpanElement>(null);
+  const packetInRef = useRef<HTMLSpanElement>(null);
   const tiltRef = useRef<HTMLDivElement>(null);
   const globeCanvasRef = useRef<HTMLCanvasElement>(null);
   const globeWrapRef = useRef<HTMLDivElement>(null);
@@ -419,24 +413,36 @@ export default function LandingPage() {
         });
       }
 
-      /* ---- Chapter III · parallax plates ---- */
-      if (localMediaRef.current) {
-        const p = viewProgress(localMediaRef.current);
-        const rates = [-1.0, -0.45, 0.55];
-        plateRefs.current.forEach((el, i) => {
-          if (!el) return;
-          el.style.transform = `translate3d(0, ${(rates[i] * (p - 0.5) * 100).toFixed(2)}px, 0)`;
-        });
+      /* ---- Chapter II · tasks tick off as their day arrives ---- */
+      if (plannerMediaRef.current) {
+        const p = viewProgress(plannerMediaRef.current);
+        const n = plannerCheckRefs.current.length || 1;
+        for (let i = 0; i < n; i++) {
+          const t = clamp((p - i * (0.72 / n)) / 0.3);
+          const path = plannerCheckRefs.current[i];
+          if (path) path.style.strokeDashoffset = (1 - t).toFixed(3);
+          const box = plannerBoxRefs.current[i];
+          if (box) box.style.borderColor = t > 0.15 ? 'var(--accent-ink)' : '';
+          const title = plannerTitleRefs.current[i];
+          if (title) {
+            title.style.opacity = lerp(1, 0.5, t).toFixed(3);
+            title.style.textDecoration = t > 0.85 ? 'line-through' : 'none';
+          }
+        }
       }
 
-      /* ---- Chapter IV · the wipe ---- */
-      if (cloudMediaRef.current) {
-        const p = clamp((viewProgress(cloudMediaRef.current) - 0.38) / 0.32);
-        if (cloudWipeRef.current) {
-          cloudWipeRef.current.style.clipPath = `inset(0 ${((1 - p) * 100).toFixed(2)}% 0 0)`;
+      /* ---- Chapter III · data moving between a local folder and the cloud ---- */
+      if (storageMediaRef.current) {
+        const p = viewProgress(storageMediaRef.current);
+        if (packetOutRef.current) {
+          const t = (p * 2.4) % 1;
+          packetOutRef.current.style.left = `${(t * 100).toFixed(2)}%`;
+          packetOutRef.current.style.opacity = (0.15 + 0.85 * Math.sin(t * Math.PI)).toFixed(3);
         }
-        if (cloudThreadRef.current) {
-          cloudThreadRef.current.style.transform = `scaleX(${p.toFixed(3)})`;
+        if (packetInRef.current) {
+          const t = (p * 2.4 + 0.5) % 1;
+          packetInRef.current.style.left = `${((1 - t) * 100).toFixed(2)}%`;
+          packetInRef.current.style.opacity = (0.15 + 0.85 * Math.sin(t * Math.PI)).toFixed(3);
         }
       }
     };
@@ -973,104 +979,88 @@ export default function LandingPage() {
         [data-in="shown"] .fl-mask:nth-of-type(2) > span { transition-delay: 90ms; }
 
         .fl-planner__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
-        .fl-sched { background: var(--card); border: 1px solid var(--rule-soft); border-radius: 4px; box-shadow: var(--shadow); padding: 8px 0; }
-        .fl-sched__row {
-          display: grid; grid-template-columns: 74px 1fr; gap: 14px; align-items: baseline;
-          padding: 13px 20px; border-bottom: 1px solid var(--rule-soft);
-          opacity: 0; transform: translateY(14px);
-          transition: opacity 560ms var(--ease), transform 560ms var(--ease);
-        }
-        .fl-sched__row:last-child { border-bottom: none; }
-        [data-in="shown"] .fl-sched__row { opacity: 1; transform: none; }
-        .fl-sched__day { font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em; color: var(--accent-ink); }
-        .fl-sched__title { font-size: 14.5px; line-height: 1.45; }
-
-        /* --------------------------------------------------- III · on disk */
-        .fl-local__grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
-        .fl-plates { position: relative; height: 380px; }
-        .fl-plate { position: absolute; will-change: transform; }
-        .fl-plate--back { left: 8%; top: 8%; right: 22%; }
-        .fl-plate--mid { left: 0; top: 30%; right: 12%; }
-        .fl-plate--front { left: 26%; top: 62%; right: 0; }
-        .fl-chip {
-          background: var(--card); border: 1px solid var(--rule-soft); border-radius: 3px;
-          box-shadow: var(--shadow); padding: 13px 16px;
-          font-size: 13px; display: flex; align-items: center; gap: 10px;
-        }
-        .fl-chip code { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
-        .fl-folder {
-          background-color: var(--card);
-          background-image:
-            linear-gradient(100deg, var(--card) 42%, rgba(250,250,247,0.5) 76%, rgba(250,250,247,0.08) 100%),
-            url('/images/folder-texture.webp');
-          background-size: cover, cover; background-position: left, right;
-          background-repeat: no-repeat, no-repeat;
-          border: 1px solid var(--rule-soft); border-radius: 4px;
-          box-shadow: var(--shadow); padding: 22px 24px;
-        }
-        .fl-folder__name { font-family: var(--mono); font-weight: 500; font-size: 16px; margin: 0 0 4px; }
-        .fl-folder__meta { font-size: 12.5px; color: var(--ink-soft); margin: 0; }
-        .fl-folder__ic { display: block; width: 34px; height: 34px; color: var(--accent-ink); margin-bottom: 14px; }
-        .fl-folder__ic svg { width: 100%; height: 100%; }
-
-        /* ------------------------------------------------ IV · in the cloud */
-        .fl-cloud__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
-        .fl-cloud__pair { display: grid; grid-template-columns: 1fr 34px 1fr; align-items: center; gap: 10px; }
-        /* min-width:0 or the mono record name sets a floor wider than the
-           column and the second card runs off the spread */
-        .fl-cloud__pair > * { min-width: 0; }
-        .fl-device {
-          background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 16px;
-          min-height: 148px; display: flex; flex-direction: column; gap: 7px; min-width: 0;
-        }
-        .fl-device__tag { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); }
-        .fl-device__name { font-family: var(--mono); font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
-        .fl-device__line { height: 6px; border-radius: 2px; background: var(--rule-soft); }
-        .fl-device__line--a { width: 84%; }
-        .fl-device__line--b { width: 62%; }
-        .fl-device__line--c { width: 71%; }
-        .fl-device--two { will-change: clip-path; }
-        .fl-thread { display: block; height: 1px; background: var(--accent); transform: scaleX(0); transform-origin: left; will-change: transform; }
-
-        /* ------------------------------------------------- V · together */
-        .fl-team__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
-        .fl-checklist {
+        .fl-planner {
           background: var(--card); border: 1px solid var(--rule-soft); border-radius: 4px;
-          box-shadow: var(--shadow); padding: 20px 22px;
+          box-shadow: var(--shadow); padding: 18px 22px 4px;
+        }
+        .fl-planner__head {
+          font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+          color: var(--ink-soft); margin: 0 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--rule-soft);
+        }
+        .fl-planner__row {
+          display: grid; grid-template-columns: 20px 64px 1fr; gap: 14px; align-items: center;
+          padding: 14px 0; border-bottom: 1px solid var(--rule-soft);
+        }
+        .fl-planner__row:last-child { border-bottom: none; }
+        .fl-planner__box {
+          width: 18px; height: 18px; border: 1.5px solid var(--rule); border-radius: 4px;
+          display: flex; align-items: center; justify-content: center;
+          transition: border-color 200ms var(--ease), background 200ms var(--ease);
+        }
+        .fl-planner__box svg { width: 11px; height: 11px; overflow: visible; }
+        .fl-planner__box path {
+          fill: none; stroke: var(--accent-ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+          stroke-dasharray: 1; stroke-dashoffset: 1;
+        }
+        .fl-planner__day { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.02em; color: var(--accent-ink); }
+        .fl-planner__title { font-size: 14.5px; line-height: 1.45; transition: opacity 200ms var(--ease); }
+
+        /* ---------------------------------------- III · local or cloud flow */
+        .fl-local__grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
+        .fl-flow {
+          display: flex; align-items: center; gap: clamp(10px, 3vw, 22px);
+          background: var(--card); border: 1px solid var(--rule-soft); border-radius: 4px;
+          box-shadow: var(--shadow); padding: clamp(24px, 4vw, 36px) clamp(16px, 3vw, 26px);
+        }
+        .fl-flow__node { flex: 0 0 auto; width: 112px; text-align: center; }
+        .fl-flow__ic { display: inline-flex; width: 38px; height: 38px; color: var(--accent-ink); margin-bottom: 10px; }
+        .fl-flow__ic svg { width: 100%; height: 100%; }
+        .fl-flow__label { font-size: 13.5px; font-weight: 600; margin: 0; }
+        .fl-flow__meta { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.02em; color: var(--ink-soft); margin: 4px 0 0; }
+        .fl-flow__path { position: relative; flex: 1 1 auto; min-width: 32px; height: 2px; }
+        .fl-flow__line { position: absolute; inset: 0; border-top: 1px dashed var(--rule); }
+        .fl-flow__packet {
+          position: absolute; top: 50%; width: 8px; height: 8px; border-radius: 50%;
+          transform: translate(-50%, -50%); will-change: left, opacity;
+        }
+        .fl-flow__packet--out { background: var(--accent-ink); }
+        .fl-flow__packet--in { background: var(--ink-soft); }
+
+        /* ------------------------------------------------- IV · together */
+        .fl-team__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
+        .fl-roster {
+          background: var(--card); border: 1px solid var(--rule-soft); border-radius: 4px;
+          box-shadow: var(--shadow); padding: 26px 22px 22px;
           transition: transform 260ms var(--ease);
         }
-        .fl-checklist__head { font-size: 11.5px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 14px; }
-        .fl-doc {
-          display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
-          padding: 11px 0; border-top: 1px solid var(--rule-soft);
-          opacity: 0; transform: translateY(10px);
-          transition: opacity 520ms var(--ease), transform 520ms var(--ease);
+        .fl-roster__staff { display: flex; justify-content: space-between; gap: 10px; }
+        .fl-roster__person { display: flex; flex: 1; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+        .fl-roster__avatar {
+          width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+          background: var(--paper); border: 1px solid var(--rule);
+          font-family: var(--mono); font-size: 11.5px; font-weight: 500; color: var(--accent-ink);
         }
-        [data-in="shown"] .fl-doc { opacity: 1; transform: none; }
-        [data-in="shown"] .fl-doc:nth-child(4) { transition-delay: 70ms; }
-        [data-in="shown"] .fl-doc:nth-child(5) { transition-delay: 140ms; }
-        [data-in="shown"] .fl-doc:nth-child(6) { transition-delay: 210ms; }
-        .fl-doc__code {
-          font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.02em;
-          color: var(--accent-ink); background: rgba(18,183,106,0.13); padding: 4px 8px; border-radius: 2px;
+        .fl-roster__task { font-size: 11px; line-height: 1.3; color: var(--ink-soft); }
+        .fl-roster__lines { position: relative; height: 30px; margin: 0 16%; }
+        .fl-roster__lines::before {
+          content: ''; position: absolute; top: 12px; left: 0; right: 0; height: 1px; background: var(--rule);
         }
-        .fl-doc__label { font-size: 13.5px; }
-        .fl-doc__state { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); }
-        .fl-feed { margin: 0 0 18px; padding: 0; list-style: none; }
-        .fl-feed li {
-          display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: center;
-          font-size: 13px; line-height: 1.45; padding: 5px 0;
-          opacity: 0; transform: translateY(8px);
-          transition: opacity 500ms var(--ease), transform 500ms var(--ease);
+        .fl-roster__lines::after {
+          content: ''; position: absolute; top: 12px; bottom: 0; left: 50%; width: 1px;
+          background: var(--rule); transform: translateX(-50%);
         }
-        [data-in="shown"] .fl-feed li { opacity: 1; transform: none; }
-        [data-in="shown"] .fl-feed li:nth-child(2) { transition-delay: 80ms; }
-        .fl-feed__who {
-          width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
-          background: rgba(18,183,106,0.15); color: var(--accent-ink);
-          font-family: var(--mono); font-size: 10px; font-weight: 500;
+        .fl-roster__lines span { position: absolute; top: 0; height: 12px; width: 1px; background: var(--rule); }
+        .fl-roster__lines span:nth-child(1) { left: 0; }
+        .fl-roster__lines span:nth-child(2) { left: 50%; transform: translateX(-50%); }
+        .fl-roster__lines span:nth-child(3) { right: 0; }
+        .fl-roster__case {
+          text-align: center; background: var(--paper); border: 1px solid var(--rule-soft);
+          border-radius: 4px; padding: 16px;
         }
-        .fl-feed__what strong { font-weight: 600; }
+        .fl-roster__cloud { display: inline-flex; width: 26px; height: 26px; color: var(--accent-ink); margin-bottom: 8px; }
+        .fl-roster__cloud svg { width: 100%; height: 100%; }
+        .fl-roster__name { font-family: var(--mono); font-weight: 500; font-size: 13.5px; margin: 0 0 2px; }
+        .fl-roster__meta { font-size: 11px; color: var(--ink-soft); margin: 0; }
 
         /* --------------------------------------------------- VI · questions */
         .fl-faq { max-width: 700px; }
@@ -1196,7 +1186,7 @@ export default function LandingPage() {
           .fl-topfolio__now { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); }
           .fl-topfolio__acts { display: flex; align-items: center; gap: 14px; }
           .fl-body { margin-left: 0; }
-          .fl-planner__grid, .fl-local__grid, .fl-cloud__grid, .fl-team__grid,
+          .fl-planner__grid, .fl-local__grid, .fl-team__grid,
           .fl-start__grid { grid-template-columns: minmax(0, 1fr); }
           .fl-start__grid > :first-child { margin-bottom: 30px; }
           .fl-advisor__grid { display: flex; flex-direction: column; }
@@ -1205,37 +1195,36 @@ export default function LandingPage() {
           .fl-advisor__prose > * + * { margin-top: 48px; }
           .fl-verdict { padding: 11px 13px; }
           .fl-planner__grid > :first-child, .fl-local__grid > :first-child,
-          .fl-cloud__grid > :first-child, .fl-team__grid > :first-child { margin-bottom: 30px; }
-          .fl-plates { height: 330px; }
+          .fl-team__grid > :first-child { margin-bottom: 30px; }
         }
         @media (max-width: 640px) {
           .fl-open { flex-wrap: wrap; row-gap: 6px; }
           .fl-open__sub { order: 3; flex-basis: 100%; }
           .fl-h1 { font-size: clamp(2.2rem, 10vw, 2.9rem); }
           .fl-title { min-height: 0; padding-top: 54px; padding-bottom: 60px; }
-          .fl-cloud__pair { grid-template-columns: 1fr; gap: 14px; }
+          .fl-flow { flex-direction: column; }
+          .fl-flow__path { width: 2px; height: 44px; min-width: 0; }
+          .fl-flow__line { border-top: none; border-left: 1px dashed var(--rule); }
+          .fl-flow__packet { display: none; }
           .fl-form__row { grid-template-columns: 1fr; gap: 0; }
-          .fl-thread { height: 1px; }
           .fl-rows { height: 258px; }
           .fl-advisor__prose > * + * { margin-top: 28px; }
         }
 
         /* ------------------------------------------------- reduced motion */
         @media (prefers-reduced-motion: reduce) {
-          .fl-title__rule, .fl-colophon__rule, .fl-rowrule, .fl-thread { transform: scaleX(1) !important; }
+          .fl-title__rule, .fl-colophon__rule, .fl-rowrule { transform: scaleX(1) !important; }
           .fl-file { position: relative; top: auto !important; transform: none !important; opacity: 1 !important; margin-bottom: 10px; }
           .fl-rows { height: auto; }
           .fl-rowrule { display: none; }
           .fl-verdict__ink { clip-path: none !important; opacity: 1 !important; }
           .fl-verdict__bar { transform: scaleX(1) !important; }
           .fl-verdict__status { opacity: 1 !important; }
-          .fl-plate { position: relative; left: auto; right: auto; top: auto; transform: none !important; margin-bottom: 12px; }
-          .fl-plates { height: auto; }
-          .fl-device--two { clip-path: none !important; }
-          .fl-checklist { transform: none !important; }
+          .fl-flow__packet { display: none; }
+          .fl-roster { transform: none !important; }
           /* keep the opacity that carries comprehension, drop position changes */
           .fl-mask > span { transform: none; transition: none; }
-          [data-in] .fl-rise, .fl-sched__row, .fl-doc, .fl-feed li { transform: none !important; transition: opacity 400ms linear; }
+          [data-in] .fl-rise { transform: none !important; transition: opacity 400ms linear; }
         }
       `}</style>
 
@@ -1487,134 +1476,111 @@ export default function LandingPage() {
                   your own alongside them.
                 </p>
               </div>
-              <figure style={{ margin: 0 }}>
-                <div className="fl-sched">
-                  {TASK_ROWS.map((t) => (
-                    <div key={t.title} className="fl-sched__row">
-                      <span className="fl-sched__day">{t.day}</span>
-                      <span className="fl-sched__title">{t.title}</span>
+              <figure ref={plannerMediaRef} style={{ margin: 0 }}>
+                <div className="fl-planner">
+                  <p className="fl-planner__head">Student 500 · workflow</p>
+                  {TASK_ROWS.map((t, i) => (
+                    <div key={t.title} className="fl-planner__row">
+                      <span
+                        className="fl-planner__box"
+                        aria-hidden="true"
+                        ref={(el) => { plannerBoxRefs.current[i] = el; }}
+                      >
+                        <svg viewBox="0 0 16 16">
+                          <path
+                            d="M3 8.5 6.5 12 13 4"
+                            pathLength={1}
+                            ref={(el) => { plannerCheckRefs.current[i] = el; }}
+                          />
+                        </svg>
+                      </span>
+                      <span className="fl-planner__day">{t.day}</span>
+                      <span
+                        className="fl-planner__title"
+                        ref={(el) => { plannerTitleRefs.current[i] = el; }}
+                      >
+                        {t.title}
+                      </span>
                     </div>
                   ))}
                 </div>
                 <figcaption className="fl-cap">
-                  A generated schedule for a Student 500 matter, shown with the day
-                  offsets the model returns before they are dated.
+                  Each task ticks off as its day arrives, right alongside the rest of
+                  your calendar.
                 </figcaption>
               </figure>
             </div>
           </div>
         </section>
 
-        {/* ------------------------------------------------ III · On disk */}
+        {/* ------------------------------------------- III · Local or cloud */}
         <section id="local" className="fl-ch fl-ch--paper" aria-labelledby="local-title" data-in="">
           <div className="fl-wrap">
             <div className="fl-open">
               <span className="fl-open__num">Chapter <b>III</b></span>
-              <span className="fl-open__sub">Your data, one file per case</span>
+              <span className="fl-open__sub">Choose where your practice lives</span>
               <span className="fl-open__line" />
             </div>
             <div className="fl-local__grid">
-              <figure ref={localMediaRef} style={{ margin: 0 }}>
-                <div className="fl-plates">
-                  <div className="fl-plate fl-plate--back" ref={(el) => { plateRefs.current[0] = el; }}>
-                    <div className="fl-chip">Your data, one file per case</div>
+              <figure ref={storageMediaRef} style={{ margin: 0 }}>
+                <div className="fl-flow">
+                  <div className="fl-flow__node">
+                    <span className="fl-flow__ic" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="12" rx="1.5" />
+                        <path d="M8 20h8M12 16v4" />
+                      </svg>
+                    </span>
+                    <p className="fl-flow__label">Your computer</p>
+                    <p className="fl-flow__meta">Local folder</p>
                   </div>
-                  <div className="fl-plate fl-plate--mid" ref={(el) => { plateRefs.current[1] = el; }}>
-                    <div className="fl-folder">
-                      <span className="fl-folder__ic" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
-                        </svg>
-                      </span>
-                      <p className="fl-folder__name">edamame-cases/</p>
-                      <p className="fl-folder__meta">Linked folder · synced through Dropbox</p>
-                    </div>
-                  </div>
-                  <div className="fl-plate fl-plate--front" ref={(el) => { plateRefs.current[2] = el; }}>
-                    <div className="fl-chip"><code>activity-events/</code> append-only</div>
-                  </div>
-                </div>
-                <figcaption className="fl-cap">
-                  Local mode links a folder directly on your computer — currently
-                  requires Chrome or Edge.
-                </figcaption>
-              </figure>
-              <div>
-                <h2 id="local-title" className="fl-h2 fl-rise">Your data, on your disk.</h2>
-                <p className="fl-lede fl-rise">
-                  Local mode links a real folder. Not a database in the browser, and
-                  not our server.
-                </p>
-                <p className="fl-p fl-rise">
-                  Every record is written as its own file: <strong>clients/</strong>,{' '}
-                  <strong>cases/</strong>, <strong>tasks/</strong>,{' '}
-                  <strong>activity-events/</strong>. Point the app at a folder inside
-                  Dropbox, OneDrive or iCloud Drive and that folder is your data,
-                  portable between machines with no server in the middle.
-                </p>
-                <p className="fl-p fl-rise">
-                  One file per record is a deliberate choice. If two machines write
-                  at once through a sync client, the conflict is scoped to a single
-                  case instead of your whole practice.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        {/* --------------------------------------------- IV · In the cloud */}
-        <section id="cloud" className="fl-ch fl-ch--plate" aria-labelledby="cloud-title" data-in="">
-          <div className="fl-wrap">
-            <div className="fl-open">
-              <span className="fl-open__num">Chapter <b>IV</b></span>
-              <span className="fl-open__sub">Access the same case from any device</span>
-              <span className="fl-open__line" />
-            </div>
-            <div className="fl-cloud__grid">
-              <div>
-                <h2 id="cloud-title" className="fl-h2 fl-rise">The same case, any device.</h2>
-                <p className="fl-lede fl-rise">
-                  Cloud mode keeps your practice in Postgres tables and your
-                  documents in a private bucket.
-                </p>
-                <p className="fl-p fl-rise">
-                  Every case is scoped to your account at the database level, so
-                  no other firm can read or write it. Document files are stored
-                  under your own path prefix, with the same rule applied at the
-                  storage layer.
-                </p>
-                <p className="fl-p fl-rise">
-                  Choose either mode at sign-up and change your mind later. Switching
-                  copies every case, client and document across for you, and leaves
-                  the local folder untouched as a backup.
-                </p>
-              </div>
-              <figure ref={cloudMediaRef} style={{ margin: 0 }}>
-                <div className="fl-cloud__pair">
-                  <div className="fl-device">
-                    <span className="fl-device__tag">Office</span>
-                    <span className="fl-device__name">Ng · Partner 820</span>
-                    <span className="fl-device__line fl-device__line--a" />
-                    <span className="fl-device__line fl-device__line--b" />
-                    <span className="fl-device__line fl-device__line--c" />
+                  <div className="fl-flow__path" aria-hidden="true">
+                    <span className="fl-flow__line" />
+                    <span ref={packetOutRef} className="fl-flow__packet fl-flow__packet--out" />
+                    <span ref={packetInRef} className="fl-flow__packet fl-flow__packet--in" />
                   </div>
-                  <span ref={cloudThreadRef} className="fl-thread" aria-hidden="true" />
-                  <div
-                    ref={cloudWipeRef}
-                    className="fl-device fl-device--two"
-                    style={reduced ? undefined : { clipPath: 'inset(0 100% 0 0)' }}
-                  >
-                    <span className="fl-device__tag">Laptop, in transit</span>
-                    <span className="fl-device__name">Ng · Partner 820</span>
-                    <span className="fl-device__line fl-device__line--a" />
-                    <span className="fl-device__line fl-device__line--b" />
-                    <span className="fl-device__line fl-device__line--c" />
+
+                  <div className="fl-flow__node">
+                    <span className="fl-flow__ic" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M7 18a4 4 0 0 1-.6-7.96A5 5 0 0 1 16 8a3.5 3.5 0 0 1 1 6.9" />
+                        <path d="M7 18h10" />
+                      </svg>
+                    </span>
+                    <p className="fl-flow__label">The cloud</p>
+                    <p className="fl-flow__meta">Postgres + storage</p>
                   </div>
                 </div>
                 <figcaption className="fl-cap">
-                  One account, two machines, one row. Nothing is copied by hand.
+                  Choose local or cloud at sign-up. Switch later and everything
+                  moves with you.
                 </figcaption>
               </figure>
+              <div>
+                <h2 id="local-title" className="fl-h2 fl-rise">Local or cloud. Your choice.</h2>
+                <p className="fl-lede fl-rise">
+                  Every account picks one of two homes for its data. Either way,
+                  it's structured the same underneath.
+                </p>
+                <p className="fl-p fl-rise">
+                  Local mode links a real folder on your computer — not a database
+                  in the browser, and not our server. Every record is its own file,
+                  so if two machines write at once through a sync client like
+                  Dropbox, the conflict is scoped to a single case, not your whole
+                  practice.
+                </p>
+                <p className="fl-p fl-rise">
+                  Cloud mode keeps the same records in Postgres tables and your
+                  documents in a private bucket, scoped to your account so no
+                  other firm can read or write them.
+                </p>
+                <p className="fl-p fl-rise">
+                  Choose either at sign-up, and change your mind later — switching
+                  copies every case, client and document across, and leaves
+                  whichever you came from untouched as a backup.
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -1623,7 +1589,7 @@ export default function LandingPage() {
         <section id="team" className="fl-ch fl-ch--paper2" aria-labelledby="team-title" data-in="">
           <div className="fl-wrap">
             <div className="fl-open">
-              <span className="fl-open__num">Chapter <b>V</b></span>
+              <span className="fl-open__num">Chapter <b>IV</b></span>
               <span className="fl-open__sub">Share cases and track who did what</span>
               <span className="fl-open__line" />
             </div>
@@ -1632,7 +1598,8 @@ export default function LandingPage() {
                 <h2 id="team-title" className="fl-h2 fl-rise">Shared work, filed correctly.</h2>
                 <p className="fl-lede fl-rise">
                   Team members share cases, an activity feed, and a document
-                  checklist per matter. Local or cloud, the same.
+                  checklist per matter — as long as the practice is on cloud
+                  storage, so everyone sees the same version.
                 </p>
                 <p className="fl-p fl-rise">
                   Uploads carry a document type from a firm-wide reference list.
@@ -1648,43 +1615,52 @@ export default function LandingPage() {
               <figure style={{ margin: 0 }}>
                 <div
                   ref={tiltRef}
-                  className="fl-checklist"
+                  className="fl-roster"
                   onPointerMove={onTilt}
                   onPointerLeave={onTiltLeave}
                 >
-                  <p className="fl-checklist__head">Chen, Skilled 190</p>
-                  <ul className="fl-feed">
-                    <li>
-                      <span className="fl-feed__who" aria-hidden="true">PR</span>
-                      <span className="fl-feed__what"><strong>Priya</strong> uploaded the medical examination</span>
-                    </li>
-                    <li>
-                      <span className="fl-feed__who" aria-hidden="true">TM</span>
-                      <span className="fl-feed__what"><strong>Tom</strong> is still waiting on the birth certificate</span>
-                    </li>
-                  </ul>
-                  {DOC_CHIPS.map((d, i) => (
-                    <div key={d.code} className="fl-doc">
-                      <span className="fl-doc__code">{d.code}</span>
-                      <span className="fl-doc__label">{d.label}</span>
-                      <span className="fl-doc__state">{i === 3 ? 'Awaiting' : 'Linked'}</span>
+                  <div className="fl-roster__staff">
+                    <div className="fl-roster__person">
+                      <span className="fl-roster__avatar" aria-hidden="true">PR</span>
+                      <span className="fl-roster__task">Uploads documents</span>
                     </div>
-                  ))}
+                    <div className="fl-roster__person">
+                      <span className="fl-roster__avatar" aria-hidden="true">TM</span>
+                      <span className="fl-roster__task">Reviews checklist</span>
+                    </div>
+                    <div className="fl-roster__person">
+                      <span className="fl-roster__avatar" aria-hidden="true">JL</span>
+                      <span className="fl-roster__task">Assigns tasks</span>
+                    </div>
+                  </div>
+                  <div className="fl-roster__lines" aria-hidden="true">
+                    <span /><span /><span />
+                  </div>
+                  <div className="fl-roster__case">
+                    <span className="fl-roster__cloud" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M7 18a4 4 0 0 1-.6-7.96A5 5 0 0 1 16 8a3.5 3.5 0 0 1 1 6.9" />
+                        <path d="M7 18h10" />
+                      </svg>
+                    </span>
+                    <p className="fl-roster__name">Chen, Skilled 190</p>
+                    <p className="fl-roster__meta">One case, one live version</p>
+                  </div>
                 </div>
                 <figcaption className="fl-cap">
-                  Sample case. The activity feed says who did what; the document type
-                  codes are how an upload finds the checklist item it satisfies.
+                  Three staff, one case, always the same version — as long as the
+                  practice is on cloud storage.
                 </figcaption>
               </figure>
             </div>
           </div>
         </section>
 
-        {/* ------------------------------------------------ VI · Questions */}
+        {/* ------------------------------------------------- V · Questions */}
         <section id="faq" className="fl-ch fl-ch--paper" aria-labelledby="faq-title" data-in="">
           <div className="fl-wrap">
             <div className="fl-open">
-              <span className="fl-open__num">Chapter <b>VI</b></span>
+              <span className="fl-open__num">Chapter <b>V</b></span>
               <span className="fl-open__sub">Answers to what people ask first</span>
               <span className="fl-open__line" />
             </div>
@@ -1706,12 +1682,12 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ---------------------------------------------------- VII · Start */}
+        {/* ----------------------------------------------------- VI · Start */}
         {!user && (
           <section id="start" className="fl-ch fl-ch--paper2" aria-labelledby="start-title" data-in="">
             <div className="fl-wrap">
               <div className="fl-open">
-                <span className="fl-open__num">Chapter <b>VII</b></span>
+                <span className="fl-open__num">Chapter <b>VI</b></span>
                 <span className="fl-open__sub">Set up storage and open your first case</span>
                 <span className="fl-open__line" />
               </div>
