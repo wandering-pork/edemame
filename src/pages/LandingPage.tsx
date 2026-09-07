@@ -90,6 +90,42 @@ const FAQS = [
   { q: 'What happens to my local data if I switch to cloud later?', a: 'Switching modes copies every case, client, and document across for you. Your local folder is left untouched afterward, so it stays as a backup.' },
 ];
 
+/** One small icon per FAQ, matching the folder/globe/roster/switch motifs
+ *  already used elsewhere on the page rather than a generic bullet. */
+function faqIcon(i: number) {
+  const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  switch (i) {
+    case 0: // own machine -> folder
+      return (
+        <svg viewBox="0 0 24 24" {...common}>
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+        </svg>
+      );
+    case 1: // AU and NZ -> map pin
+      return (
+        <svg viewBox="0 0 24 24" {...common}>
+          <path d="M12 21s7-7.2 7-12a7 7 0 1 0-14 0c0 4.8 7 12 7 12Z" />
+          <circle cx="12" cy="9" r="2.4" />
+        </svg>
+      );
+    case 2: // whole team -> two people
+      return (
+        <svg viewBox="0 0 24 24" {...common}>
+          <circle cx="9" cy="8" r="3" />
+          <circle cx="17" cy="9" r="2.3" />
+          <path d="M4 20c0-3.3 2.3-5.6 5-5.6s5 2.3 5 5.6M14.6 20c.2-2.6 1.6-4.6 3.5-5" />
+        </svg>
+      );
+    default: // switch storage modes -> swap arrows
+      return (
+        <svg viewBox="0 0 24 24" {...common}>
+          <path d="M6 8h11M17 8l-3-3M17 8l-3 3" />
+          <path d="M18 16H7M7 16l3-3M7 16l3 3" />
+        </svg>
+      );
+  }
+}
+
 type Chapter = { id: string; numeral: string; short: string; title: string };
 
 const CHAPTERS: Chapter[] = [
@@ -337,6 +373,8 @@ export default function LandingPage() {
   const podMarkerRef = useRef<HTMLImageElement>(null);
   const rosterTrackRef = useRef<HTMLDivElement>(null);
   const rosterChipRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const faqListRef = useRef<HTMLDivElement>(null);
+  const faqIconRefs = useRef<Array<HTMLSpanElement | null>>([]);
 
   /* --- the scroll spine: ordinary vertical scroll, read, never hijacked --- */
   useEffect(() => {
@@ -468,6 +506,18 @@ export default function LandingPage() {
           el.style.left = `${(t * 100).toFixed(2)}%`;
           const edge = Math.min(t, 1 - t);
           el.style.opacity = clamp(edge / 0.1, 0.1, 1).toFixed(3);
+        });
+      }
+
+      /* ---- Chapter V · FAQ icons settle in one at a time ---- */
+      if (faqListRef.current) {
+        const p = viewProgress(faqListRef.current);
+        const n = faqIconRefs.current.length || 1;
+        faqIconRefs.current.forEach((el, i) => {
+          if (!el) return;
+          const t = clamp((p - i * (0.5 / n)) / 0.35);
+          el.style.opacity = lerp(0.15, 1, t).toFixed(3);
+          el.style.transform = `scale(${lerp(0.6, 1, t).toFixed(3)})`;
         });
       }
     };
@@ -1102,11 +1152,17 @@ export default function LandingPage() {
         .fl-faqitem { border-top: 1px solid var(--rule-soft); }
         .fl-faqitem:last-child { border-bottom: 1px solid var(--rule-soft); }
         .fl-faqitem button {
-          width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: 20px;
+          width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 20px;
           background: none; border: none; cursor: pointer; padding: 18px 2px; text-align: left;
           font-family: var(--display); font-weight: 600; font-size: 17px; line-height: 1.35;
           letter-spacing: -0.01em; color: var(--ink);
         }
+        .fl-faqitem__q { display: flex; align-items: center; gap: 14px; }
+        .fl-faqitem__icon {
+          display: inline-flex; width: 20px; height: 20px; color: var(--accent-ink); flex-shrink: 0;
+          will-change: opacity, transform;
+        }
+        .fl-faqitem__icon svg { width: 100%; height: 100%; }
         .fl-faqitem button:hover { color: var(--accent-ink); }
         .fl-faqitem__sign { font-family: var(--text); font-size: 16px; color: var(--accent-ink); flex-shrink: 0; }
         .fl-faqitem__body { overflow: hidden; max-height: 0; transition: max-height 260ms var(--ease); }
@@ -1725,13 +1781,22 @@ export default function LandingPage() {
               <span className="fl-open__line" />
             </div>
             <h2 id="faq-title" className="fl-h2 fl-rise">Common questions.</h2>
-            <div className="fl-faq" style={{ marginTop: 30 }}>
+            <div ref={faqListRef} className="fl-faq" style={{ marginTop: 30 }}>
               {FAQS.map((item, i) => {
                 const open = openFaq === i;
                 return (
                   <div key={item.q} className="fl-faqitem" data-open={open}>
                     <button type="button" aria-expanded={open} onClick={() => setOpenFaq(open ? null : i)}>
-                      {item.q}
+                      <span className="fl-faqitem__q">
+                        <span
+                          className="fl-faqitem__icon"
+                          aria-hidden="true"
+                          ref={(el) => { faqIconRefs.current[i] = el; }}
+                        >
+                          {faqIcon(i)}
+                        </span>
+                        {item.q}
+                      </span>
                       <span className="fl-faqitem__sign" aria-hidden="true">{open ? '−' : '+'}</span>
                     </button>
                     <div className="fl-faqitem__body"><p>{item.a}</p></div>
