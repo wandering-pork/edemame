@@ -1040,7 +1040,9 @@ export default function LandingPage() {
           background: var(--paper); border: 1px solid var(--rule);
           font-family: var(--mono); font-size: 11.5px; font-weight: 500; color: var(--accent-ink);
         }
-        .fl-roster__task { font-size: 11px; line-height: 1.3; color: var(--ink-soft); }
+        .fl-roster__taskrow { display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .fl-roster__taskicon { width: 13px; height: 13px; color: var(--accent-ink); flex-shrink: 0; }
+        .fl-roster__task { font-size: 11px; line-height: 1.3; color: var(--ink-soft); text-align: left; }
         .fl-roster__lines { position: relative; height: 30px; margin: 0 16%; }
         .fl-roster__lines::before {
           content: ''; position: absolute; top: 12px; left: 0; right: 0; height: 1px; background: var(--rule);
@@ -1622,15 +1624,34 @@ export default function LandingPage() {
                   <div className="fl-roster__staff">
                     <div className="fl-roster__person">
                       <span className="fl-roster__avatar" aria-hidden="true">PR</span>
-                      <span className="fl-roster__task">Uploads documents</span>
+                      <span className="fl-roster__taskrow">
+                        <svg className="fl-roster__taskicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 15V4M8 8l4-4 4 4" />
+                          <path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" />
+                        </svg>
+                        <span className="fl-roster__task">Uploads documents</span>
+                      </span>
                     </div>
                     <div className="fl-roster__person">
                       <span className="fl-roster__avatar" aria-hidden="true">TM</span>
-                      <span className="fl-roster__task">Reviews checklist</span>
+                      <span className="fl-roster__taskrow">
+                        <svg className="fl-roster__taskicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1Z" />
+                          <rect x="5" y="6" width="14" height="15" rx="1.5" />
+                          <path d="M8.5 12.5l1.5 1.5 3-3M8.5 17.5l1.5 1.5 3-3" />
+                        </svg>
+                        <span className="fl-roster__task">Reviews checklist</span>
+                      </span>
                     </div>
                     <div className="fl-roster__person">
                       <span className="fl-roster__avatar" aria-hidden="true">JL</span>
-                      <span className="fl-roster__task">Assigns tasks</span>
+                      <span className="fl-roster__taskrow">
+                        <svg className="fl-roster__taskicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="9" y="4" width="11" height="16" rx="1.5" />
+                          <path d="M9 12H3M6 9l-3 3 3 3" />
+                        </svg>
+                        <span className="fl-roster__task">Assigns tasks</span>
+                      </span>
                     </div>
                   </div>
                   <div className="fl-roster__lines" aria-hidden="true">
