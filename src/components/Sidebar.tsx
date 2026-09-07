@@ -108,7 +108,7 @@ export const Sidebar: React.FC = () => {
   const handleSignOut = async () => {
     setMobileOpen(false);
     await signOut();
-    navigate('/login', { replace: true });
+    navigate('/', { replace: true });
   };
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
