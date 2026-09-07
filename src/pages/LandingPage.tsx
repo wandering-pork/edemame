@@ -370,7 +370,7 @@ export default function LandingPage() {
   const tiltRef = useRef<HTMLDivElement>(null);
   const globeCanvasRef = useRef<HTMLCanvasElement>(null);
   const globeWrapRef = useRef<HTMLDivElement>(null);
-  const podMarkerRef = useRef<HTMLSpanElement>(null);
+  const seedRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const rosterTrackRef = useRef<HTMLDivElement>(null);
   const rosterChipRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const faqListRef = useRef<HTMLDivElement>(null);
@@ -395,13 +395,21 @@ export default function LandingPage() {
     };
 
     const paint = () => {
-      // the sidebar pod slides down (or back up) the vine as a direct
-      // function of how far through the whole page you are
-      if (podMarkerRef.current) {
+      // a seed drops into place beside each chapter as you reach it —
+      // one at a time, in order — and retracts back up if you scroll
+      // above that chapter again, since it's a pure function of position
+      if (seedRefs.current.length) {
         const total = Math.max(document.documentElement.scrollHeight - innerHeight, 1);
-        const railInset = 16;
-        const railHeight = Math.max((podMarkerRef.current.parentElement?.clientHeight ?? 0) - railInset * 2, 1);
-        podMarkerRef.current.style.top = `${(railInset + clamp(scrollY / total) * railHeight).toFixed(1)}px`;
+        const globalP = clamp(scrollY / total);
+        const n = seedRefs.current.length;
+        const seg = 1 / n;
+        seedRefs.current.forEach((el, i) => {
+          if (!el) return;
+          const t = clamp((globalP - i * seg) / seg);
+          const eased = t <= 0 ? 0 : t >= 1 ? 1 : easeOutBack(t);
+          el.style.opacity = clamp(t * 2.5).toFixed(3);
+          el.style.transform = `translateY(${(-15 * (1 - eased)).toFixed(2)}px)`;
+        });
       }
       // hero rule draws as the first screen is left behind
       if (heroRuleRef.current) {
@@ -781,40 +789,28 @@ export default function LandingPage() {
           letter-spacing: -0.01em; text-decoration: none; color: var(--ink);
         }
         .fl-folio__mark span { color: var(--accent-ink); }
-        /* The pod is the sidebar's own scroll-progress marker — an edamame
-           pod sliding down a vine from right under the wordmark to the
-           footer, in place of a plain progress bar. The rail lives on the
-           whole railwrap (which now stretches to fill the space between
-           logo and footer, with the chapter list centered inside it), not
-           just alongside the list, so the pod's 0% position starts at the
-           very top instead of wherever the list happens to be centered.
-           Generated locally (Fooocus): a cel-shaded clipart pod, its own
-           light green background left in (removing it cleanly — via
-           multiply or chroma key — either left the background vividly
-           green or ate the pod's own fill; see the sidecar json), framed
-           as a small bordered card instead, matching every other graphic
-           on this page living in one. */
         .fl-folio__railwrap {
           position: relative; flex: 1; display: flex; flex-direction: column;
-          justify-content: center; padding-left: 18px; margin-top: 22px; min-height: 0;
+          justify-content: center; margin-top: 22px; min-height: 0;
         }
-        .fl-folio__rail {
-          position: absolute; left: 3px; top: 16px; bottom: 16px; width: 1px; background: var(--rule-soft);
-        }
-        .fl-folio__pod {
-          position: absolute; left: 3px; top: 0; width: 26px;
-          transform: translate(-50%, -50%);
-          background: var(--card); border: 1px solid var(--rule-soft); border-radius: 6px;
-          box-shadow: var(--shadow); padding: 2px;
-          pointer-events: none; will-change: top;
-        }
-        .fl-folio__pod img { display: block; width: 100%; height: auto; max-width: none; border-radius: 4px; }
         .fl-folio__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
         .fl-folio__link {
-          display: grid; grid-template-columns: 26px 1fr; align-items: baseline; gap: 8px;
+          display: grid; grid-template-columns: 12px 26px 1fr; align-items: baseline; gap: 8px;
           padding: 6px 0; text-decoration: none; color: var(--ink-soft);
           font-size: 13px; letter-spacing: 0.01em;
           transition: color 140ms var(--ease);
+        }
+        /* One seed per chapter, dropping into place (with a little
+           overshoot bounce via easeOutBack) as scroll reaches it, in
+           order — a literal "seeds falling one by one," replacing the
+           earlier single sliding marker. Defaults to resting/visible so a
+           reduced-motion or pre-JS view shows a complete, non-broken row
+           of seeds rather than an empty one. */
+        .fl-folio__seed {
+          width: 6px; height: 6px; border-radius: 50%; align-self: center;
+          background: var(--accent);
+          box-shadow: inset -1px -1px 1.5px rgba(11,107,63,0.5), 1px 1px 1px rgba(255,255,255,0.5);
+          opacity: 1; transform: none; will-change: opacity, transform;
         }
         .fl-folio__link em {
           font-family: var(--mono); font-style: normal; font-size: 11px;
@@ -825,7 +821,7 @@ export default function LandingPage() {
         .fl-folio__link[aria-current="true"] { color: var(--ink); }
         .fl-folio__link[aria-current="true"] em { color: var(--accent-ink); }
         .fl-folio__link[aria-current="true"]::after {
-          content: ''; grid-column: 2; display: block; height: 1px; background: var(--accent-ink);
+          content: ''; grid-column: 3; display: block; height: 1px; background: var(--accent-ink);
         }
         .fl-folio__foot { font-size: 12.5px; color: var(--ink-soft); line-height: 1.7; }
         .fl-folio__foot a { color: var(--ink); text-underline-offset: 3px; text-decoration-thickness: 1px; }
@@ -1339,18 +1335,19 @@ export default function LandingPage() {
       <nav className="fl-folio" aria-label="Contents">
         <a className="fl-folio__mark" href="#top">Edamame<span>.</span></a>
         <div className="fl-folio__railwrap">
-          <span className="fl-folio__rail" aria-hidden="true" />
-          <span ref={podMarkerRef} className="fl-folio__pod" aria-hidden="true">
-            <img src="/images/pod-marker.webp" alt="" />
-          </span>
           <ol className="fl-folio__list">
-            {chapters.map((c) => (
+            {chapters.map((c, i) => (
               <li key={c.id}>
                 <a
                   className="fl-folio__link"
                   href={`#${c.id}`}
                   aria-current={activeChapter === c.id}
                 >
+                  <span
+                    className="fl-folio__seed"
+                    aria-hidden="true"
+                    ref={(el) => { seedRefs.current[i] = el; }}
+                  />
                   <em>{c.numeral}</em>
                   {c.short}
                 </a>
