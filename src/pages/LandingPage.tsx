@@ -567,7 +567,8 @@ export default function LandingPage() {
           position: fixed; inset: 0 auto 0 0; width: var(--rail); z-index: 40;
           display: flex; flex-direction: column; padding: 30px 22px 26px 30px;
           border-right: 1px solid var(--rule-soft);
-          background: var(--paper);
+          background-color: var(--paper); background-image: var(--grain);
+          background-size: 480px 480px; background-blend-mode: multiply;
         }
         .fl-folio__mark {
           font-family: var(--display); font-weight: 700; font-size: 17px;
@@ -672,6 +673,7 @@ export default function LandingPage() {
           letter-spacing: -0.028em; margin: 0; max-width: 15ch; text-wrap: balance;
         }
         .fl-h1 i { font-style: italic; color: var(--accent-ink); margin-right: 0.14em; }
+        .fl-h1__accent { color: var(--accent-ink); }
         .fl-title__track {
           display: block; height: 2px; background: var(--rule-soft);
           margin: clamp(26px, 4vh, 44px) 0 0; max-width: 760px; overflow: hidden;
@@ -689,36 +691,30 @@ export default function LandingPage() {
 
         .fl-title__grid { display: grid; grid-template-columns: minmax(0, 1fr); }
         .fl-title__figure {
-          margin: clamp(56px, 8vh, 76px) 0 0; max-width: 380px;
-          animation: fl-docket-in 700ms var(--ease) 260ms both;
+          margin: clamp(48px, 7vh, 64px) 0 0; max-width: 560px;
+          animation: fl-hero-figure-in 800ms var(--ease) 260ms both;
         }
-        .fl-title__docket {
-          position: relative;
-          background: var(--card); border: 1px solid var(--rule-soft); border-radius: 4px;
-          box-shadow: var(--shadow); padding: 18px 20px 20px; transform: rotate(-1.6deg);
+        .fl-title__map { display: block; width: 100%; height: auto; overflow: visible; }
+        .fl-title__mapRoutes {
+          fill: none; stroke: var(--ink-soft); stroke-width: 1;
+          stroke-dasharray: 1 5; stroke-linecap: round; opacity: 0.8;
         }
-        .fl-title__stamp {
-          position: absolute; bottom: -22px; right: -22px; width: 68px; height: 68px;
-          color: var(--accent-ink); transform: rotate(9deg);
-          filter: drop-shadow(0 2px 3px rgba(16,32,24,0.18));
+        .fl-title__mapPins { fill: var(--ink-soft); }
+        .fl-title__mapPins text {
+          font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em;
+          fill: var(--ink-soft); text-transform: uppercase;
         }
-        .fl-title__stamp svg { width: 100%; height: 100%; overflow: visible; }
-        .fl-title__stamp text {
-          font-family: var(--mono); font-weight: 500; font-size: 15px; letter-spacing: 0.02em;
-          fill: currentColor; text-anchor: middle; text-transform: uppercase;
+        .fl-title__mapDest { fill: var(--accent-ink); }
+        .fl-title__mapStampRing { fill: none; stroke: var(--accent-ink); }
+        .fl-title__mapDest text {
+          font-family: var(--mono); font-weight: 600; font-size: 12px; letter-spacing: 0.04em;
+          fill: var(--accent-ink); text-transform: uppercase;
         }
-        .fl-title__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-        .fl-title__row {
-          display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 12px;
-          background: var(--paper); border: 1px solid var(--rule-soft); border-radius: 3px; padding: 10px 12px;
+        .fl-title__mapStamp {
+          font-family: var(--mono); font-weight: 500; font-size: 9px; letter-spacing: 0.03em;
+          fill: var(--accent-ink); text-transform: uppercase;
         }
-        .fl-title__rowN { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
-        .fl-title__rowLabel { font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em; }
-        .fl-title__rowTag {
-          font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase;
-          color: var(--accent-ink); white-space: nowrap;
-        }
-        @keyframes fl-docket-in {
+        @keyframes fl-hero-figure-in {
           from { opacity: 0; transform: translateY(16px); }
           to { opacity: 1; transform: none; }
         }
@@ -726,7 +722,7 @@ export default function LandingPage() {
           .fl-title__figure { animation: none; }
         }
         @media (min-width: 1024px) {
-          .fl-title__grid { grid-template-columns: minmax(0, 1fr) minmax(280px, 380px); gap: clamp(32px, 6vw, 96px); align-items: center; }
+          .fl-title__grid { grid-template-columns: minmax(0, 0.95fr) minmax(360px, 620px); gap: clamp(32px, 6vw, 96px); align-items: center; }
           .fl-title__figure { margin: 0; }
         }
 
@@ -1140,7 +1136,7 @@ export default function LandingPage() {
           <div className="fl-title__grid">
             <div>
               <h1 className="fl-h1">
-                Your immigration case, sorted.
+                Your immigration case, <span className="fl-h1__accent">sorted.</span>
               </h1>
               <span className="fl-title__track" aria-hidden="true">
                 <span ref={heroRuleRef} className="fl-title__rule" />
@@ -1160,33 +1156,43 @@ export default function LandingPage() {
             </div>
 
             <figure className="fl-title__figure">
-              <div className="fl-title__docket">
-                <div className="fl-title__stamp" aria-hidden="true">
-                  <svg viewBox="0 0 100 100">
-                    <filter id="fl-stamp-rough">
-                      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="noise" />
-                      <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" />
-                    </filter>
-                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="5" filter="url(#fl-stamp-rough)" />
-                    <text x="50" y="55">Filed</text>
-                  </svg>
-                </div>
-                <div className="fl-docket__head">
-                  <span>Docket</span>
-                  <b>3 open</b>
-                </div>
-                <ul className="fl-title__rows">
-                  {CASE_FILES.slice(0, 3).map((f, i) => (
-                    <li key={f.label} className="fl-title__row">
-                      <span className="fl-title__rowN">{i + 1}</span>
-                      <span className="fl-title__rowLabel">{f.label}</span>
-                      <span className="fl-title__rowTag">Workflow attached</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <svg className="fl-title__map" viewBox="0 0 520 400" aria-hidden="true">
+                <defs>
+                  <filter id="fl-stamp-rough">
+                    <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="noise" />
+                    <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" />
+                  </filter>
+                </defs>
+
+                <g className="fl-title__mapRoutes">
+                  <path d="M50,70 Q235,110 420,300" />
+                  <path d="M330,60 Q400,120 420,300" />
+                  <path d="M200,130 Q330,150 420,300" />
+                  <path d="M360,150 Q410,180 420,300" />
+                </g>
+
+                <g className="fl-title__mapPins">
+                  <circle cx="50" cy="70" r="3" />
+                  <circle cx="330" cy="60" r="3" />
+                  <circle cx="200" cy="130" r="3" />
+                  <circle cx="360" cy="150" r="3" />
+                  <text x="58" y="66">London</text>
+                  <text x="338" y="56">Guangzhou</text>
+                  <text x="192" y="150" textAnchor="end">Mumbai</text>
+                  <text x="368" y="144">Manila</text>
+                </g>
+
+                <g className="fl-title__mapDest">
+                  <circle cx="420" cy="300" r="4.5" />
+                  <text x="432" y="296">AU / NZ</text>
+                  <g transform="translate(462,338) rotate(-8)">
+                    <circle cx="0" cy="0" r="24" className="fl-title__mapStampRing" strokeWidth="3" filter="url(#fl-stamp-rough)" />
+                    <text x="0" y="4" textAnchor="middle" className="fl-title__mapStamp">Filed</text>
+                  </g>
+                </g>
+              </svg>
               <figcaption className="fl-cap">
-                Three pathways, each opened with its workflow already in place.
+                Every case starts somewhere. This is where it's going.
               </figcaption>
             </figure>
           </div>
