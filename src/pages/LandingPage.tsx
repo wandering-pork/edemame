@@ -666,6 +666,7 @@ export default function LandingPage() {
           --display: 'Fraunces', Georgia, 'Times New Roman', serif;
           --text: 'Archivo', 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
           --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          --mono-ai: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
           --ease: cubic-bezier(0.23, 1, 0.32, 1);
           --rail: 208px;
           /* A near-invisible fiber grain, layered with multiply so the flat
@@ -797,15 +798,31 @@ export default function LandingPage() {
           letter-spacing: -0.028em; margin: 0; max-width: 15ch; text-wrap: balance;
         }
         .fl-h1 i { font-style: italic; color: var(--accent-ink); margin-right: 0.14em; }
-        /* The docket, checklist and folder chips all use mono for a status
-           value ("3 open", "Filed", "Linked") — carry that same device into
-           the headline itself for the one word that IS the case's status,
-           rather than just recoloring it in the same serif. Also sidesteps
-           Fraunces' r/t collision at the headline's tight tracking. */
+        /* The one word in the headline that names what the AI actually did
+           gets JetBrains Mono — the typeface most associated with AI coding
+           tools (Copilot, Cursor) — rather than IBM Plex Mono, which this
+           page already uses for plain machine-readable status values
+           ("3 open", "Filed", "Linked") and would blur the two together.
+           The blinking cursor borrows the same "still completing" cue as an
+           AI chat response. Also sidesteps Fraunces' r/t collision at the
+           headline's tight tracking. */
         .fl-h1__accent {
-          display: inline-block; font-family: var(--mono); font-weight: 500;
+          display: inline-block; font-family: var(--mono-ai); font-weight: 500;
           font-size: 0.62em; letter-spacing: 0.01em; color: var(--accent-ink);
           vertical-align: 0.05em;
+        }
+        .fl-h1__cursor {
+          display: inline-block; width: 0.5em; height: 0.8em; margin-left: 0.05em;
+          vertical-align: -0.08em;
+          border-right: 0.14em solid var(--accent-ink);
+          animation: fl-cursor-blink 1s steps(1) infinite;
+        }
+        @keyframes fl-cursor-blink {
+          0%, 49% { opacity: 1; }
+          50%, 100% { opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .fl-h1__cursor { animation: none; opacity: 0; }
         }
         .fl-title__track {
           display: block; height: 2px; background: var(--rule-soft);
@@ -819,7 +836,6 @@ export default function LandingPage() {
           font-size: clamp(1.05rem, 1.6vw, 1.28rem); line-height: 1.55;
           max-width: 44ch; margin: 26px 0 0; color: var(--ink);
         }
-        .fl-title__sub { font-size: 15px; line-height: 1.6; color: var(--ink-soft); max-width: 46ch; margin: 12px 0 0; }
         .fl-title__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: clamp(28px, 4vh, 42px); }
 
         /* A genuinely oversized globe — its own circumference is the sweep
@@ -1281,17 +1297,12 @@ export default function LandingPage() {
 
           <div className="fl-title__prose">
             <h1 className="fl-h1">
-              Your immigration case, <span className="fl-h1__accent">sorted.</span>
+              Your immigration case, <span className="fl-h1__accent">sorted.<span className="fl-h1__cursor" aria-hidden="true" /></span>
             </h1>
             <span className="fl-title__track" aria-hidden="true">
               <span ref={heroRuleRef} className="fl-title__rule" />
             </span>
             <p className="fl-title__deck">{audienceLine}</p>
-            <p className="fl-title__sub">
-              Assess a pathway and open the case with its workflow already attached.
-              Keep every file on your own disk, or sync it to your account — your
-              choice.
-            </p>
             <div className="fl-title__acts">
               {renderCta('fl-btn')}
               {!user && (
