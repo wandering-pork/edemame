@@ -813,39 +813,17 @@ export default function LandingPage() {
         .fl-title__sub { font-size: 15px; line-height: 1.6; color: var(--ink-soft); max-width: 46ch; margin: 12px 0 0; }
         .fl-title__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: clamp(28px, 4vh, 42px); }
 
-        /* A single bold line sweeping from the top of the hero down and
-           across into the globe — the case's route, arriving. One draw-on
-           reveal on load (pathLength normalizes stroke-dashoffset to 0..1
-           regardless of the path's actual geometric length), then still. */
-        .fl-title__swoosh {
-          position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%;
-          overflow: visible; pointer-events: none;
-        }
-        .fl-title__swooshPath {
-          fill: none; stroke: var(--accent-ink); stroke-width: 2.5; stroke-linecap: round;
-          stroke-dasharray: 1; stroke-dashoffset: 1;
-          animation: fl-swoosh-draw 1500ms var(--ease) 350ms forwards;
-        }
-        @keyframes fl-swoosh-draw {
-          to { stroke-dashoffset: 0; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .fl-title__swooshPath { animation: none; stroke-dashoffset: 0; }
-        }
-        @media (max-width: 1023px) {
-          .fl-title__swoosh { display: none; }
-        }
-
-        /* An ambient, oversized globe hanging from the top edge and
-           bleeding off the right, rather than a small contained diagram.
-           Lit warm gold on one side fading to ink shadow on the other (the
+        /* A genuinely oversized globe — its own circumference is the sweep
+           the text plays against, hanging from the top edge and bleeding
+           off the right, rather than a small contained diagram. Lit warm
+           gold on one side fading to ink shadow on the other (the
            reference's day/night terminator), but built from tokens already
            in the page's own palette — plus a soft bloom — instead of the
            teal/orange-on-black of a typical stock SaaS globe asset. */
         .fl-title__globe {
           position: absolute; z-index: 0; inset: auto auto auto auto;
-          top: clamp(24px, 6vh, 88px); right: clamp(-200px, -14vw, -40px);
-          width: clamp(520px, 58vw, 900px); aspect-ratio: 1;
+          top: clamp(-40px, 0vh, 0px); right: clamp(-420px, -30vw, -140px);
+          width: clamp(760px, 92vw, 1500px); aspect-ratio: 1;
           pointer-events: none; overflow: hidden; border-radius: 50%;
           animation: fl-globe-in 1100ms var(--ease) 200ms both;
         }
@@ -1294,14 +1272,6 @@ export default function LandingPage() {
 
         {/* ------------------------------------------------------ title page */}
         <header className="fl-title">
-          <svg className="fl-title__swoosh" viewBox="0 0 1600 800" preserveAspectRatio="none" aria-hidden="true">
-            <path
-              className="fl-title__swooshPath"
-              pathLength={1}
-              d="M784,12 C620,220 640,480 900,580 C1080,650 1350,610 1592,615"
-            />
-          </svg>
-
           <div className="fl-title__globe" aria-hidden="true">
             <div className="fl-title__globeGlow" />
             <canvas ref={globeCanvasRef} className="fl-title__globeCanvas" />
