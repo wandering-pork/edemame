@@ -35,6 +35,11 @@ function isAudience(value: string | null): value is Audience {
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
+function hexToRgb(hex: string): [number, number, number] | null {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.trim());
+  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null;
+}
+
 /** Mild overshoot, so a case file snaps into its docket row instead of gliding. */
 function easeOutBack(t: number) {
   const c1 = 1.02;
@@ -466,10 +471,13 @@ export default function LandingPage() {
   /* --- hero · a slowly rotating dot-matrix globe, drawn on canvas ---
      A Fibonacci sphere (even point spread, no pole clustering) rotated
      around its vertical axis. Each point's size/opacity is scaled by how
-     much it faces the camera, so the sphere reads as lit/dimensional from
-     dot density alone — a halftone-print technique, not a gradient — and
-     stays inside the page's flat ink-on-paper palette instead of the
-     glowing neon-on-black look of a typical SaaS hero globe. */
+     much it faces the camera (a halftone-print take on shading, not a
+     gradient fill), and its color is blended along a fixed screen-space
+     light direction — warm gold where "lit", ink where "shadowed" — the
+     same day/night terminator look as a typical glowing stock globe
+     asset, but built from tokens already in this page's palette (plus
+     one warm gold introduced just for this) instead of that asset's own
+     teal/orange-on-black. */
   useEffect(() => {
     const canvas = globeCanvasRef.current;
     if (!canvas) return;
@@ -477,7 +485,12 @@ export default function LandingPage() {
     if (!ctx) return;
 
     const styles = getComputedStyle(canvas);
-    const inkSoft = styles.getPropertyValue('--ink-soft').trim() || '#56635C';
+    const ink = styles.getPropertyValue('--ink').trim() || '#101614';
+    const warm: [number, number, number] = [232, 183, 90];
+    const shadow: [number, number, number] = hexToRgb(ink) ?? [16, 22, 20];
+    // Fixed in screen space (not sphere space), so the terminator stays put
+    // as the sphere turns underneath it — as if lit by one steady light.
+    const lightDir = { x: -0.651, y: 0.759 };
 
     const COUNT = 3200;
     const points: Array<[number, number, number]> = [];
@@ -518,17 +531,23 @@ export default function LandingPage() {
         if (rz < 0) continue;
         const rx = x * cosT + z * sinT;
         const shade = 0.12 + 0.88 * rz;
+
+        const lit = clamp((rx * lightDir.x + y * lightDir.y + 1) / 2) ** 0.6;
+        const r = Math.round(lerp(shadow[0], warm[0], lit));
+        const g = Math.round(lerp(shadow[1], warm[1], lit));
+        const b = Math.round(lerp(shadow[2], warm[2], lit));
+
         ctx.beginPath();
-        ctx.arc(cx + rx * R, cy - y * R, 0.55 * shade + 0.18, 0, Math.PI * 2);
-        ctx.fillStyle = inkSoft;
-        ctx.globalAlpha = 0.16 + 0.74 * shade;
+        ctx.arc(cx + rx * R, cy - y * R, 0.75 * shade + 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.globalAlpha = 0.55 + 0.42 * shade;
         ctx.fill();
       }
 
       ctx.globalAlpha = 0.35;
       ctx.beginPath();
       ctx.arc(cx, cy, R, 0, Math.PI * 2);
-      ctx.strokeStyle = inkSoft;
+      ctx.strokeStyle = `rgb(${shadow[0]}, ${shadow[1]}, ${shadow[2]})`;
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.globalAlpha = 1;
@@ -794,21 +813,28 @@ export default function LandingPage() {
         .fl-title__sub { font-size: 15px; line-height: 1.6; color: var(--ink-soft); max-width: 46ch; margin: 12px 0 0; }
         .fl-title__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: clamp(28px, 4vh, 42px); }
 
-        /* An ambient, oversized globe bleeding off the right edge, rather
-           than a small contained diagram — flat ink line-art (graticule +
-           silhouette only, no shading/gradient) so it reads as a schematic
-           drawing, not the generic 3D SaaS-hero globe. One accent-colored
-           marker for AU/NZ is the only thing it calls out by name. */
+        /* An ambient, oversized globe hanging from the top edge and
+           bleeding off the right, rather than a small contained diagram.
+           Lit warm gold on one side fading to ink shadow on the other (the
+           reference's day/night terminator), but built from tokens already
+           in the page's own palette — plus a soft bloom — instead of the
+           teal/orange-on-black of a typical stock SaaS globe asset. */
         .fl-title__globe {
-          position: absolute; z-index: 0; inset: 0 auto 0 auto; margin: auto 0;
-          top: 0; bottom: 0; right: clamp(-200px, -14vw, -40px);
+          position: absolute; z-index: 0; inset: auto auto auto auto;
+          top: clamp(24px, 6vh, 88px); right: clamp(-200px, -14vw, -40px);
           width: clamp(520px, 58vw, 900px); aspect-ratio: 1;
-          pointer-events: none;
+          pointer-events: none; overflow: hidden; border-radius: 50%;
           animation: fl-globe-in 1100ms var(--ease) 200ms both;
         }
-        .fl-title__globeCanvas { display: block; width: 100%; height: 100%; }
+        .fl-title__globeGlow {
+          position: absolute; z-index: 0; inset: 0;
+          background:
+            radial-gradient(circle at 32% 28%, rgba(232,183,90,0.22), transparent 62%),
+            radial-gradient(circle at 68% 76%, rgba(11,107,63,0.14), transparent 64%);
+        }
+        .fl-title__globeCanvas { position: relative; z-index: 1; display: block; width: 100%; height: 100%; }
         .fl-title__globeOverlay {
-          position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
+          position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; overflow: visible;
         }
         .fl-title__globeRing { fill: none; stroke: var(--accent-ink); stroke-width: 1.6; opacity: 0.55; }
         .fl-title__globeDot { fill: var(--accent-ink); }
@@ -1246,6 +1272,7 @@ export default function LandingPage() {
         {/* ------------------------------------------------------ title page */}
         <header className="fl-title">
           <div className="fl-title__globe" aria-hidden="true">
+            <div className="fl-title__globeGlow" />
             <canvas ref={globeCanvasRef} className="fl-title__globeCanvas" />
             <svg className="fl-title__globeOverlay" viewBox="0 0 700 700">
               <defs>
