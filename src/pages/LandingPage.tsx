@@ -807,9 +807,11 @@ export default function LandingPage() {
            reduced-motion or pre-JS view shows a complete, non-broken row
            of seeds rather than an empty one. */
         .fl-folio__seed {
-          width: 6px; height: 6px; border-radius: 50%; align-self: center;
-          background: var(--accent);
-          box-shadow: inset -1px -1px 1.5px rgba(11,107,63,0.5), 1px 1px 1px rgba(255,255,255,0.5);
+          width: 8px; height: 9.5px; align-self: center;
+          border-radius: 50% 50% 48% 48% / 58% 58% 42% 42%;
+          background: radial-gradient(circle at 32% 26%, #A9F0C4 0%, var(--accent) 46%, #0E7A46 100%);
+          border: 0.5px solid var(--accent-ink);
+          box-shadow: 0 0.5px 1px rgba(11,107,63,0.35);
           opacity: 1; transform: none; will-change: opacity, transform;
         }
         .fl-folio__link em {
