@@ -370,7 +370,7 @@ export default function LandingPage() {
   const tiltRef = useRef<HTMLDivElement>(null);
   const globeCanvasRef = useRef<HTMLCanvasElement>(null);
   const globeWrapRef = useRef<HTMLDivElement>(null);
-  const podMarkerRef = useRef<HTMLImageElement>(null);
+  const podMarkerRef = useRef<HTMLSpanElement>(null);
   const rosterTrackRef = useRef<HTMLDivElement>(null);
   const rosterChipRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const faqListRef = useRef<HTMLDivElement>(null);
@@ -399,7 +399,9 @@ export default function LandingPage() {
       // function of how far through the whole page you are
       if (podMarkerRef.current) {
         const total = Math.max(document.documentElement.scrollHeight - innerHeight, 1);
-        podMarkerRef.current.style.top = `${(clamp(scrollY / total) * 100).toFixed(2)}%`;
+        const railInset = 16;
+        const railHeight = Math.max((podMarkerRef.current.parentElement?.clientHeight ?? 0) - railInset * 2, 1);
+        podMarkerRef.current.style.top = `${(railInset + clamp(scrollY / total) * railHeight).toFixed(1)}px`;
       }
       // hero rule draws as the first screen is left behind
       if (heroRuleRef.current) {
@@ -780,20 +782,33 @@ export default function LandingPage() {
         }
         .fl-folio__mark span { color: var(--accent-ink); }
         /* The pod is the sidebar's own scroll-progress marker — an edamame
-           pod sliding down a vine beside the chapter list, in place of a
-           plain progress bar. Generated locally (Fooocus), no alpha channel,
-           so it sits on white and relies on multiply blend to disappear
-           against the paper background (same trick as the paper grain and
-           the hero's stamp texture). */
-        .fl-folio__railwrap { position: relative; margin: auto 0; padding-left: 18px; }
+           pod sliding down a vine from right under the wordmark to the
+           footer, in place of a plain progress bar. The rail lives on the
+           whole railwrap (which now stretches to fill the space between
+           logo and footer, with the chapter list centered inside it), not
+           just alongside the list, so the pod's 0% position starts at the
+           very top instead of wherever the list happens to be centered.
+           Generated locally (Fooocus): a cel-shaded clipart pod, its own
+           light green background left in (removing it cleanly — via
+           multiply or chroma key — either left the background vividly
+           green or ate the pod's own fill; see the sidecar json), framed
+           as a small bordered card instead, matching every other graphic
+           on this page living in one. */
+        .fl-folio__railwrap {
+          position: relative; flex: 1; display: flex; flex-direction: column;
+          justify-content: center; padding-left: 18px; margin-top: 22px; min-height: 0;
+        }
         .fl-folio__rail {
-          position: absolute; left: 3px; top: 2px; bottom: 2px; width: 1px; background: var(--rule-soft);
+          position: absolute; left: 3px; top: 16px; bottom: 16px; width: 1px; background: var(--rule-soft);
         }
         .fl-folio__pod {
-          position: absolute; left: 3px; top: 0; width: 15px; max-width: none; height: auto;
-          transform: translate(-50%, -50%); mix-blend-mode: multiply;
+          position: absolute; left: 3px; top: 0; width: 26px;
+          transform: translate(-50%, -50%);
+          background: var(--card); border: 1px solid var(--rule-soft); border-radius: 6px;
+          box-shadow: var(--shadow); padding: 2px;
           pointer-events: none; will-change: top;
         }
+        .fl-folio__pod img { display: block; width: 100%; height: auto; max-width: none; border-radius: 4px; }
         .fl-folio__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
         .fl-folio__link {
           display: grid; grid-template-columns: 26px 1fr; align-items: baseline; gap: 8px;
@@ -1325,7 +1340,9 @@ export default function LandingPage() {
         <a className="fl-folio__mark" href="#top">Edamame<span>.</span></a>
         <div className="fl-folio__railwrap">
           <span className="fl-folio__rail" aria-hidden="true" />
-          <img ref={podMarkerRef} src="/images/pod-marker.webp" alt="" className="fl-folio__pod" />
+          <span ref={podMarkerRef} className="fl-folio__pod" aria-hidden="true">
+            <img src="/images/pod-marker.webp" alt="" />
+          </span>
           <ol className="fl-folio__list">
             {chapters.map((c) => (
               <li key={c.id}>
