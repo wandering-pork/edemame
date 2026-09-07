@@ -813,6 +813,29 @@ export default function LandingPage() {
         .fl-title__sub { font-size: 15px; line-height: 1.6; color: var(--ink-soft); max-width: 46ch; margin: 12px 0 0; }
         .fl-title__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: clamp(28px, 4vh, 42px); }
 
+        /* A single bold line sweeping from the top of the hero down and
+           across into the globe — the case's route, arriving. One draw-on
+           reveal on load (pathLength normalizes stroke-dashoffset to 0..1
+           regardless of the path's actual geometric length), then still. */
+        .fl-title__swoosh {
+          position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%;
+          overflow: visible; pointer-events: none;
+        }
+        .fl-title__swooshPath {
+          fill: none; stroke: var(--accent-ink); stroke-width: 2.5; stroke-linecap: round;
+          stroke-dasharray: 1; stroke-dashoffset: 1;
+          animation: fl-swoosh-draw 1500ms var(--ease) 350ms forwards;
+        }
+        @keyframes fl-swoosh-draw {
+          to { stroke-dashoffset: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .fl-title__swooshPath { animation: none; stroke-dashoffset: 0; }
+        }
+        @media (max-width: 1023px) {
+          .fl-title__swoosh { display: none; }
+        }
+
         /* An ambient, oversized globe hanging from the top edge and
            bleeding off the right, rather than a small contained diagram.
            Lit warm gold on one side fading to ink shadow on the other (the
@@ -1271,6 +1294,14 @@ export default function LandingPage() {
 
         {/* ------------------------------------------------------ title page */}
         <header className="fl-title">
+          <svg className="fl-title__swoosh" viewBox="0 0 1600 800" preserveAspectRatio="none" aria-hidden="true">
+            <path
+              className="fl-title__swooshPath"
+              pathLength={1}
+              d="M784,12 C620,220 640,480 900,580 C1080,650 1350,610 1592,615"
+            />
+          </svg>
+
           <div className="fl-title__globe" aria-hidden="true">
             <div className="fl-title__globeGlow" />
             <canvas ref={globeCanvasRef} className="fl-title__globeCanvas" />
