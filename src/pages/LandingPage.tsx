@@ -336,6 +336,7 @@ export default function LandingPage() {
   const cloudThreadRef = useRef<HTMLSpanElement>(null);
   const tiltRef = useRef<HTMLDivElement>(null);
   const globeCanvasRef = useRef<HTMLCanvasElement>(null);
+  const globeWrapRef = useRef<HTMLDivElement>(null);
 
   /* --- the scroll spine: ordinary vertical scroll, read, never hijacked --- */
   useEffect(() => {
@@ -360,6 +361,13 @@ export default function LandingPage() {
       if (heroRuleRef.current) {
         const p = clamp(scrollY / (innerHeight * 0.65));
         heroRuleRef.current.style.transform = `scaleX(${p})`;
+      }
+      // the globe slides up and out as the hero is left behind, faster than
+      // the page itself scrolls — a light parallax exit rather than a hard cut
+      if (globeWrapRef.current) {
+        const p = clamp(scrollY / (innerHeight * 0.9));
+        globeWrapRef.current.style.transform = `translateY(${(p * -22).toFixed(2)}%)`;
+        globeWrapRef.current.style.opacity = String(clamp(1 - p * 1.15, 0, 1));
       }
       if (colophonRuleRef.current) {
         const p = viewProgress(colophonRuleRef.current.parentElement as HTMLElement);
@@ -814,15 +822,19 @@ export default function LandingPage() {
         .fl-title__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: clamp(28px, 4vh, 42px); }
 
         /* A genuinely oversized globe — its own circumference is the sweep
-           the text plays against, hanging from the top edge and bleeding
-           off the right, rather than a small contained diagram. Lit warm
-           gold on one side fading to ink shadow on the other (the
-           reference's day/night terminator), but built from tokens already
-           in the page's own palette — plus a soft bloom — instead of the
-           teal/orange-on-black of a typical stock SaaS globe asset. */
+           the text plays against, cut by the top edge of the hero (bottom-
+           anchored, so the surplus height that doesn't fit the section
+           spills upward and is clipped there) and bleeding off the right,
+           rather than a small contained diagram. Lit warm gold on one side
+           fading to ink shadow on the other (a day/night terminator), but
+           built from tokens already in the page's own palette — plus a
+           soft bloom — instead of the teal/orange-on-black of a typical
+           stock SaaS globe asset. The wrap slides it up and fades it out as
+           the hero scrolls past (see the scroll-spine effect). */
+        .fl-title__globeWrap { position: absolute; inset: 0; pointer-events: none; }
         .fl-title__globe {
           position: absolute; z-index: 0; inset: auto auto auto auto;
-          top: clamp(-40px, 0vh, 0px); right: clamp(-420px, -30vw, -140px);
+          bottom: clamp(-40px, 0vh, 0px); right: clamp(-420px, -30vw, -140px);
           width: clamp(760px, 92vw, 1500px); aspect-ratio: 1;
           pointer-events: none; overflow: hidden; border-radius: 50%;
           animation: fl-globe-in 1100ms var(--ease) 200ms both;
@@ -834,20 +846,6 @@ export default function LandingPage() {
             radial-gradient(circle at 68% 76%, rgba(11,107,63,0.14), transparent 64%);
         }
         .fl-title__globeCanvas { position: relative; z-index: 1; display: block; width: 100%; height: 100%; }
-        .fl-title__globeOverlay {
-          position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; overflow: visible;
-        }
-        .fl-title__globeRing { fill: none; stroke: var(--accent-ink); stroke-width: 1.6; opacity: 0.55; }
-        .fl-title__globeDot { fill: var(--accent-ink); }
-        .fl-title__globeLabel {
-          font-family: var(--mono); font-weight: 600; font-size: 13px; letter-spacing: 0.04em;
-          fill: var(--accent-ink); text-transform: uppercase;
-        }
-        .fl-title__globeStampRing { fill: none; stroke: var(--accent-ink); }
-        .fl-title__globeStamp {
-          font-family: var(--mono); font-weight: 500; font-size: 9.5px; letter-spacing: 0.03em;
-          fill: var(--accent-ink); text-transform: uppercase;
-        }
         @keyframes fl-globe-in {
           from { opacity: 0; transform: translateX(28px); }
           to { opacity: 1; transform: none; }
@@ -858,8 +856,9 @@ export default function LandingPage() {
         @media (max-width: 1023px) {
           .fl-title { overflow: visible; }
           .fl-title__prose { order: 1; }
+          .fl-title__globeWrap { position: relative; inset: auto; order: 2; }
           .fl-title__globe {
-            position: relative; order: 2; inset: auto; top: auto; bottom: auto; right: auto;
+            position: relative; inset: auto; top: auto; bottom: auto; right: auto;
             margin: clamp(48px, 8vh, 64px) auto 0;
             width: min(82vw, 440px); opacity: 1;
           }
@@ -1272,27 +1271,11 @@ export default function LandingPage() {
 
         {/* ------------------------------------------------------ title page */}
         <header className="fl-title">
-          <div className="fl-title__globe" aria-hidden="true">
-            <div className="fl-title__globeGlow" />
-            <canvas ref={globeCanvasRef} className="fl-title__globeCanvas" />
-            <svg className="fl-title__globeOverlay" viewBox="0 0 700 700">
-              <defs>
-                <filter id="fl-stamp-rough">
-                  <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="noise" />
-                  <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" />
-                </filter>
-              </defs>
-
-              <g transform="translate(470,430)">
-                <circle r="18" className="fl-title__globeRing" />
-                <circle r="4.5" className="fl-title__globeDot" />
-                <text x="-14" y="-22" textAnchor="end" className="fl-title__globeLabel">AU / NZ</text>
-                <g transform="translate(38,30) rotate(-7)">
-                  <circle cx="0" cy="0" r="24" className="fl-title__globeStampRing" strokeWidth="3" filter="url(#fl-stamp-rough)" />
-                  <text x="0" y="4" textAnchor="middle" className="fl-title__globeStamp">Filed</text>
-                </g>
-              </g>
-            </svg>
+          <div ref={globeWrapRef} className="fl-title__globeWrap">
+            <div className="fl-title__globe" aria-hidden="true">
+              <div className="fl-title__globeGlow" />
+              <canvas ref={globeCanvasRef} className="fl-title__globeCanvas" />
+            </div>
           </div>
 
           <div className="fl-title__prose">
