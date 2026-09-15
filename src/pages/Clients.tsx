@@ -64,7 +64,18 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
   );
 
   const getClientCases = (clientId: string) => {
-    return cases.filter(c => c.clientId === clientId);
+    return cases.filter(c => c.clientId === clientId || c.applicantId === clientId);
+  };
+
+  // Only meaningful when a case splits the engaging customer from the applicant
+  // (applicantId set and different from clientId) — otherwise it's one person
+  // playing both roles and no badge is needed.
+  const getClientRolesForCase = (c: Case, clientId: string): ('Customer' | 'Applicant')[] => {
+    if (!c.applicantId || c.applicantId === c.clientId) return [];
+    const roles: ('Customer' | 'Applicant')[] = [];
+    if (c.clientId === clientId) roles.push('Customer');
+    if (c.applicantId === clientId) roles.push('Applicant');
+    return roles;
   };
 
   // "Active case" = most recently started case that isn't closed, falling back to any case.
@@ -318,6 +329,7 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
                           <div className="space-y-2.5">
                             {getClientCases(client.id).map(c => {
                               const progress = getCaseProgress(c.id);
+                              const roles = getClientRolesForCase(c, client.id);
                               return (
                                 <div key={c.id} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-3.5 card-lift">
                                   <div className="flex justify-between items-start mb-2.5 gap-3">
@@ -327,6 +339,18 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
                                           #{c.id.substring(0, 8)}
                                         </span>
                                         <span className="font-semibold text-gray-900 dark:text-white text-sm truncate">{c.title}</span>
+                                        {roles.map(role => (
+                                          <span
+                                            key={role}
+                                            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide ${
+                                              role === 'Applicant'
+                                                ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/25 dark:text-purple-400'
+                                                : 'bg-amber-50 text-amber-700 dark:bg-amber-900/25 dark:text-amber-400'
+                                            }`}
+                                          >
+                                            {role}
+                                          </span>
+                                        ))}
                                       </div>
                                       <p className="text-xs text-gray-400 dark:text-slate-500 line-clamp-1">{c.description}</p>
                                     </div>
