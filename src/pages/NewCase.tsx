@@ -297,7 +297,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
   const canGenerate = !isLoading && !!description && !!templateId && !!clientId;
 
   return (
-    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200">
+    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-paper dark:bg-plate min-h-screen transition-colors duration-200">
       <style>{`
         @keyframes rowStreamIn {
           from { opacity: 0; transform: translateY(4px); }
@@ -308,12 +308,12 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       <div className="max-w-[720px] mx-auto page-enter">
         <div className="flex items-end justify-between mb-5">
           <div>
-            <h1 className="text-[26px] font-extrabold tracking-tight text-gray-900 dark:text-white">New Case Intake</h1>
-            <p className="text-[13px] text-gray-500 dark:text-slate-400 mt-1">Select a client and let AI plan the workflow.</p>
+            <h1 className="text-[26px] font-extrabold tracking-tight text-ink dark:text-plate-ink">New Case Intake</h1>
+            <p className="text-[13px] text-ink-soft dark:text-plate-ink-soft mt-1">Select a client and let AI plan the workflow.</p>
           </div>
           <button
             onClick={() => onGoBack('cases')}
-            className="text-[13px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            className="text-[13px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink transition-colors"
           >
             Cancel
           </button>
@@ -323,17 +323,17 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
         {/* PHASE 1 — Form                                                   */}
         {/* ---------------------------------------------------------------- */}
         {step === 'input' && (
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-6 space-y-5">
+          <div className="bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl shadow-sm p-6 space-y-5">
 
             <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4">
               {/* Custom Client Selector */}
               <div className="relative focus-ring rounded-lg">
-                <label className="block text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-1.5">Client</label>
+                <label className="block text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5">Client</label>
                 <div
                   className="relative"
                   onClick={() => setIsClientDropdownOpen(true)}
                 >
-                  <User className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500" size={17} />
+                  <User className="absolute left-3 top-2.5 text-ink-faint dark:text-plate-ink-faint" size={17} />
                   <input
                     type="text"
                     value={clientSearchTerm}
@@ -345,10 +345,10 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                       }
                     }}
                     onFocus={() => setIsClientDropdownOpen(true)}
-                    className="w-full pl-9 pr-9 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-gray-900 dark:text-white outline-none"
+                    className="w-full pl-9 pr-9 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-ink dark:text-plate-ink outline-none"
                     placeholder="Search client…"
                   />
-                  <ChevronDown className="absolute right-3 top-3 text-gray-400 dark:text-slate-500 pointer-events-none" size={15} />
+                  <ChevronDown className="absolute right-3 top-3 text-ink-faint dark:text-plate-ink-faint pointer-events-none" size={15} />
                 </div>
 
                 {isClientDropdownOpen && (
@@ -357,18 +357,18 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                       className="fixed inset-0 z-10"
                       onClick={() => setIsClientDropdownOpen(false)}
                     ></div>
-                    <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-20 mt-1 w-full bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {filteredClients.length === 0 ? (
-                        <div className="p-3 text-[13px] text-gray-500 dark:text-slate-500 italic">No clients found.</div>
+                        <div className="p-3 text-[13px] text-ink-soft dark:text-plate-ink-soft italic">No clients found.</div>
                       ) : (
                         filteredClients.map(c => (
                           <div
                             key={c.id}
                             onClick={() => handleSelectClient(c)}
-                            className="p-3 hover:bg-edamame-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-100 dark:border-slate-700 last:border-0"
+                            className="p-3 hover:bg-edamame-50 dark:hover:bg-plate-card cursor-pointer border-b border-ink/10 dark:border-plate-ink/15 last:border-0"
                           >
-                            <div className="font-medium text-[13px] text-gray-900 dark:text-white">{c.name}</div>
-                            <div className="flex gap-2 text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
+                            <div className="font-medium text-[13px] text-ink dark:text-plate-ink">{c.name}</div>
+                            <div className="flex gap-2 text-[11px] text-ink-soft dark:text-plate-ink-soft mt-0.5">
                               <span>DOB: {c.dob || 'N/A'}</span>
                               <span>•</span>
                               <span>{c.phone || c.email || 'No Contact Info'}</span>
@@ -382,14 +382,14 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
               </div>
 
               <div className="focus-ring rounded-lg">
-                <label className="block text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-1.5">Start Date</label>
+                <label className="block text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5">Start Date</label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500" size={17} />
+                  <Calendar className="absolute left-3 top-2.5 text-ink-faint dark:text-plate-ink-faint" size={17} />
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-gray-900 dark:text-white outline-none transition-all"
+                    className="w-full pl-9 pr-3 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-ink dark:text-plate-ink outline-none transition-all"
                   />
                 </div>
               </div>
@@ -400,16 +400,16 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <div
                   onClick={() => { setSplitRoles(v => !v); if (splitRoles) { setApplicantId(''); setApplicantSearchTerm(''); } }}
-                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${splitRoles ? 'bg-edamame-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${splitRoles ? 'bg-edamame-500' : 'bg-ink/20 dark:bg-plate-ink/20'}`}
                 >
                   <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${splitRoles ? 'translate-x-4' : ''}`} />
                 </div>
-                <span className="text-[12.5px] font-medium text-gray-600 dark:text-slate-300">
+                <span className="text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft">
                   Client and applicant are different people
                 </span>
               </label>
               {splitRoles && (
-                <p className="mt-1 ml-[46px] text-[11px] text-gray-400 dark:text-slate-500">
+                <p className="mt-1 ml-[46px] text-[11px] text-ink-faint dark:text-plate-ink-faint">
                   Client = the engaging/paying party. Applicant = the person named on the visa.
                 </p>
               )}
@@ -418,9 +418,9 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
             {/* Applicant picker (when roles split) */}
             {splitRoles && (
               <div className="relative focus-ring rounded-lg">
-                <label className="block text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-1.5">Applicant (visa applicant)</label>
+                <label className="block text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5">Applicant (visa applicant)</label>
                 <div className="relative" onClick={() => setIsApplicantDropdownOpen(true)}>
-                  <User className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500" size={17} />
+                  <User className="absolute left-3 top-2.5 text-ink-faint dark:text-plate-ink-faint" size={17} />
                   <input
                     type="text"
                     value={applicantSearchTerm}
@@ -432,26 +432,26 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                       }
                     }}
                     onFocus={() => setIsApplicantDropdownOpen(true)}
-                    className="w-full pl-9 pr-9 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-gray-900 dark:text-white outline-none"
+                    className="w-full pl-9 pr-9 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-ink dark:text-plate-ink outline-none"
                     placeholder="Search applicant…"
                   />
-                  <ChevronDown className="absolute right-3 top-3 text-gray-400 dark:text-slate-500 pointer-events-none" size={15} />
+                  <ChevronDown className="absolute right-3 top-3 text-ink-faint dark:text-plate-ink-faint pointer-events-none" size={15} />
                 </div>
                 {isApplicantDropdownOpen && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setIsApplicantDropdownOpen(false)} />
-                    <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-20 mt-1 w-full bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {filteredApplicants.length === 0 ? (
-                        <div className="p-3 text-[13px] text-gray-500 dark:text-slate-500 italic">No clients found.</div>
+                        <div className="p-3 text-[13px] text-ink-soft dark:text-plate-ink-soft italic">No clients found.</div>
                       ) : (
                         filteredApplicants.map(c => (
                           <div
                             key={c.id}
                             onClick={() => handleSelectApplicant(c)}
-                            className="p-3 hover:bg-edamame-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-100 dark:border-slate-700 last:border-0"
+                            className="p-3 hover:bg-edamame-50 dark:hover:bg-plate-card cursor-pointer border-b border-ink/10 dark:border-plate-ink/15 last:border-0"
                           >
-                            <div className="font-medium text-[13px] text-gray-900 dark:text-white">{c.name}</div>
-                            <div className="flex gap-2 text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
+                            <div className="font-medium text-[13px] text-ink dark:text-plate-ink">{c.name}</div>
+                            <div className="flex gap-2 text-[11px] text-ink-soft dark:text-plate-ink-soft mt-0.5">
                               <span>DOB: {c.dob || 'N/A'}</span>
                               <span>•</span>
                               <span>{c.phone || c.email || 'No Contact Info'}</span>
@@ -466,11 +466,11 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
             )}
 
             <div className="focus-ring rounded-lg">
-              <label className="block text-[11px] font-semibold text-gray-500 dark:text-slate-400 mb-1.5">Workflow Template</label>
+              <label className="block text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5">Workflow Template</label>
               <select
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
-                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-gray-900 dark:text-white outline-none"
+                className="w-full px-3 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-ink dark:text-plate-ink outline-none"
               >
                 <option value="">— Choose a workflow —</option>
                 {templates.map(t => (
@@ -483,7 +483,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                   <button
                     type="button"
                     onClick={() => setStepsExpanded(v => !v)}
-                    className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors"
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-faint dark:text-plate-ink-faint hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors"
                   >
                     <List size={13} />
                     This template includes {selectedTemplate.steps.length} steps
@@ -492,11 +492,11 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                   {stepsExpanded && (
                     <ol className="mt-2 space-y-1 pl-1">
                       {selectedTemplate.steps.map((s, i) => (
-                        <li key={i} className="flex gap-2 text-[11px] text-gray-600 dark:text-slate-400">
-                          <span className="flex-shrink-0 font-bold text-gray-400 dark:text-slate-500 w-4">{i + 1}.</span>
+                        <li key={i} className="flex gap-2 text-[11px] text-ink-soft dark:text-plate-ink-soft">
+                          <span className="flex-shrink-0 font-bold text-ink-faint dark:text-plate-ink-faint w-4">{i + 1}.</span>
                           <div>
-                            <span className="font-semibold text-gray-700 dark:text-slate-300">{s.title}</span>
-                            {s.description && <span className="text-gray-400 dark:text-slate-500"> — {s.description}</span>}
+                            <span className="font-semibold text-ink-soft dark:text-plate-ink-soft">{s.title}</span>
+                            {s.description && <span className="text-ink-faint dark:text-plate-ink-faint"> — {s.description}</span>}
                           </div>
                         </li>
                       ))}
@@ -508,10 +508,10 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
 
             <div>
               <div className="flex items-baseline justify-between mb-1.5">
-                <label className="text-[11px] font-semibold text-gray-500 dark:text-slate-400">
+                <label className="text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft">
                   Case Notes
                 </label>
-                <span className="text-[10.5px] text-gray-400 dark:text-slate-500">
+                <span className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint">
                   {templateId
                     ? 'Placeholder shows what to include for this visa type'
                     : 'Select a template to see guided prompts'}
@@ -536,7 +536,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                   rows={8}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3.5 py-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-gray-900 dark:text-white outline-none transition-all resize-y text-[13px] leading-relaxed"
+                  className="w-full px-3.5 py-3 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-ink dark:text-plate-ink outline-none transition-all resize-y text-[13px] leading-relaxed"
                   placeholder={getDescriptionPlaceholder(selectedTemplate)}
                 />
               </div>
@@ -575,14 +575,14 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
         {/* PHASE 2 — Generating                                             */}
         {/* ---------------------------------------------------------------- */}
         {step === 'generating' && (
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-6">
+          <div className="bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl shadow-sm p-6">
             <div className="flex items-center gap-3">
               <div className="w-[34px] h-[34px] rounded-[10px] bg-edamame-50 dark:bg-edamame-900/20 flex items-center justify-center text-edamame-600 dark:text-edamame-400 flex-shrink-0">
                 <Sparkles className="animate-spin" size={18} />
               </div>
               <div>
-                <div className="text-[14.5px] font-bold tracking-tight text-gray-900 dark:text-white">Drafting your task plan…</div>
-                <div className="text-[12px] text-gray-400 dark:text-slate-500 mt-0.5">
+                <div className="text-[14.5px] font-bold tracking-tight text-ink dark:text-plate-ink">Drafting your task plan…</div>
+                <div className="text-[12px] text-ink-faint dark:text-plate-ink-faint mt-0.5">
                   {selectedTemplate?.title} · {selectedClient?.name} ·{' '}
                   {generatedTasks.length > 0
                     ? `task ${revealedTasks.length} of ${generatedTasks.length}`
@@ -595,13 +595,13 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
               {revealedTasks.map((task, idx) => (
                 <div
                   key={idx}
-                  className="row-stream-in flex items-center gap-3 px-3.5 py-2.5 border border-gray-100 dark:border-slate-800 rounded-[10px] bg-gray-50 dark:bg-slate-800/50"
+                  className="row-stream-in flex items-center gap-3 px-3.5 py-2.5 border border-ink/10 dark:border-plate-ink/15 rounded-[10px] bg-paper-2 dark:bg-plate-card/50"
                 >
                   <span className="w-5 h-5 rounded-md bg-edamame-100 dark:bg-edamame-900/30 text-edamame-700 dark:text-edamame-400 text-[10px] font-extrabold flex items-center justify-center flex-shrink-0">
                     {idx + 1}
                   </span>
-                  <span className="flex-1 text-[13px] font-semibold tracking-tight text-gray-900 dark:text-white truncate">{task.title}</span>
-                  <span className="text-[11px] font-semibold text-gray-400 dark:text-slate-500 flex-shrink-0">
+                  <span className="flex-1 text-[13px] font-semibold tracking-tight text-ink dark:text-plate-ink truncate">{task.title}</span>
+                  <span className="text-[11px] font-semibold text-ink-faint dark:text-plate-ink-faint flex-shrink-0">
                     {task.date ? format(new Date(task.date), 'MMM d') : ''}
                   </span>
                 </div>
@@ -614,12 +614,12 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
         {/* PHASE 3 — Review                                                 */}
         {/* ---------------------------------------------------------------- */}
         {step === 'review' && (
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-6">
+          <div className="bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl shadow-sm p-6">
             <div className="flex items-center gap-2.5">
               <Sparkles className="text-edamame-600 dark:text-edamame-400 flex-shrink-0" size={18} />
               <div className="flex-1 min-w-0">
-                <div className="text-[15px] font-bold tracking-tight text-gray-900 dark:text-white">Review generated plan</div>
-                <div className="text-[12px] text-gray-400 dark:text-slate-500 mt-0.5 truncate">
+                <div className="text-[15px] font-bold tracking-tight text-ink dark:text-plate-ink">Review generated plan</div>
+                <div className="text-[12px] text-ink-faint dark:text-plate-ink-faint mt-0.5 truncate">
                   {selectedTemplate?.title} · {selectedClient?.name} · edit or remove tasks before saving
                 </div>
               </div>
@@ -632,9 +632,9 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
               {generatedTasks.map((task, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-3 p-3.5 border border-gray-200 dark:border-slate-800 rounded-[10px] hover:border-edamame-300 dark:hover:border-edamame-700 transition-colors"
+                  className="flex items-start gap-3 p-3.5 border border-ink/15 dark:border-plate-ink/20 rounded-[10px] hover:border-edamame-300 dark:hover:border-edamame-700 transition-colors"
                 >
-                  <span className="w-5 h-5 mt-0.5 rounded-md bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 text-[10px] font-extrabold flex items-center justify-center flex-shrink-0">
+                  <span className="w-5 h-5 mt-0.5 rounded-md bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft text-[10px] font-extrabold flex items-center justify-center flex-shrink-0">
                     {idx + 1}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -642,14 +642,14 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                       type="text"
                       value={task.title}
                       onChange={(e) => updateGeneratedTask(idx, 'title', e.target.value)}
-                      className="w-full text-[13px] font-semibold tracking-tight text-gray-900 dark:text-white border-none bg-transparent p-0 focus:ring-0 placeholder-gray-400"
+                      className="w-full text-[13px] font-semibold tracking-tight text-ink dark:text-plate-ink border-none bg-transparent p-0 focus:ring-0 placeholder-ink-soft/50"
                       placeholder="Task Title"
                     />
                     <input
                       type="text"
                       value={(task.description || '').split(/(?<=[.!?])\s/)[0] || ''}
                       onChange={(e) => updateGeneratedTask(idx, 'description', e.target.value)}
-                      className="w-full text-[11px] text-gray-500 dark:text-slate-400 border-none bg-transparent p-0 mt-0.5 focus:ring-0 placeholder-gray-300 dark:placeholder-slate-600"
+                      className="w-full text-[11px] text-ink-soft dark:text-plate-ink-soft border-none bg-transparent p-0 mt-0.5 focus:ring-0 placeholder-ink-soft/40 dark:placeholder-plate-ink-soft/50"
                       placeholder="Description"
                     />
                   </div>
@@ -658,11 +658,11 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                       type="date"
                       value={task.date}
                       onChange={(e) => updateGeneratedTask(idx, 'date', e.target.value)}
-                      className="text-[11px] font-semibold px-2 py-1 rounded-md bg-gray-100 dark:bg-slate-800 border-none text-gray-600 dark:text-slate-300 focus:ring-2 focus:ring-edamame-500"
+                      className="text-[11px] font-semibold px-2 py-1 rounded-md bg-paper-2 dark:bg-plate-card border-none text-ink-soft dark:text-plate-ink-soft focus:ring-2 focus:ring-edamame-500"
                     />
                     <button
                       onClick={() => removeGeneratedTask(idx)}
-                      className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors"
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-ink-faint dark:text-plate-ink-faint hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors"
                       aria-label="Remove task"
                     >
                       <X size={14} />
@@ -675,7 +675,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
             <div className="flex items-center justify-between mt-5">
               <button
                 onClick={handleAnalyze}
-                className="px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 text-[12.5px] font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+                className="px-4 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft text-[12.5px] font-semibold hover:bg-paper-2 dark:hover:bg-plate transition-colors"
               >
                 ↺ Regenerate
               </button>

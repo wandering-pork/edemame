@@ -144,18 +144,18 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 p-4 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 dark:border-slate-800">
+      <div className="bg-paper-2 dark:bg-plate-card rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-ink/10 dark:border-plate-ink/15">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-ink/10 dark:border-plate-ink/15 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck size={20} className="text-green-600 dark:text-green-400" />
-            <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
+            <h3 className="font-semibold text-lg text-ink dark:text-plate-ink">
               Passport Scanner
             </h3>
           </div>
           <button
             onClick={handleClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
+            className="p-1.5 text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft transition-colors rounded-lg hover:bg-paper-2 dark:hover:bg-plate-card"
           >
             <X size={18} />
           </button>
@@ -179,20 +179,20 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
                 className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
                   isDragActive
                     ? 'border-green-500 bg-green-50 dark:bg-green-900/10'
-                    : 'border-gray-300 dark:border-slate-700 hover:border-green-400 dark:hover:border-green-600 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+                    : 'border-ink/20 dark:border-plate-ink/25 hover:border-green-400 dark:hover:border-green-600 hover:bg-paper-2 dark:hover:bg-plate/50'
                 }`}
               >
                 <input {...getInputProps()} />
                 <Upload
                   size={36}
-                  className="mx-auto mb-3 text-gray-400 dark:text-slate-500"
+                  className="mx-auto mb-3 text-ink-faint dark:text-plate-ink-faint"
                 />
-                <p className="text-sm font-medium text-gray-700 dark:text-slate-300">
+                <p className="text-sm font-medium text-ink-soft dark:text-plate-ink-soft">
                   {isDragActive
                     ? 'Drop your passport image here'
                     : 'Drag & drop a passport image, or click to browse'}
                 </p>
-                <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                <p className="text-xs text-ink-faint dark:text-plate-ink-faint mt-1">
                   Supports JPG and PNG files
                 </p>
               </div>
@@ -206,16 +206,16 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
                 size={40}
                 className="mx-auto mb-4 text-green-600 dark:text-green-400 animate-spin"
               />
-              <p className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-4">
+              <p className="text-sm font-medium text-ink-soft dark:text-plate-ink-soft mb-4">
                 {statusMsg}
               </p>
-              <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+              <div className="w-full bg-paper-2 dark:bg-plate-card rounded-full h-2.5 overflow-hidden">
                 <div
                   className="h-2.5 rounded-full bg-green-500 transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">
+              <p className="text-xs text-ink-faint dark:text-plate-ink-faint mt-2">
                 {progress}%
               </p>
             </div>
@@ -231,7 +231,7 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
 
                 return (
                   <div key={key}>
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-slate-300 mb-1 uppercase">
+                    <label className="flex items-center gap-1.5 text-xs font-medium text-ink-soft dark:text-plate-ink-soft mb-1 uppercase">
                       {label}
                       {isValid === true && (
                         <CheckCircle
@@ -257,7 +257,7 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
                             [key]: e.target.value,
                           }))
                         }
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 text-gray-900 dark:text-white outline-none text-sm"
+                        className="w-full px-3 py-2 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg focus:ring-2 focus:ring-green-500 text-ink dark:text-plate-ink outline-none text-sm"
                       >
                         <option value="">-- Select --</option>
                         <option value="Male">Male</option>
@@ -274,14 +274,14 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
                             [key]: e.target.value,
                           }))
                         }
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 text-gray-900 dark:text-white outline-none text-sm"
+                        className="w-full px-3 py-2 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg focus:ring-2 focus:ring-green-500 text-ink dark:text-plate-ink outline-none text-sm"
                       />
                     )}
                   </div>
                 );
               })}
 
-              <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 dark:text-slate-500">
+              <div className="flex items-center gap-2 mt-2 text-xs text-ink-faint dark:text-plate-ink-faint">
                 <CheckCircle size={12} className="text-green-500" />
                 <span>MRZ check digit validated</span>
                 <span className="mx-1">|</span>
@@ -298,10 +298,10 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
                 size={36}
                 className="mx-auto mb-3 text-amber-500"
               />
-              <p className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+              <p className="text-sm font-medium text-ink-soft dark:text-plate-ink-soft mb-2">
                 Could not extract passport data
               </p>
-              <p className="text-xs text-gray-500 dark:text-slate-400 mb-4">
+              <p className="text-xs text-ink-soft dark:text-plate-ink-soft mb-4">
                 <span className="block mb-2">The image may be blurry, poorly lit, or at an angle.</span>
                 <span className="block">Try again with a clear photo, or fill in details manually below.</span>
               </p>
@@ -312,10 +312,10 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
               )}
               {result?.rawText && (
                 <details className="text-left mb-4">
-                  <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 dark:hover:text-slate-300 font-medium">
+                  <summary className="text-xs text-ink-faint dark:text-plate-ink-faint cursor-pointer hover:text-ink-soft dark:hover:text-plate-ink-soft font-medium">
                     📋 Show extracted text (for debugging)
                   </summary>
-                  <pre className="mt-2 text-xs bg-gray-50 dark:bg-slate-800 p-3 rounded-lg overflow-auto max-h-32 text-gray-600 dark:text-slate-400 whitespace-pre-wrap border border-gray-200 dark:border-slate-700">
+                  <pre className="mt-2 text-xs bg-paper-2 dark:bg-plate-card p-3 rounded-lg overflow-auto max-h-32 text-ink-soft dark:text-plate-ink-soft whitespace-pre-wrap border border-ink/15 dark:border-plate-ink/20">
                     {result.rawText}
                   </pre>
                 </details>
@@ -325,7 +325,7 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-2">
+        <div className="px-6 py-4 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex justify-end gap-2">
           {stage === 'error' && (
             <>
               <button
@@ -339,7 +339,7 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
               </button>
               <button
                 onClick={handleRetry}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-medium text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors"
               >
                 Try Again
               </button>
@@ -347,7 +347,7 @@ export const PassportScanner: React.FC<PassportScannerProps> = ({
           )}
           <button
             onClick={handleClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors"
           >
             Cancel
           </button>

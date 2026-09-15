@@ -76,15 +76,15 @@ function CatalogSection({
   return (
     <div>
       <div className="flex items-center justify-between mb-2.5">
-        <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">{title}</span>
+        <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">{title}</span>
       </div>
       <div className="relative mb-3">
-        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-slate-600" />
+        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft/40 dark:text-plate-ink-soft/40" />
         <input
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder={`Quick search ${title.toLowerCase()}…`}
-          className="w-full pl-8 pr-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[12px] text-gray-700 dark:text-slate-200 outline-none focus:border-edamame transition-colors"
+          className="w-full pl-8 pr-3 py-2 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[12px] text-ink-soft dark:text-plate-ink-soft outline-none focus:border-edamame transition-colors"
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -95,26 +95,26 @@ function CatalogSection({
             <button
               key={item.kind}
               onClick={() => onOpen(item.kind)}
-              className="group relative text-left flex items-start gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-edamame transition-colors"
+              className="group relative text-left flex items-start gap-2.5 p-3 rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card hover:border-edamame transition-colors"
             >
               <div className="w-8 h-8 rounded-lg bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center flex-shrink-0">
                 <Icon size={15} className="text-edamame" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[12.5px] font-bold text-gray-900 dark:text-white truncate">{item.label}</span>
+                  <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink truncate">{item.label}</span>
                   {isRecommended && (
                     <span className="text-[9px] font-bold px-1.5 py-px rounded-full bg-edamame/10 text-edamame-700 dark:text-edamame-400 flex-shrink-0">AI PICK</span>
                   )}
                 </div>
-                <p className="text-[10.5px] text-gray-400 dark:text-slate-500 mt-0.5 leading-snug">{item.description}</p>
+                <p className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint mt-0.5 leading-snug">{item.description}</p>
               </div>
-              <ExternalLink size={12} className="absolute top-3 right-3 text-gray-200 dark:text-slate-700 group-hover:text-edamame transition-colors" />
+              <ExternalLink size={12} className="absolute top-3 right-3 text-ink-soft/30 dark:text-plate-ink-soft/30 group-hover:text-edamame transition-colors" />
             </button>
           );
         })}
         {filtered.length === 0 && (
-          <div className="col-span-full text-center py-6 text-[12px] text-gray-400 dark:text-slate-500">
+          <div className="col-span-full text-center py-6 text-[12px] text-ink-faint dark:text-plate-ink-faint">
             No matches for "{query}".
           </div>
         )}
@@ -150,10 +150,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({
       </div>
 
       {/* Chat with Edamame */}
-      <aside className="flex flex-col bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden max-h-[560px]">
-        <div className="flex items-center gap-2 px-4 py-3.5 border-b border-gray-100 dark:border-slate-800 flex-shrink-0">
+      <aside className="flex flex-col bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl shadow-sm overflow-hidden max-h-[560px]">
+        <div className="flex items-center gap-2 px-4 py-3.5 border-b border-ink/10 dark:border-plate-ink/15 flex-shrink-0">
           <Sparkles size={15} className="text-edamame" strokeWidth={1.8} />
-          <span className="text-[13px] font-bold text-gray-900 dark:text-white">Chat with Edamame</span>
+          <span className="text-[13px] font-bold text-ink dark:text-plate-ink">Chat with Edamame</span>
           <button onClick={onNewChat} className="ml-auto flex items-center gap-1 text-[11.5px] font-semibold text-edamame hover:text-edamame-600 transition-colors">
             <Plus size={12} strokeWidth={2.2} /> New
           </button>
@@ -165,8 +165,8 @@ export const Workspace: React.FC<WorkspaceProps> = ({
               <div className="w-10 h-10 rounded-2xl bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center mb-3">
                 <Sparkles size={18} className="text-edamame dark:text-edamame-400" />
               </div>
-              <p className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Not sure where to start?</p>
-              <p className="text-xs text-gray-400 dark:text-slate-500 leading-relaxed">
+              <p className="text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-1">Not sure where to start?</p>
+              <p className="text-xs text-ink-faint dark:text-plate-ink-faint leading-relaxed">
                 Tell Edamame what you're trying to do and the View / Tools suggestions above will refresh.
               </p>
             </div>
@@ -182,7 +182,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({
                     </div>
                   ) : (
                     <div>
-                      <p className="text-[12.5px] text-gray-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                      <p className="text-[12.5px] text-ink-soft dark:text-plate-ink-soft leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
                       {messageRecommendations[msg.id]?.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {messageRecommendations[msg.id].map(rec => (
@@ -196,7 +196,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({
                           ))}
                         </div>
                       )}
-                      <div className="text-[10px] text-gray-300 dark:text-slate-600 mt-1.5">{format(new Date(msg.createdAt), 'HH:mm')}</div>
+                      <div className="text-[10px] text-ink-soft/40 dark:text-plate-ink-soft/40 mt-1.5">{format(new Date(msg.createdAt), 'HH:mm')}</div>
                     </div>
                   )}
                 </div>
@@ -205,21 +205,21 @@ export const Workspace: React.FC<WorkspaceProps> = ({
           )}
           {isSending && (
             <div className="flex items-center gap-1 pl-1 mt-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '120ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '240ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-ink/20 dark:bg-plate-ink/20 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-ink/20 dark:bg-plate-ink/20 animate-bounce" style={{ animationDelay: '120ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-ink/20 dark:bg-plate-ink/20 animate-bounce" style={{ animationDelay: '240ms' }} />
             </div>
           )}
           <div ref={chatEndRef} />
         </div>
 
-        <div className="flex items-center gap-2 px-3.5 py-3 border-t border-gray-100 dark:border-slate-800 flex-shrink-0">
+        <div className="flex items-center gap-2 px-3.5 py-3 border-t border-ink/10 dark:border-plate-ink/15 flex-shrink-0">
           <input
             value={chatInput}
             onChange={e => setChatInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } }}
             placeholder="What are you trying to do?"
-            className="flex-1 min-w-0 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-[12.5px] text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-slate-500 outline-none focus:border-edamame transition-all"
+            className="flex-1 min-w-0 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg px-3 py-2 text-[12.5px] text-ink dark:text-plate-ink-soft placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50 outline-none focus:border-edamame transition-all"
           />
           <button
             onClick={onSend}

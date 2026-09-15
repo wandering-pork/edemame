@@ -86,7 +86,7 @@ const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
 const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: string }> = {
   verified: { cls: 'bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400', label: 'Verified' },
   linked: { cls: 'bg-blue-500/[0.13] text-blue-700 dark:text-blue-400', label: 'Linked' },
-  waived: { cls: 'bg-slate-500/[0.13] text-slate-600 dark:text-slate-300', label: 'Waived' },
+  waived: { cls: 'bg-slate-500/[0.13] text-ink-soft dark:text-plate-ink-soft', label: 'Waived' },
   pending: { cls: 'bg-amber-500/[0.13] text-amber-700 dark:text-amber-400', label: 'Pending' },
 };
 
@@ -817,13 +817,13 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   // ---- Task row renderer (shared by pending + completed lists) ----
-  const rowMenuCls = 'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors';
+  const rowMenuCls = 'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
   const renderTaskRow = (task: Task, isCompleted: boolean) => {
     const overdue = !isCompleted && new Date(task.date) < new Date();
     const editing = editingDate?.taskId === task.id;
     return (
-      <div key={task.id} className="task-card group relative flex items-center gap-3 px-[18px] py-3 border-b border-gray-100 dark:border-slate-800 last:border-b-0">
+      <div key={task.id} className="task-card group relative flex items-center gap-3 px-[18px] py-3 border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0">
         {/* Left edge — red when overdue */}
         <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${overdue ? 'bg-red-500' : 'bg-transparent'}`} />
 
@@ -834,7 +834,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           className={`check-btn w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
             isCompleted
               ? 'bg-edamame border-[1.5px] border-edamame'
-              : 'border-[1.5px] border-gray-300 dark:border-slate-600 hover:border-edamame'
+              : 'border-[1.5px] border-ink/20 dark:border-plate-ink/25 hover:border-edamame'
           }`}
         >
           {isCompleted && <Check size={11} className="text-white" strokeWidth={3} />}
@@ -842,11 +842,11 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
         {/* Title + description */}
         <div className="flex-1 min-w-0">
-          <div className={`text-[13.5px] font-semibold tracking-tight leading-snug ${isCompleted ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-900 dark:text-white'}`}>
+          <div className={`text-[13.5px] font-semibold tracking-tight leading-snug ${isCompleted ? 'line-through text-ink-faint dark:text-plate-ink-faint' : 'text-ink dark:text-plate-ink'}`}>
             {task.title}
           </div>
           {task.description && !isCompleted && (
-            <div className="text-[11.5px] text-gray-400 dark:text-slate-500 mt-0.5 truncate">{task.description}</div>
+            <div className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint mt-0.5 truncate">{task.description}</div>
           )}
         </div>
 
@@ -858,14 +858,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             value={editingDate!.date}
             onChange={(e) => handleDateChange(task.id, e.target.value)}
             onBlur={() => handleDateBlur(task.id)}
-            className="text-[11.5px] font-semibold bg-transparent border border-gray-200 dark:border-slate-700 rounded-md px-1.5 py-0.5 outline-none focus:border-edamame text-gray-700 dark:text-slate-300"
+            className="text-[11.5px] font-semibold bg-transparent border border-ink/15 dark:border-plate-ink/20 rounded-md px-1.5 py-0.5 outline-none focus:border-edamame text-ink-soft dark:text-plate-ink-soft"
           />
         ) : (
           <button
             onClick={() => { if (!isCompleted) setEditingDate({ taskId: task.id, date: task.date }); }}
             disabled={isCompleted}
             className={`text-[11.5px] font-bold whitespace-nowrap flex-shrink-0 ${
-              overdue ? 'text-red-600 dark:text-red-400' : isCompleted ? 'text-gray-300 dark:text-slate-600' : 'text-gray-500 dark:text-slate-400 hover:text-edamame'
+              overdue ? 'text-red-600 dark:text-red-400' : isCompleted ? 'text-ink-soft/40 dark:text-plate-ink-soft/40' : 'text-ink-soft dark:text-plate-ink-soft hover:text-edamame'
             }`}
           >
             {format(new Date(task.date), 'MMM d')}
@@ -876,14 +876,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setActiveDropdown(activeDropdown === task.id ? null : task.id)}
-            className="w-6 h-6 rounded-md flex items-center justify-center text-gray-300 dark:text-slate-600 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 opacity-0 group-hover:opacity-100 transition-all"
+            className="w-6 h-6 rounded-md flex items-center justify-center text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-ink-soft dark:hover:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card opacity-0 group-hover:opacity-100 transition-all"
           >
             <MoreVertical size={14} />
           </button>
           {activeDropdown === task.id && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setActiveDropdown(null)} />
-              <div className="absolute right-0 top-full mt-1 z-40 w-44 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
+              <div className="absolute right-0 top-full mt-1 z-40 w-44 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
                 {isCompleted ? (
                   <button onClick={() => { onUpdateTask({ ...task, isCompleted: false }); setActiveDropdown(null); }} className={rowMenuCls}>
                     <RotateCcw size={14} className="text-orange-400" />Revert to pending
@@ -910,10 +910,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // ---- Render ----
   const status = STATUS_META[currentCase.status];
 
-  const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors';
+  const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
   return (
-    <div className="px-5 py-5 lg:px-7 lg:py-6 bg-gray-50 dark:bg-slate-950 min-h-full">
+    <div className="px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate min-h-full">
 
       {/* ══════════════════════════════════════════
           TOP BAR
@@ -921,16 +921,16 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       <div className="flex items-center gap-3 flex-wrap">
         <button
           onClick={onBack}
-          className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-100 transition-colors"
+          className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink transition-colors"
         >
           <ArrowLeft size={15} strokeWidth={1.8} className="group-hover:-translate-x-0.5 transition-transform" />
           Cases
         </button>
-        <h1 className="text-[17px] font-bold text-gray-900 dark:text-white tracking-tight min-w-0 truncate">
+        <h1 className="text-[17px] font-bold text-ink dark:text-plate-ink tracking-tight min-w-0 truncate">
           {currentCase.title}
-          <span className="text-gray-400 dark:text-slate-500 font-semibold"> — {client.name}</span>
+          <span className="text-ink-faint dark:text-plate-ink-faint font-semibold"> — {client.name}</span>
         </h1>
-        <span className="font-mono text-[10.5px] text-gray-400 dark:text-slate-500">{displayCaseNumber(currentCase)}</span>
+        <span className="font-mono text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{displayCaseNumber(currentCase)}</span>
         {visaSubclass && (
           <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400">SC-{visaSubclass}</span>
         )}
@@ -949,12 +949,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             {statusOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setStatusOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-40 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-40 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
                   {(['open', 'in_progress', 'on_hold', 'closed'] as CaseStatus[]).map(s => (
                     <button
                       key={s}
                       onClick={() => { handleStatusChange(s); setStatusOpen(false); }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors ${currentCase.status === s ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-slate-400'}`}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold hover:bg-paper-2 dark:hover:bg-plate transition-colors ${currentCase.status === s ? 'text-ink dark:text-plate-ink' : 'text-ink-soft dark:text-plate-ink-soft'}`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[s].dot}`} />
                       {STATUS_META[s].label}
@@ -966,11 +966,11 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           </div>
 
           {/* Draft + Eligibility action chips */}
-          <div className="flex items-center gap-1.5 pr-2 border-r border-gray-200 dark:border-slate-700">
+          <div className="flex items-center gap-1.5 pr-2 border-r border-ink/15 dark:border-plate-ink/20">
             <button
               onClick={() => handleSkillAction('Please help me draft a cover letter for this immigration case.')}
               title="Draft a document with the Agent"
-              className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11.5px] font-semibold text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame transition-colors"
+              className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
             >
               <PenLine size={13} strokeWidth={1.8} />
               <span className="hidden md:inline">Draft</span>
@@ -978,7 +978,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             <button
               onClick={handleEligibility}
               title="Open the Visa Advisor pre-filled with this client"
-              className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11.5px] font-semibold text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame transition-colors"
+              className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
             >
               <ShieldCheck size={13} strokeWidth={1.8} />
               <span className="hidden md:inline">Eligibility</span>
@@ -1000,7 +1000,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
               agentOpen
                 ? 'border-edamame bg-edamame/10 text-edamame-700 dark:text-edamame-400'
-                : 'border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 hover:border-edamame'
+                : 'border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame'
             }`}
           >
             <Sparkles size={13} strokeWidth={1.8} />
@@ -1012,14 +1012,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             <button
               onClick={() => setMoreOpen(o => !o)}
               title="More actions"
-              className="w-8 h-8 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-center text-gray-500 dark:text-slate-400 hover:border-edamame hover:text-edamame transition-colors"
+              className="w-8 h-8 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card flex items-center justify-center text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
             >
               <MoreHorizontal size={16} />
             </button>
             {moreOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMoreOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-52 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-52 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
                   <button onClick={() => { openOrFocusTab('checklist'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
                   <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Workspace</button>
                   <button onClick={() => { setShowAutoPackager(true); setMoreOpen(false); }} className={menuItemCls}>Auto-Packager</button>
@@ -1035,7 +1035,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   >
                     Edit case
                   </button>
-                  <div className="h-px bg-gray-100 dark:bg-slate-800 my-1" />
+                  <div className="h-px bg-paper-2 dark:bg-plate-card my-1" />
                   <button
                     onClick={() => { setShowDeleteConfirm(true); setMoreOpen(false); }}
                     className="w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
@@ -1078,13 +1078,13 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         {/* ── CENTER COLUMN ── */}
         <div className="min-w-0">
           {/* Tabs — Workspace is always present; opening a View/Tool adds a closable, pinnable tab */}
-          <div className="flex items-center gap-0.5 border-b border-gray-100 dark:border-slate-800 overflow-x-auto custom-scrollbar">
+          <div className="flex items-center gap-0.5 border-b border-ink/10 dark:border-plate-ink/15 overflow-x-auto custom-scrollbar">
             <button
               onClick={() => setActiveTabId('workspace')}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${
                 activeTabId === 'workspace'
-                  ? 'border-edamame text-gray-900 dark:text-white'
-                  : 'border-transparent text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
+                  ? 'border-edamame text-ink dark:text-plate-ink'
+                  : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
               }`}
             >
               <Sparkles size={13} className={activeTabId === 'workspace' ? 'text-edamame' : ''} />
@@ -1096,38 +1096,38 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 key={tab.id}
                 className={`group flex items-center gap-1.5 pl-4 pr-2 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors cursor-pointer ${
                   activeTabId === tab.id
-                    ? 'border-edamame text-gray-900 dark:text-white'
-                    : 'border-transparent text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300'
+                    ? 'border-edamame text-ink dark:text-plate-ink'
+                    : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
                 }`}
                 onClick={() => setActiveTabId(tab.id)}
               >
                 {tab.label}
                 {tab.kind === 'checklist' && checklist.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
                     {checklist.length}
                   </span>
                 )}
                 {tab.kind === 'tasks' && caseTasks.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
                     {caseTasks.length}
                   </span>
                 )}
                 {tab.kind === 'documents' && documents.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
                     {documents.length}
                   </span>
                 )}
                 <button
                   onClick={(e) => { e.stopPropagation(); togglePinTab(tab.id); }}
                   title={tab.pinned ? 'Unpin tab' : 'Pin tab (persists across reloads)'}
-                  className={`p-0.5 rounded transition-colors ${tab.pinned ? 'text-edamame' : 'text-gray-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 hover:text-edamame'}`}
+                  className={`p-0.5 rounded transition-colors ${tab.pinned ? 'text-edamame' : 'text-ink-soft/40 dark:text-plate-ink-soft/40 opacity-0 group-hover:opacity-100 hover:text-edamame'}`}
                 >
                   {tab.pinned ? <Pin size={11} /> : <PinOff size={11} />}
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
                   title="Close tab"
-                  className="p-0.5 rounded text-gray-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-colors"
+                  className="p-0.5 rounded text-ink-soft/40 dark:text-plate-ink-soft/40 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-colors"
                 >
                   <X size={11} />
                 </button>
@@ -1168,8 +1168,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             <div className="mt-4 space-y-6">
               <section>
                 <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">
-                    Pending <span className="text-gray-400 dark:text-slate-500 font-semibold">· {pendingTasks.length} tasks</span>
+                  <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">
+                    Pending <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {pendingTasks.length} tasks</span>
                   </span>
                   {overdueCount > 0 && (
                     <span className="text-[10.5px] font-bold px-2.5 py-1 rounded-md bg-red-500/[0.13] text-red-700 dark:text-red-400">
@@ -1179,12 +1179,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 </div>
 
                 {pendingTasks.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-gray-200 dark:border-slate-800 p-10 text-center">
-                    <CheckCircle2 size={26} className="mx-auto mb-2 text-gray-200 dark:text-slate-700" />
-                    <p className="text-sm text-gray-400 dark:text-slate-500">All tasks completed</p>
+                  <div className="rounded-xl border border-dashed border-ink/15 dark:border-plate-ink/20 p-10 text-center">
+                    <CheckCircle2 size={26} className="mx-auto mb-2 text-ink-soft/30 dark:text-plate-ink-soft/30" />
+                    <p className="text-sm text-ink-faint dark:text-plate-ink-faint">All tasks completed</p>
                   </div>
                 ) : (
-                  <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+                  <div className="bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl overflow-hidden">
                     {pendingTasks.map(task => renderTaskRow(task, false))}
                   </div>
                 )}
@@ -1192,10 +1192,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
               {completedTasks.length > 0 && (
                 <section>
-                  <div className="text-[12.5px] font-bold text-gray-500 dark:text-slate-500 mb-2.5">
-                    Completed <span className="text-gray-400 dark:text-slate-600 font-semibold">· {completedTasks.length} tasks</span>
+                  <div className="text-[12.5px] font-bold text-ink-soft dark:text-plate-ink-soft mb-2.5">
+                    Completed <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {completedTasks.length} tasks</span>
                   </div>
-                  <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+                  <div className="bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl overflow-hidden">
                     {completedTasks.map(task => renderTaskRow(task, true))}
                   </div>
                 </section>
@@ -1230,25 +1230,25 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             const checklistBody = (
               <div className="space-y-4">
                 {checklist.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-gray-200 dark:border-slate-800 p-10 text-center">
-                    <FileText size={26} className="mx-auto mb-2 text-gray-200 dark:text-slate-700" />
-                    <p className="text-sm text-gray-400 dark:text-slate-500">No checklist items yet. Generate one or add items manually.</p>
+                  <div className="rounded-xl border border-dashed border-ink/15 dark:border-plate-ink/20 p-10 text-center">
+                    <FileText size={26} className="mx-auto mb-2 text-ink-soft/30 dark:text-plate-ink-soft/30" />
+                    <p className="text-sm text-ink-faint dark:text-plate-ink-faint">No checklist items yet. Generate one or add items manually.</p>
                   </div>
                 ) : (
                   Array.from(groups.entries()).map(([category, items]) => {
                     const collapsed = collapsedCategories.has(category);
                     return (
-                      <div key={category} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+                      <div key={category} className="bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl overflow-hidden">
                         <button
                           onClick={() => toggleCategoryCollapsed(category)}
                           className="w-full flex items-center justify-between px-5 py-3 text-left"
                         >
-                          <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">{category}</span>
+                          <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">{category}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold text-gray-400 dark:text-slate-500">
+                            <span className="text-[11px] font-bold text-ink-faint dark:text-plate-ink-faint">
                               {items.filter(i => i.status === 'linked' || i.status === 'verified').length}/{items.length}
                             </span>
-                            {collapsed ? <ChevronRight size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+                            {collapsed ? <ChevronRight size={14} className="text-ink-faint dark:text-plate-ink-faint" /> : <ChevronDown size={14} className="text-ink-faint dark:text-plate-ink-faint" />}
                           </div>
                         </button>
                         {!collapsed && items.map(item => {
@@ -1266,19 +1266,19 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                                 const docId = e.dataTransfer.getData(CASE_FILE_DRAG_MIME);
                                 if (docId) handleChecklistLinkDocument(item, docId);
                               }}
-                              className={`table-row-hover flex items-center gap-3 px-5 py-2.5 border-t border-gray-100 dark:border-slate-800 transition-colors ${
+                              className={`table-row-hover flex items-center gap-3 px-5 py-2.5 border-t border-ink/10 dark:border-plate-ink/15 transition-colors ${
                                 isDragOver ? 'bg-edamame/[0.06] dark:bg-edamame/[0.08]' : ''
                               }`}
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-[13px] font-semibold text-gray-800 dark:text-slate-200 tracking-tight">{item.label}</span>
+                                  <span className="text-[13px] font-semibold text-ink dark:text-plate-ink-soft tracking-tight">{item.label}</span>
                                   <DocumentTypeBadge code={item.documentTypeCode} />
                                 </div>
-                                {item.description && <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{item.description}</div>}
+                                {item.description && <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-0.5">{item.description}</div>}
                                 {linkedDoc ? (
-                                  <div className="flex items-center gap-1.5 mt-1 text-[11px] text-gray-500 dark:text-slate-400">
-                                    <FileText size={11} className="text-gray-400 dark:text-slate-600 flex-shrink-0" />
+                                  <div className="flex items-center gap-1.5 mt-1 text-[11px] text-ink-soft dark:text-plate-ink-soft">
+                                    <FileText size={11} className="text-ink-faint dark:text-plate-ink-faint flex-shrink-0" />
                                     <button
                                       onClick={() => handleChecklistPreview(linkedDoc)}
                                       title="Open file"
@@ -1289,13 +1289,13 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                                     <button
                                       onClick={() => handleChecklistUnlink(item)}
                                       title="Remove linked file"
-                                      className="text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400"
+                                      className="text-ink-faint dark:text-plate-ink-faint hover:text-red-500 dark:hover:text-red-400"
                                     >
                                       <X size={11} />
                                     </button>
                                   </div>
                                 ) : (
-                                  <div className={`mt-1 text-[10.5px] italic ${isDragOver ? 'text-edamame font-semibold' : 'text-gray-400 dark:text-slate-500'}`}>
+                                  <div className={`mt-1 text-[10.5px] italic ${isDragOver ? 'text-edamame font-semibold' : 'text-ink-faint dark:text-plate-ink-faint'}`}>
                                     Drag a file from Case Files to link it here
                                   </div>
                                 )}
@@ -1319,12 +1319,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                                 {checklistStatusMenuId === item.id && (
                                   <>
                                     <div className="fixed inset-0 z-30" onClick={() => setChecklistStatusMenuId(null)} />
-                                    <div className="absolute right-0 top-full mt-1.5 z-40 w-32 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-800 p-1 modal-content">
+                                    <div className="absolute right-0 top-full mt-1.5 z-40 w-32 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
                                       {(['pending', 'linked', 'verified', 'waived'] as ChecklistItemStatus[]).map(s => (
                                         <button
                                           key={s}
                                           onClick={() => { updateChecklistStatus(item.id, s); setChecklistStatusMenuId(null); }}
-                                          className={`w-full text-left px-3 py-1.5 rounded-lg text-[11.5px] font-semibold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors ${item.status === s ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-slate-400'}`}
+                                          className={`w-full text-left px-3 py-1.5 rounded-lg text-[11.5px] font-semibold hover:bg-paper-2 dark:hover:bg-plate transition-colors ${item.status === s ? 'text-ink dark:text-plate-ink' : 'text-ink-soft dark:text-plate-ink-soft'}`}
                                         >
                                           {CHECKLIST_STATUS_META[s].label}
                                         </button>
@@ -1346,8 +1346,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             return (
               <div className="mt-4 space-y-4">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">
-                    Document Checklist <span className="text-gray-400 dark:text-slate-500 font-semibold">· {uploadedCount}/{checklist.length} linked</span>
+                  <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">
+                    Document Checklist <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {uploadedCount}/{checklist.length} linked</span>
                   </span>
                   <div className="flex items-center gap-2">
                     {/* §4.4 — show Case Files beside the checklist so a file can be dragged across without switching tabs. */}
@@ -1357,7 +1357,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                       className={`inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
                         caseFilesSplit
                           ? 'border-edamame text-edamame bg-edamame/[0.06]'
-                          : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame'
+                          : 'border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame'
                       }`}
                     >
                       <Columns2 size={12} /> Case Files
@@ -1366,13 +1366,13 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     <button
                       onClick={runAutoLinkPass}
                       title="Re-run auto-link against the current Case Files and document type settings"
-                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame transition-colors"
+                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
                     >
                       <RefreshCw size={12} /> Refresh
                     </button>
                     <button
                       onClick={() => setShowChecklistGenerator(true)}
-                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-edamame hover:text-edamame transition-colors"
+                      className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
                     >
                       <Sparkles size={12} /> Generate
                     </button>
@@ -1390,8 +1390,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     <div className="min-w-0">{checklistBody}</div>
                     <aside className="min-w-0 space-y-3 xl:sticky xl:top-4">
                       <div className="flex items-center justify-between">
-                        <span className="text-[12px] font-bold text-gray-900 dark:text-white">
-                          Case Files <span className="text-gray-400 dark:text-slate-500 font-semibold">· {documents.length}</span>
+                        <span className="text-[12px] font-bold text-ink dark:text-plate-ink">
+                          Case Files <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {documents.length}</span>
                         </span>
                         <button
                           onClick={() => openOrFocusTab('documents')}
@@ -1456,37 +1456,37 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       {/* Edit Case Modal */}
       {isEditingCase && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Edit Case</h3>
-              <button onClick={() => setIsEditingCase(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+          <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-ink/10 dark:border-plate-ink/15 animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-ink/10 dark:border-plate-ink/15 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-ink dark:text-plate-ink">Edit Case</h3>
+              <button onClick={() => setIsEditingCase(false)} className="p-1.5 text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft rounded-lg hover:bg-paper-2 dark:hover:bg-plate-card transition-colors">
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Case Title</label>
+                <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Case Title</label>
                 <input
                   type="text"
                   value={caseEditForm.title}
                   onChange={(e) => setCaseEditForm({ ...caseEditForm, title: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white"
+                  className="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Description</label>
+                <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Description</label>
                 <textarea
                   value={caseEditForm.description}
                   onChange={(e) => setCaseEditForm({ ...caseEditForm, description: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white resize-none"
+                  className="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink resize-none"
                   rows={4}
                 />
               </div>
             </div>
-            <div className="p-6 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-3">
+            <div className="p-6 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex justify-end gap-3">
               <button
                 onClick={() => setIsEditingCase(false)}
-                className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                className="px-4 py-2 text-sm font-bold text-ink-soft dark:text-plate-ink-soft hover:text-ink-soft dark:hover:text-plate-ink transition-colors"
               >
                 Cancel
               </button>
@@ -1505,20 +1505,20 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+          <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-ink/10 dark:border-plate-ink/15 animate-in zoom-in-95 duration-200">
             <div className="p-6">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center text-red-600 mb-4">
                 <AlertCircle size={24} />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Delete Case?</h3>
-              <p className="text-gray-600 dark:text-slate-400 leading-relaxed">
+              <h3 className="text-xl font-bold text-ink dark:text-plate-ink mb-2">Delete Case?</h3>
+              <p className="text-ink-soft dark:text-plate-ink-soft leading-relaxed">
                 Are you sure you want to delete <strong>"{currentCase.title}"</strong>? This action cannot be undone. All tasks associated with this case will remain but will no longer be linked.
               </p>
             </div>
-            <div className="p-6 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-3">
+            <div className="p-6 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex justify-end gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                className="px-4 py-2 text-sm font-bold text-ink-soft dark:text-plate-ink-soft hover:text-ink-soft dark:hover:text-plate-ink transition-colors"
               >
                 Cancel
               </button>
@@ -1537,47 +1537,47 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       {/* Task Modal (Add/Edit) */}
       {isTaskModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-gray-100 dark:border-slate-800">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+          <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-ink/10 dark:border-plate-ink/15 animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-ink/10 dark:border-plate-ink/15">
+              <h3 className="text-xl font-bold text-ink dark:text-plate-ink">
                 {editingTask ? 'Edit Task' : 'Add New Task'}
               </h3>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Task Title</label>
+                <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Task Title</label>
                 <input
                   type="text"
                   value={taskForm.title}
                   onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white"
+                  className="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink"
                   placeholder="e.g., Review Documents"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Description</label>
+                <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Description</label>
                 <textarea
                   value={taskForm.description}
                   onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white resize-none"
+                  className="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink resize-none"
                   rows={3}
                   placeholder="Add more details..."
                 />
               </div>
               {!editingTask?.isCompleted && (
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Planned Date</label>
+                  <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Planned Date</label>
                   <div className="flex gap-2">
                     <input
                       type="date"
                       value={taskForm.date}
                       onChange={(e) => setTaskForm({ ...taskForm, date: e.target.value })}
-                      className="flex-1 px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white"
+                      className="flex-1 px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink"
                     />
                     <button
                       type="button"
                       onClick={() => setTaskForm({ ...taskForm, date: format(new Date(), 'yyyy-MM-dd') })}
-                      className="px-4 py-2.5 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors text-xs font-bold uppercase"
+                      className="px-4 py-2.5 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft rounded-xl hover:bg-paper-2/70 dark:hover:bg-plate transition-colors text-xs font-bold uppercase"
                     >
                       Today
                     </button>
@@ -1585,10 +1585,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 </div>
               )}
             </div>
-            <div className="p-6 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-3">
+            <div className="p-6 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex justify-end gap-3">
               <button
                 onClick={() => setIsTaskModalOpen(false)}
-                className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                className="px-4 py-2 text-sm font-bold text-ink-soft dark:text-plate-ink-soft hover:text-ink-soft dark:hover:text-plate-ink transition-colors"
               >
                 Cancel
               </button>
@@ -1606,17 +1606,17 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       {/* Offset Modal */}
       {offsetModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+          <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-ink/10 dark:border-plate-ink/15 animate-in zoom-in-95 duration-200">
             <div className="p-6">
               <div className="w-12 h-12 bg-edamame/10 rounded-full flex items-center justify-center text-edamame mb-4">
                 <AlertCircle size={24} />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Adjust Future Tasks?</h3>
-              <p className="text-gray-600 dark:text-slate-400 leading-relaxed">
+              <h3 className="text-xl font-bold text-ink dark:text-plate-ink mb-2">Adjust Future Tasks?</h3>
+              <p className="text-ink-soft dark:text-plate-ink-soft leading-relaxed">
                 You've changed the date for this task. Would you like to automatically offset all future pending tasks in this case by the same number of days?
               </p>
             </div>
-            <div className="p-6 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex flex-col gap-2">
+            <div className="p-6 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex flex-col gap-2">
               <button
                 onClick={() => confirmOffset(true)}
                 className="w-full py-3 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-xl shadow-lg shadow-edamame/20 transition-all"
@@ -1625,13 +1625,13 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               </button>
               <button
                 onClick={() => confirmOffset(false)}
-                className="w-full py-3 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 font-bold rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all"
+                className="w-full py-3 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft font-bold rounded-xl border border-ink/15 dark:border-plate-ink/20 hover:bg-paper-2 dark:hover:bg-plate-card transition-all"
               >
                 No, Only This Task
               </button>
               <button
                 onClick={() => setOffsetModal(null)}
-                className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-slate-500 transition-colors"
+                className="w-full py-2 text-sm text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft transition-colors"
               >
                 Cancel Change
               </button>
@@ -1677,37 +1677,37 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       {/* Manually add a Document Checklist item */}
       {addItemOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Add Checklist Item</h3>
-              <button onClick={() => setAddItemOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+          <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-ink/10 dark:border-plate-ink/15 animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-ink/10 dark:border-plate-ink/15 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-ink dark:text-plate-ink">Add Checklist Item</h3>
+              <button onClick={() => setAddItemOpen(false)} className="p-1.5 text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft rounded-lg hover:bg-paper-2 dark:hover:bg-plate-card transition-colors">
                 <X size={18} />
               </button>
             </div>
             <div className="p-6 space-y-3">
               <div>
-                <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Document Name</label>
+                <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Document Name</label>
                 <input
                   autoFocus
                   type="text"
                   value={addItemForm.label}
                   onChange={(e) => setAddItemForm({ ...addItemForm, label: e.target.value })}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddChecklistItem(); }}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white"
+                  className="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink"
                   placeholder="e.g., Additional reference letter"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Category</label>
                 <input
                   type="text"
                   value={addItemForm.category}
                   onChange={(e) => setAddItemForm({ ...addItemForm, category: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white"
+                  className="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1">Document Type</label>
+                <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Document Type</label>
                 <DocumentTypePicker
                   value={addItemForm.documentTypeCode}
                   onChange={(code) => setAddItemForm({ ...addItemForm, documentTypeCode: code })}
@@ -1715,10 +1715,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 />
               </div>
             </div>
-            <div className="p-6 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-3">
+            <div className="p-6 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex justify-end gap-3">
               <button
                 onClick={() => setAddItemOpen(false)}
-                className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                className="px-4 py-2 text-sm font-bold text-ink-soft dark:text-plate-ink-soft hover:text-ink-soft dark:hover:text-plate-ink transition-colors"
               >
                 Cancel
               </button>

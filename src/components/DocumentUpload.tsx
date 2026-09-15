@@ -132,7 +132,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
           ${compact ? 'px-3 py-4' : 'px-6 py-9'}
           ${isDragActive
             ? 'border-edamame-500 bg-edamame-50/70 dark:bg-edamame-500/10 scale-[1.005]'
-            : 'border-gray-250 dark:border-white/10 bg-white/40 dark:bg-white/[0.015] hover:border-edamame-400 hover:bg-edamame-50/30 dark:hover:border-edamame-700/60 dark:hover:bg-edamame-500/[0.04]'
+            : 'border-ink/15 dark:border-white/10 bg-white/40 dark:bg-white/[0.015] hover:border-edamame-400 hover:bg-edamame-50/30 dark:hover:border-edamame-700/60 dark:hover:bg-edamame-500/[0.04]'
           }
           ${uploading ? 'pointer-events-none opacity-60' : ''}
         `}
@@ -143,19 +143,19 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
             className={`rounded-2xl flex items-center justify-center transition-all duration-200 ${compact ? 'w-8 h-8' : 'w-11 h-11'} ${
               isDragActive
                 ? 'bg-edamame-500 text-white scale-110'
-                : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-slate-500 group-hover:bg-edamame-100 dark:group-hover:bg-edamame-500/15 group-hover:text-edamame-600 dark:group-hover:text-edamame-400'
+                : 'bg-paper-2 dark:bg-plate-card dark:bg-white/5 text-ink-faint dark:text-plate-ink-faint group-hover:bg-edamame-100 dark:group-hover:bg-edamame-500/15 group-hover:text-edamame-600 dark:group-hover:text-edamame-400'
             }`}
           >
             <Upload size={compact ? 13 : 18} strokeWidth={2} />
           </div>
           {uploading ? (
-            <p className={`font-semibold text-gray-500 dark:text-slate-400 ${compact ? 'text-[11px]' : 'text-sm'}`}>Uploading…</p>
+            <p className={`font-semibold text-ink-soft dark:text-plate-ink-soft ${compact ? 'text-[11px]' : 'text-sm'}`}>Uploading…</p>
           ) : isDragActive ? (
             <p className={`font-bold text-edamame-600 dark:text-edamame-400 ${compact ? 'text-[11px]' : 'text-sm'}`}>
               Drop to upload
             </p>
           ) : compact ? (
-            <p className="text-[11px] font-semibold text-gray-700 dark:text-slate-200">
+            <p className="text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft">
               Drop files, or{' '}
               <span className="text-edamame-600 dark:text-edamame-400 underline decoration-edamame-300 dark:decoration-edamame-700/60 underline-offset-2">
                 browse
@@ -163,13 +163,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
             </p>
           ) : (
             <>
-              <p className="text-[13.5px] font-semibold text-gray-700 dark:text-slate-200">
+              <p className="text-[13.5px] font-semibold text-ink-soft dark:text-plate-ink-soft">
                 Drop files here, or{' '}
                 <span className="text-edamame-600 dark:text-edamame-400 underline decoration-edamame-300 dark:decoration-edamame-700/60 underline-offset-2">
                   browse
                 </span>
               </p>
-              <p className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-gray-400 dark:text-slate-500">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-ink-faint dark:text-plate-ink-faint">
                 PDF · JPG · PNG · DOCX  —  max 50 MB
               </p>
             </>
@@ -178,20 +178,20 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
       </div>
 
       {staged.length > 0 && (
-        <div className="rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
-          <div className="px-3.5 py-2.5 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-[11.5px] font-bold text-gray-700 dark:text-slate-200">
+        <div className="rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card overflow-hidden">
+          <div className="px-3.5 py-2.5 border-b border-ink/10 dark:border-plate-ink/15 flex items-center justify-between">
+            <span className="text-[11.5px] font-bold text-ink-soft dark:text-plate-ink-soft">
               Set a document type to finish uploading
             </span>
-            <span className="text-[10.5px] font-semibold text-gray-400 dark:text-slate-500">
+            <span className="text-[10.5px] font-semibold text-ink-faint dark:text-plate-ink-faint">
               {staged.filter(s => s.documentTypeCode).length}/{staged.length} typed
             </span>
           </div>
-          <div className="divide-y divide-gray-100 dark:divide-slate-800">
+          <div className="divide-y divide-ink/10 dark:divide-plate-ink/15">
             {staged.map(entry => (
               <div key={entry.id} className="flex items-center gap-2 px-3.5 py-2">
-                <FileText size={13} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
-                <span className="flex-1 min-w-0 text-[12px] font-semibold text-gray-700 dark:text-slate-200 truncate" title={entry.file.name}>
+                <FileText size={13} className="text-ink-faint dark:text-plate-ink-faint flex-shrink-0" />
+                <span className="flex-1 min-w-0 text-[12px] font-semibold text-ink-soft dark:text-plate-ink-soft truncate" title={entry.file.name}>
                   {entry.file.name}
                 </span>
                 <DocumentTypePicker
@@ -206,22 +206,22 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
                   type="button"
                   onClick={() => removeStaged(entry.id)}
                   title="Remove from this upload"
-                  className="p-1 text-gray-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 flex-shrink-0"
+                  className="p-1 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-red-500 dark:hover:text-red-400 flex-shrink-0"
                 >
                   <X size={13} />
                 </button>
               </div>
             ))}
           </div>
-          <div className="px-3.5 py-2.5 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2">
-            <span className="text-[10.5px] text-gray-400 dark:text-slate-500">
+          <div className="px-3.5 py-2.5 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex items-center justify-between gap-2">
+            <span className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint">
               Nothing fits? Pick <span className="font-mono font-bold">OTH — Other</span>.
             </span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setStaged([])}
-                className="px-3 py-1.5 text-[11.5px] font-semibold text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                className="px-3 py-1.5 text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:text-ink-soft dark:text-plate-ink-soft dark:hover:text-plate-ink transition-colors"
               >
                 Cancel
               </button>

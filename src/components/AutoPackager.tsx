@@ -401,23 +401,23 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-sm animate-[fadeIn_.18s_ease-out]">
-      <div className="w-full max-w-3xl bg-white dark:bg-[#0F1113] shadow-2xl flex flex-col h-full border-l border-gray-200/60 dark:border-white/5">
+      <div className="w-full max-w-3xl bg-white dark:bg-[#0F1113] shadow-2xl flex flex-col h-full border-l border-ink/15 dark:border-plate-ink/20/60 dark:border-white/5">
         {/* Header */}
-        <div className="px-7 pt-6 pb-4 border-b border-gray-100 dark:border-white/5">
+        <div className="px-7 pt-6 pb-4 border-b border-ink/10 dark:border-plate-ink/15 dark:border-white/5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-edamame-600 dark:text-edamame-400">
                 <Package size={12} />
                 Auto-Packager
               </div>
-              <h2 className="mt-1.5 text-[22px] leading-tight font-extrabold tracking-[-0.02em] text-gray-900 dark:text-white">
+              <h2 className="mt-1.5 text-[22px] leading-tight font-extrabold tracking-[-0.02em] text-ink dark:text-plate-ink">
                 Compress, name & package for ImmiAccount
               </h2>
-              <p className="mt-1 text-[13px] text-gray-500 dark:text-slate-400">
+              <p className="mt-1 text-[13px] text-ink-soft dark:text-plate-ink-soft">
                 Drag documents onto checklist slots, then compress and rename in one pass — nothing leaves this machine.
               </p>
             </div>
-            <button onClick={onClose} aria-label="Close" className="-mt-1 -mr-1 p-2 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
+            <button onClick={onClose} aria-label="Close" className="-mt-1 -mr-1 p-2 rounded-lg text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 transition-colors">
               <X size={18} strokeWidth={2.25} />
             </button>
           </div>
@@ -430,7 +430,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
               const isPast = phases.findIndex(x => x.key === phase) > i;
               return (
                 <div key={p.key} className={`text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                  isActive ? 'bg-edamame-500 text-white' : isPast ? 'bg-edamame-100 dark:bg-edamame-500/15 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-slate-500'
+                  isActive ? 'bg-edamame-500 text-white' : isPast ? 'bg-edamame-100 dark:bg-edamame-500/15 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card dark:bg-white/5 text-ink-faint dark:text-plate-ink-faint'
                 }`}>
                   {p.label}
                 </div>
@@ -444,25 +444,25 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
         <div className="flex-1 overflow-y-auto px-7 py-6 space-y-5">
           {phase === 'source' && (
             <div className="space-y-3">
-              <div className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Where are the files you want to compress?</div>
+              <div className="text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider">Where are the files you want to compress?</div>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => { setSource('case'); setPhase('assign'); }}
-                  className="text-left p-4 rounded-xl border border-gray-200 dark:border-white/10 hover:border-edamame-400 dark:hover:border-edamame-700/60 transition-colors"
+                  className="text-left p-4 rounded-xl border border-ink/15 dark:border-plate-ink/20 dark:border-white/10 hover:border-edamame-400 dark:hover:border-edamame-700/60 transition-colors"
                 >
                   <FolderOpen size={18} className="text-edamame-600 dark:text-edamame-400 mb-1.5" />
-                  <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200">Compress files in Case Files</div>
-                  <div className="text-[11.5px] text-gray-500 dark:text-slate-400 mt-0.5">
+                  <div className="text-[13px] font-bold text-ink dark:text-plate-ink-soft">Compress files in Case Files</div>
+                  <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5">
                     Files already uploaded to this case — oversized, supported-format files are pre-selected for you.
                   </div>
                 </button>
                 <button
                   onClick={() => { setSource('local'); setPhase('assign'); }}
-                  className="text-left p-4 rounded-xl border border-gray-200 dark:border-white/10 hover:border-edamame-400 dark:hover:border-edamame-700/60 transition-colors"
+                  className="text-left p-4 rounded-xl border border-ink/15 dark:border-plate-ink/20 dark:border-white/10 hover:border-edamame-400 dark:hover:border-edamame-700/60 transition-colors"
                 >
                   <Monitor size={18} className="text-edamame-600 dark:text-edamame-400 mb-1.5" />
-                  <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200">Compress files from your local PC</div>
-                  <div className="text-[11.5px] text-gray-500 dark:text-slate-400 mt-0.5">
+                  <div className="text-[13px] font-bold text-ink dark:text-plate-ink-soft">Compress files from your local PC</div>
+                  <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5">
                     Pick files straight from your computer — including ones too large to have been uploaded to Case Files.
                   </div>
                 </button>
@@ -474,7 +474,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
             <div className="grid grid-cols-2 gap-5">
               {/* Slots */}
               <div className="space-y-2">
-                <div className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Checklist slots</div>
+                <div className="text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider">Checklist slots</div>
                 {slots.map(slot => {
                   const ids = assignments[slot.id] || [];
                   const totalSize = ids.reduce((s, id) => s + (docsById.get(id)?.fileSize ?? 0), 0);
@@ -483,20 +483,20 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                       key={slot.id}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={handleDrop(slot.id)}
-                      className="rounded-xl border border-dashed border-gray-250 dark:border-white/10 hover:border-edamame-400 dark:hover:border-edamame-700/60 transition-colors p-3"
+                      className="rounded-xl border border-dashed border-ink/15 dark:border-white/10 hover:border-edamame-400 dark:hover:border-edamame-700/60 transition-colors p-3"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200 truncate">{slot.label}</div>
-                          {slot.description && <div className="text-[11px] text-gray-400 dark:text-slate-500 truncate">{slot.description}</div>}
+                          <div className="text-[13px] font-bold text-ink dark:text-plate-ink-soft truncate">{slot.label}</div>
+                          {slot.description && <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint truncate">{slot.description}</div>}
                         </div>
-                        <span className={`flex-shrink-0 text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${slot.required ? 'bg-edamame-100 dark:bg-edamame-500/15 text-edamame-700 dark:text-edamame-400' : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-slate-500'}`}>
+                        <span className={`flex-shrink-0 text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${slot.required ? 'bg-edamame-100 dark:bg-edamame-500/15 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card dark:bg-white/5 text-ink-faint dark:text-plate-ink-faint'}`}>
                           {slot.required ? 'Required' : 'Optional'}
                         </span>
                       </div>
                       <div className="mt-2 space-y-1">
                         {ids.length === 0 ? (
-                          <div className="text-[11px] text-gray-300 dark:text-slate-600 italic py-2 text-center">Drop a file here</div>
+                          <div className="text-[11px] text-ink-soft/40 dark:text-plate-ink-soft/40 italic py-2 text-center">Drop a file here</div>
                         ) : ids.map(id => {
                           const doc = docsById.get(id);
                           if (!doc) return null;
@@ -520,7 +520,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                         })}
                       </div>
                       {ids.length > 0 && (
-                        <div className="mt-1.5 text-[10.5px] font-mono text-gray-400 dark:text-slate-500">
+                        <div className="mt-1.5 text-[10.5px] font-mono text-ink-faint dark:text-plate-ink-faint">
                           {ids.length} file{ids.length === 1 ? '' : 's'} · {formatBytes(totalSize)}
                         </div>
                       )}
@@ -536,7 +536,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                 className="space-y-2"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">
+                  <div className="text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider">
                     {source === 'local' ? 'Files from your PC' : 'Case documents'}
                   </div>
                   {source === 'local' && (
@@ -558,9 +558,9 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                     {localFileError}
                   </div>
                 )}
-                <div className="rounded-xl border border-gray-150 dark:border-white/[0.06] bg-gray-50/40 dark:bg-white/[0.015] p-2 min-h-[120px] space-y-1">
+                <div className="rounded-xl border border-ink/10 dark:border-white/[0.06] bg-paper-2/60 dark:bg-plate-card/40 dark:bg-white/[0.015] p-2 min-h-[120px] space-y-1">
                   {unassigned.length === 0 ? (
-                    <div className="text-[11.5px] text-gray-400 dark:text-slate-500 italic text-center py-6">
+                    <div className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint italic text-center py-6">
                       {sourceDocs.length === 0
                         ? (source === 'local' ? 'Add files from your computer to get started.' : 'No documents uploaded for this case yet.')
                         : 'All documents assigned.'}
@@ -574,21 +574,21 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                         key={doc.id}
                         draggable
                         onDragStart={(e) => { e.dataTransfer.setData('text/plain', doc.id); setDraggingId(doc.id); }}
-                        className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[11.5px] bg-white dark:bg-[#13161A] border cursor-grab ${oversized ? 'border-amber-300 dark:border-amber-700/50' : 'border-gray-150 dark:border-white/[0.06]'}`}
+                        className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[11.5px] bg-white dark:bg-[#13161A] border cursor-grab ${oversized ? 'border-amber-300 dark:border-amber-700/50' : 'border-ink/10 dark:border-white/[0.06]'}`}
                       >
-                        <GripVertical size={12} className="flex-shrink-0 text-gray-300 dark:text-slate-600" />
-                        <span className="truncate flex-1 text-gray-700 dark:text-slate-300">{doc.fileName}</span>
+                        <GripVertical size={12} className="flex-shrink-0 text-ink-soft/40 dark:text-plate-ink-soft/40" />
+                        <span className="truncate flex-1 text-ink-soft dark:text-plate-ink-soft">{doc.fileName}</span>
                         {eligible && (
                           <span className="flex-shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-edamame-100 dark:bg-edamame-500/15 text-edamame-700 dark:text-edamame-400">
                             Ready to compress
                           </span>
                         )}
-                        <span className="flex-shrink-0 text-[9.5px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{kindLabel(kind)}</span>
-                        <span className={`font-mono flex-shrink-0 ${oversized ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-400 dark:text-slate-500'}`}>
+                        <span className="flex-shrink-0 text-[9.5px] font-bold uppercase tracking-wider text-ink-faint dark:text-plate-ink-faint">{kindLabel(kind)}</span>
+                        <span className={`font-mono flex-shrink-0 ${oversized ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-ink-faint dark:text-plate-ink-faint'}`}>
                           {formatBytes(doc.fileSize)}
                         </span>
                         {source === 'local' && (
-                          <button onClick={() => removeLocalFile(doc.id)} title="Remove" className="flex-shrink-0 text-gray-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400">
+                          <button onClick={() => removeLocalFile(doc.id)} title="Remove" className="flex-shrink-0 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-red-500 dark:text-ink-soft dark:text-plate-ink-soft dark:hover:text-red-400">
                             <X size={12} />
                           </button>
                         )}
@@ -596,7 +596,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                     );
                   })}
                 </div>
-                <p className="text-[11px] text-gray-400 dark:text-slate-500">Drag a file onto a slot on the left. Drop it back here to unassign.</p>
+                <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint">Drag a file onto a slot on the left. Drop it back here to unassign.</p>
               </div>
             </div>
           )}
@@ -604,7 +604,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
           {phase === 'dashboard' && (
             <div className="space-y-4">
               {processing ? (
-                <div className="flex items-center gap-2.5 text-sm text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-800/50 rounded-lg px-3 py-2.5">
+                <div className="flex items-center gap-2.5 text-sm text-ink-soft dark:text-plate-ink-soft bg-paper-2 dark:bg-plate-card/50 rounded-lg px-3 py-2.5">
                   <Loader2 size={16} className="animate-spin text-edamame-500 flex-shrink-0" />
                   {processProgress}
                 </div>
@@ -633,13 +633,13 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                   const after = r.outcome.bytes.length;
                   const saved = before - after;
                   return (
-                    <div key={r.docId} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-100 dark:border-white/5">
+                    <div key={r.docId} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-ink/10 dark:border-plate-ink/15 dark:border-white/5">
                       <div className="flex-1 min-w-0">
-                        <div className="text-[12.5px] font-semibold text-gray-700 dark:text-slate-300 truncate">{doc.fileName}</div>
-                        <div className="text-[11px] text-gray-400 dark:text-slate-500">{r.outcome.note}</div>
+                        <div className="text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft truncate">{doc.fileName}</div>
+                        <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">{r.outcome.note}</div>
                       </div>
                       <div className="flex-shrink-0 text-right font-mono text-[11.5px]">
-                        <div className={saved > 0 ? 'text-gray-400 dark:text-slate-500 line-through' : 'text-gray-400 dark:text-slate-500'}>{formatBytes(before)}</div>
+                        <div className={saved > 0 ? 'text-ink-faint dark:text-plate-ink-faint line-through' : 'text-ink-faint dark:text-plate-ink-faint'}>{formatBytes(before)}</div>
                         <div className={r.outcome.flagged ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-edamame-600 dark:text-edamame-400 font-bold'}>{formatBytes(after)}</div>
                       </div>
                       {r.outcome.flagged ? <FileWarning size={16} className="flex-shrink-0 text-amber-500" /> : <CheckCircle size={16} className="flex-shrink-0 text-edamame-500" />}
@@ -652,7 +652,7 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
 
           {phase === 'naming' && (
             <div className="space-y-2">
-              <p className="text-[12.5px] text-gray-500 dark:text-slate-400">
+              <p className="text-[12.5px] text-ink-soft dark:text-plate-ink-soft">
                 Auto-suggested from applicant name, document type, and today's date — edit any name before packaging.
               </p>
               {hasNameErrors && (
@@ -665,16 +665,16 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
                 const error = nameErrors[r.docId];
                 return (
                   <div key={r.docId} className="space-y-1">
-                    <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${error ? 'border-red-300 dark:border-red-700/60 bg-red-50/50 dark:bg-red-900/10' : 'border-gray-100 dark:border-white/5'}`}>
+                    <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${error ? 'border-red-300 dark:border-red-700/60 bg-red-50/50 dark:bg-red-900/10' : 'border-ink/10 dark:border-plate-ink/15 dark:border-white/5'}`}>
                       <Sparkles size={14} className="flex-shrink-0 text-edamame-400" />
                       <input
                         type="text"
                         value={r.outputName}
                         onChange={(e) => renameResult(r.docId, e.target.value)}
                         aria-invalid={!!error}
-                        className={`flex-1 min-w-0 text-[12.5px] font-mono bg-transparent border-b outline-none py-1 text-gray-800 dark:text-slate-200 ${error ? 'border-red-400 dark:border-red-600' : 'border-gray-200 dark:border-slate-700 focus:border-edamame-500'}`}
+                        className={`flex-1 min-w-0 text-[12.5px] font-mono bg-transparent border-b outline-none py-1 text-ink dark:text-plate-ink-soft ${error ? 'border-red-400 dark:border-red-600' : 'border-ink/15 dark:border-plate-ink/20 focus:border-edamame-500'}`}
                       />
-                      <span className="flex-shrink-0 font-mono text-[11px] text-gray-400 dark:text-slate-500">{formatBytes(r.outcome.bytes.length)}</span>
+                      <span className="flex-shrink-0 font-mono text-[11px] text-ink-faint dark:text-plate-ink-faint">{formatBytes(r.outcome.bytes.length)}</span>
                     </div>
                     {error && <div className="pl-3 text-[11px] font-semibold text-red-600 dark:text-red-400">{error}</div>}
                   </div>
@@ -685,25 +685,25 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
 
           {phase === 'output' && (
             <div className="space-y-4">
-              <div className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">Where should packaged files go?</div>
+              <div className="text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider">Where should packaged files go?</div>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setOutputMode('save')}
-                  className={`text-left p-4 rounded-xl border transition-colors ${outputMode === 'save' ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-500/10' : 'border-gray-200 dark:border-white/10 hover:border-edamame-300'}`}
+                  className={`text-left p-4 rounded-xl border transition-colors ${outputMode === 'save' ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-500/10' : 'border-ink/15 dark:border-plate-ink/20 dark:border-white/10 hover:border-edamame-300'}`}
                 >
                   <Save size={16} className="text-edamame-600 dark:text-edamame-400 mb-1.5" />
-                  <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200">Add to Case Files</div>
-                  <div className="text-[11.5px] text-gray-500 dark:text-slate-400 mt-0.5">
+                  <div className="text-[13px] font-bold text-ink dark:text-plate-ink-soft">Add to Case Files</div>
+                  <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5">
                     Writes to the client's linked folder (local mode) or cloud storage (cloud mode) via the case's Documents tab — nothing leaves the machine unless cloud sync is enabled.
                   </div>
                 </button>
                 <button
                   onClick={() => setOutputMode('download')}
-                  className={`text-left p-4 rounded-xl border transition-colors ${outputMode === 'download' ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-500/10' : 'border-gray-200 dark:border-white/10 hover:border-edamame-300'}`}
+                  className={`text-left p-4 rounded-xl border transition-colors ${outputMode === 'download' ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-500/10' : 'border-ink/15 dark:border-plate-ink/20 dark:border-white/10 hover:border-edamame-300'}`}
                 >
                   <Download size={16} className="text-edamame-600 dark:text-edamame-400 mb-1.5" />
-                  <div className="text-[13px] font-bold text-gray-800 dark:text-slate-200">Download to my computer</div>
-                  <div className="text-[11.5px] text-gray-500 dark:text-slate-400 mt-0.5">
+                  <div className="text-[13px] font-bold text-ink dark:text-plate-ink-soft">Download to my computer</div>
+                  <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5">
                     Triggers a browser download per file — pick a different folder in your browser's save dialog if needed.
                   </div>
                 </button>
@@ -754,12 +754,12 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
         </div>
 
         {/* Footer */}
-        <div className="px-7 py-4 border-t border-gray-100 dark:border-white/5 bg-gray-50/60 dark:bg-black/20 flex items-center gap-2.5">
+        <div className="px-7 py-4 border-t border-ink/10 dark:border-plate-ink/15 dark:border-white/5 bg-paper-2/60 dark:bg-plate-card/40 dark:bg-black/20 flex items-center gap-2.5">
           {phase !== 'assign' && (
             <button
               onClick={() => setPhase(phases[phases.findIndex(p => p.key === phase) - 1].key)}
               disabled={processing || finalizing}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 transition-colors disabled:opacity-50"
             >
               <ArrowLeft size={14} /> Back
             </button>
@@ -767,13 +767,13 @@ export const AutoPackager: React.FC<AutoPackagerProps> = ({ caseId, documents, v
           {phase === 'assign' && !hasInitialLocalFiles && (
             <button
               onClick={() => setPhase('source')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 transition-colors"
             >
               <ArrowLeft size={14} /> Change source
             </button>
           )}
           <div className="flex-1" />
-          <button onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
+          <button onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 rounded-lg transition-colors">
             Cancel
           </button>
           {phase === 'assign' && (

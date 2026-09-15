@@ -22,7 +22,7 @@ export const CaseFilesDragList: React.FC<{
 }> = ({ documents, onOpenDocument }) => {
   if (documents.length === 0) {
     return (
-      <p className="text-[11.5px] text-gray-400 dark:text-slate-500 leading-relaxed text-center py-6 rounded-xl border border-dashed border-gray-200 dark:border-slate-800">
+      <p className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint leading-relaxed text-center py-6 rounded-xl border border-dashed border-ink/15 dark:border-plate-ink/20">
         No files in this case yet.
       </p>
     );
@@ -42,13 +42,13 @@ export const CaseFilesDragList: React.FC<{
               e.dataTransfer.effectAllowed = 'link';
             }}
             title="Drag onto a Document Checklist item to link it"
-            className="group flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing border border-gray-100 dark:border-slate-800 hover:border-edamame/50 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+            className="group flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing border border-ink/10 dark:border-plate-ink/15 hover:border-edamame/50 hover:bg-paper-2 dark:hover:bg-plate transition-colors"
           >
-            <Icon size={12} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
+            <Icon size={12} className="text-ink-faint dark:text-plate-ink-faint flex-shrink-0" />
             <button
               type="button"
               onClick={() => onOpenDocument?.(doc)}
-              className="text-[11.5px] text-gray-600 dark:text-slate-300 truncate group-hover:text-edamame text-left flex-1 min-w-0"
+              className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft truncate group-hover:text-edamame text-left flex-1 min-w-0"
             >
               {doc.fileName}
             </button>

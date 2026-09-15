@@ -29,7 +29,7 @@ const formatDob = (dob?: string) => {
 
 const Section: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="py-1.5">
-    <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+    <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-ink-faint dark:text-plate-ink-faint">
       {label}
     </div>
     {children}
@@ -45,11 +45,11 @@ const ResultRow: React.FC<{ primary: string; secondary: string; action: string; 
   <button
     type="button"
     onClick={onClick}
-    className="w-full text-left px-3 py-2 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group"
+    className="w-full text-left px-3 py-2 flex items-center gap-3 hover:bg-paper-2 dark:hover:bg-plate transition-colors group"
   >
     <span className="min-w-0 flex-1">
-      <span className="block text-[13.5px] font-semibold text-slate-900 dark:text-white truncate">{primary}</span>
-      <span className="block text-[11.5px] text-slate-500 dark:text-slate-400 truncate">{secondary}</span>
+      <span className="block text-[13.5px] font-semibold text-ink dark:text-plate-ink truncate">{primary}</span>
+      <span className="block text-[11.5px] text-ink-soft dark:text-plate-ink-soft truncate">{secondary}</span>
     </span>
     <span className="flex-shrink-0 text-[11px] font-semibold text-edamame-600 dark:text-edamame-400 opacity-0 group-hover:opacity-100 transition-opacity">
       {action}
@@ -129,7 +129,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
   return (
     <>
       <div ref={containerRef} className="relative flex-1 max-w-[420px]">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none" />
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint dark:text-plate-ink-faint pointer-events-none" />
         <input
           type="text"
           value={query}
@@ -143,9 +143,9 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
           }}
           placeholder="Search cases, clients, tasks…"
           aria-label="Search cases, clients and tasks"
-          className="w-full pl-9 pr-8 py-2 text-[13px] rounded-lg bg-gray-100 dark:bg-slate-800 border border-transparent
-                     text-gray-700 dark:text-slate-200 placeholder:text-gray-400 dark:placeholder:text-slate-500
-                     focus:outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-edamame-300 dark:focus:border-edamame-700
+          className="w-full pl-9 pr-8 py-2 text-[13px] rounded-lg bg-paper-2 dark:bg-plate-card border border-transparent
+                     text-ink dark:text-plate-ink-soft placeholder:text-ink-faint dark:placeholder:text-plate-ink-faint
+                     focus:outline-none focus:bg-paper dark:focus:bg-plate focus:border-edamame-300 dark:focus:border-edamame-700
                      focus:ring-[3px] focus:ring-edamame-500/[.18] transition-colors"
         />
         {query && (
@@ -156,16 +156,16 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
               setIsOpen(false);
             }}
             aria-label="Clear search"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-faint dark:text-plate-ink-faint hover:text-ink dark:hover:text-plate-ink-soft"
           >
             <X size={14} />
           </button>
         )}
 
         {showPanel && (
-          <div className="absolute left-0 right-0 top-full mt-1.5 z-40 rounded-xl bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[70vh] overflow-y-auto divide-y divide-gray-100 dark:divide-slate-800">
+          <div className="absolute left-0 right-0 top-full mt-1.5 z-40 rounded-xl bg-paper dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 shadow-2xl overflow-hidden max-h-[70vh] overflow-y-auto divide-y divide-ink/10 dark:divide-plate-ink/15">
             {results.isEmpty ? (
-              <div className="px-3 py-4 text-[12.5px] text-slate-500 dark:text-slate-400">
+              <div className="px-3 py-4 text-[12.5px] text-ink-soft dark:text-plate-ink-soft">
                 No matches for “{debouncedQuery.trim()}”.
               </div>
             ) : (
