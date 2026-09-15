@@ -74,7 +74,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       {/* Bell button */}
       <button
         onClick={handleBellClick}
-        className="relative p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-700 dark:hover:text-slate-200 transition-colors"
+        className="relative p-2 rounded-lg text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card hover:text-ink-soft dark:hover:text-plate-ink transition-colors"
         aria-label="Notifications"
       >
         <Bell size={20} />
@@ -87,13 +87,13 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
 
       {/* Dropdown panel */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 z-50">
+        <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto rounded-xl shadow-2xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card z-50">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900 z-10">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-ink/10 dark:border-plate-ink/15 sticky top-0 bg-paper-2 dark:bg-plate-card z-10">
+            <h3 className="text-sm font-semibold text-ink dark:text-plate-ink-soft">
               Notifications
               {unreadCount > 0 && (
-                <span className="ml-2 text-xs font-normal text-gray-400 dark:text-slate-500">
+                <span className="ml-2 text-xs font-normal text-ink-faint dark:text-plate-ink-faint">
                   {unreadCount} unread
                 </span>
               )}
@@ -111,11 +111,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           {/* Notification list */}
           {sorted.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-              <Bell size={32} className="text-gray-300 dark:text-slate-600 mb-2" />
-              <p className="text-sm text-gray-400 dark:text-slate-500">No notifications</p>
+              <Bell size={32} className="text-ink-soft/40 dark:text-plate-ink-soft/40 mb-2" />
+              <p className="text-sm text-ink-faint dark:text-plate-ink-faint">No notifications</p>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-100 dark:divide-slate-800">
+            <ul className="divide-y divide-ink/10 dark:divide-plate-ink/15">
               {sorted.map(notification => {
                 const { Icon, iconClass, bgClass } = typeConfig[notification.type];
                 return (
@@ -123,7 +123,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                     key={notification.id}
                     className={`relative flex gap-3 px-4 py-3 cursor-pointer transition-colors ${
                       notification.read
-                        ? 'bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+                        ? 'bg-paper-2 dark:bg-plate-card hover:bg-paper-2 dark:hover:bg-plate/50'
                         : 'bg-edamame-50 dark:bg-edamame-900/10 hover:bg-edamame-100/60 dark:hover:bg-edamame-900/20'
                     }`}
                     onClick={() => handleNotificationClick(notification.id, notification.read)}
@@ -137,15 +137,15 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                     <div className="flex-1 min-w-0 pr-6">
                       <p className={`text-sm font-medium leading-snug truncate ${
                         notification.read
-                          ? 'text-gray-600 dark:text-slate-400'
-                          : 'text-gray-900 dark:text-slate-100'
+                          ? 'text-ink-soft dark:text-plate-ink-soft'
+                          : 'text-ink dark:text-plate-ink'
                       }`}>
                         {notification.title}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-ink-soft dark:text-plate-ink-soft mt-0.5 line-clamp-2 leading-relaxed">
                         {notification.message}
                       </p>
-                      <p className="text-[11px] text-gray-400 dark:text-slate-600 mt-1">
+                      <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1">
                         {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
                       </p>
                     </div>
@@ -161,7 +161,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                         e.stopPropagation();
                         onDelete(notification.id);
                       }}
-                      className="absolute right-2 top-3 p-1 rounded text-gray-300 dark:text-slate-600 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                      className="absolute right-2 top-3 p-1 rounded text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-ink-soft dark:hover:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card transition-colors"
                       aria-label="Dismiss notification"
                     >
                       <X size={13} />

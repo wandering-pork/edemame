@@ -122,21 +122,21 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
   };
 
   return (
-    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-white dark:bg-slate-900 min-h-screen transition-colors duration-200 page-enter">
+    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-paper-2 dark:bg-plate-card min-h-screen transition-colors duration-200 page-enter">
       <div className="max-w-[1440px] mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-[-0.035em] text-gray-900 dark:text-slate-100">
+            <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-[-0.035em] text-ink dark:text-plate-ink">
               Team View
             </h1>
-            <p className="text-[13px] text-gray-500 dark:text-slate-400 mt-1">
+            <p className="text-[13px] text-ink-soft dark:text-plate-ink-soft mt-1">
               Open tasks across the practice, by owner
             </p>
           </div>
           <button
             onClick={() => navigate('/team-members')}
-            className="btn-press focus-ring inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-[13px] bg-gray-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-gray-700 dark:hover:bg-white transition-colors whitespace-nowrap"
+            className="btn-press focus-ring inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-[13px] bg-ink dark:bg-plate-ink text-paper dark:text-plate hover:bg-ink/80 dark:hover:bg-plate-ink/90 transition-colors whitespace-nowrap"
           >
             <Users size={16} strokeWidth={1.8} />
             Manage Members
@@ -150,7 +150,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
             return (
               <div
                 key={member.id}
-                className="bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-800 rounded-xl p-3"
+                className="bg-paper-2 dark:bg-plate-card/50 border border-ink/10 dark:border-plate-ink/15 rounded-xl p-3"
               >
                 <div className="flex items-center gap-2.5 px-1 pb-3">
                   <div
@@ -160,19 +160,19 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                     {member.avatar || initialsOf(member.name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-bold tracking-[-0.01em] text-gray-900 dark:text-slate-100 truncate">
+                    <div className="text-[13px] font-bold tracking-[-0.01em] text-ink dark:text-plate-ink truncate">
                       {member.name}
                     </div>
-                    <div className="text-[10.5px] text-gray-400 dark:text-slate-500">{roleLabel[member.role]}</div>
+                    <div className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{roleLabel[member.role]}</div>
                   </div>
-                  <span className="text-[11px] font-bold text-gray-400 dark:text-slate-500 flex-shrink-0">
+                  <span className="text-[11px] font-bold text-ink-faint dark:text-plate-ink-faint flex-shrink-0">
                     {openTasks.length}
                   </span>
                 </div>
 
                 <div className="flex flex-col gap-2">
                   {openTasks.length === 0 ? (
-                    <div className="text-center text-xs text-gray-400 dark:text-slate-600 py-6">No open tasks</div>
+                    <div className="text-center text-xs text-ink-faint dark:text-plate-ink-faint py-6">No open tasks</div>
                   ) : (
                     openTasks.map(t => {
                       const c = t.caseId ? cases.find(cs => cs.id === t.caseId) : undefined;
@@ -181,19 +181,19 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                         <button
                           key={t.id}
                           onClick={() => c && navigate(`/cases/${c.id}`)}
-                          className="task-card text-left bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-[10px] px-3.5 py-3"
+                          className="task-card text-left bg-paper-2 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-[10px] px-3.5 py-3"
                         >
-                          <div className="text-[12.5px] font-semibold tracking-[-0.01em] text-gray-900 dark:text-slate-100 leading-snug">
+                          <div className="text-[12.5px] font-semibold tracking-[-0.01em] text-ink dark:text-plate-ink leading-snug">
                             {t.title}
                           </div>
-                          <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-1 truncate">
+                          <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1 truncate">
                             {c ? c.title : 'No case linked'}
                           </div>
                           <span
                             className={`inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-md mt-2 ${
                               overdue
                                 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400'
-                                : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'
+                                : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'
                             }`}
                           >
                             {overdue ? 'Overdue · ' : 'Due '}
@@ -208,7 +208,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
             );
           })}
           {memberColumns.length === 0 && (
-            <div className="col-span-full text-center text-sm text-gray-400 dark:text-slate-600 py-16">
+            <div className="col-span-full text-center text-sm text-ink-faint dark:text-plate-ink-faint py-16">
               No team members yet.
             </div>
           )}
@@ -219,23 +219,23 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
           {/* Case Board */}
           <section className="xl:col-span-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-              <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">Shared Case Board</h2>
+              <h2 className="text-base font-bold text-ink dark:text-plate-ink">Shared Case Board</h2>
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" size={14} strokeWidth={1.8} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint dark:text-plate-ink-faint" size={14} strokeWidth={1.8} />
                   <input
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     placeholder="Search..."
-                    className="focus-ring pl-9 pr-3 py-2 rounded-lg text-[13px] bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 focus:border-edamame-500 outline-none transition-colors text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500"
+                    className="focus-ring pl-9 pr-3 py-2 rounded-lg text-[13px] bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 focus:border-edamame-500 outline-none transition-colors text-ink dark:text-plate-ink placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50"
                   />
                 </div>
                 <div className="relative">
-                  <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none" size={14} strokeWidth={1.8} />
+                  <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint dark:text-plate-ink-faint pointer-events-none" size={14} strokeWidth={1.8} />
                   <select
                     value={filterMemberId}
                     onChange={e => setFilterMemberId(e.target.value)}
-                    className="focus-ring pl-9 pr-8 py-2 rounded-lg text-[13px] bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 focus:border-edamame-500 outline-none text-gray-900 dark:text-slate-100 appearance-none cursor-pointer"
+                    className="focus-ring pl-9 pr-8 py-2 rounded-lg text-[13px] bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 focus:border-edamame-500 outline-none text-ink dark:text-plate-ink appearance-none cursor-pointer"
                   >
                     <option value="all">All members</option>
                     {teamMembers.map(m => (
@@ -246,9 +246,9 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
               </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm divide-y divide-gray-100 dark:divide-slate-800 overflow-hidden">
+            <div className="bg-paper-2 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl shadow-sm divide-y divide-ink/10 dark:divide-plate-ink/15 overflow-hidden">
               {filteredCases.length === 0 && (
-                <div className="p-10 text-center text-gray-400 dark:text-slate-600 text-sm">
+                <div className="p-10 text-center text-ink-faint dark:text-plate-ink-faint text-sm">
                   No cases match this filter.
                 </div>
               )}
@@ -260,7 +260,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                 return (
                   <div
                     key={c.id}
-                    className="table-row-hover p-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 flex items-center gap-4"
+                    className="table-row-hover p-4 hover:bg-paper-2 dark:hover:bg-plate/50 flex items-center gap-4"
                   >
                     <button
                       onClick={() => navigate(`/cases/${c.id}`)}
@@ -273,17 +273,17 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                         {initialsOf(client?.name || 'Unknown')}
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-gray-900 dark:text-slate-100 text-[13px] tracking-[-0.01em] truncate">
+                        <h3 className="font-semibold text-ink dark:text-plate-ink text-[13px] tracking-[-0.01em] truncate">
                           {c.title}
                         </h3>
-                        <p className="text-[11.5px] text-gray-400 dark:text-slate-500 truncate">
+                        <p className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint truncate">
                           {client?.name || 'Unknown client'} &middot; {c.status.replace('_', ' ')}
                         </p>
                         <div className="mt-1.5 flex items-center gap-2">
-                          <div className="flex-1 h-1 rounded-full bg-gray-100 dark:bg-slate-800 overflow-hidden max-w-[160px]">
+                          <div className="flex-1 h-1 rounded-full bg-paper-2 dark:bg-plate-card overflow-hidden max-w-[160px]">
                             <div className="progress-fill h-full bg-edamame-500 rounded-full" style={{ width: `${progress}%` }} />
                           </div>
-                          <span className="text-[10px] font-semibold text-gray-400 dark:text-slate-500">{progress}%</span>
+                          <span className="text-[10px] font-semibold text-ink-faint dark:text-plate-ink-faint">{progress}%</span>
                         </div>
                       </div>
                     </button>
@@ -300,21 +300,21 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                         <button
                           onClick={() => openAssignModal(c.id)}
                           title="Assign case owner"
-                          className="w-8 h-8 rounded-full border border-dashed border-gray-300 dark:border-slate-600 text-gray-400 dark:text-slate-500 hover:border-edamame-500 hover:text-edamame-500 flex items-center justify-center transition-colors"
+                          className="w-8 h-8 rounded-full border border-dashed border-ink/20 dark:border-plate-ink/25 text-ink-faint dark:text-plate-ink-faint hover:border-edamame-500 hover:text-edamame-500 flex items-center justify-center transition-colors"
                         >
                           <UserPlus size={13} strokeWidth={1.8} />
                         </button>
                       )}
                       <button
                         onClick={() => openAssignModal(c.id)}
-                        className="btn-press px-3 py-1.5 rounded-lg text-[11.5px] font-semibold bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:bg-edamame-500 hover:text-white transition-colors"
+                        className="btn-press px-3 py-1.5 rounded-lg text-[11.5px] font-semibold bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:bg-edamame-500 hover:text-white transition-colors"
                       >
                         Assign
                       </button>
                       <ChevronRight
                         size={17}
                         strokeWidth={1.8}
-                        className="text-gray-300 dark:text-slate-600"
+                        className="text-ink-soft/40 dark:text-plate-ink-soft/40"
                       />
                     </div>
                   </div>
@@ -327,12 +327,12 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
           <section>
             <div className="flex items-center gap-2 mb-4">
               <Activity className="w-4 h-4 text-edamame-500" strokeWidth={1.8} />
-              <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">Activity Feed</h2>
+              <h2 className="text-base font-bold text-ink dark:text-plate-ink">Activity Feed</h2>
             </div>
-            <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm p-4 min-h-[280px]">
+            <div className="bg-paper-2 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl shadow-sm p-4 min-h-[280px]">
               {recentActivity.length === 0 ? (
-                <div className="py-10 text-center text-sm text-gray-400 dark:text-slate-600">
-                  <Clock className="w-8 h-8 mx-auto mb-3 text-gray-300 dark:text-slate-700" strokeWidth={1.8} />
+                <div className="py-10 text-center text-sm text-ink-faint dark:text-plate-ink-faint">
+                  <Clock className="w-8 h-8 mx-auto mb-3 text-ink-soft/40 dark:text-plate-ink-soft/40" strokeWidth={1.8} />
                   Activity will appear here as your team works.
                 </div>
               ) : (
@@ -349,8 +349,8 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                           {actor ? (actor.avatar || initialsOf(actor.name)) : '—'}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12.5px] text-gray-800 dark:text-slate-100 leading-snug">{ev.summary}</p>
-                          <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
+                          <p className="text-[12.5px] text-ink dark:text-plate-ink-soft leading-snug">{ev.summary}</p>
+                          <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-0.5">
                             {formatDistanceToNow(new Date(ev.createdAt), { addSuffix: true })}
                           </p>
                         </div>
@@ -367,19 +367,19 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
       {/* Assign modal */}
       {assignModal && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full modal-content">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Assign Case</h2>
+          <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl max-w-md w-full modal-content">
+            <div className="flex items-center justify-between p-6 border-b border-ink/15 dark:border-plate-ink/20">
+              <h2 className="text-lg font-bold text-ink dark:text-plate-ink">Assign Case</h2>
               <button
                 onClick={() => setAssignModal(null)}
-                className="text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors text-xl"
+                className="text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink transition-colors text-xl"
               >
                 ×
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Team member</label>
+                <label className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">Team member</label>
                 <div className="space-y-2">
                   {teamMembers.map(m => (
                     <button
@@ -388,30 +388,30 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                       className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
                         assignTarget === m.id
                           ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-900/20 ring-2 ring-edamame-500/20'
-                          : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600'
+                          : 'border-ink/15 dark:border-plate-ink/20 hover:border-ink/20 dark:hover:border-plate-ink/25'
                       }`}
                     >
                       <div className="w-9 h-9 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center font-bold text-sm">
                         {m.avatar || initialsOf(m.name)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 dark:text-white text-sm">{m.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-slate-400">{roleLabel[m.role]}</p>
+                        <p className="font-semibold text-ink dark:text-plate-ink text-sm">{m.name}</p>
+                        <p className="text-xs text-ink-soft dark:text-plate-ink-soft">{roleLabel[m.role]}</p>
                       </div>
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
-                  Note <span className="font-normal text-gray-400">(optional)</span>
+                <label className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">
+                  Note <span className="font-normal text-ink-faint dark:text-plate-ink-faint">(optional)</span>
                 </label>
                 <textarea
                   value={assignNote}
                   onChange={e => setAssignNote(e.target.value)}
                   placeholder="Context for the reassignment..."
                   rows={2}
-                  className="focus-ring w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-all resize-none"
+                  className="focus-ring w-full px-4 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink dark:text-plate-ink placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50 outline-none transition-all resize-none"
                 />
               </div>
 
@@ -422,7 +422,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                 if (history.length === 0) return null;
                 return (
                   <div>
-                    <p className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-gray-400 dark:text-slate-500 mb-2">
+                    <p className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-ink-faint dark:text-plate-ink-faint mb-2">
                       Assignment history
                     </p>
                     <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
@@ -430,14 +430,14 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                         const fromMember = getMember(ev.fromOwnerId);
                         const toMember = getMember(ev.toOwnerId);
                         return (
-                          <div key={ev.id} className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-2">
+                          <div key={ev.id} className="text-xs text-ink-soft dark:text-plate-ink-soft flex items-center gap-2">
                             <Clock size={12} strokeWidth={1.8} />
                             <span>
                               {fromMember ? `${fromMember.name} → ` : 'Assigned to '}
-                              <span className="font-semibold text-gray-700 dark:text-slate-200">
+                              <span className="font-semibold text-ink-soft dark:text-plate-ink-soft">
                                 {toMember?.name || 'Unknown'}
                               </span>
-                              <span className="ml-2 text-gray-400 dark:text-slate-500">{format(new Date(ev.changedAt), 'MMM d')}</span>
+                              <span className="ml-2 text-ink-faint dark:text-plate-ink-faint">{format(new Date(ev.changedAt), 'MMM d')}</span>
                             </span>
                           </div>
                         );
@@ -448,17 +448,17 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
               })()}
             </div>
 
-            <div className="flex items-center gap-3 p-6 border-t border-gray-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 p-6 border-t border-ink/15 dark:border-plate-ink/20">
               <button
                 onClick={() => setAssignModal(null)}
-                className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmAssign}
                 disabled={!assignTarget}
-                className="btn-press ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg transition-colors"
+                className="btn-press ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
                 Confirm assignment
               </button>

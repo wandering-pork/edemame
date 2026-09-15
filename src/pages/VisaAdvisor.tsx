@@ -1,6 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { format, parse } from 'date-fns';
 import { Client, WorkflowTemplate } from '../types';
 import {
   ChevronRight,
@@ -9,16 +8,15 @@ import {
   CheckCircle,
   AlertCircle,
   HelpCircle,
+  XCircle,
   ArrowRight,
   Check,
-  Lock,
-  Target,
   Sparkles,
 } from 'lucide-react';
 
 interface WizardState {
   step: 'input' | 'report';
-  currentStep: number; // 1-4
+  currentStep: number; // 1-3
   clientInfo: {
     fullName: string;
     dob: string;
@@ -38,14 +36,16 @@ interface WizardState {
   };
 }
 
+interface VisaOption {
+  visaSubclass: string;
+  visaName: string;
+  verdict: 'qualifies' | 'possibly_qualifies' | 'unlikely' | 'needs_more_info';
+  reasons: string[];
+  gaps: string[];
+}
+
 interface EligibilityReport {
-  visaOptions: Array<{
-    visaSubclass: string;
-    visaName: string;
-    verdict: 'qualifies' | 'possibly_qualifies' | 'unlikely' | 'needs_more_info';
-    reasons: string[];
-    gaps: string[];
-  }>;
+  visaOptions: VisaOption[];
   summary: string;
   primaryRecommendation: string;
   suggestedTemplateKeyword: string;
@@ -69,39 +69,43 @@ interface VisaAdvisorProps {
 // plus a neutral treatment for "needs more info" which has no equivalent in the prototype.
 const verdictColors: Record<
   string,
-  { cardBg: string; cardBorder: string; badgeBg: string; badgeText: string; titleText: string; bar: string }
+  { cardBg: string; cardBorder: string; badgeBg: string; badgeText: string; titleText: string; bar: string; iconText: string }
 > = {
   qualifies: {
     cardBg: 'bg-emerald-50/70 dark:bg-emerald-500/[0.06]',
     cardBorder: 'border-emerald-200 dark:border-emerald-800/60',
     badgeBg: 'bg-emerald-100 dark:bg-emerald-500/15',
     badgeText: 'text-[#047857] dark:text-emerald-400',
-    titleText: 'text-slate-900 dark:text-white',
+    titleText: 'text-ink dark:text-plate-ink',
     bar: 'bg-[#10B981]',
+    iconText: 'text-emerald-600 dark:text-emerald-400',
   },
   possibly_qualifies: {
     cardBg: 'bg-amber-50/70 dark:bg-amber-500/[0.06]',
     cardBorder: 'border-amber-200 dark:border-amber-800/60',
     badgeBg: 'bg-amber-100 dark:bg-amber-500/15',
     badgeText: 'text-[#B45309] dark:text-amber-400',
-    titleText: 'text-slate-900 dark:text-white',
+    titleText: 'text-ink dark:text-plate-ink',
     bar: 'bg-[#F59E0B]',
+    iconText: 'text-amber-600 dark:text-amber-400',
   },
   unlikely: {
     cardBg: 'bg-red-50/70 dark:bg-red-500/[0.06]',
     cardBorder: 'border-red-200 dark:border-red-800/60',
     badgeBg: 'bg-red-100 dark:bg-red-500/15',
     badgeText: 'text-[#B91C1C] dark:text-red-400',
-    titleText: 'text-slate-900 dark:text-white',
+    titleText: 'text-ink dark:text-plate-ink',
     bar: 'bg-[#EF4444]',
+    iconText: 'text-red-600 dark:text-red-400',
   },
   needs_more_info: {
-    cardBg: 'bg-slate-50 dark:bg-slate-800/40',
-    cardBorder: 'border-slate-200 dark:border-slate-700',
-    badgeBg: 'bg-slate-100 dark:bg-slate-700/60',
-    badgeText: 'text-slate-600 dark:text-slate-300',
-    titleText: 'text-slate-900 dark:text-white',
+    cardBg: 'bg-paper-2 dark:bg-plate-card/40',
+    cardBorder: 'border-ink/15 dark:border-plate-ink/20',
+    badgeBg: 'bg-paper-2 dark:bg-plate-card/60',
+    badgeText: 'text-ink-soft dark:text-plate-ink-soft',
+    titleText: 'text-ink dark:text-plate-ink',
     bar: 'bg-slate-400',
+    iconText: 'text-ink-soft dark:text-plate-ink-soft',
   },
 };
 
@@ -121,21 +125,43 @@ const verdictBarWidth: Record<string, string> = {
   needs_more_info: '0%',
 };
 
-const stepLabels = ['Personal', 'Goals', 'Details', 'Support'];
+// Ordering used to pick the "best" pathway and sort the report — mirrors the
+// confidence implied by verdictBarWidth above, not a real numeric score.
+const verdictRank: Record<string, number> = {
+  qualifies: 3,
+  possibly_qualifies: 2,
+  unlikely: 1,
+  needs_more_info: 0,
+};
+
+const verdictIcon: Record<string, React.ElementType> = {
+  qualifies: CheckCircle,
+  possibly_qualifies: AlertCircle,
+  unlikely: XCircle,
+  needs_more_info: HelpCircle,
+};
+
+const stepLabels = ['Prospect', 'Intent', 'Background'];
+const stepHeadings = ['Who are we assessing?', 'What do they want?', 'What are they bringing?'];
+const stepSubheadings = [
+  'Enough to establish age and citizenship',
+  'Purpose drives which pathways are even relevant',
+  'English, qualifications and any final considerations',
+];
 
 // Shared chip styling for single-select pill groups (brand fill when active).
 const chipClass = (active: boolean) =>
   `px-3.5 py-1.5 rounded-full border text-xs font-semibold transition-all btn-press ${
     active
       ? 'bg-edamame-500 border-edamame-500 text-white'
-      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-edamame-400 dark:hover:border-edamame-500'
+      : 'bg-paper-2 dark:bg-plate-card border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame-400 dark:hover:border-edamame-500'
   }`;
 
 const inputClass =
-  'w-full px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/60 text-[13.5px] text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all';
+  'w-full px-3.5 py-2.5 border border-ink/15 dark:border-plate-ink/20 rounded-lg bg-paper-2 dark:bg-plate-card/60 text-[13.5px] text-ink dark:text-plate-ink outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all';
 
 const labelClass =
-  'block text-[10px] font-bold uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400 mb-2';
+  'block text-[10px] font-bold uppercase tracking-[0.11em] text-ink-soft dark:text-plate-ink-soft mb-2';
 
 export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   clients,
@@ -174,9 +200,17 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
   const [isLoading, setIsLoading] = useState(false);
   const [report, setReport] = useState<EligibilityReport | null>(null);
+  const [showAllPathways, setShowAllPathways] = useState(false);
+
+  const sortedOptions = useMemo(() => {
+    if (!report) return [];
+    return [...report.visaOptions].sort(
+      (a, b) => (verdictRank[b.verdict] ?? -1) - (verdictRank[a.verdict] ?? -1)
+    );
+  }, [report]);
 
   const handleNext = () => {
-    if (wizardState.currentStep < 4) {
+    if (wizardState.currentStep < 3) {
       setWizardState((prev) => ({
         ...prev,
         currentStep: prev.currentStep + 1,
@@ -212,6 +246,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
       if (!response.ok) throw new Error('Failed to check eligibility');
       const data: { result: EligibilityReport; usage: EligibilityUsage | null } = await response.json();
       setReport(data.result);
+      setShowAllPathways(false);
       setWizardState((prev) => ({ ...prev, step: 'report' }));
       if (data.usage) onEligibilityChecked?.(data.usage);
     } catch (error) {
@@ -223,6 +258,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
   const handleStartOver = () => {
     setReport(null);
+    setShowAllPathways(false);
     setWizardState((prev) => ({
       ...prev,
       step: 'input',
@@ -235,19 +271,28 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
     navigate('/cases', { state: { suggestedTemplateKeyword: templateKeyword } });
   };
 
+  const first = wizardState.clientInfo.fullName ? wizardState.clientInfo.fullName.split(' ')[0] : null;
+  const best = sortedOptions[0];
+  const second = sortedOptions[1];
+  const top3 = sortedOptions.slice(0, 3);
+  const rest = sortedOptions.slice(3);
+  const viableCount = sortedOptions.filter(
+    (v) => v.verdict === 'qualifies' || v.verdict === 'possibly_qualifies'
+  ).length;
+
   return (
-    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-white dark:bg-slate-900 min-h-screen transition-colors duration-200 page-enter">
+    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-paper-2 dark:bg-plate-card min-h-screen transition-colors duration-200 page-enter">
       <div className="max-w-[860px] mx-auto">
         {/* Input stage */}
         {wizardState.step === 'input' && (
           <>
             {/* Header */}
             <div className="mb-8">
-              <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-tight text-slate-900 dark:text-white">
+              <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-tight text-ink dark:text-plate-ink">
                 Visa Eligibility Advisor
               </h1>
-              <p className="text-[13px] text-slate-600 dark:text-slate-400 mt-1">
-                Discover which Australian visa pathways you may qualify for
+              <p className="text-[13px] text-ink-soft dark:text-plate-ink-soft mt-1">
+                Three steps, then a report you can walk a client through
               </p>
             </div>
 
@@ -255,7 +300,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
             <div className="mb-8 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex gap-3">
-                  {[1, 2, 3, 4].map(step => (
+                  {[1, 2, 3].map(step => (
                     <div key={step} className="relative flex flex-col items-center">
                       <div
                         className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-[13px] transition-all ${
@@ -263,56 +308,50 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             ? 'bg-edamame-500 text-white'
                             : step === wizardState.currentStep
                             ? 'bg-edamame-500/15 border-2 border-edamame-500 text-edamame-600 dark:text-edamame-400'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
+                            : 'bg-paper-2 dark:bg-plate-card text-ink-faint dark:text-plate-ink-faint'
                         }`}
                       >
                         {step < wizardState.currentStep ? <Check size={16} /> : step}
                       </div>
-                      <div className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 mt-2 whitespace-nowrap">
+                      <div className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink-soft dark:text-plate-ink-soft mt-2 whitespace-nowrap">
                         {stepLabels[step - 1]}
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="text-right">
-                  <p className="text-[13px] font-bold text-slate-900 dark:text-white">
-                    Step {wizardState.currentStep} of 4
+                  <p className="text-[13px] font-bold text-ink dark:text-plate-ink">
+                    Step {wizardState.currentStep} of 3
                   </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {Math.round((wizardState.currentStep / 4) * 100)}% complete
+                  <p className="text-[11px] text-ink-soft dark:text-plate-ink-soft mt-0.5">
+                    {Math.round((wizardState.currentStep / 3) * 100)}% complete
                   </p>
                 </div>
               </div>
 
               {/* Progress bar */}
-              <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-paper-2 dark:bg-plate-card rounded-full overflow-hidden">
                 <div
                   className="progress-fill h-full bg-edamame-500 rounded-full"
-                  style={{ width: `${(wizardState.currentStep / 4) * 100}%` }}
+                  style={{ width: `${(wizardState.currentStep / 3) * 100}%` }}
                 />
               </div>
             </div>
 
             {/* Form card */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="bg-paper-2 dark:bg-plate-card rounded-xl shadow-sm border border-ink/15 dark:border-plate-ink/20 overflow-hidden">
               <div className="p-6">
               {/* Step label */}
               <div className="mb-6">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                  {wizardState.currentStep === 1 && 'Personal Information'}
-                  {wizardState.currentStep === 2 && 'Immigration Goals'}
-                  {wizardState.currentStep === 3 && 'Additional Details'}
-                  {wizardState.currentStep === 4 && 'Supporting Factors'}
+                <h2 className="text-base font-bold text-ink dark:text-plate-ink">
+                  {stepHeadings[wizardState.currentStep - 1]}
                 </h2>
-                <p className="text-[12.5px] text-slate-500 dark:text-slate-400 mt-1">
-                  {wizardState.currentStep === 1 && 'Tell us about yourself'}
-                  {wizardState.currentStep === 2 && 'What brings you to Australia?'}
-                  {wizardState.currentStep === 3 && 'Let\'s get into the specifics'}
-                  {wizardState.currentStep === 4 && 'Final considerations'}
+                <p className="text-[12.5px] text-ink-soft dark:text-plate-ink-soft mt-1">
+                  {stepSubheadings[wizardState.currentStep - 1]}
                 </p>
               </div>
 
-              {/* Step 1: Personal Info */}
+              {/* Step 1: Who are we assessing? */}
               {wizardState.currentStep === 1 && (
                 <div className="space-y-4">
                   <div>
@@ -418,7 +457,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                 </div>
               )}
 
-              {/* Step 2: Immigration Goals */}
+              {/* Step 2: What do they want? (purpose + duration + purpose-specific details) */}
               {wizardState.currentStep === 2 && (
                 <div className="space-y-5">
                   <div>
@@ -472,244 +511,241 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                       ))}
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* Step 3: Conditional Details */}
-              {wizardState.currentStep === 3 && (
-                <div className="space-y-4">
-                  {wizardState.goals.primaryPurpose === 'work' && (
-                    <>
-                      <div>
-                        <label className={labelClass}>Occupation</label>
-                        <input
-                          type="text"
-                          value={wizardState.details.occupation || ''}
-                          onChange={(e) =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              details: { ...prev.details, occupation: e.target.value },
-                            }))
-                          }
-                          placeholder="e.g. Software Engineer"
-                          className={inputClass}
-                        />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Years of Experience</label>
-                        <input
-                          type="number"
-                          value={wizardState.details.yearsExperience || ''}
-                          onChange={(e) =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              details: {
-                                ...prev.details,
-                                yearsExperience: parseInt(e.target.value) || 0,
-                              },
-                            }))
-                          }
-                          min="0"
-                          className={inputClass}
-                        />
-                      </div>
-                      <div>
-                        <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={wizardState.details.skillsAssessment || false}
-                            onChange={(e) =>
-                              setWizardState((prev) => ({
-                                ...prev,
-                                details: {
-                                  ...prev.details,
-                                  skillsAssessment: e.target.checked,
-                                },
-                              }))
-                            }
-                            className="w-4 h-4 rounded accent-edamame-500"
-                          />
-                          Skills assessment completed?
-                        </label>
-                      </div>
-                    </>
-                  )}
+                  {wizardState.goals.primaryPurpose && (
+                    <div className="pt-1 border-t border-ink/10 dark:border-plate-ink/15/60 space-y-4">
+                      <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink-soft dark:text-plate-ink-soft pt-4">
+                        Specifics for this pathway
+                      </p>
 
-                  {wizardState.goals.primaryPurpose === 'study' && (
-                    <>
-                      <div>
-                        <label className={labelClass}>Course Level</label>
-                        <select
-                          value={wizardState.details.courseLevel || ''}
-                          onChange={(e) =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              details: { ...prev.details, courseLevel: e.target.value },
-                            }))
-                          }
-                          className={inputClass}
-                        >
-                          <option value="">-- Select --</option>
-                          <option value="secondary">Secondary/Foundation</option>
-                          <option value="vocation">Vocational (VET)</option>
-                          <option value="bachelor">Bachelor Degree</option>
-                          <option value="master">Master Degree</option>
-                          <option value="phd">PhD/Research</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={wizardState.details.financialSupport || false}
-                            onChange={(e) =>
-                              setWizardState((prev) => ({
-                                ...prev,
-                                details: {
-                                  ...prev.details,
-                                  financialSupport: e.target.checked,
-                                },
-                              }))
-                            }
-                            className="w-4 h-4 rounded accent-edamame-500"
-                          />
-                          Financial support confirmed?
-                        </label>
-                      </div>
-                    </>
-                  )}
+                      {wizardState.goals.primaryPurpose === 'work' && (
+                        <>
+                          <div>
+                            <label className={labelClass}>Occupation</label>
+                            <input
+                              type="text"
+                              value={wizardState.details.occupation || ''}
+                              onChange={(e) =>
+                                setWizardState((prev) => ({
+                                  ...prev,
+                                  details: { ...prev.details, occupation: e.target.value },
+                                }))
+                              }
+                              placeholder="e.g. Software Engineer"
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelClass}>Years of Experience</label>
+                            <input
+                              type="number"
+                              value={wizardState.details.yearsExperience || ''}
+                              onChange={(e) =>
+                                setWizardState((prev) => ({
+                                  ...prev,
+                                  details: {
+                                    ...prev.details,
+                                    yearsExperience: parseInt(e.target.value) || 0,
+                                  },
+                                }))
+                              }
+                              min="0"
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={wizardState.details.skillsAssessment || false}
+                                onChange={(e) =>
+                                  setWizardState((prev) => ({
+                                    ...prev,
+                                    details: {
+                                      ...prev.details,
+                                      skillsAssessment: e.target.checked,
+                                    },
+                                  }))
+                                }
+                                className="w-4 h-4 rounded accent-edamame-500"
+                              />
+                              Skills assessment completed?
+                            </label>
+                          </div>
+                        </>
+                      )}
 
-                  {wizardState.goals.primaryPurpose === 'family' && (
-                    <>
-                      <div>
-                        <label className={labelClass}>Relationship Type</label>
-                        <select
-                          value={wizardState.details.relationshipType || ''}
-                          onChange={(e) =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              details: { ...prev.details, relationshipType: e.target.value },
-                            }))
-                          }
-                          className={inputClass}
-                        >
-                          <option value="">-- Select --</option>
-                          <option value="spouse">Spouse / Partner</option>
-                          <option value="child">Dependent Child</option>
-                          <option value="parent">Parent</option>
-                          <option value="sibling">Sibling</option>
-                          <option value="other">Other Family Member</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className={labelClass}>Sponsor's AU Status</label>
-                        <select
-                          value={wizardState.details.sponsorStatus || ''}
-                          onChange={(e) =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              details: { ...prev.details, sponsorStatus: e.target.value },
-                            }))
-                          }
-                          className={inputClass}
-                        >
-                          <option value="">-- Select --</option>
-                          <option value="citizen">Australian Citizen</option>
-                          <option value="pr">Permanent Resident</option>
-                          <option value="none">None / Not Available</option>
-                        </select>
-                      </div>
-                    </>
-                  )}
+                      {wizardState.goals.primaryPurpose === 'study' && (
+                        <>
+                          <div>
+                            <label className={labelClass}>Course Level</label>
+                            <select
+                              value={wizardState.details.courseLevel || ''}
+                              onChange={(e) =>
+                                setWizardState((prev) => ({
+                                  ...prev,
+                                  details: { ...prev.details, courseLevel: e.target.value },
+                                }))
+                              }
+                              className={inputClass}
+                            >
+                              <option value="">-- Select --</option>
+                              <option value="secondary">Secondary/Foundation</option>
+                              <option value="vocation">Vocational (VET)</option>
+                              <option value="bachelor">Bachelor Degree</option>
+                              <option value="master">Master Degree</option>
+                              <option value="phd">PhD/Research</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={wizardState.details.financialSupport || false}
+                                onChange={(e) =>
+                                  setWizardState((prev) => ({
+                                    ...prev,
+                                    details: {
+                                      ...prev.details,
+                                      financialSupport: e.target.checked,
+                                    },
+                                  }))
+                                }
+                                className="w-4 h-4 rounded accent-edamame-500"
+                              />
+                              Financial support confirmed?
+                            </label>
+                          </div>
+                        </>
+                      )}
 
-                  {wizardState.goals.primaryPurpose === 'pr' && (
-                    <>
-                      <div>
-                        <label className={labelClass}>Self-Assessed Points Score</label>
-                        <select
-                          value={wizardState.details.pointsScore || ''}
-                          onChange={(e) =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              details: { ...prev.details, pointsScore: e.target.value },
-                            }))
-                          }
-                          className={inputClass}
-                        >
-                          <option value="">-- Select --</option>
-                          <option value="under65">Under 65 points</option>
-                          <option value="65-79">65–79 points</option>
-                          <option value="80-95">80–95 points</option>
-                          <option value="95plus">95+ points</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className={labelClass}>Preferred State</label>
-                        <input
-                          type="text"
-                          value={wizardState.details.statePreference || ''}
-                          onChange={(e) =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              details: { ...prev.details, statePreference: e.target.value },
-                            }))
-                          }
-                          placeholder="e.g. NSW, VIC"
-                          className={inputClass}
-                        />
-                      </div>
-                    </>
-                  )}
+                      {wizardState.goals.primaryPurpose === 'family' && (
+                        <>
+                          <div>
+                            <label className={labelClass}>Relationship Type</label>
+                            <select
+                              value={wizardState.details.relationshipType || ''}
+                              onChange={(e) =>
+                                setWizardState((prev) => ({
+                                  ...prev,
+                                  details: { ...prev.details, relationshipType: e.target.value },
+                                }))
+                              }
+                              className={inputClass}
+                            >
+                              <option value="">-- Select --</option>
+                              <option value="spouse">Spouse / Partner</option>
+                              <option value="child">Dependent Child</option>
+                              <option value="parent">Parent</option>
+                              <option value="sibling">Sibling</option>
+                              <option value="other">Other Family Member</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className={labelClass}>Sponsor's AU Status</label>
+                            <select
+                              value={wizardState.details.sponsorStatus || ''}
+                              onChange={(e) =>
+                                setWizardState((prev) => ({
+                                  ...prev,
+                                  details: { ...prev.details, sponsorStatus: e.target.value },
+                                }))
+                              }
+                              className={inputClass}
+                            >
+                              <option value="">-- Select --</option>
+                              <option value="citizen">Australian Citizen</option>
+                              <option value="pr">Permanent Resident</option>
+                              <option value="none">None / Not Available</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
 
-                  {wizardState.goals.primaryPurpose === 'visit' && (
-                    <>
-                      <div>
-                        <label className={labelClass}>Trip Duration</label>
-                        <input
-                          type="text"
-                          value={wizardState.details.tripDuration || ''}
-                          onChange={(e) =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              details: { ...prev.details, tripDuration: e.target.value },
-                            }))
-                          }
-                          placeholder="e.g. 2 weeks, 3 months"
-                          className={inputClass}
-                        />
-                      </div>
-                      <div>
-                        <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={wizardState.details.strongTies || false}
-                            onChange={(e) =>
-                              setWizardState((prev) => ({
-                                ...prev,
-                                details: {
-                                  ...prev.details,
-                                  strongTies: e.target.checked,
-                                },
-                              }))
-                            }
-                            className="w-4 h-4 rounded accent-edamame-500"
-                          />
-                          Strong ties to home country (property, job, family)?
-                        </label>
-                      </div>
-                    </>
-                  )}
+                      {wizardState.goals.primaryPurpose === 'pr' && (
+                        <>
+                          <div>
+                            <label className={labelClass}>Self-Assessed Points Score</label>
+                            <select
+                              value={wizardState.details.pointsScore || ''}
+                              onChange={(e) =>
+                                setWizardState((prev) => ({
+                                  ...prev,
+                                  details: { ...prev.details, pointsScore: e.target.value },
+                                }))
+                              }
+                              className={inputClass}
+                            >
+                              <option value="">-- Select --</option>
+                              <option value="under65">Under 65 points</option>
+                              <option value="65-79">65–79 points</option>
+                              <option value="80-95">80–95 points</option>
+                              <option value="95plus">95+ points</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className={labelClass}>Preferred State</label>
+                            <input
+                              type="text"
+                              value={wizardState.details.statePreference || ''}
+                              onChange={(e) =>
+                                setWizardState((prev) => ({
+                                  ...prev,
+                                  details: { ...prev.details, statePreference: e.target.value },
+                                }))
+                              }
+                              placeholder="e.g. NSW, VIC"
+                              className={inputClass}
+                            />
+                          </div>
+                        </>
+                      )}
 
-                  {!wizardState.goals.primaryPurpose && (
-                    <div className="text-center py-8 text-slate-400 dark:text-slate-600">
-                      <p className="text-[13px]">Please select a primary purpose in Step 2 to continue.</p>
+                      {wizardState.goals.primaryPurpose === 'visit' && (
+                        <>
+                          <div>
+                            <label className={labelClass}>Trip Duration</label>
+                            <input
+                              type="text"
+                              value={wizardState.details.tripDuration || ''}
+                              onChange={(e) =>
+                                setWizardState((prev) => ({
+                                  ...prev,
+                                  details: { ...prev.details, tripDuration: e.target.value },
+                                }))
+                              }
+                              placeholder="e.g. 2 weeks, 3 months"
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={wizardState.details.strongTies || false}
+                                onChange={(e) =>
+                                  setWizardState((prev) => ({
+                                    ...prev,
+                                    details: {
+                                      ...prev.details,
+                                      strongTies: e.target.checked,
+                                    },
+                                  }))
+                                }
+                                className="w-4 h-4 rounded accent-edamame-500"
+                              />
+                              Strong ties to home country (property, job, family)?
+                            </label>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Step 4: Supporting Factors */}
-              {wizardState.currentStep === 4 && (
+              {/* Step 3: What are they bringing? */}
+              {wizardState.currentStep === 3 && (
                 <div className="space-y-4">
                   <div>
                     <label className={labelClass}>English Proficiency</label>
@@ -736,7 +772,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   </div>
 
                   <div>
-                    <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
                       <input
                         type="checkbox"
                         checked={wizardState.supportingFactors.healthConcerns}
@@ -756,7 +792,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   </div>
 
                   <div>
-                    <label className="flex items-center gap-2 text-[12.5px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
                       <input
                         type="checkbox"
                         checked={wizardState.supportingFactors.criminalHistory}
@@ -779,11 +815,11 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
             </div>
 
             {/* Footer with buttons */}
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 flex justify-between gap-3">
+            <div className="px-6 py-4 bg-paper-2 dark:bg-plate-card/60 border-t border-ink/15 dark:border-plate-ink/20 flex justify-between gap-3">
               <button
                 onClick={handleBack}
                 disabled={wizardState.currentStep === 1}
-                className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors btn-press"
+                className="flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors btn-press"
               >
                 <ChevronLeft size={15} />
                 Back
@@ -792,7 +828,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
               <button
                 onClick={handleNext}
                 disabled={isLoading}
-                className="flex items-center gap-2 px-5 py-2 text-[13.5px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg disabled:bg-slate-400 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-all btn-press"
+                className="flex items-center gap-2 px-5 py-2 text-[13.5px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed transition-all btn-press"
               >
                 {isLoading ? (
                   <>
@@ -801,7 +837,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   </>
                 ) : (
                   <>
-                    {wizardState.currentStep === 4 ? (
+                    {wizardState.currentStep === 3 ? (
                       <>
                         <Sparkles size={15} />
                         Get Assessment
@@ -821,43 +857,112 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
         )}
 
         {/* Report stage */}
-        {wizardState.step === 'report' && report && (
+        {wizardState.step === 'report' && report && best && (
           <div className="space-y-8">
             {/* Header */}
-            <div className="text-center mb-4">
-              <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-tight text-slate-900 dark:text-white">
-                Your Visa Eligibility Results
-              </h1>
-              <p className="text-[13px] text-slate-600 dark:text-slate-400 mt-1">
-                Based on your information, here are the visa pathways you may qualify for
-              </p>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-tight text-ink dark:text-plate-ink">
+                  Assessment for {wizardState.clientInfo.fullName || 'this prospect'}
+                </h1>
+                <p className="text-[13px] text-ink-soft dark:text-plate-ink-soft mt-1">
+                  {viableCount} of {sortedOptions.length} pathways viable · assessed{' '}
+                  {new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+              <button
+                onClick={handleStartOver}
+                className="px-4 py-2 text-[13px] font-semibold text-ink-soft dark:text-plate-ink-soft bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors btn-press"
+              >
+                Start Over
+              </button>
             </div>
 
-            {/* Summary section */}
-            <div className="bg-edamame-50 dark:bg-edamame-900/10 rounded-xl border border-edamame-200 dark:border-edamame-800/60 p-6">
-              <div className="flex items-start gap-3 mb-3">
-                <Target className="w-5 h-5 text-edamame-600 dark:text-edamame-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    Our Recommendation
-                  </h2>
-                  <p className="text-[13.5px] text-slate-700 dark:text-slate-300 mt-1.5 leading-relaxed">
-                    {report.primaryRecommendation}
-                  </p>
+            {/* Hero: recommended pathway */}
+            {(() => {
+              const colors = verdictColors[best.verdict] ?? verdictColors.needs_more_info;
+              const HeroIcon = verdictIcon[best.verdict] ?? HelpCircle;
+              const isQualified = best.verdict === 'qualifies' || best.verdict === 'possibly_qualifies';
+              return (
+                <div className={`rounded-xl border p-6 flex items-center gap-6 flex-wrap ${colors.cardBg} ${colors.cardBorder}`}>
+                  <HeroIcon size={52} strokeWidth={1.5} className={`flex-shrink-0 ${colors.iconText}`} />
+                  <div className="min-w-[240px] flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink-soft dark:text-plate-ink-soft">
+                        Recommended pathway
+                      </span>
+                      <span
+                        className={`text-[10.5px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap ${colors.badgeBg} ${colors.badgeText}`}
+                      >
+                        {verdictLabels[best.verdict]}
+                      </span>
+                    </div>
+                    <h2 className="text-[20px] font-extrabold tracking-tight text-ink dark:text-plate-ink mt-1.5">
+                      {best.visaName} visa — subclass {best.visaSubclass}
+                    </h2>
+                    <p className="text-[13.5px] leading-relaxed text-ink-soft dark:text-plate-ink-soft mt-1.5">
+                      {best.reasons.slice(0, 2).join('. ')}
+                      {best.reasons.length > 0 ? '.' : ''}
+                    </p>
+                  </div>
+                  {isQualified && (
+                    <button
+                      onClick={() => handleOpenCase(best.visaSubclass)}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-edamame-500 hover:bg-edamame-600 text-white text-[13px] font-bold rounded-lg transition-colors btn-press whitespace-nowrap"
+                    >
+                      Open Case <ArrowRight size={14} />
+                    </button>
+                  )}
                 </div>
-              </div>
-              <p className="text-[12.5px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                {report.summary}
+              );
+            })()}
+
+            {/* Client summary — plain language */}
+            <div className="bg-paper-2 dark:bg-plate-card rounded-xl shadow-sm border border-ink/15 dark:border-plate-ink/20 p-6">
+              <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink-soft dark:text-plate-ink-soft mb-3">
+                Client summary — plain language
               </p>
+              <div className="text-[13.5px] leading-relaxed text-ink-soft dark:text-plate-ink-soft space-y-3">
+                <p>
+                  Based on what you have told us, the strongest pathway for {first || 'the applicant'} is the{' '}
+                  <strong className="text-ink dark:text-plate-ink">
+                    {best.visaName} visa (subclass {best.visaSubclass})
+                  </strong>
+                  . {best.reasons[0] || ''}
+                </p>
+                {second && (
+                  <p>
+                    A second option worth keeping open is the{' '}
+                    <strong className="text-ink dark:text-plate-ink">
+                      {second.visaName} visa (subclass {second.visaSubclass})
+                    </strong>
+                    . {second.reasons[0] || ''}
+                  </p>
+                )}
+                {best.gaps.length > 0 && (
+                  <div>
+                    <p className="mb-1.5">Before lodging, these need attention:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {best.gaps.map((g, i) => (
+                        <li key={i}>{g}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-[12px] text-ink-soft dark:text-plate-ink-soft pt-1">
+                  This summary is general information about visa pathways, not immigration advice. Eligibility is
+                  assessed by the Department of Home Affairs at lodgement.
+                </p>
+              </div>
             </div>
 
             {/* Visa options */}
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">
+              <h3 className="text-base font-bold text-ink dark:text-plate-ink mb-4">
                 Visa Eligibility Breakdown
               </h3>
               <div className="flex flex-col gap-3">
-                {report.visaOptions.map((visa) => {
+                {(showAllPathways ? sortedOptions : top3).map((visa) => {
                   const colors = verdictColors[visa.verdict] ?? verdictColors.needs_more_info;
                   const isQualified = visa.verdict === 'qualifies' || visa.verdict === 'possibly_qualifies';
                   return (
@@ -869,7 +974,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                         <span className={`text-[14.5px] font-bold tracking-tight ${colors.titleText}`}>
                           {visa.visaName}
                         </span>
-                        <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                        <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-paper-2 dark:bg-plate-card/60 text-ink-soft dark:text-plate-ink-soft uppercase tracking-wide">
                           SC-{visa.visaSubclass}
                         </span>
                         <span
@@ -883,7 +988,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                           so this reflects the verdict tier rather than an exact percentage. */}
                       {visa.verdict !== 'needs_more_info' && (
                         <div className="flex items-center gap-2.5 mt-3">
-                          <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-700/60 overflow-hidden">
+                          <div className="flex-1 h-1.5 rounded-full bg-paper-2 dark:bg-plate-card/60 overflow-hidden">
                             <div
                               className={`progress-fill h-full rounded-full ${colors.bar}`}
                               style={{ width: verdictBarWidth[visa.verdict] }}
@@ -894,14 +999,14 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
                       <div className="space-y-3 mt-3.5">
                         <div>
-                          <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 mb-1.5">
+                          <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink-soft dark:text-plate-ink-soft mb-1.5">
                             Why
                           </p>
                           <ul className="space-y-1">
                             {visa.reasons.map((reason, i) => (
                               <li
                                 key={i}
-                                className="text-[12.5px] text-slate-600 dark:text-slate-300 flex items-start gap-2 leading-relaxed"
+                                className="text-[12.5px] text-ink-soft dark:text-plate-ink-soft flex items-start gap-2 leading-relaxed"
                               >
                                 <span className="text-edamame-500 flex-shrink-0">·</span>
                                 {reason}
@@ -912,14 +1017,14 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
                         {visa.gaps.length > 0 && (
                           <div>
-                            <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 mb-1.5">
+                            <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink-soft dark:text-plate-ink-soft mb-1.5">
                               Gaps to Address
                             </p>
                             <ul className="space-y-1">
                               {visa.gaps.map((gap, i) => (
                                 <li
                                   key={i}
-                                  className="text-[12.5px] text-slate-600 dark:text-slate-300 flex items-start gap-2 leading-relaxed"
+                                  className="text-[12.5px] text-ink-soft dark:text-plate-ink-soft flex items-start gap-2 leading-relaxed"
                                 >
                                   <span className="text-amber-500 flex-shrink-0">!</span>
                                   {gap}
@@ -930,7 +1035,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                         )}
 
                         {isQualified && (
-                          <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+                          <div className="pt-3 border-t border-ink/15 dark:border-plate-ink/20">
                             <button
                               onClick={() => handleOpenCase(visa.visaSubclass)}
                               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-edamame-500 hover:bg-edamame-600 text-white text-[12.5px] font-bold rounded-lg transition-colors btn-press"
@@ -944,16 +1049,20 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   );
                 })}
               </div>
-            </div>
 
-            {/* Footer buttons */}
-            <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
-              <button
-                onClick={handleStartOver}
-                className="px-5 py-2.5 text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors btn-press"
-              >
-                Start Over
-              </button>
+              {rest.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllPathways((s) => !s)}
+                  className="flex items-center gap-1.5 mt-4 text-[13px] font-semibold text-edamame-600 dark:text-edamame-400 hover:text-edamame-700 dark:hover:text-edamame-300"
+                >
+                  <ChevronRight
+                    size={15}
+                    className={`transition-transform ${showAllPathways ? 'rotate-90' : ''}`}
+                  />
+                  {showAllPathways ? 'Hide' : 'Show'} the other {rest.length} pathway{rest.length === 1 ? '' : 's'} assessed
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -24,7 +24,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-paper dark:bg-plate flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-2xl">
         {/* Logo */}
         <div className="flex justify-center mb-8">
@@ -33,10 +33,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
         {/* Heading */}
         <div className="text-center mb-10">
-          <h1 className="font-ibm-sans text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+          <h1 className="font-ibm-sans text-3xl font-semibold text-ink dark:text-plate-ink mb-3">
             Welcome to Edamame
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 text-lg">
+          <p className="text-ink-soft dark:text-plate-ink-soft text-lg">
             Choose how you'd like to store your data to get started.
           </p>
         </div>
@@ -50,11 +50,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             onClick={() => setSelected('local')}
             className={`relative flex flex-col items-center text-center rounded-2xl border-2 p-8 transition-all duration-200
               ${!localStorageSupported
-                ? 'opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                ? 'opacity-50 cursor-not-allowed border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card'
                 : 'cursor-pointer ' + (
                   selected === 'local'
                     ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-950 shadow-lg ring-2 ring-edamame-500/30'
-                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-edamame-300 dark:hover:border-edamame-700 hover:shadow-md'
+                    : 'border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card hover:border-edamame-300 dark:hover:border-edamame-700 hover:shadow-md'
                 )
               }`}
           >
@@ -63,15 +63,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 ${
                   selected === 'local'
                     ? 'bg-edamame-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                    : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'
                 }`}
             >
               <HardDrive className="w-7 h-7" />
             </div>
-            <h2 className="font-ibm-sans text-xl font-medium text-gray-900 dark:text-white mb-2">
+            <h2 className="font-ibm-sans text-xl font-medium text-ink dark:text-plate-ink mb-2">
               Local Storage
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+            <p className="text-sm text-ink-soft dark:text-plate-ink-soft leading-relaxed">
               All data stays on this device. No account required. Full privacy compliance.
             </p>
             {!localStorageSupported && (
@@ -96,7 +96,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               ${
                 selected === 'cloud'
                   ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-950 shadow-lg ring-2 ring-edamame-500/30'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-edamame-300 dark:hover:border-edamame-700 hover:shadow-md'
+                  : 'border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card hover:border-edamame-300 dark:hover:border-edamame-700 hover:shadow-md'
               }`}
           >
             <div
@@ -104,15 +104,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 ${
                   selected === 'cloud'
                     ? 'bg-edamame-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                    : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'
                 }`}
             >
               <Cloud className="w-7 h-7" />
             </div>
-            <h2 className="font-ibm-sans text-xl font-medium text-gray-900 dark:text-white mb-2">
+            <h2 className="font-ibm-sans text-xl font-medium text-ink dark:text-plate-ink mb-2">
               Cloud Storage
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+            <p className="text-sm text-ink-soft dark:text-plate-ink-soft leading-relaxed">
               Multi-device access. Team collaboration. Requires account.
             </p>
             {selected === 'cloud' && (
@@ -135,7 +135,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               ${
                 selected && !submitting
                   ? 'bg-edamame-500 hover:bg-edamame-600 text-white shadow-md hover:shadow-lg cursor-pointer'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                  : 'bg-paper-2 dark:bg-plate-card text-ink-faint dark:text-plate-ink-faint cursor-not-allowed'
               }`}
           >
             {submitting ? 'Continuing...' : 'Continue'}
@@ -143,7 +143,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         </div>
 
         {/* Footer note */}
-        <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-8">
+        <p className="text-center text-xs text-ink-faint dark:text-plate-ink-faint mt-8">
           You can change this later in Settings.
         </p>
       </div>

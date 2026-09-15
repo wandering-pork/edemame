@@ -136,27 +136,27 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-sm animate-[fadeIn_.18s_ease-out]">
       <div
-        className="w-full max-w-2xl bg-white dark:bg-[#0F1113] shadow-2xl flex flex-col h-full border-l border-gray-200/60 dark:border-white/5 animate-[slideInRight_.28s_cubic-bezier(.32,.72,0,1)]"
+        className="w-full max-w-2xl bg-paper dark:bg-[#0F1113] shadow-2xl flex flex-col h-full border-l border-ink/15 dark:border-white/5 animate-[slideInRight_.28s_cubic-bezier(.32,.72,0,1)]"
       >
         {/* Header — eyebrow + title, no decorative box */}
-        <div className="px-7 pt-6 pb-5 border-b border-gray-100 dark:border-white/5">
+        <div className="px-7 pt-6 pb-5 border-b border-ink/10 dark:border-plate-ink/15 dark:border-white/5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-edamame-600 dark:text-edamame-400">
                 <span className="inline-block w-1 h-1 rounded-full bg-edamame-500" />
                 Subclass 820 · Submission Bundle
               </div>
-              <h2 className="mt-1.5 text-[22px] leading-tight font-extrabold tracking-[-0.02em] text-gray-900 dark:text-white">
+              <h2 className="mt-1.5 text-[22px] leading-tight font-extrabold tracking-[-0.02em] text-ink dark:text-plate-ink">
                 Per-slot ImmiAccount packages
               </h2>
-              <p className="mt-1 text-[13px] text-gray-500 dark:text-slate-400">
+              <p className="mt-1 text-[13px] text-ink-soft dark:text-plate-ink-soft">
                 One PDF per aspect of the relationship · auto-split at 5 MB · never mid-document
               </p>
             </div>
             <button
               onClick={onClose}
               aria-label="Close"
-              className="-mt-1 -mr-1 p-2 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+              className="-mt-1 -mr-1 p-2 rounded-lg text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 transition-colors"
             >
               <X size={18} strokeWidth={2.25} />
             </button>
@@ -166,12 +166,12 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-7 py-6 space-y-5">
           {empty && (
-            <div className="text-center py-16 px-6 border border-dashed border-gray-200 dark:border-white/10 rounded-2xl">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center text-gray-300 dark:text-slate-600">
+            <div className="text-center py-16 px-6 border border-dashed border-ink/15 dark:border-plate-ink/20 dark:border-white/10 rounded-2xl">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-paper-2 dark:bg-plate-card dark:bg-white/5 flex items-center justify-center text-ink-soft/40 dark:text-plate-ink-soft/40">
                 <Layers size={20} strokeWidth={1.5} />
               </div>
-              <p className="text-sm font-semibold text-gray-700 dark:text-slate-200">No PDFs to bundle yet</p>
-              <p className="text-[13px] text-gray-400 dark:text-slate-500 mt-1">
+              <p className="text-sm font-semibold text-ink-soft dark:text-plate-ink-soft">No PDFs to bundle yet</p>
+              <p className="text-[13px] text-ink-faint dark:text-plate-ink-faint mt-1">
                 Upload PDFs from the Documents tab — filenames are auto-tagged where possible.
               </p>
             </div>
@@ -233,8 +233,8 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                       isDone
                         ? 'border-edamame-200 dark:border-edamame-700/40 bg-white dark:bg-[#13161A]'
                         : isEmpty
-                          ? 'border-gray-150 dark:border-white/[0.06] bg-gray-50/40 dark:bg-white/[0.015]'
-                          : 'border-gray-200 dark:border-white/10 bg-white dark:bg-[#13161A] hover:border-gray-300 dark:hover:border-white/15'
+                          ? 'border-ink/10 dark:border-white/[0.06] bg-paper-2/60 dark:bg-plate-card/40 dark:bg-white/[0.015]'
+                          : 'border-ink/15 dark:border-plate-ink/20 dark:border-white/10 bg-white dark:bg-[#13161A] hover:border-ink/20 dark:hover:border-white/15'
                     }`}
                   >
                     {/* Binder-tab spine */}
@@ -249,7 +249,7 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                     <div className="flex items-center gap-4 pl-5 pr-4 py-4">
                       <div className="flex-1 min-w-0">
                         {/* Eyebrow: ImmiAccount field name */}
-                        <div className="text-[9.5px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-slate-500 truncate">
+                        <div className="text-[9.5px] font-bold uppercase tracking-[0.16em] text-ink-faint dark:text-plate-ink-faint truncate">
                           {meta.immiSlot}
                         </div>
                         {/* Aspect label */}
@@ -260,7 +260,7 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                           >
                             {meta.label}
                           </span>
-                          <span className="font-mono text-[11px] text-gray-400 dark:text-slate-500">
+                          <span className="font-mono text-[11px] text-ink-faint dark:text-plate-ink-faint">
                             {docs.length} doc{docs.length === 1 ? '' : 's'} · {formatBytes(totalSize)}
                           </span>
                           {willSplit && (
@@ -276,7 +276,7 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                         </div>
                         {/* Hint when empty */}
                         {isEmpty && (
-                          <p className="mt-1 text-[11.5px] text-gray-400 dark:text-slate-500 italic">
+                          <p className="mt-1 text-[11.5px] text-ink-faint dark:text-plate-ink-faint italic">
                             {meta.hint}
                           </p>
                         )}
@@ -288,10 +288,10 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                         disabled={isEmpty || isProcessing || blocked}
                         className={`flex-shrink-0 inline-flex items-center justify-center min-w-[78px] text-[11px] font-bold uppercase tracking-[0.08em] px-3.5 py-2 rounded-lg transition-all ${
                           isEmpty || blocked
-                            ? 'bg-gray-100 dark:bg-white/[0.04] text-gray-300 dark:text-slate-600 cursor-not-allowed'
+                            ? 'bg-paper-2 dark:bg-plate-card dark:bg-white/[0.04] text-ink-soft/40 dark:text-plate-ink-soft/40 cursor-not-allowed'
                             : isDone
                               ? 'bg-white dark:bg-white/5 border border-edamame-300 dark:border-edamame-700/50 text-edamame-700 dark:text-edamame-300 hover:bg-edamame-50 dark:hover:bg-edamame-500/10'
-                              : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-edamame-600 dark:hover:bg-edamame-500 dark:hover:text-white shadow-sm'
+                              : 'bg-ink dark:bg-plate-ink text-paper dark:text-plate hover:bg-edamame-600 dark:hover:bg-edamame-500 dark:hover:text-white shadow-sm'
                         }`}
                       >
                         {isProcessing ? (
@@ -302,7 +302,7 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
 
                     {/* Per-slot state strip */}
                     {isProcessing && (
-                      <div className="pl-5 pr-4 pb-3 -mt-1.5 text-[11.5px] text-gray-500 dark:text-slate-400 flex items-center gap-2 font-mono">
+                      <div className="pl-5 pr-4 pb-3 -mt-1.5 text-[11.5px] text-ink-soft dark:text-plate-ink-soft flex items-center gap-2 font-mono">
                         <Loader2 size={11} className="animate-spin text-edamame-500" />
                         {state.progress}
                       </div>
@@ -314,26 +314,26 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                       </div>
                     )}
                     {isDone && state.results && (
-                      <div className="border-t border-dashed border-gray-200 dark:border-white/10 px-5 py-2.5">
+                      <div className="border-t border-dashed border-ink/15 dark:border-plate-ink/20 dark:border-white/10 px-5 py-2.5">
                         {state.results.map((r, idx) => (
                           <div
                             key={r.filename}
                             className={`group flex items-center gap-3 py-1.5 ${
-                              idx > 0 ? 'border-t border-gray-100 dark:border-white/5' : ''
+                              idx > 0 ? 'border-t border-ink/10 dark:border-plate-ink/15 dark:border-white/5' : ''
                             }`}
                           >
                             <CheckCircle size={12} className="text-edamame-500 flex-shrink-0" strokeWidth={2.5} />
-                            <span className="font-mono text-[11.5px] text-gray-700 dark:text-slate-200 truncate flex-1">
+                            <span className="font-mono text-[11.5px] text-ink-soft dark:text-plate-ink-soft truncate flex-1">
                               {r.filename}
                             </span>
-                            <span className="font-mono text-[11px] text-gray-400 dark:text-slate-500 flex-shrink-0 tabular-nums">
+                            <span className="font-mono text-[11px] text-ink-faint dark:text-plate-ink-faint flex-shrink-0 tabular-nums">
                               {formatBytes(r.size)}
                             </span>
                             <button
                               type="button"
                               onClick={() => triggerDownload(r.url, r.filename)}
                               title="Download"
-                              className="p-1.5 rounded text-gray-400 hover:text-edamame-600 dark:hover:text-edamame-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                              className="p-1.5 rounded text-ink-faint dark:text-plate-ink-faint hover:text-edamame-600 dark:hover:text-edamame-400 hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 transition-colors"
                             >
                               <Download size={13} />
                             </button>
@@ -350,20 +350,20 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
 
         {/* Footer */}
         {!empty && (
-          <div className="px-7 py-4 border-t border-gray-100 dark:border-white/5 bg-gray-50/60 dark:bg-black/20 backdrop-blur-sm">
+          <div className="px-7 py-4 border-t border-ink/10 dark:border-plate-ink/15 dark:border-white/5 bg-paper-2/60 dark:bg-plate-card/40 dark:bg-black/20 backdrop-blur-sm">
             <div className="flex items-center gap-4">
               <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-slate-500">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint dark:text-plate-ink-faint">
                   Ready to package
                 </div>
-                <div className="mt-0.5 font-mono text-[12px] text-gray-700 dark:text-slate-300 tabular-nums">
+                <div className="mt-0.5 font-mono text-[12px] text-ink-soft dark:text-plate-ink-soft tabular-nums">
                   {totalTagged} doc{totalTagged === 1 ? '' : 's'} · {populatedSlots} slot{populatedSlots === 1 ? '' : 's'}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="text-[12px] font-semibold px-3.5 py-2 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                className="text-[12px] font-semibold px-3.5 py-2 rounded-lg text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 transition-colors"
               >
                 Close
               </button>
@@ -371,7 +371,7 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
                 type="button"
                 onClick={buildAll}
                 disabled={blocked || totalTagged === 0}
-                className="inline-flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.08em] px-4 py-2 rounded-lg bg-edamame-500 text-white hover:bg-edamame-600 disabled:bg-gray-200 dark:disabled:bg-white/[0.04] disabled:text-gray-400 dark:disabled:text-slate-600 disabled:cursor-not-allowed transition-colors shadow-sm shadow-edamame-500/25 disabled:shadow-none"
+                className="inline-flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.08em] px-4 py-2 rounded-lg bg-edamame-500 text-white hover:bg-edamame-600 disabled:bg-paper-2 dark:bg-plate-card dark:disabled:bg-white/[0.04] disabled:text-ink-faint dark:text-plate-ink-faint dark:disabled:text-ink-soft dark:text-plate-ink-soft disabled:cursor-not-allowed transition-colors shadow-sm shadow-edamame-500/25 disabled:shadow-none"
                 title={blocked ? 'Resolve untagged documents first' : 'Build a bundle for every populated slot in sequence'}
               >
                 <Layers size={13} strokeWidth={2.25} />

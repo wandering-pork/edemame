@@ -71,7 +71,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
     const [stepsOpen, setStepsOpen] = useState(false);
     const steps = template.steps || [];
     return (
-      <div className="card-lift bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+      <div className="card-lift bg-paper-2 dark:bg-plate-card rounded-xl border border-ink/15 dark:border-plate-ink/20 overflow-hidden">
         {/* Accent top bar */}
         <div className={`h-1 w-full ${accent.bar}`} />
         <div className="p-5">
@@ -81,13 +81,13 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
             </div>
             <div className="flex items-center gap-1.5">
               {isSystem ? (
-                <span className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.1em]">
+                <span className="text-[9px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.1em]">
                   System
                 </span>
               ) : (
                 <button
                   onClick={() => onDeleteTemplate(template.id)}
-                  className="p-1.5 text-gray-300 dark:text-slate-700 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                  className="p-1.5 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
                   aria-label="Delete template"
                 >
                   <Trash2 size={15} />
@@ -95,15 +95,15 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
               )}
             </div>
           </div>
-          <h3 className="font-bold text-gray-900 dark:text-white text-[14.5px] tracking-tight mt-3 leading-snug">
+          <h3 className="font-bold text-ink dark:text-plate-ink text-[14.5px] tracking-tight mt-3 leading-snug">
             {template.title}
           </h3>
           {template.visaSubclass && (
-            <p className="text-[11px] font-semibold text-gray-400 dark:text-slate-500 mt-0.5">
+            <p className="text-[11px] font-semibold text-ink-faint dark:text-plate-ink-faint mt-0.5">
               Subclass {template.visaSubclass}
             </p>
           )}
-          <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed mt-2 line-clamp-3">
+          <p className="text-xs text-ink-soft dark:text-plate-ink-soft leading-relaxed mt-2 line-clamp-3">
             {template.description}
           </p>
 
@@ -111,23 +111,23 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
             <div>
               <button
                 onClick={() => setStepsOpen(v => !v)}
-                className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-500 dark:text-slate-400 hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors mt-3.5 select-none"
+                className="flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors mt-3.5 select-none"
               >
                 <List size={13} strokeWidth={1.8} />
                 {steps.length} steps
                 {stepsOpen ? <ChevronUp size={13} strokeWidth={1.8} /> : <ChevronDown size={13} strokeWidth={1.8} />}
               </button>
               {stepsOpen && (
-                <ol className="mt-2.5 border-t border-gray-100 dark:border-slate-800">
+                <ol className="mt-2.5 border-t border-ink/10 dark:border-plate-ink/15">
                   {steps.map((step, i) => (
-                    <li key={i} className="flex gap-2.5 items-baseline py-1.5 border-b border-gray-100 dark:border-slate-800">
-                      <span className="flex-shrink-0 w-4 text-[10px] font-extrabold text-gray-400 dark:text-slate-500">
+                    <li key={i} className="flex gap-2.5 items-baseline py-1.5 border-b border-ink/10 dark:border-plate-ink/15">
+                      <span className="flex-shrink-0 w-4 text-[10px] font-extrabold text-ink-faint dark:text-plate-ink-faint">
                         {String(i + 1).padStart(2, '0')}
                       </span>
-                      <span className="text-xs text-gray-600 dark:text-slate-300 leading-snug">
+                      <span className="text-xs text-ink-soft dark:text-plate-ink-soft leading-snug">
                         {step.title}
                         {step.description && (
-                          <span className="text-gray-400 dark:text-slate-500"> — {step.description}</span>
+                          <span className="text-ink-faint dark:text-plate-ink-faint"> — {step.description}</span>
                         )}
                       </span>
                     </li>
@@ -142,15 +142,15 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
   };
 
   return (
-    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200 page-enter">
+    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-paper dark:bg-plate min-h-screen transition-colors duration-200 page-enter">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-[26px] font-extrabold text-gray-900 dark:text-white font-ibm-serif tracking-tight">
+            <h1 className="text-[26px] font-extrabold text-ink dark:text-plate-ink font-ibm-serif tracking-tight">
               Workflow Templates
             </h1>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+            <p className="text-sm text-ink-soft dark:text-plate-ink-soft mt-1">
               Define standard procedures for different visa types.
             </p>
           </div>
@@ -167,24 +167,24 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
 
       {/* Create form */}
       {isEditing && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-edamame/20 dark:border-edamame/15 p-6 mb-8 modal-content">
+        <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-sm border border-edamame/20 dark:border-edamame/15 p-6 mb-8 modal-content">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 flex items-center justify-center">
                 <Sparkles size={16} />
               </div>
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">Create New Template</h3>
+              <h3 className="text-base font-bold text-ink dark:text-plate-ink">Create New Template</h3>
             </div>
             <button
               onClick={() => setIsEditing(false)}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card transition-colors"
             >
               <X size={16} />
             </button>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-bold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wider mb-1.5">
                 Template Title
               </label>
               <input
@@ -192,14 +192,14 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
                 value={newTemplate.title}
                 onChange={e => setNewTemplate({ ...newTemplate, title: e.target.value })}
                 placeholder="e.g. 190 Visa Application — Standard"
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm focus:border-edamame/50 dark:focus:border-edamame/30 text-gray-900 dark:text-white outline-none transition-colors placeholder-gray-400 dark:placeholder-slate-600"
+                className="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl text-sm focus:border-edamame/50 dark:focus:border-edamame/30 text-ink dark:text-plate-ink outline-none transition-colors placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-bold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wider mb-1.5">
                 Process Description
               </label>
-              <p className="text-xs text-gray-400 dark:text-slate-500 mb-2">
+              <p className="text-xs text-ink-faint dark:text-plate-ink-faint mb-2">
                 Describe the steps — the AI will use this to generate specific tasks.
               </p>
               <textarea
@@ -207,14 +207,14 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
                 onChange={e => setNewTemplate({ ...newTemplate, description: e.target.value })}
                 rows={4}
                 placeholder="1. Gather ID documents. 2. Request skills assessment. 3. Submit EOI..."
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm focus:border-edamame/50 dark:focus:border-edamame/30 text-gray-900 dark:text-white outline-none transition-colors placeholder-gray-400 dark:placeholder-slate-600 resize-none"
+                className="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl text-sm focus:border-edamame/50 dark:focus:border-edamame/30 text-ink dark:text-plate-ink outline-none transition-colors placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50 resize-none"
               />
             </div>
             <div className="flex justify-end gap-2.5 pt-1">
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-xl transition-colors"
               >
                 Cancel
               </button>
@@ -233,8 +233,8 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
       {systemTemplates.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center gap-2.5 mb-3">
-            <span className="w-[22px] h-px bg-gray-300 dark:bg-slate-700" />
-            <span className="text-[9.5px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.12em]">
+            <span className="w-[22px] h-px bg-ink/20 dark:bg-plate-ink/20" />
+            <span className="text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.12em]">
               Built-in Templates
             </span>
           </div>
@@ -250,8 +250,8 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
       {userTemplates.length > 0 && (
         <div>
           <div className="flex items-center gap-2.5 mb-3">
-            <span className="w-[22px] h-px bg-gray-300 dark:bg-slate-700" />
-            <span className="text-[9.5px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-[0.12em]">
+            <span className="w-[22px] h-px bg-ink/20 dark:bg-plate-ink/20" />
+            <span className="text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.12em]">
               Custom Templates
             </span>
           </div>
@@ -265,7 +265,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, onAddTemplate, 
 
         {templates.length === 0 && (
           <div className="text-center py-20">
-            <div className="flex flex-col items-center gap-3 text-gray-400 dark:text-slate-600">
+            <div className="flex flex-col items-center gap-3 text-ink-faint dark:text-plate-ink-faint">
               <FileText size={36} className="opacity-25" />
               <p className="text-sm">No templates yet. Create your first template to get started.</p>
             </div>

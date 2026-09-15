@@ -79,19 +79,19 @@ export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, vis
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-100 dark:border-slate-800 overflow-hidden">
+      <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl w-full max-w-lg border border-ink/10 dark:border-plate-ink/15 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-slate-800">
+        <div className="flex items-center justify-between p-5 border-b border-ink/10 dark:border-plate-ink/15">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 flex items-center justify-center">
               <Package size={16} />
             </div>
             <div>
-              <h3 className="font-bold text-gray-900 dark:text-white text-sm">5MB Crusher</h3>
-              <p className="text-xs text-gray-400 dark:text-slate-500">Bundle & compress for ImmiAccount</p>
+              <h3 className="font-bold text-ink dark:text-plate-ink text-sm">5MB Crusher</h3>
+              <p className="text-xs text-ink-faint dark:text-plate-ink-faint">Bundle & compress for ImmiAccount</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-lg text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -99,17 +99,17 @@ export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, vis
         <div className="p-5 space-y-4">
           {/* Document selection */}
           {pdfDocs.length === 0 ? (
-            <div className="text-center py-6 text-gray-400 dark:text-slate-500 text-sm">
+            <div className="text-center py-6 text-ink-faint dark:text-plate-ink-faint text-sm">
               No PDF documents uploaded for this case yet.
             </div>
           ) : (
             <div>
-              <div className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+              <div className="text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-2">
                 Select PDFs to include
               </div>
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
                 {pdfDocs.map(doc => (
-                  <label key={doc.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+                  <label key={doc.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-paper-2 dark:hover:bg-plate/50 cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={selected.has(doc.id)}
@@ -117,8 +117,8 @@ export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, vis
                       className="w-4 h-4 text-edamame-500 rounded"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm text-gray-700 dark:text-slate-300 truncate">{doc.fileName}</div>
-                      <div className="text-xs text-gray-400 dark:text-slate-500">{formatBytes(doc.fileSize)} → {immiAccountName(doc)}</div>
+                      <div className="text-sm text-ink-soft dark:text-plate-ink-soft truncate">{doc.fileName}</div>
+                      <div className="text-xs text-ink-faint dark:text-plate-ink-faint">{formatBytes(doc.fileSize)} → {immiAccountName(doc)}</div>
                     </div>
                   </label>
                 ))}
@@ -128,7 +128,7 @@ export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, vis
 
           {/* Status */}
           {status === 'processing' && (
-            <div className="flex items-center gap-2.5 text-sm text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-800/50 rounded-lg px-3 py-2.5">
+            <div className="flex items-center gap-2.5 text-sm text-ink-soft dark:text-plate-ink-soft bg-paper-2 dark:bg-plate-card/50 rounded-lg px-3 py-2.5">
               <Loader2 size={16} className="animate-spin text-edamame-500 flex-shrink-0" />
               {progress}
             </div>
@@ -158,8 +158,8 @@ export const PdfPackager: React.FC<PdfPackagerProps> = ({ caseId, documents, vis
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2.5 p-5 border-t border-gray-100 dark:border-slate-800">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
+        <div className="flex gap-2.5 p-5 border-t border-ink/10 dark:border-plate-ink/15">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-xl transition-colors">
             Cancel
           </button>
           {status === 'done' && result ? (

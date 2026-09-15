@@ -16,6 +16,15 @@
               'ibm-sans': ['Archivo', '"Helvetica Neue"', 'Helvetica', 'Arial', 'system-ui', 'sans-serif'],
               sans: ['Archivo', '"Helvetica Neue"', 'Helvetica', 'Arial', 'system-ui', 'sans-serif'],
               display: ['"Archivo Black"', 'Archivo', 'system-ui', 'sans-serif'],
+              // Editorial type roles ported from LandingPage's "Chaptered
+              // Editorial" register (see the .fl-* CSS variables there),
+              // for aligning the logged-in app's own visual language —
+              // serif for section headings, IBM Plex Mono strictly for
+              // machine-readable values (codes, dates, IDs), JetBrains Mono
+              // reserved for AI-attributed values.
+              serif: ['Fraunces', 'Georgia', '"Times New Roman"', 'serif'],
+              mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+              'mono-ai': ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
             },
             colors: {
               slate: {
@@ -41,6 +50,30 @@
               'status-warning': '#F59E0B',
               'status-danger': '#EF4444',
               'status-info': '#3B82F6',
+              // Editorial surface/ink palette ported from LandingPage's
+              // --paper/--ink/--plate CSS variables, additive to the
+              // existing edamame/slate system so the landing page's
+              // self-contained .fl-* styles are unaffected.
+              paper: {
+                DEFAULT: '#F1F3EF',
+                2: '#E7EBE4',
+              },
+              ink: {
+                DEFAULT: '#101614',
+                soft: '#56635C',
+                // Solid (non-opacity) low-emphasis tier for micro-labels/timestamps —
+                // 3.5-3.8:1 contrast on paper/paper-2. Never use ink-soft with an
+                // opacity modifier for real text: it silently breaks contrast as
+                // backgrounds vary. See CLAUDE.md-adjacent design review notes.
+                faint: '#737E77',
+              },
+              plate: {
+                DEFAULT: '#0D1A13',
+                ink: '#EDF2EC',
+                'ink-soft': '#A2B7AA',
+                'ink-faint': '#718479',
+                card: '#17251E',
+              },
             }
           }
         }
@@ -49,16 +82,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700;800;900&family=Archivo+Black&display=swap" rel="stylesheet">
-    <!-- Fraunces (display), IBM Plex Mono (data) and JetBrains Mono (AI accent)
-         are used only by the LandingPage marketing page
-         (src/pages/LandingPage.tsx), which is set as a chaptered editorial
-         spread. Its type roles are deliberate: serif for display, Archivo
-         (the brand face, loaded above) for prose and UI, IBM Plex Mono
-         strictly for machine-readable values — subclass codes, document type
-         codes, day offsets, file paths, docket numbers — and JetBrains Mono
-         (the typeface most associated with AI coding tools, e.g. GitHub
-         Copilot/Cursor) for the single word that names what the AI actually
-         did to the case. Nothing else in the app loads any of these faces.
+    <!-- Fraunces (display/serif), IBM Plex Mono (data) and JetBrains Mono
+         (AI accent) originated in the LandingPage marketing page
+         (src/pages/LandingPage.tsx), set as a chaptered editorial spread,
+         and are now shared app-wide (see `serif`/`mono`/`mono-ai` in the
+         Tailwind config above) so the logged-in app's visual language
+         aligns with it. Type roles are deliberate: serif for section
+         headings, Archivo (the brand face, loaded above) for prose and UI,
+         IBM Plex Mono strictly for machine-readable values — subclass
+         codes, document type codes, day offsets, file paths, docket
+         numbers, dates in data-dense views — and JetBrains Mono (the
+         typeface most associated with AI coding tools, e.g. GitHub
+         Copilot/Cursor) reserved for values the AI generated/touched.
          Fraunces is variable on optical size and weight, so headings carry
          real 600/700 weights rather than a synthesised bold. -->
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">

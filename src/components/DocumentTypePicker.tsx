@@ -71,28 +71,28 @@ export const DocumentTypePicker: React.FC<DocumentTypePickerProps> = ({
         } ${
           invalid
             ? 'border-red-400 dark:border-red-500/60 bg-red-50/60 dark:bg-red-900/10'
-            : 'border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 hover:border-edamame'
+            : 'border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card hover:border-edamame'
         }`}
       >
-        <Tag size={compact ? 10 : 12} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
+        <Tag size={compact ? 10 : 12} className="text-ink-faint dark:text-plate-ink-faint flex-shrink-0" />
         {selected ? (
           <>
-            <span className="font-mono font-bold text-gray-800 dark:text-slate-200 flex-shrink-0">{selected.code}</span>
-            <span className="text-gray-500 dark:text-slate-400 truncate">{selected.description}</span>
+            <span className="font-mono font-bold text-ink dark:text-plate-ink-soft flex-shrink-0">{selected.code}</span>
+            <span className="text-ink-soft dark:text-plate-ink-soft truncate">{selected.description}</span>
           </>
         ) : value ? (
           // A code with no matching row (the firm deleted the type after tagging).
           <span className="font-mono font-bold text-amber-600 dark:text-amber-400">{value}</span>
         ) : (
-          <span className="text-gray-400 dark:text-slate-500 truncate">{placeholder}</span>
+          <span className="text-ink-faint dark:text-plate-ink-faint truncate">{placeholder}</span>
         )}
-        <ChevronDown size={compact ? 11 : 13} className="ml-auto text-gray-400 dark:text-slate-500 flex-shrink-0" />
+        <ChevronDown size={compact ? 11 : 13} className="ml-auto text-ink-faint dark:text-plate-ink-faint flex-shrink-0" />
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 z-50 mt-1 min-w-[260px] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-200 dark:border-slate-800 overflow-hidden modal-content">
-          <div className="relative border-b border-gray-100 dark:border-slate-800">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-slate-600" />
+        <div className="absolute left-0 right-0 z-50 mt-1 min-w-[260px] bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/15 dark:border-plate-ink/20 overflow-hidden modal-content">
+          <div className="relative border-b border-ink/10 dark:border-plate-ink/15">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft/40 dark:text-plate-ink-soft/40" />
             <input
               ref={inputRef}
               value={query}
@@ -106,12 +106,12 @@ export const DocumentTypePicker: React.FC<DocumentTypePickerProps> = ({
                 }
               }}
               placeholder="Search by code or description…"
-              className="w-full pl-8 pr-3 py-2.5 bg-transparent text-[12px] text-gray-800 dark:text-slate-200 outline-none"
+              className="w-full pl-8 pr-3 py-2.5 bg-transparent text-[12px] text-ink dark:text-plate-ink-soft outline-none"
             />
           </div>
           <div className="max-h-64 overflow-y-auto custom-scrollbar py-1">
             {groups.length === 0 ? (
-              <div className="px-3 py-6 text-center text-[11.5px] text-gray-400 dark:text-slate-500">
+              <div className="px-3 py-6 text-center text-[11.5px] text-ink-faint dark:text-plate-ink-faint">
                 No document type matches "{query}". Use{' '}
                 <button type="button" onClick={() => pick(OTHER_DOCUMENT_TYPE_CODE)} className="font-bold text-edamame hover:underline">
                   {OTHER_DOCUMENT_TYPE_CODE} — Other
@@ -121,7 +121,7 @@ export const DocumentTypePicker: React.FC<DocumentTypePickerProps> = ({
             ) : (
               groups.map(([category, types]) => (
                 <div key={category}>
-                  <div className="px-3 pt-2 pb-1 text-[9.5px] font-bold uppercase tracking-[0.1em] text-gray-400 dark:text-slate-500">
+                  <div className="px-3 pt-2 pb-1 text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink-faint dark:text-plate-ink-faint">
                     {category}
                   </div>
                   {types.map(t => (
@@ -129,12 +129,12 @@ export const DocumentTypePicker: React.FC<DocumentTypePickerProps> = ({
                       key={t.id}
                       type="button"
                       onClick={() => pick(t.code)}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors ${
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-paper-2 dark:hover:bg-plate transition-colors ${
                         t.code === value ? 'bg-edamame/[0.06] dark:bg-edamame/[0.08]' : ''
                       }`}
                     >
-                      <span className="font-mono text-[11px] font-bold text-gray-700 dark:text-slate-300 w-14 flex-shrink-0">{t.code}</span>
-                      <span className="text-[11.5px] text-gray-600 dark:text-slate-400 truncate flex-1">{t.description}</span>
+                      <span className="font-mono text-[11px] font-bold text-ink-soft dark:text-plate-ink-soft w-14 flex-shrink-0">{t.code}</span>
+                      <span className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft truncate flex-1">{t.description}</span>
                       {t.autoLink && (
                         <span
                           title="Auto-link is on for this Document Type"
@@ -166,7 +166,7 @@ export const DocumentTypeBadge: React.FC<{ code?: string; className?: string }> 
       title={type ? `${type.code} — ${type.description}` : `${code} — this Document Type is no longer configured`}
       className={`inline-flex items-center font-mono text-[9.5px] font-bold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md ${
         type
-          ? 'bg-slate-500/[0.13] text-slate-600 dark:text-slate-300'
+          ? 'bg-slate-500/[0.13] text-ink-soft dark:text-plate-ink-soft'
           : 'bg-amber-500/[0.13] text-amber-700 dark:text-amber-400'
       } ${className}`}
     >

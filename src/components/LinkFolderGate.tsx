@@ -31,7 +31,7 @@ export const LinkFolderGate: React.FC<LinkFolderGateProps> = ({ status, supporte
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-paper dark:bg-plate flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-md text-center">
         <div className="flex justify-center mb-8">
           <LogoBrand />
@@ -43,20 +43,20 @@ export const LinkFolderGate: React.FC<LinkFolderGateProps> = ({ status, supporte
 
         {!supported ? (
           <>
-            <h1 className="font-ibm-sans text-xl font-medium text-gray-900 dark:text-white mb-2">
+            <h1 className="font-ibm-sans text-xl font-medium text-ink dark:text-plate-ink mb-2">
               Browser not supported
             </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-ink-soft dark:text-plate-ink-soft">
               Local storage mode needs the File System Access API, currently only available in Chrome and Edge.
               Please switch browsers to continue.
             </p>
           </>
         ) : status === 'needs-permission' ? (
           <>
-            <h1 className="font-ibm-sans text-xl font-medium text-gray-900 dark:text-white mb-2">
+            <h1 className="font-ibm-sans text-xl font-medium text-ink dark:text-plate-ink mb-2">
               Reconnect your data folder
             </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-sm text-ink-soft dark:text-plate-ink-soft mb-6">
               {linkedFolderName ? <>Your browser needs permission to access <strong>{linkedFolderName}</strong> again.</> : 'Your browser needs permission to access your linked folder again.'}
             </p>
             <button
@@ -71,10 +71,10 @@ export const LinkFolderGate: React.FC<LinkFolderGateProps> = ({ status, supporte
           </>
         ) : (
           <>
-            <h1 className="font-ibm-sans text-xl font-medium text-gray-900 dark:text-white mb-2">
+            <h1 className="font-ibm-sans text-xl font-medium text-ink dark:text-plate-ink mb-2">
               Link your data folder
             </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-sm text-ink-soft dark:text-plate-ink-soft mb-6">
               Choose a folder on this device — your clients, cases, and tasks will be stored there as files. Put it
               inside Dropbox, OneDrive, or iCloud Drive to keep it in sync across your machines.
             </p>

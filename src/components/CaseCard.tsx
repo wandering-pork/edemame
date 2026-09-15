@@ -55,7 +55,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({
 
   return (
     <div
-      className={`relative group overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-200 hover:shadow-lg hover:scale-[1.01] card-lift cursor-pointer ${className}`}
+      className={`relative group overflow-hidden rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card transition-all duration-200 hover:shadow-lg hover:scale-[1.01] card-lift cursor-pointer ${className}`}
       onClick={() => onViewDetails(caseData.id)}
     >
       <StatusCardBorder status={status} />
@@ -64,14 +64,14 @@ export const CaseCard: React.FC<CaseCardProps> = ({
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div className="flex-1 pr-4">
-            <h3 className="text-lg font-ibm-serif font-bold text-slate-900 dark:text-white mb-1">
+            <h3 className="text-lg font-ibm-serif font-bold text-ink dark:text-plate-ink mb-1">
               {caseData.title}
             </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-ink-soft dark:text-plate-ink-soft">
               {client.name} • DOB {client.dob || 'N/A'}
             </p>
             {applicant && applicant.id !== client.id && (
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+              <p className="text-xs text-ink-faint dark:text-plate-ink-faint mt-0.5">
                 Applicant: {applicant.name}
               </p>
             )}
@@ -79,13 +79,13 @@ export const CaseCard: React.FC<CaseCardProps> = ({
           <div className="flex items-center gap-2 flex-shrink-0">
             {owner ? (
               <div
-                className="flex items-center gap-2 px-2 py-1 rounded-full bg-slate-50 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600"
+                className="flex items-center gap-2 px-2 py-1 rounded-full bg-paper-2 dark:bg-plate-card/60 border border-ink/15 dark:border-plate-ink/20"
                 title={`Owned by ${owner.name}`}
               >
                 <div className="w-6 h-6 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center text-[10px] font-bold">
                   {owner.avatar || owner.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                 </div>
-                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 max-w-[80px] truncate">
+                <span className="text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft max-w-[80px] truncate">
                   {owner.name.split(' ')[0]}
                 </span>
               </div>
@@ -93,13 +93,13 @@ export const CaseCard: React.FC<CaseCardProps> = ({
               onAssignClick && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onAssignClick(caseData.id); }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-dashed border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-edamame-500 hover:text-edamame-500 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-dashed border-ink/20 dark:border-plate-ink/25 text-ink-soft dark:text-plate-ink-soft hover:border-edamame-500 hover:text-edamame-500 transition-colors"
                 >
                   <UserPlus size={11} /> Assign
                 </button>
               )
             )}
-            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-edamame-500 transition-colors" />
+            <ChevronRight className="w-5 h-5 text-ink-faint dark:text-plate-ink-faint group-hover:text-edamame-500 transition-colors" />
           </div>
         </div>
 
@@ -115,18 +115,18 @@ export const CaseCard: React.FC<CaseCardProps> = ({
           {/* Case info */}
           <div className="space-y-3">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+              <p className="text-xs font-semibold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wide mb-1">
                 Progress
               </p>
-              <p className="text-sm text-slate-700 dark:text-slate-300">
+              <p className="text-sm text-ink-soft dark:text-plate-ink-soft">
                 {completedTasks}/{totalTasks} tasks done
               </p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+              <p className="text-xs font-semibold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wide mb-1">
                 Duration
               </p>
-              <p className="text-sm text-slate-700 dark:text-slate-300">
+              <p className="text-sm text-ink-soft dark:text-plate-ink-soft">
                 {daysInProgress} days in progress
               </p>
             </div>
@@ -136,13 +136,13 @@ export const CaseCard: React.FC<CaseCardProps> = ({
           <div className="space-y-3">
             <StatusBadge status={status} />
             {nextTask && (
-              <div className="flex items-start gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-700/50">
+              <div className="flex items-start gap-2 p-2.5 rounded-lg bg-paper-2 dark:bg-plate-card/50">
                 <Calendar className="w-4 h-4 text-edamame-500 flex-shrink-0 mt-0.5" />
                 <div className="text-xs">
-                  <p className="font-semibold text-slate-900 dark:text-white line-clamp-1">
+                  <p className="font-semibold text-ink dark:text-plate-ink line-clamp-1">
                     {nextTask.title}
                   </p>
-                  <p className="text-slate-600 dark:text-slate-400">
+                  <p className="text-ink-soft dark:text-plate-ink-soft">
                     Due: {format(new Date(nextTask.date), 'MMM d')}
                   </p>
                 </div>
