@@ -36,7 +36,7 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
           fill="none"
           stroke="currentColor"
           strokeWidth={strokeWidth}
-          className="text-slate-200 dark:text-slate-700"
+          className="text-ink-soft/30 dark:text-plate-ink-soft/30"
         />
         {/* Progress circle */}
         <circle
@@ -54,7 +54,7 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
       </svg>
       {/* Center text */}
       <div className="absolute flex flex-col items-center">
-        <span className="text-2xl font-bold text-slate-900 dark:text-white font-ibm-serif">
+        <span className="text-2xl font-bold text-ink dark:text-plate-ink font-ibm-serif">
           {displayPercentage}%
         </span>
       </div>

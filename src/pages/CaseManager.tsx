@@ -191,15 +191,15 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   }
 
   return (
-    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-white dark:bg-slate-900 min-h-screen transition-colors duration-200 page-enter">
+    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-paper dark:bg-plate min-h-screen transition-colors duration-200 page-enter">
       <div className="max-w-[1440px] mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <h1 className="text-[26px] md:text-[27px] font-extrabold tracking-[-0.035em] text-gray-900 dark:text-slate-100">
+            <h1 className="font-serif text-[28px] md:text-[29px] font-semibold tracking-[-0.02em] text-ink dark:text-plate-ink">
               Case Manager
             </h1>
-            <p className="text-[13px] text-gray-500 dark:text-slate-400 mt-1">
+            <p className="text-[13px] text-ink-soft dark:text-plate-ink-soft mt-1">
               Track and manage all immigration cases at a glance
             </p>
           </div>
@@ -207,7 +207,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
             <button
               onClick={() => setShowConfigurations(true)}
               title="Case Manager configurations — document types and other module settings"
-              className="btn-press focus-ring flex items-center justify-center gap-1.5 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:border-edamame-500 hover:text-edamame-600 dark:hover:text-edamame-400 px-4 py-2.5 rounded-xl font-bold transition-colors text-[13px] whitespace-nowrap"
+              className="btn-press focus-ring flex items-center justify-center gap-1.5 border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame-500 hover:text-edamame-600 dark:hover:text-edamame-400 px-4 py-2.5 rounded-xl font-bold transition-colors text-[13px] whitespace-nowrap"
             >
               <Settings2 size={16} strokeWidth={1.8} />
               Configurations
@@ -226,13 +226,13 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
 
         {/* Search bar */}
         <div className="relative max-w-md mt-6">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" size={17} strokeWidth={1.8} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint dark:text-plate-ink-faint" size={17} strokeWidth={1.8} />
           <input
             type="text"
             placeholder="Search cases, clients..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="focus-ring w-full pl-11 pr-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 focus:border-edamame-500 dark:focus:border-edamame-500 rounded-xl text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 outline-none transition-colors text-[13px]"
+            className="focus-ring w-full pl-11 pr-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 focus:border-edamame-500 dark:focus:border-edamame-500 rounded-xl text-ink dark:text-plate-ink placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50 outline-none transition-colors text-[13px]"
           />
         </div>
 
@@ -245,13 +245,13 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
               className={`btn-press px-3.5 py-1.5 rounded-full border text-[12px] font-semibold transition-colors whitespace-nowrap ${
                 statusFilter === f.key
                   ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-900/20 text-edamame-700 dark:text-edamame-400'
-                  : 'border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-500 dark:text-slate-400 hover:border-edamame-500'
+                  : 'border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame-500'
               }`}
             >
               {f.label}
             </button>
           ))}
-          <span className="ml-auto text-[12px] text-gray-400 dark:text-slate-500 whitespace-nowrap">
+          <span className="ml-auto text-[12px] text-ink-faint dark:text-plate-ink-faint whitespace-nowrap">
             {filteredRows.length} {filteredRows.length === 1 ? 'case' : 'cases'}
             {searchTerm && <span className="ml-1 italic">matching "{searchTerm}"</span>}
           </span>
@@ -260,14 +260,14 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
         {/* Cases list */}
         {filteredRows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24">
-            <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center mb-4">
-              <FileText size={32} className="text-gray-400 dark:text-slate-600" strokeWidth={1.8} />
+            <div className="w-16 h-16 rounded-full bg-paper-2 dark:bg-plate-card flex items-center justify-center mb-4">
+              <FileText size={32} className="text-ink-soft/40 dark:text-plate-ink-soft/40" strokeWidth={1.8} />
             </div>
-            <h3 className="text-base font-bold text-gray-900 dark:text-slate-100 mb-1">No cases found</h3>
-            <p className="text-gray-500 dark:text-slate-400 text-sm">Try adjusting your search or filters, or create a new case</p>
+            <h3 className="text-base font-bold text-ink dark:text-plate-ink mb-1">No cases found</h3>
+            <p className="text-ink-soft dark:text-plate-ink-soft text-sm">Try adjusting your search or filters, or create a new case</p>
           </div>
         ) : (
-          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden mt-4">
+          <div className="bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl overflow-hidden mt-4">
             {filteredRows.map((r) => {
               const c = r.case;
               const client = r.client;
@@ -279,7 +279,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                 <div
                   key={c.id}
                   onClick={() => handleViewDetails(c.id)}
-                  className="table-row-hover hover:bg-gray-50 dark:hover:bg-slate-800/60 relative flex items-center gap-4 px-5 pl-6 py-[15px] border-b border-gray-100 dark:border-slate-800 last:border-b-0"
+                  className="table-row-hover hover:bg-paper-2 dark:hover:bg-plate/60 relative flex items-center gap-4 px-5 pl-6 py-[15px] border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0"
                 >
                   {/* Status edge */}
                   <div
@@ -301,17 +301,17 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                   {/* Case type + client info */}
                   <div className="flex-[1.6] min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold tracking-[-0.015em] text-gray-900 dark:text-slate-100 whitespace-nowrap overflow-hidden text-ellipsis">
+                      <span className="text-sm font-bold tracking-[-0.015em] text-ink dark:text-plate-ink whitespace-nowrap overflow-hidden text-ellipsis">
                         {c.title}
                       </span>
                       {r.template?.visaSubclass && (
-                        <span className="text-[9.5px] font-bold px-[7px] py-0.5 rounded-md bg-edamame-500/10 text-edamame-700 dark:text-edamame-400 flex-shrink-0">
+                        <span className="font-mono text-[9.5px] font-medium px-[7px] py-0.5 rounded-md bg-edamame-500/10 text-edamame-700 dark:text-edamame-400 flex-shrink-0">
                           SC-{r.template.visaSubclass}
                         </span>
                       )}
                     </div>
-                    <div className="text-[11.5px] text-gray-400 dark:text-slate-500 mt-[3px] whitespace-nowrap overflow-hidden text-ellipsis">
-                      {client?.name || 'Unknown'} &middot; DOB {client?.dob || 'N/A'} &middot; {ref}
+                    <div className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint mt-[3px] whitespace-nowrap overflow-hidden text-ellipsis">
+                      {client?.name || 'Unknown'} &middot; DOB {client?.dob || 'N/A'} &middot; <span className="font-mono">{ref}</span>
                     </div>
                   </div>
 
@@ -319,22 +319,22 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                   <div className="hidden min-[1021px]:block flex-1 min-w-0">
                     {r.nextTask ? (
                       <>
-                        <div className="text-[9px] font-bold tracking-[0.11em] uppercase text-gray-400 dark:text-slate-500">
+                        <div className="text-[9px] font-bold tracking-[0.11em] uppercase text-ink-faint dark:text-plate-ink-faint">
                           Next task
                         </div>
-                        <div className="text-xs font-semibold mt-1 text-gray-900 dark:text-slate-100 whitespace-nowrap overflow-hidden text-ellipsis">
+                        <div className="text-xs font-semibold mt-1 text-ink dark:text-plate-ink whitespace-nowrap overflow-hidden text-ellipsis">
                           {r.nextTask.title}
                         </div>
                         <div
-                          className={`text-[11px] font-semibold mt-0.5 ${
-                            r.isNextOverdue ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'
+                          className={`font-mono text-[11px] font-medium mt-0.5 ${
+                            r.isNextOverdue ? 'text-red-600 dark:text-red-400' : 'text-ink-soft dark:text-plate-ink-soft'
                           }`}
                         >
                           Due {format(new Date(r.nextTask.date), 'MMM d')}
                         </div>
                       </>
                     ) : (
-                      <div className="flex items-center gap-1.5 text-xs text-gray-300 dark:text-slate-600">
+                      <div className="flex items-center gap-1.5 text-xs text-ink-soft/40 dark:text-plate-ink-soft/40">
                         <Calendar size={13} strokeWidth={1.8} />
                         No pending tasks
                       </div>
@@ -343,11 +343,11 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
 
                   {/* Progress */}
                   <div className="w-[112px] flex-shrink-0">
-                    <div className="flex justify-between text-[10.5px] text-gray-400 dark:text-slate-500">
-                      <span className="font-bold text-gray-900 dark:text-slate-100">{r.progress}%</span>
+                    <div className="font-mono flex justify-between text-[10.5px] text-ink-faint dark:text-plate-ink-faint">
+                      <span className="font-medium text-ink dark:text-plate-ink">{r.progress}%</span>
                       <span>{r.completedTasks}/{r.totalTasks}</span>
                     </div>
-                    <div className="h-[5px] rounded-full bg-gray-100 dark:bg-slate-800 overflow-hidden mt-[5px]">
+                    <div className="h-[5px] rounded-full bg-paper-2 dark:bg-plate overflow-hidden mt-[5px]">
                       <div
                         className="progress-fill h-full rounded-full bg-edamame-500"
                         style={{ width: `${r.progress}%` }}
@@ -384,14 +384,14 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                           setAssignNote('');
                         }}
                         title="Assign case owner"
-                        className="w-6 h-6 rounded-full border border-dashed border-gray-300 dark:border-slate-600 text-gray-400 dark:text-slate-500 hover:border-edamame-500 hover:text-edamame-500 flex items-center justify-center flex-shrink-0 transition-colors"
+                        className="w-6 h-6 rounded-full border border-dashed border-ink/20 dark:border-plate-ink/25 text-ink-faint dark:text-plate-ink-faint hover:border-edamame-500 hover:text-edamame-500 flex items-center justify-center flex-shrink-0 transition-colors"
                       >
                         <UserPlus size={12} strokeWidth={1.8} />
                       </button>
                     )
                   )}
 
-                  <ChevronRight size={18} strokeWidth={1.8} className="text-gray-300 dark:text-slate-600 flex-shrink-0" />
+                  <ChevronRight size={18} strokeWidth={1.8} className="text-ink-soft/40 dark:text-plate-ink-soft/40 flex-shrink-0" />
                 </div>
               );
             })}
@@ -401,19 +401,19 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
 
       {assignModalCaseId && onAssignCase && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full modal-content">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Assign Case</h2>
+          <div className="bg-paper dark:bg-plate-card rounded-2xl shadow-2xl max-w-md w-full modal-content">
+            <div className="flex items-center justify-between p-6 border-b border-ink/10 dark:border-plate-ink/15">
+              <h2 className="font-serif text-xl font-semibold text-ink dark:text-plate-ink">Assign Case</h2>
               <button
                 onClick={() => setAssignModalCaseId(null)}
-                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+                className="p-1 hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg text-ink-soft dark:text-plate-ink-soft"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6 space-y-3">
               {teamMembers.length === 0 && (
-                <p className="text-sm text-slate-500 dark:text-slate-400">No team members yet. Add some in Team Members.</p>
+                <p className="text-sm text-ink-soft dark:text-plate-ink-soft">No team members yet. Add some in Team Members.</p>
               )}
               {teamMembers.map(m => (
                 <button
@@ -422,15 +422,15 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
                     assignTarget === m.id
                       ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-900/20 ring-2 ring-edamame-500/20'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                      : 'border-ink/15 dark:border-plate-ink/20 hover:border-ink/25 dark:hover:border-plate-ink/30'
                   }`}
                 >
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center font-bold">
                     {m.avatar || m.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-900 dark:text-white text-sm">{m.name}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{m.role}</p>
+                    <p className="font-semibold text-ink dark:text-plate-ink text-sm">{m.name}</p>
+                    <p className="text-xs text-ink-soft dark:text-plate-ink-soft capitalize">{m.role}</p>
                   </div>
                 </button>
               ))}
@@ -439,13 +439,13 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                 onChange={e => setAssignNote(e.target.value)}
                 placeholder="Reassignment note (optional)..."
                 rows={2}
-                className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all resize-none text-sm"
+                className="w-full px-4 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate text-ink dark:text-plate-ink outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all resize-none text-sm"
               />
             </div>
-            <div className="flex items-center gap-3 p-6 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 p-6 border-t border-ink/10 dark:border-plate-ink/15">
               <button
                 onClick={() => setAssignModalCaseId(null)}
-                className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -456,7 +456,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                   setAssignModalCaseId(null);
                 }}
                 disabled={!assignTarget}
-                className="ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg transition-colors"
+                className="ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
                 Confirm
               </button>

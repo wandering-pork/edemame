@@ -340,18 +340,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
   ];
 
   return (
-    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-white dark:bg-slate-900 min-h-screen transition-colors duration-200 page-enter">
+    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-paper dark:bg-plate min-h-screen transition-colors duration-200 page-enter">
       <div className="max-w-[1440px] mx-auto">
         {/* ── Header ─────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+            <div className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-ink-soft dark:text-plate-ink-soft">
               {format(now, 'EEEE, d MMMM yyyy')}
             </div>
-            <h1 className="text-[27px] font-extrabold tracking-[-0.035em] text-slate-900 dark:text-white mt-1.5">
+            <h1 className="font-serif text-[29px] font-semibold tracking-[-0.02em] text-ink dark:text-plate-ink mt-1.5">
               {greeting}, {firstName}
             </h1>
-            <div className="text-[13.5px] text-slate-600 dark:text-slate-400 mt-1">{summaryLine}</div>
+            <div className="text-[13.5px] text-ink-soft dark:text-plate-ink-soft mt-1">{summaryLine}</div>
           </div>
           <button
             onClick={handleOpenTaskModal}
@@ -367,13 +367,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {stats.map(st => (
             <div
               key={st.label}
-              className="stat-card bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl px-[18px] py-4 shadow-sm"
+              className="stat-card bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl px-[18px] py-4"
             >
-              <div className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-slate-400 dark:text-slate-500">
+              <div className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-ink-soft dark:text-plate-ink-soft">
                 {st.label}
               </div>
               <div className="flex items-baseline gap-2 mt-[7px]">
-                <span className="text-[25px] font-extrabold tracking-[-0.03em] text-slate-900 dark:text-white">
+                <span className="font-mono text-[24px] font-medium tracking-[-0.01em] text-ink dark:text-plate-ink">
                   {st.value}
                 </span>
                 <span className={`text-[11px] font-semibold truncate ${st.color}`}>{st.delta}</span>
@@ -385,9 +385,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* ── Needs attention / Agent activity ─────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-3.5 mt-3.5 items-start">
           {/* Needs attention */}
-          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-5 pt-4 pb-2.5">
-              <span className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-slate-400 dark:text-slate-500">
+              <span className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-ink-soft dark:text-plate-ink-soft">
                 Needs attention
               </span>
               <span
@@ -401,7 +401,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </span>
             </div>
             {attentionItems.length === 0 ? (
-              <div className="px-5 py-8 text-center text-[12.5px] text-slate-400 dark:text-slate-500 border-t border-gray-100 dark:border-slate-800">
+              <div className="px-5 py-8 text-center text-[12.5px] text-ink-soft dark:text-plate-ink-soft border-t border-ink/10 dark:border-plate-ink/15">
                 Nothing needs attention right now.
               </div>
             ) : (
@@ -409,17 +409,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div
                   key={item.id}
                   onClick={() => (item.caseId ? navigate(`/cases/${item.caseId}`) : setSelectedTaskId(item.id))}
-                  className="flex items-center gap-3 px-5 py-3 border-t border-gray-100 dark:border-slate-800 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                  className="flex items-center gap-3 px-5 py-3 border-t border-ink/10 dark:border-plate-ink/15 cursor-pointer transition-colors hover:bg-paper-2 dark:hover:bg-plate/60"
                 >
                   <span
                     className="badge-pulse w-2 h-2 rounded-full flex-shrink-0"
                     style={{ backgroundColor: item.dot }}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100 truncate">
+                    <div className="text-[13px] font-semibold tracking-[-0.01em] text-ink dark:text-plate-ink truncate">
                       {item.title}
                     </div>
-                    <div className="text-[11.5px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">{item.sub}</div>
+                    <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5 truncate">{item.sub}</div>
                   </div>
                   <span className="text-xs font-semibold text-edamame-600 dark:text-edamame-400 whitespace-nowrap">
                     {item.caseId ? 'Open case →' : 'View task →'}
@@ -430,30 +430,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Agent activity */}
-          <div className="bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl overflow-hidden">
             <div className="flex items-center gap-2 px-5 pt-4 pb-2.5">
               <Sparkles size={14} className="text-edamame-500" />
-              <span className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-slate-400 dark:text-slate-500">
+              <span className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-ink-soft dark:text-plate-ink-soft">
                 Agent activity
               </span>
             </div>
             {activityItems.length === 0 ? (
-              <div className="px-5 py-8 text-center text-[12.5px] text-slate-400 dark:text-slate-500 border-t border-gray-100 dark:border-slate-800">
+              <div className="px-5 py-8 text-center text-[12.5px] text-ink-soft dark:text-plate-ink-soft border-t border-ink/10 dark:border-plate-ink/15">
                 No AI activity yet.
               </div>
             ) : (
               activityItems.map(item => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-3 px-5 py-2.5 border-t border-gray-100 dark:border-slate-800"
+                  className="flex items-center gap-3 px-5 py-2.5 border-t border-ink/10 dark:border-plate-ink/15"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12.5px] font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-100 truncate">
+                    <div className="text-[12.5px] font-semibold tracking-[-0.01em] text-ink dark:text-plate-ink truncate">
                       {item.title}
                     </div>
-                    <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">{item.sub}</div>
+                    <div className="text-[11px] text-ink-soft dark:text-plate-ink-soft mt-0.5 truncate">{item.sub}</div>
                   </div>
-                  <span className="text-[10.5px] text-slate-400 dark:text-slate-500 whitespace-nowrap">{item.time}</span>
+                  <span className="font-mono-ai text-[10.5px] text-edamame-700 dark:text-edamame-400 whitespace-nowrap">{item.time}</span>
                 </div>
               ))
             )}
@@ -463,10 +463,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* ── This week ─────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-7 mb-3">
           <div className="flex items-center gap-3">
-            <h3 className="text-base font-bold tracking-[-0.015em] text-slate-900 dark:text-white">
+            <h3 className="font-serif text-lg font-semibold tracking-[-0.01em] text-ink dark:text-plate-ink">
               {windowContainsToday ? 'This week' : 'Week of'}
             </h3>
-            <span className="text-xs text-slate-400 dark:text-slate-500">
+            <span className="font-mono text-xs text-ink-soft dark:text-plate-ink-soft">
               {format(windowDays[0], 'MMM d')} – {format(windowDays[windowDays.length - 1], 'MMM d, yyyy')}
             </span>
             <div className="flex items-center gap-0.5">
@@ -474,7 +474,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 onClick={() => setManualWindowStart(jumpWeek(windowStart, -1))}
                 aria-label="Previous week"
                 title="Previous week"
-                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                className="p-1 rounded-md text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate hover:text-ink dark:hover:text-plate-ink transition-colors"
               >
                 <SkipBack size={15} />
               </button>
@@ -482,7 +482,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 onClick={() => setManualWindowStart(stepDay(windowStart, -1))}
                 aria-label="Previous day"
                 title="Previous day"
-                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                className="p-1 rounded-md text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate hover:text-ink dark:hover:text-plate-ink transition-colors"
               >
                 <ChevronLeft size={16} />
               </button>
@@ -490,7 +490,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 onClick={() => setManualWindowStart(stepDay(windowStart, 1))}
                 aria-label="Next day"
                 title="Next day"
-                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                className="p-1 rounded-md text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate hover:text-ink dark:hover:text-plate-ink transition-colors"
               >
                 <ChevronRight size={16} />
               </button>
@@ -498,7 +498,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 onClick={() => setManualWindowStart(jumpWeek(windowStart, 1))}
                 aria-label="Next week"
                 title="Next week"
-                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                className="p-1 rounded-md text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate hover:text-ink dark:hover:text-plate-ink transition-colors"
               >
                 <SkipForward size={15} />
               </button>
@@ -512,15 +512,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
               )}
             </div>
           </div>
-          <div className="flex gap-0.5 p-[3px] bg-slate-100 dark:bg-slate-800 rounded-[9px]">
+          <div className="flex gap-0.5 p-[3px] bg-paper-2 dark:bg-plate rounded-[9px]">
             {segs.map(sg => (
               <button
                 key={sg.key}
                 onClick={() => setBoardScope(sg.key)}
                 className={`px-3.5 py-1.5 rounded-[7px] text-xs font-semibold transition-all ${
                   boardScope === sg.key
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    ? 'bg-paper dark:bg-plate-card text-ink dark:text-plate-ink'
+                    : 'text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink'
                 }`}
               >
                 {sg.label}
@@ -557,21 +557,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       ? 'bg-edamame/[.15] border-edamame-500 border-dashed'
                       : isToday
                       ? 'bg-edamame/[.07] border-edamame/45'
-                      : 'bg-white dark:bg-slate-900 border-gray-100 dark:border-slate-800'
+                      : 'bg-paper-2/50 dark:bg-plate-card border-ink/10 dark:border-plate-ink/15'
                   }`}
                 >
-                  <div className="flex items-baseline justify-between pb-2 border-b border-gray-100 dark:border-slate-800">
-                    <div>
+                  <div className="flex items-baseline justify-between pb-2 border-b border-ink/10 dark:border-plate-ink/15">
+                    <div className="font-mono">
                       <span
-                        className={`text-[9px] font-bold uppercase tracking-[0.11em] ${
-                          isToday ? 'text-[#047857] dark:text-[#4ADE80]' : 'text-slate-400 dark:text-slate-500'
+                        className={`text-[9px] font-medium uppercase tracking-[0.11em] ${
+                          isToday ? 'text-[#047857] dark:text-[#4ADE80]' : 'text-ink-soft dark:text-plate-ink-soft'
                         }`}
                       >
                         {format(day, 'EEE')}
                       </span>
                       <span
-                        className={`text-[17px] font-extrabold tracking-[-0.03em] ml-1.5 ${
-                          isToday ? 'text-[#047857] dark:text-[#4ADE80]' : 'text-slate-900 dark:text-slate-100'
+                        className={`text-[17px] font-medium tracking-[-0.01em] ml-1.5 ${
+                          isToday ? 'text-[#047857] dark:text-[#4ADE80]' : 'text-ink dark:text-plate-ink'
                         }`}
                       >
                         {format(day, 'd')}
@@ -579,8 +579,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     {dayTasks.length > 0 && (
                       <span
-                        className={`text-[10px] font-bold ${
-                          isToday ? 'text-[#047857] dark:text-[#4ADE80]' : 'text-slate-400 dark:text-slate-500'
+                        className={`font-mono text-[10px] font-medium ${
+                          isToday ? 'text-[#047857] dark:text-[#4ADE80]' : 'text-ink-soft dark:text-plate-ink-soft'
                         }`}
                       >
                         {dayTasks.length} task{dayTasks.length === 1 ? '' : 's'}
@@ -589,7 +589,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
 
                   {dayTasks.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-300 dark:text-slate-700 opacity-70">
+                    <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-ink-soft/40 dark:text-plate-ink-soft/40 opacity-70">
                       <CalendarIcon size={20} />
                       <span className="text-[10.5px]">No tasks</span>
                     </div>
@@ -619,11 +619,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             <div className={`text-[9px] font-bold uppercase tracking-[0.08em] ${kind.text}`}>
                               {kind.label}
                             </div>
-                            <div className="text-[11.5px] font-semibold leading-tight mt-0.5 text-slate-900 dark:text-slate-100 break-words">
+                            <div className="text-[11.5px] font-semibold leading-tight mt-0.5 text-ink dark:text-plate-ink break-words">
                               {task.title}
                             </div>
                             {c && (
-                              <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 break-words">
+                              <div className="text-[10px] text-ink-soft dark:text-plate-ink-soft mt-0.5 break-words">
                                 {client?.name || 'Unknown client'} · {c.title}
                               </div>
                             )}
@@ -642,12 +642,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* ── New Task modal ────────────────────────────────────────────── */}
       {isTaskModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-slate-800">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
-              <h3 className="font-bold text-[15px] text-slate-900 dark:text-white">Create New Task</h3>
+          <div className="bg-paper dark:bg-plate-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-ink/10 dark:border-plate-ink/15">
+            <div className="px-6 py-4 border-b border-ink/10 dark:border-plate-ink/15 flex items-center justify-between">
+              <h3 className="font-serif font-semibold text-[16px] text-ink dark:text-plate-ink">Create New Task</h3>
               <button
                 onClick={() => setIsTaskModalOpen(false)}
-                className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                className="text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink"
               >
                 <X size={20} />
               </button>
@@ -655,21 +655,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[12.5px] font-semibold text-ink dark:text-plate-ink-soft mb-1">
                   Task Title
                 </label>
                 <input
                   type="text"
                   value={newTask.title}
                   onChange={e => setNewTask({ ...newTask, title: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-slate-900 dark:text-white outline-none text-[13.5px]"
+                  className="w-full px-3 py-2 bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-ink dark:text-plate-ink outline-none text-[13.5px]"
                   placeholder="e.g. Call client regarding documents"
                   autoFocus
                 />
               </div>
 
               <div>
-                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[12.5px] font-semibold text-ink dark:text-plate-ink-soft mb-1">
                   Due Date
                 </label>
                 <div className="flex gap-2">
@@ -677,12 +677,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     type="date"
                     value={newTask.date}
                     onChange={e => setNewTask({ ...newTask, date: e.target.value })}
-                    className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-slate-900 dark:text-white outline-none text-[13.5px]"
+                    className="flex-1 px-3 py-2 bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-ink dark:text-plate-ink outline-none text-[13.5px] font-mono"
                   />
                   <button
                     type="button"
                     onClick={() => setNewTask({ ...newTask, date: format(new Date(), 'yyyy-MM-dd') })}
-                    className="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-[10.5px] font-bold uppercase"
+                    className="px-3 py-2 bg-paper-2 dark:bg-plate text-ink-soft dark:text-plate-ink-soft rounded-lg hover:bg-paper-2/70 dark:hover:bg-plate-card transition-colors text-[10.5px] font-bold uppercase"
                   >
                     Today
                   </button>
@@ -690,12 +690,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Case <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span>
+                <label className="block text-[12.5px] font-semibold text-ink dark:text-plate-ink-soft mb-1">
+                  Case <span className="text-ink-soft dark:text-plate-ink-soft font-normal">(optional)</span>
                 </label>
                 <div className="relative">
                   <div className="relative">
-                    <LinkIcon className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500" size={16} />
+                    <LinkIcon className="absolute left-3 top-2.5 text-ink-soft dark:text-plate-ink-soft" size={16} />
                     <input
                       type="text"
                       value={caseSearchTerm}
@@ -707,25 +707,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         }
                       }}
                       onFocus={() => setIsCaseDropdownOpen(true)}
-                      className="w-full pl-10 pr-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-slate-900 dark:text-white outline-none text-[13.5px]"
+                      className="w-full pl-10 pr-3 py-2 bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-ink dark:text-plate-ink outline-none text-[13.5px]"
                       placeholder="Search case..."
                     />
                   </div>
                   {isCaseDropdownOpen && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setIsCaseDropdownOpen(false)} />
-                      <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-20 mt-1 w-full bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                         {filteredCases.length === 0 ? (
-                          <div className="p-3 text-[12.5px] text-slate-500 dark:text-slate-500 italic">No cases found.</div>
+                          <div className="p-3 text-[12.5px] text-ink-soft dark:text-plate-ink-soft italic">No cases found.</div>
                         ) : (
                           filteredCases.map(c => (
                             <div
                               key={c.id}
                               onClick={() => handleSelectCase(c)}
-                              className="p-2 hover:bg-edamame/10 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-100 dark:border-slate-700 last:border-0"
+                              className="p-2 hover:bg-edamame/10 dark:hover:bg-plate-card cursor-pointer border-b border-ink/10 dark:border-plate-ink/15 last:border-0"
                             >
-                              <div className="text-[13px] font-semibold text-slate-900 dark:text-white">{c.title}</div>
-                              <div className="text-[11.5px] text-slate-500 dark:text-slate-400">{getClientName(c.clientId)}</div>
+                              <div className="text-[13px] font-semibold text-ink dark:text-plate-ink">{c.title}</div>
+                              <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft">{getClientName(c.clientId)}</div>
                             </div>
                           ))
                         )}
@@ -736,23 +736,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
 
               <div>
-                <label className="block text-[12.5px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Description <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span>
+                <label className="block text-[12.5px] font-semibold text-ink dark:text-plate-ink-soft mb-1">
+                  Description <span className="text-ink-soft dark:text-plate-ink-soft font-normal">(optional)</span>
                 </label>
                 <textarea
                   value={newTask.description}
                   onChange={e => setNewTask({ ...newTask, description: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-slate-900 dark:text-white outline-none resize-none text-[13.5px]"
+                  className="w-full px-3 py-2 bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-ink dark:text-plate-ink outline-none resize-none text-[13.5px]"
                   placeholder="Add details..."
                 />
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-2">
+            <div className="px-6 py-4 bg-paper-2/70 dark:bg-plate/50 border-t border-ink/10 dark:border-plate-ink/15 flex justify-end gap-2">
               <button
                 onClick={() => setIsTaskModalOpen(false)}
-                className="px-4 py-2 text-[13px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-gray-200 dark:hover:border-slate-700 rounded-lg transition-all"
+                className="px-4 py-2 text-[13px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper dark:hover:bg-plate border border-transparent hover:border-ink/15 dark:hover:border-plate-ink/20 rounded-lg transition-all"
               >
                 Cancel
               </button>

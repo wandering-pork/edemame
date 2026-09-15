@@ -48,7 +48,7 @@ interface CaseRailProps {
 }
 
 const RailLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-gray-400 dark:text-slate-500">{children}</div>
+  <div className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-ink-faint dark:text-plate-ink-faint">{children}</div>
 );
 
 export const CaseRail: React.FC<CaseRailProps> = ({
@@ -70,7 +70,7 @@ export const CaseRail: React.FC<CaseRailProps> = ({
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   return (
-    <aside className="ed-rail xl:sticky xl:top-4 self-start bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm p-[18px]">
+    <aside className="ed-rail xl:sticky xl:top-4 self-start bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl shadow-sm p-[18px]">
       <RailLabel>Case Info</RailLabel>
 
       {/* Client */}
@@ -79,40 +79,40 @@ export const CaseRail: React.FC<CaseRailProps> = ({
           {client.name.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0">
-          <div className="text-sm font-bold text-gray-900 dark:text-white tracking-tight truncate">{client.name}</div>
-          <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">DOB {client.dob}</div>
+          <div className="text-sm font-bold text-ink dark:text-plate-ink tracking-tight truncate">{client.name}</div>
+          <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-0.5">DOB {client.dob}</div>
         </div>
       </div>
-      <div className="flex flex-col gap-1 mt-2.5 text-[11.5px] text-gray-500 dark:text-slate-400">
+      <div className="flex flex-col gap-1 mt-2.5 text-[11.5px] text-ink-soft dark:text-plate-ink-soft">
         <span className="truncate">{client.email}</span>
         <span>{client.phone}</span>
       </div>
 
       {applicant && applicant.id !== client.id && (
-        <div className="mt-3.5 pt-3.5 border-t border-gray-100 dark:border-slate-800">
+        <div className="mt-3.5 pt-3.5 border-t border-ink/10 dark:border-plate-ink/15">
           <RailLabel>Applicant</RailLabel>
           <div className="flex items-center gap-2.5 mt-2.5">
             <div className="w-7 h-7 rounded-full bg-violet-100 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
               {applicant.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 truncate">{applicant.name}</div>
-              <div className="text-[10px] text-gray-400 dark:text-slate-500">DOB {applicant.dob}</div>
+              <div className="text-xs font-semibold text-ink dark:text-plate-ink-soft truncate">{applicant.name}</div>
+              <div className="text-[10px] text-ink-faint dark:text-plate-ink-faint">DOB {applicant.dob}</div>
             </div>
           </div>
         </div>
       )}
 
       {/* Progress */}
-      <div className="mt-4 pt-3.5 border-t border-gray-100 dark:border-slate-800">
+      <div className="mt-4 pt-3.5 border-t border-ink/10 dark:border-plate-ink/15">
         <div className="flex items-baseline justify-between">
           <RailLabel>Progress</RailLabel>
-          <span className="text-[13px] font-extrabold text-gray-900 dark:text-white">{progress}%</span>
+          <span className="text-[13px] font-extrabold text-ink dark:text-plate-ink">{progress}%</span>
         </div>
-        <div className="h-[5px] rounded-full bg-gray-100 dark:bg-slate-800 overflow-hidden mt-2">
+        <div className="h-[5px] rounded-full bg-paper-2 dark:bg-plate-card overflow-hidden mt-2">
           <div className="progress-fill h-full bg-edamame rounded-full" style={{ width: `${progress}%` }} />
         </div>
-        <div className="flex justify-between text-[10.5px] text-gray-400 dark:text-slate-500 mt-1.5">
+        <div className="flex justify-between text-[10.5px] text-ink-faint dark:text-plate-ink-faint mt-1.5">
           <span>{completedCount} done</span>
           <span>{pendingCount} pending</span>
         </div>
@@ -120,7 +120,7 @@ export const CaseRail: React.FC<CaseRailProps> = ({
 
       {/* Alerts */}
       {alerts.length > 0 && (
-        <div className="mt-3.5 pt-3.5 border-t border-gray-100 dark:border-slate-800">
+        <div className="mt-3.5 pt-3.5 border-t border-ink/10 dark:border-plate-ink/15">
           <RailLabel>Alerts</RailLabel>
           <div className="mt-2 space-y-0.5">
             {alerts.map((al, i) => (
@@ -134,11 +134,11 @@ export const CaseRail: React.FC<CaseRailProps> = ({
       )}
 
       {/* Case Files — drag a row onto a Document Checklist item to link it */}
-      <div className="mt-3.5 pt-3.5 border-t border-gray-100 dark:border-slate-800">
+      <div className="mt-3.5 pt-3.5 border-t border-ink/10 dark:border-plate-ink/15">
         <div className="flex items-baseline justify-between">
           <RailLabel>Case Files</RailLabel>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10.5px] font-bold text-gray-400 dark:text-slate-500">{documents.length}</span>
+            <span className="text-[10.5px] font-bold text-ink-faint dark:text-plate-ink-faint">{documents.length}</span>
             {onOpenCaseFilesTab && (
               <button
                 type="button"
@@ -161,7 +161,7 @@ export const CaseRail: React.FC<CaseRailProps> = ({
           />
         </div>
         {documents.length === 0 ? (
-          <p className="mt-2 text-[11px] text-gray-400 dark:text-slate-500 leading-relaxed">
+          <p className="mt-2 text-[11px] text-ink-faint dark:text-plate-ink-faint leading-relaxed">
             No files in this case yet.
           </p>
         ) : (
@@ -178,13 +178,13 @@ export const CaseRail: React.FC<CaseRailProps> = ({
                     e.dataTransfer.effectAllowed = 'link';
                   }}
                   title={oversized ? 'This file is over 5MB and will be rejected by the Department of Home Affairs.' : 'Drag onto a Document Checklist item to link it'}
-                  className="group relative flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-grab active:cursor-grabbing hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+                  className="group relative flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-grab active:cursor-grabbing hover:bg-paper-2 dark:hover:bg-plate transition-colors"
                 >
-                  <Icon size={12} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
+                  <Icon size={12} className="text-ink-faint dark:text-plate-ink-faint flex-shrink-0" />
                   <button
                     type="button"
                     onClick={() => onOpenDocument?.(doc)}
-                    className="text-[11px] text-gray-600 dark:text-slate-300 truncate group-hover:text-edamame text-left flex-1 min-w-0"
+                    className="text-[11px] text-ink-soft dark:text-plate-ink-soft truncate group-hover:text-edamame text-left flex-1 min-w-0"
                   >
                     {doc.fileName}
                   </button>
@@ -198,18 +198,18 @@ export const CaseRail: React.FC<CaseRailProps> = ({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setMenuOpenId(m => (m === doc.id ? null : doc.id)); }}
                       title="More actions"
-                      className="p-0.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-150 dark:hover:bg-slate-700"
+                      className="p-0.5 rounded text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink hover:bg-paper-2 dark:hover:bg-plate-card"
                     >
                       <MoreVertical size={12} />
                     </button>
                     {menuOpenId === doc.id && (
                       <>
                         <div className="fixed inset-0 z-30" onClick={() => setMenuOpenId(null)} />
-                        <div className="absolute right-0 top-full mt-1 z-40 w-32 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-gray-100 dark:border-slate-800 p-1">
+                        <div className="absolute right-0 top-full mt-1 z-40 w-32 bg-paper-2 dark:bg-plate-card rounded-lg shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1">
                           <button
                             type="button"
                             onClick={() => { setMenuOpenId(null); onOpenDocument?.(doc); }}
-                            className="w-full text-left px-2 py-1.5 rounded-md text-[11px] font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                            className="w-full text-left px-2 py-1.5 rounded-md text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card transition-colors"
                           >
                             View file
                           </button>

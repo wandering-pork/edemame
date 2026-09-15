@@ -91,28 +91,28 @@ const RichMessage: React.FC<{ text: string }> = ({ text }) => {
       {blocks.map((b, i) => {
         if (b.kind === 'h') {
           return (
-            <div key={i} className="text-[13px] font-extrabold text-gray-900 dark:text-white leading-relaxed">
+            <div key={i} className="text-[13px] font-extrabold text-ink dark:text-plate-ink leading-relaxed">
               {renderInline(b.text)}
             </div>
           );
         }
         if (b.kind === 'b') {
           return (
-            <div key={i} className="text-xs font-bold text-gray-900 dark:text-white leading-relaxed mt-3.5">
+            <div key={i} className="text-xs font-bold text-ink dark:text-plate-ink leading-relaxed mt-3.5">
               {renderInline(b.text)}
             </div>
           );
         }
         if (b.kind === 'li') {
           return (
-            <div key={i} className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed mt-1.5 pl-3 break-words">
+            <div key={i} className="text-xs text-ink-soft dark:text-plate-ink-soft leading-relaxed mt-1.5 pl-3 break-words">
               <span className="text-edamame mr-1.5">·</span>
               {renderInline(b.text)}
             </div>
           );
         }
         return (
-          <div key={i} className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed mt-2 break-words">
+          <div key={i} className="text-xs text-ink-soft dark:text-plate-ink-soft leading-relaxed mt-2 break-words">
             {renderInline(b.text)}
           </div>
         );
@@ -138,23 +138,23 @@ const IssueDraftCard: React.FC<{
 
   if (message.issueDraftResolved === 'cancelled') {
     return (
-      <div className="text-xs text-gray-400 dark:text-slate-500 italic mt-2">
+      <div className="text-xs text-ink-faint dark:text-plate-ink-faint italic mt-2">
         Draft discarded — no issue was filed.
       </div>
     );
   }
 
   return (
-    <div className="mt-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 overflow-hidden">
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200 dark:border-slate-700">
-        <Github size={13} className="text-gray-500 dark:text-slate-400" />
-        <span className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
+    <div className="mt-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card/60 overflow-hidden">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-ink/15 dark:border-plate-ink/20">
+        <Github size={13} className="text-ink-soft dark:text-plate-ink-soft" />
+        <span className="text-[11px] font-bold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wide">
           Drafted GitHub issue
         </span>
       </div>
       <div className="px-3 py-2.5">
-        <p className="text-xs font-bold text-gray-900 dark:text-white break-words">{draft.title}</p>
-        <p className="text-xs text-gray-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed mt-1.5 break-words">
+        <p className="text-xs font-bold text-ink dark:text-plate-ink break-words">{draft.title}</p>
+        <p className="text-xs text-ink-soft dark:text-plate-ink-soft whitespace-pre-wrap leading-relaxed mt-1.5 break-words">
           {draft.body}
         </p>
       </div>
@@ -165,7 +165,7 @@ const IssueDraftCard: React.FC<{
             <span className="font-mono">wandering-pork/edemame</span> — visible to anyone on the internet.
             Review it for client-identifying details before confirming.
           </div>
-          <div className="flex items-center gap-2 px-3 py-2 border-t border-gray-200 dark:border-slate-700">
+          <div className="flex items-center gap-2 px-3 py-2 border-t border-ink/15 dark:border-plate-ink/20">
             <button
               onClick={onConfirm}
               disabled={isSubmitting}
@@ -177,7 +177,7 @@ const IssueDraftCard: React.FC<{
             <button
               onClick={onCancel}
               disabled={isSubmitting}
-              className="btn-press flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+              className="btn-press flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-ink/20 dark:border-plate-ink/25 text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card transition-colors disabled:opacity-50"
             >
               <X size={12} strokeWidth={2.5} />
               Cancel
@@ -228,12 +228,12 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
   const isEmpty = !activeConv || activeConv.messages.length === 0;
 
   return (
-    <aside className="ed-agent xl:sticky xl:top-4 self-start flex flex-col bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden xl:max-h-[calc(100vh-120px)]">
+    <aside className="ed-agent xl:sticky xl:top-4 self-start flex flex-col bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl shadow-sm overflow-hidden xl:max-h-[calc(100vh-120px)]">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3.5 border-b border-gray-100 dark:border-slate-800 flex-shrink-0">
+      <div className="flex items-center gap-2 px-4 py-3.5 border-b border-ink/10 dark:border-plate-ink/15 flex-shrink-0">
         <Sparkles size={15} className="text-edamame" strokeWidth={1.8} />
-        <span className="text-[13px] font-bold text-gray-900 dark:text-white">Agent</span>
-        <span className="text-[11px] text-gray-400 dark:text-slate-500">
+        <span className="text-[13px] font-bold text-ink dark:text-plate-ink">Agent</span>
+        <span className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
           {conversations.length} chat{conversations.length !== 1 ? 's' : ''}
         </span>
         <button
@@ -247,7 +247,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
 
       {/* Conversation switcher */}
       {conversations.length > 1 && (
-        <div className="flex gap-1 px-3 py-2 border-b border-gray-100 dark:border-slate-800 overflow-x-auto custom-scrollbar flex-shrink-0">
+        <div className="flex gap-1 px-3 py-2 border-b border-ink/10 dark:border-plate-ink/15 overflow-x-auto custom-scrollbar flex-shrink-0">
           {conversations.map(conv => (
             <button
               key={conv.id}
@@ -255,7 +255,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
               className={`flex-shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-colors truncate max-w-[90px] ${
                 activeConvId === conv.id
                   ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400'
-                  : 'text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+                  : 'text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card'
               }`}
             >
               {conv.title || 'Chat'}
@@ -271,8 +271,8 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
             <div className="w-10 h-10 rounded-2xl bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center mb-3">
               <Sparkles size={18} className="text-edamame dark:text-edamame-400" />
             </div>
-            <p className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Edamame Agent</p>
-            <p className="text-xs text-gray-400 dark:text-slate-500 leading-relaxed">
+            <p className="text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-1">Edamame Agent</p>
+            <p className="text-xs text-ink-faint dark:text-plate-ink-faint leading-relaxed">
               Ask anything about this case — I already know the context, client details, and outstanding tasks.
             </p>
             <div className="flex flex-wrap justify-center gap-1.5 mt-4">
@@ -316,16 +316,16 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
         )}
         {isSending && (
           <div className="flex items-center gap-1 pl-1 mt-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '120ms' }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-slate-600 animate-bounce" style={{ animationDelay: '240ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-ink/20 dark:bg-plate-ink/20 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-ink/20 dark:bg-plate-ink/20 animate-bounce" style={{ animationDelay: '120ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-ink/20 dark:bg-plate-ink/20 animate-bounce" style={{ animationDelay: '240ms' }} />
           </div>
         )}
         <div ref={chatEndRef} />
       </div>
 
       {/* Input */}
-      <div className="flex items-center gap-2 px-3.5 py-3 border-t border-gray-100 dark:border-slate-800 flex-shrink-0">
+      <div className="flex items-center gap-2 px-3.5 py-3 border-t border-ink/10 dark:border-plate-ink/15 flex-shrink-0">
         <input
           value={chatInput}
           onChange={e => setChatInput(e.target.value)}
@@ -333,7 +333,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); }
           }}
           placeholder="Ask about this case…"
-          className="flex-1 min-w-0 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-[12.5px] text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-slate-500 outline-none focus:border-edamame focus-ring transition-all"
+          className="flex-1 min-w-0 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg px-3 py-2 text-[12.5px] text-ink dark:text-plate-ink-soft placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50 outline-none focus:border-edamame focus-ring transition-all"
         />
         <button
           onClick={onSend}
@@ -375,7 +375,7 @@ const MessageView: React.FC<{
           onCancel={onCancelIssueDraft}
         />
       )}
-      <div className="text-[10px] text-gray-400 dark:text-slate-500 mt-3">{time}</div>
+      <div className="text-[10px] text-ink-faint dark:text-plate-ink-faint mt-3">{time}</div>
     </div>
   );
 };

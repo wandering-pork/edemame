@@ -54,11 +54,11 @@ export const CaseNotes: React.FC<CaseNotesProps> = ({ caseId }) => {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 p-6">
-      <h2 className="text-sm font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+    <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-sm border border-ink/15 dark:border-plate-ink/20 p-6">
+      <h2 className="text-sm font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-4 flex items-center gap-2">
         <MessageSquare size={16} />
         Case Notes
-        <span className="ml-1 px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 text-xs rounded-full">
+        <span className="ml-1 px-2 py-0.5 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft text-xs rounded-full">
           {notes.length}
         </span>
       </h2>
@@ -69,7 +69,7 @@ export const CaseNotes: React.FC<CaseNotesProps> = ({ caseId }) => {
           value={newContent}
           onChange={(e) => setNewContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-gray-900 dark:text-white resize-none text-sm"
+          className="w-full px-4 py-3 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink resize-none text-sm"
           rows={3}
           placeholder="Add a note... (Ctrl+Enter to submit)"
         />
@@ -87,11 +87,11 @@ export const CaseNotes: React.FC<CaseNotesProps> = ({ caseId }) => {
 
       {/* Notes list */}
       {loading ? (
-        <div className="text-center text-gray-400 dark:text-slate-500 py-6 text-sm italic">
+        <div className="text-center text-ink-faint dark:text-plate-ink-faint py-6 text-sm italic">
           Loading notes...
         </div>
       ) : notes.length === 0 ? (
-        <div className="text-center text-gray-400 dark:text-slate-500 py-6 text-sm italic border border-dashed border-gray-200 dark:border-slate-800 rounded-xl">
+        <div className="text-center text-ink-faint dark:text-plate-ink-faint py-6 text-sm italic border border-dashed border-ink/15 dark:border-plate-ink/20 rounded-xl">
           No notes yet. Add one above.
         </div>
       ) : (
@@ -99,20 +99,20 @@ export const CaseNotes: React.FC<CaseNotesProps> = ({ caseId }) => {
           {notes.map((note) => (
             <div
               key={note.id}
-              className="group relative bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 border border-gray-100 dark:border-slate-800 hover:border-gray-200 dark:hover:border-slate-700 transition-colors"
+              className="group relative bg-paper-2 dark:bg-plate-card/50 rounded-xl p-4 border border-ink/10 dark:border-plate-ink/15 hover:border-ink/20 dark:hover:border-plate-ink/25 transition-colors"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-700 dark:text-slate-300 whitespace-pre-wrap break-words">
+                  <p className="text-sm text-ink-soft dark:text-plate-ink-soft whitespace-pre-wrap break-words">
                     {note.content}
                   </p>
-                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">
+                  <p className="text-xs text-ink-faint dark:text-plate-ink-faint mt-2">
                     {format(new Date(note.createdAt), 'MMM d, yyyy \'at\' h:mm a')}
                   </p>
                 </div>
                 <button
                   onClick={() => handleDeleteNote(note.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all shrink-0"
+                  className="opacity-0 group-hover:opacity-100 p-1.5 text-ink-faint dark:text-plate-ink-faint hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all shrink-0"
                   title="Delete note"
                 >
                   <Trash2 size={14} />

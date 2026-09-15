@@ -141,11 +141,11 @@ export const CsvImport: React.FC<CsvImportProps> = ({ isOpen, onClose, onImport 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 p-4 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 dark:border-slate-800">
+      <div className="bg-paper-2 dark:bg-plate-card rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-ink/10 dark:border-plate-ink/15">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
-          <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Import Clients from CSV</h3>
-          <button onClick={handleClose} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
+        <div className="px-6 py-4 border-b border-ink/10 dark:border-plate-ink/15 flex items-center justify-between">
+          <h3 className="font-semibold text-lg text-ink dark:text-plate-ink">Import Clients from CSV</h3>
+          <button onClick={handleClose} className="p-1.5 text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -154,12 +154,12 @@ export const CsvImport: React.FC<CsvImportProps> = ({ isOpen, onClose, onImport 
         <div className="px-6 pt-4 flex items-center gap-2 text-xs font-medium">
           {(['upload', 'preview', 'map', 'done'] as Step[]).map((s, i) => (
             <React.Fragment key={s}>
-              {i > 0 && <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />}
+              {i > 0 && <div className="flex-1 h-px bg-paper-2 dark:bg-plate-card" />}
               <div
                 className={`px-2.5 py-1 rounded-full capitalize ${
                   step === s
                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'text-gray-400 dark:text-slate-500'
+                    : 'text-ink-faint dark:text-plate-ink-faint'
                 }`}
               >
                 {s === 'done' ? 'Complete' : s}
@@ -184,16 +184,16 @@ export const CsvImport: React.FC<CsvImportProps> = ({ isOpen, onClose, onImport 
               className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${
                 isDragActive
                   ? 'border-green-500 bg-green-50 dark:bg-green-900/10'
-                  : 'border-gray-300 dark:border-slate-700 hover:border-green-400 dark:hover:border-green-600'
+                  : 'border-ink/20 dark:border-plate-ink/25 hover:border-green-400 dark:hover:border-green-600'
               }`}
             >
               <input {...getInputProps()} />
-              <Upload className="mx-auto mb-4 text-gray-400 dark:text-slate-500" size={40} />
-              <p className="text-gray-700 dark:text-slate-300 font-medium">
+              <Upload className="mx-auto mb-4 text-ink-faint dark:text-plate-ink-faint" size={40} />
+              <p className="text-ink-soft dark:text-plate-ink-soft font-medium">
                 {isDragActive ? 'Drop CSV file here...' : 'Drag & drop a CSV file here'}
               </p>
-              <p className="text-sm text-gray-400 dark:text-slate-500 mt-1">or click to browse</p>
-              <p className="text-xs text-gray-400 dark:text-slate-600 mt-3">
+              <p className="text-sm text-ink-faint dark:text-plate-ink-faint mt-1">or click to browse</p>
+              <p className="text-xs text-ink-faint dark:text-plate-ink-faint mt-3">
                 Expected columns: name, email, phone, dob, address, passportNumber, nationality, gender
               </p>
             </div>
@@ -202,17 +202,17 @@ export const CsvImport: React.FC<CsvImportProps> = ({ isOpen, onClose, onImport 
           {/* PREVIEW STEP */}
           {step === 'preview' && (
             <div>
-              <p className="text-sm text-gray-600 dark:text-slate-400 mb-3">
-                Found <span className="font-semibold text-gray-900 dark:text-white">{csvRows.length}</span> rows and{' '}
-                <span className="font-semibold text-gray-900 dark:text-white">{csvHeaders.length}</span> columns.
+              <p className="text-sm text-ink-soft dark:text-plate-ink-soft mb-3">
+                Found <span className="font-semibold text-ink dark:text-plate-ink">{csvRows.length}</span> rows and{' '}
+                <span className="font-semibold text-ink dark:text-plate-ink">{csvHeaders.length}</span> columns.
                 Preview of first 5 rows:
               </p>
-              <div className="overflow-x-auto border border-gray-200 dark:border-slate-700 rounded-lg">
+              <div className="overflow-x-auto border border-ink/15 dark:border-plate-ink/20 rounded-lg">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-gray-50 dark:bg-slate-800">
+                    <tr className="bg-paper-2 dark:bg-plate-card">
                       {csvHeaders.map((h) => (
-                        <th key={h} className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-slate-400 whitespace-nowrap">
+                        <th key={h} className="px-3 py-2 text-left font-semibold text-ink-soft dark:text-plate-ink-soft whitespace-nowrap">
                           {h}
                         </th>
                       ))}
@@ -220,9 +220,9 @@ export const CsvImport: React.FC<CsvImportProps> = ({ isOpen, onClose, onImport 
                   </thead>
                   <tbody>
                     {csvRows.slice(0, 5).map((row, i) => (
-                      <tr key={i} className="border-t border-gray-100 dark:border-slate-800">
+                      <tr key={i} className="border-t border-ink/10 dark:border-plate-ink/15">
                         {csvHeaders.map((h) => (
-                          <td key={h} className="px-3 py-2 text-gray-700 dark:text-slate-300 whitespace-nowrap max-w-[200px] truncate">
+                          <td key={h} className="px-3 py-2 text-ink-soft dark:text-plate-ink-soft whitespace-nowrap max-w-[200px] truncate">
                             {row[h] || '-'}
                           </td>
                         ))}
@@ -237,13 +237,13 @@ export const CsvImport: React.FC<CsvImportProps> = ({ isOpen, onClose, onImport 
           {/* MAP COLUMNS STEP */}
           {step === 'map' && (
             <div>
-              <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
+              <p className="text-sm text-ink-soft dark:text-plate-ink-soft mb-4">
                 Map your CSV columns to client fields. <span className="text-red-500">*</span> = required.
               </p>
               <div className="space-y-3">
                 {CLIENT_FIELDS.map((field) => (
                   <div key={field.key} className="flex items-center gap-3">
-                    <label className="w-40 text-sm font-medium text-gray-700 dark:text-slate-300 flex-shrink-0">
+                    <label className="w-40 text-sm font-medium text-ink-soft dark:text-plate-ink-soft flex-shrink-0">
                       {field.label}
                       {field.required && <span className="text-red-500 ml-0.5">*</span>}
                     </label>
@@ -252,7 +252,7 @@ export const CsvImport: React.FC<CsvImportProps> = ({ isOpen, onClose, onImport 
                       onChange={(e) =>
                         setColumnMap((prev) => ({ ...prev, [field.key]: e.target.value }))
                       }
-                      className="flex-1 px-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 outline-none"
+                      className="flex-1 px-3 py-2 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-sm text-ink dark:text-plate-ink focus:ring-2 focus:ring-green-500 outline-none"
                     >
                       <option value="">-- Skip --</option>
                       {csvHeaders.map((h) => (
@@ -273,8 +273,8 @@ export const CsvImport: React.FC<CsvImportProps> = ({ isOpen, onClose, onImport 
               <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
                 <Check className="text-green-600 dark:text-green-400" size={32} />
               </div>
-              <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Import Complete</h4>
-              <p className="text-gray-600 dark:text-slate-400">
+              <h4 className="text-xl font-semibold text-ink dark:text-plate-ink mb-2">Import Complete</h4>
+              <p className="text-ink-soft dark:text-plate-ink-soft">
                 Successfully imported <span className="font-semibold text-green-600 dark:text-green-400">{importedCount}</span> client
                 {importedCount !== 1 ? 's' : ''}.
               </p>
@@ -283,12 +283,12 @@ export const CsvImport: React.FC<CsvImportProps> = ({ isOpen, onClose, onImport 
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex justify-between">
+        <div className="px-6 py-4 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex justify-between">
           <div>
             {(step === 'preview' || step === 'map') && (
               <button
                 onClick={() => setStep(step === 'map' ? 'preview' : 'upload')}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors"
               >
                 <ArrowLeft size={14} />
                 Back
@@ -307,7 +307,7 @@ export const CsvImport: React.FC<CsvImportProps> = ({ isOpen, onClose, onImport 
               <>
                 <button
                   onClick={handleClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors"
                 >
                   Cancel
                 </button>

@@ -57,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
   const navigate = useNavigate();
 
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 px-6 py-3 bg-white/85 dark:bg-slate-900/85 backdrop-blur-sm border-b border-gray-100 dark:border-slate-800">
+    <header className="sticky top-0 z-30 flex items-center gap-3 px-6 py-3 bg-paper/85 dark:bg-plate/85 backdrop-blur-sm border-b border-ink/10 dark:border-plate-ink/15">
       {/* Global search — available from every module. */}
       <GlobalSearch
         clients={clients}
@@ -74,7 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Theme toggle */}
       <button
         onClick={() => onThemeChange(theme === 'dark' ? 'classic' : 'dark')}
-        className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-700 dark:hover:text-slate-200 transition-colors"
+        className="p-2 rounded-lg text-ink-faint dark:text-plate-ink-faint hover:bg-ink/8 dark:hover:bg-plate-ink/10 hover:text-ink dark:hover:text-plate-ink transition-colors"
         aria-label="Toggle theme"
       >
         {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -91,12 +91,12 @@ export const Header: React.FC<HeaderProps> = ({
       {/* User chip */}
       <button
         onClick={() => navigate('/settings')}
-        className="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+        className="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full hover:bg-ink/8 dark:hover:bg-plate-ink/10 transition-colors"
       >
         <span className="w-7 h-7 rounded-full bg-edamame-100 dark:bg-edamame-900/30 text-edamame-700 dark:text-edamame-300 text-[11px] font-bold flex items-center justify-center flex-shrink-0">
           {initials(userName || userEmail)}
         </span>
-        <span className="hidden sm:block text-[13px] font-semibold text-gray-700 dark:text-slate-200 leading-none max-w-[140px] truncate">
+        <span className="hidden sm:block text-[13px] font-semibold text-ink dark:text-plate-ink-soft leading-none max-w-[140px] truncate">
           {userName || userEmail}
         </span>
       </button>

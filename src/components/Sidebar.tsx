@@ -51,9 +51,9 @@ const NavItem: React.FC<{
       } ${
         isActive
           ? collapsed
-            ? 'bg-white/20 dark:bg-white/10 text-white shadow-inner'
-            : 'bg-white/15 dark:bg-white/8 text-white'
-          : 'text-white/55 dark:text-white/40 hover:bg-white/10 dark:hover:bg-white/6 hover:text-white/90'
+            ? 'bg-edamame/12 dark:bg-edamame/15 text-ink dark:text-plate-ink shadow-inner'
+            : 'bg-edamame/10 dark:bg-edamame/15 text-ink dark:text-plate-ink'
+          : 'text-ink-faint dark:text-plate-ink-faint hover:bg-ink/5 dark:hover:bg-plate-ink/8 hover:text-ink dark:hover:text-plate-ink'
       }`
     }
   >
@@ -61,18 +61,18 @@ const NavItem: React.FC<{
       <>
         {/* Active indicator bar — expanded only */}
         {isActive && !collapsed && (
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-white rounded-r-full opacity-90" />
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-edamame-600 dark:bg-edamame-400 rounded-r-full opacity-90" />
         )}
 
         {/* Active dot — collapsed only */}
         {isActive && collapsed && (
-          <span className="absolute -right-0.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-white rounded-full ring-1 ring-edamame-sidebar dark:ring-slate-900" />
+          <span className="absolute -right-0.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-edamame-600 dark:bg-edamame-400 rounded-full ring-1 ring-paper dark:ring-plate" />
         )}
 
         <Icon
           size={collapsed ? 17 : 16}
           className={`flex-shrink-0 transition-colors duration-150 ${
-            isActive ? 'text-white' : 'text-white/50 group-hover:text-white/80'
+            isActive ? 'text-edamame-700 dark:text-edamame-400' : 'text-ink-faint dark:text-plate-ink-faint group-hover:text-ink-soft dark:group-hover:text-plate-ink-soft'
           }`}
         />
 
@@ -84,13 +84,13 @@ const NavItem: React.FC<{
         {collapsed && (
           <span
             className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-md text-[12px] font-medium whitespace-nowrap z-[100] shadow-xl
-                       bg-gray-950/95 dark:bg-slate-800 text-white
+                       bg-ink dark:bg-plate-card text-paper dark:text-plate-ink
                        opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100
                        transition-all duration-100 origin-left"
           >
             {label}
             {/* Arrow */}
-            <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-950/95 dark:border-r-slate-800" />
+            <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-ink dark:border-r-plate-card" />
           </span>
         )}
       </>
@@ -129,7 +129,7 @@ export const Sidebar: React.FC = () => {
           {isDrawer ? (
             <button
               onClick={() => setMobileOpen(false)}
-              className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-lg text-ink-faint dark:text-plate-ink-faint hover:text-ink dark:hover:text-plate-ink hover:bg-ink/8 dark:hover:bg-plate-ink/10 transition-colors"
             >
               <X size={16} />
             </button>
@@ -137,7 +137,7 @@ export const Sidebar: React.FC = () => {
             <button
               onClick={toggle}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white/50 hover:text-white transition-all duration-150"
+              className="flex items-center justify-center w-7 h-7 rounded-lg bg-ink/6 dark:bg-plate-ink/10 hover:bg-ink/10 dark:hover:bg-plate-ink/15 text-ink-faint dark:text-plate-ink-faint hover:text-ink dark:hover:text-plate-ink transition-all duration-150"
             >
               {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
             </button>
@@ -154,9 +154,9 @@ export const Sidebar: React.FC = () => {
           {collapsed && !isDrawer ? (
             /* Collapsed monogram */
             <div className="flex items-center justify-center py-3 w-full">
-              <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center ring-1 ring-white/10 shadow-inner">
+              <div className="w-9 h-9 rounded-xl bg-ink/8 dark:bg-plate-ink/10 flex items-center justify-center ring-1 ring-ink/10 dark:ring-plate-ink/15 shadow-inner">
                 <span
-                  className="text-white font-black text-base leading-none"
+                  className="text-edamame-700 dark:text-edamame-400 font-black text-base leading-none"
                   style={{ fontFamily: "'Sniglet', cursive" }}
                 >
                   E
@@ -172,7 +172,7 @@ export const Sidebar: React.FC = () => {
         </NavLink>
 
         {/* Divider */}
-        <div className="mx-4 h-px bg-white/8 dark:bg-white/5" />
+        <div className="mx-4 h-px bg-ink/10 dark:bg-plate-ink/15" />
       </div>
 
       {/* ── Navigation ── */}
@@ -181,13 +181,13 @@ export const Sidebar: React.FC = () => {
           <div key={gi}>
             {/* Section label */}
             {group.label && !(collapsed && !isDrawer) && (
-              <p className="px-3 mb-2 text-[9px] font-bold uppercase tracking-[0.12em] text-white/25 select-none">
+              <p className="px-3 mb-2 text-[9px] font-bold uppercase tracking-[0.12em] text-ink-soft/40 dark:text-plate-ink-soft/40 select-none">
                 {group.label}
               </p>
             )}
             {/* Divider instead of label when collapsed */}
             {group.label && collapsed && !isDrawer && gi > 0 && (
-              <div className="h-px bg-white/8 mx-2 mb-3" />
+              <div className="h-px bg-ink/10 dark:bg-plate-ink/15 mx-2 mb-3" />
             )}
 
             <div className={`space-y-0.5 ${collapsed && !isDrawer ? 'flex flex-col items-center' : ''}`}>
@@ -208,7 +208,7 @@ export const Sidebar: React.FC = () => {
 
       {/* ── Footer ── */}
       <div className="flex-shrink-0 pb-4 pt-2">
-        <div className="mx-4 h-px bg-white/8 dark:bg-white/5 mb-3" />
+        <div className="mx-4 h-px bg-ink/10 dark:bg-plate-ink/15 mb-3" />
         <div className={`px-3 space-y-0.5 ${collapsed && !isDrawer ? 'flex flex-col items-center space-y-0.5' : ''}`}>
           <NavItem
             to="/settings"
@@ -222,21 +222,21 @@ export const Sidebar: React.FC = () => {
           <button
             onClick={handleSignOut}
             className={`group relative flex items-center rounded-lg text-[13px] font-medium
-              text-white/40 hover:bg-red-500/15 hover:text-red-300 transition-all duration-150
+              text-ink-faint dark:text-plate-ink-faint hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-all duration-150
               ${collapsed && !isDrawer ? 'w-10 h-10 mx-auto justify-center' : 'w-full px-3 py-2.5 gap-3'}
             `}
           >
             <LogOut
               size={collapsed && !isDrawer ? 17 : 16}
-              className="flex-shrink-0 text-white/35 group-hover:text-red-400 transition-colors"
+              className="flex-shrink-0 text-ink-faint dark:text-plate-ink-faint group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors"
             />
             {!(collapsed && !isDrawer) && (
               <span className="leading-none tracking-[-0.01em]">Sign Out</span>
             )}
             {collapsed && !isDrawer && (
-              <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-md text-[12px] font-medium whitespace-nowrap z-[100] shadow-xl bg-gray-950/95 dark:bg-slate-800 text-white opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-100 origin-left">
+              <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-md text-[12px] font-medium whitespace-nowrap z-[100] shadow-xl bg-ink dark:bg-plate-card text-paper dark:text-plate-ink opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-100 origin-left">
                 Sign Out
-                <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-950/95 dark:border-r-slate-800" />
+                <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-ink dark:border-r-plate-card" />
               </span>
             )}
           </button>
@@ -244,7 +244,7 @@ export const Sidebar: React.FC = () => {
 
         {/* Version — expanded only */}
         {!(collapsed && !isDrawer) && (
-          <p className="px-6 mt-3 text-[10px] text-white/18 font-mono tracking-wider select-none">
+          <p className="px-6 mt-3 text-[10px] text-ink-soft/40 dark:text-plate-ink-soft/40 font-mono tracking-wider select-none">
             v1.0 · Edamame Legal
           </p>
         )}
@@ -267,8 +267,8 @@ export const Sidebar: React.FC = () => {
       <aside
         className={`
           hidden md:flex flex-col
-          bg-edamame-sidebar dark:bg-slate-900
-          border-r border-transparent dark:border-slate-800
+          bg-paper dark:bg-plate
+          border-r border-ink/10 dark:border-plate-ink/15
           h-screen fixed left-0 top-0 z-20
           transition-[width] duration-300 ease-in-out
           overflow-hidden
@@ -276,9 +276,9 @@ export const Sidebar: React.FC = () => {
         `}
       >
         {/* Subtle depth texture */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        <div className="absolute inset-0 pointer-events-none opacity-[0.035] text-ink dark:text-plate-ink"
           style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 24px, rgba(255,255,255,0.5) 24px, rgba(255,255,255,0.5) 25px)',
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 24px, currentColor 24px, currentColor 25px)',
           }}
         />
         <div className="relative z-10 flex flex-col h-full">
@@ -296,7 +296,7 @@ export const Sidebar: React.FC = () => {
 
       {/* Mobile drawer */}
       <aside
-        className={`md:hidden fixed left-0 top-0 h-full w-72 z-50 bg-edamame-sidebar dark:bg-slate-900 shadow-2xl sidebar-drawer ${
+        className={`md:hidden fixed left-0 top-0 h-full w-72 z-50 bg-paper dark:bg-plate shadow-2xl sidebar-drawer ${
           mobileOpen ? 'sidebar-drawer-open' : 'sidebar-drawer-closed'
         }`}
         aria-modal="true"

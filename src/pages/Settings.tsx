@@ -219,28 +219,28 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
   };
 
   return (
-    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-gray-50 dark:bg-slate-950 min-h-screen transition-colors duration-200 page-enter">
+    <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-paper dark:bg-plate min-h-screen transition-colors duration-200 page-enter">
       <div className="max-w-[680px] mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-[26px] font-extrabold tracking-[-0.035em] text-gray-900 dark:text-white">
+          <h1 className="text-[26px] font-extrabold tracking-[-0.035em] text-ink dark:text-plate-ink">
             Settings
           </h1>
-          <p className="text-[13px] text-gray-500 dark:text-slate-400 mt-1">
+          <p className="text-[13px] text-ink-soft dark:text-plate-ink-soft mt-1">
             Customize your workspace appearance
           </p>
         </div>
 
         {/* Appearance section */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="bg-paper-2 dark:bg-plate-card rounded-xl border border-ink/15 dark:border-plate-ink/20 shadow-sm overflow-hidden">
           {/* Section header */}
-          <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-3">
+          <div className="px-6 py-4 border-b border-ink/10 dark:border-plate-ink/15 flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 dark:text-edamame-400 flex items-center justify-center">
               <Palette size={16} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white">Appearance</h2>
-              <p className="text-xs text-gray-400 dark:text-slate-500">Choose how the interface looks.</p>
+              <h2 className="text-sm font-bold text-ink dark:text-plate-ink">Appearance</h2>
+              <p className="text-xs text-ink-faint dark:text-plate-ink-faint">Choose how the interface looks.</p>
             </div>
           </div>
 
@@ -252,7 +252,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
                 className={`group relative rounded-xl border-2 text-left transition-all duration-200 overflow-hidden ${
                   selectedTheme === 'classic'
                     ? 'border-edamame shadow-lg shadow-edamame/15 ring-2 ring-edamame/20'
-                    : 'border-gray-200 dark:border-slate-700 hover:border-edamame/40 dark:hover:border-edamame/30'
+                    : 'border-ink/15 dark:border-plate-ink/20 hover:border-edamame/40 dark:hover:border-edamame/30'
                 }`}
               >
                 {/* Preview area */}
@@ -299,7 +299,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
                 className={`group relative rounded-xl border-2 text-left transition-all duration-200 overflow-hidden ${
                   selectedTheme === 'dark'
                     ? 'border-edamame shadow-lg shadow-edamame/15 ring-2 ring-edamame/20'
-                    : 'border-gray-200 dark:border-slate-700 hover:border-edamame/40 dark:hover:border-edamame/30'
+                    : 'border-ink/15 dark:border-plate-ink/20 hover:border-edamame/40 dark:hover:border-edamame/30'
                 }`}
               >
                 {/* Preview area */}
@@ -342,14 +342,14 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 dark:bg-slate-900/60 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
+          <div className="px-6 py-4 bg-paper-2 dark:bg-plate-card/60 border-t border-ink/10 dark:border-plate-ink/15 flex items-center justify-between">
             {saved ? (
               <span className="text-xs font-semibold text-edamame-600 dark:text-edamame-400 flex items-center gap-1.5">
                 <Check size={13} />
                 Saved successfully
               </span>
             ) : (
-              <span className="text-xs text-gray-400 dark:text-slate-600">
+              <span className="text-xs text-ink-faint dark:text-plate-ink-faint">
                 {hasChanges ? 'You have unsaved changes.' : 'All changes saved.'}
               </span>
             )}
@@ -359,7 +359,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
               className={`btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
                 hasChanges
                   ? 'bg-edamame hover:bg-edamame-600 text-white shadow-md shadow-edamame/20'
-                  : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-600 cursor-not-allowed'
+                  : 'bg-paper-2 dark:bg-plate-card text-ink-faint dark:text-plate-ink-faint cursor-not-allowed'
               }`}
             >
               <Save size={15} />
@@ -370,23 +370,23 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
 
         {/* Data Storage section */}
         {profile?.storageMode === 'local' && (
-          <div className="mt-6 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-3">
+          <div className="mt-6 bg-paper-2 dark:bg-plate-card rounded-xl border border-ink/15 dark:border-plate-ink/20 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-ink/10 dark:border-plate-ink/15 flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 dark:text-edamame-400 flex items-center justify-center">
                 <FolderCog size={16} />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-gray-900 dark:text-white">Data Storage</h2>
-                <p className="text-xs text-gray-400 dark:text-slate-500">Your clients, cases, and tasks are stored as files in this folder.</p>
+                <h2 className="text-sm font-bold text-ink dark:text-plate-ink">Data Storage</h2>
+                <p className="text-xs text-ink-faint dark:text-plate-ink-faint">Your clients, cases, and tasks are stored as files in this folder.</p>
               </div>
             </div>
             <div className="p-6 flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                <p className="text-sm font-medium text-ink dark:text-plate-ink">
                   {profile.linkedFolderName || 'No folder linked'}
                 </p>
                 {profile.linkedAt && (
-                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+                  <p className="text-xs text-ink-faint dark:text-plate-ink-faint mt-0.5">
                     Linked {new Date(profile.linkedAt).toLocaleString()}
                   </p>
                 )}
@@ -397,13 +397,13 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
               <button
                 onClick={handleChangeFolder}
                 disabled={changingFolder}
-                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 transition-all disabled:opacity-50 flex-shrink-0"
+                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-paper-2 hover:bg-paper-2/70 text-ink-soft dark:bg-plate-card dark:hover:bg-plate dark:text-plate-ink-soft transition-all disabled:opacity-50 flex-shrink-0"
               >
                 <FolderCog size={15} />
                 {changingFolder ? 'Changing...' : 'Change Folder'}
               </button>
             </div>
-            <div className="px-6 pb-5 -mt-2 flex items-start gap-1.5 text-xs text-gray-400 dark:text-slate-500">
+            <div className="px-6 pb-5 -mt-2 flex items-start gap-1.5 text-xs text-ink-faint dark:text-plate-ink-faint">
               <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
               <span>If the folder you pick already has Edamame data in it, that data is adopted as-is rather than overwritten.</span>
             </div>
@@ -411,20 +411,20 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
         )}
 
         {/* Storage mode switch */}
-        <div className="mt-6 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-3">
+        <div className="mt-6 bg-paper-2 dark:bg-plate-card rounded-xl border border-ink/15 dark:border-plate-ink/20 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-ink/10 dark:border-plate-ink/15 flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 dark:text-edamame-400 flex items-center justify-center">
               {profile?.storageMode === 'local' ? <HardDrive size={16} /> : <Cloud size={16} />}
             </div>
             <div>
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white">Storage Mode</h2>
-              <p className="text-xs text-gray-400 dark:text-slate-500">
+              <h2 className="text-sm font-bold text-ink dark:text-plate-ink">Storage Mode</h2>
+              <p className="text-xs text-ink-faint dark:text-plate-ink-faint">
                 Currently storing data {profile?.storageMode === 'local' ? 'locally in a linked folder' : 'in the cloud'}.
               </p>
             </div>
           </div>
           <div className="p-6 flex items-center justify-between gap-4">
-            <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm">
+            <p className="text-xs text-ink-soft dark:text-plate-ink-soft max-w-sm">
               {profile?.storageMode === 'local'
                 ? 'Switch to cloud storage to access your data from any device without a linked folder. This overwrites any existing data in your cloud account with your local copy.'
                 : 'Switch to local storage to keep your data as files in a folder you control (e.g. inside Dropbox or OneDrive). This overwrites any existing Edamame data in the folder you pick with your cloud copy.'}
@@ -433,7 +433,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
               <button
                 onClick={handleSwitchToCloud}
                 disabled={switchingMode}
-                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 transition-all disabled:opacity-50 flex-shrink-0"
+                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-paper-2 hover:bg-paper-2/70 text-ink-soft dark:bg-plate-card dark:hover:bg-plate dark:text-plate-ink-soft transition-all disabled:opacity-50 flex-shrink-0"
               >
                 <Cloud size={15} />
                 {switchingMode ? (switchProgress || 'Switching...') : 'Switch to Cloud'}
@@ -442,7 +442,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
               <button
                 onClick={handleSwitchToLocal}
                 disabled={switchingMode}
-                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 transition-all disabled:opacity-50 flex-shrink-0"
+                className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-paper-2 hover:bg-paper-2/70 text-ink-soft dark:bg-plate-card dark:hover:bg-plate dark:text-plate-ink-soft transition-all disabled:opacity-50 flex-shrink-0"
               >
                 <HardDrive size={15} />
                 {switchingMode ? (switchProgress || 'Switching...') : 'Switch to Local'}
@@ -458,14 +458,14 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
         </div>
 
         {/* Usage section */}
-        <div className="mt-6 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-3">
+        <div className="mt-6 bg-paper-2 dark:bg-plate-card rounded-xl border border-ink/15 dark:border-plate-ink/20 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-ink/10 dark:border-plate-ink/15 flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 dark:text-edamame-400 flex items-center justify-center">
               <BarChart3 size={16} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white">Usage</h2>
-              <p className="text-xs text-gray-400 dark:text-slate-500">A summary of your activity on this account.</p>
+              <h2 className="text-sm font-bold text-ink dark:text-plate-ink">Usage</h2>
+              <p className="text-xs text-ink-faint dark:text-plate-ink-faint">A summary of your activity on this account.</p>
             </div>
           </div>
           <div className="p-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -477,24 +477,24 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
               { label: 'Gemini tokens used', value: usageStats.totalTokens.toLocaleString() },
               { label: 'Estimated AI cost', value: `$${usageStats.estimatedCostUsd.toFixed(2)}` },
             ].map(stat => (
-              <div key={stat.label} className="rounded-lg bg-gray-50 dark:bg-slate-800/60 p-4">
-                <div className="text-xl font-extrabold text-gray-900 dark:text-white">
+              <div key={stat.label} className="rounded-lg bg-paper-2 dark:bg-plate-card/60 p-4">
+                <div className="text-xl font-extrabold text-ink dark:text-plate-ink">
                   {usageEvents === null ? '—' : stat.value}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">{stat.label}</div>
+                <div className="text-xs text-ink-soft dark:text-plate-ink-soft mt-1">{stat.label}</div>
               </div>
             ))}
           </div>
-          <div className="px-6 pb-5 -mt-2 flex items-start gap-1.5 text-xs text-gray-400 dark:text-slate-500">
+          <div className="px-6 pb-5 -mt-2 flex items-start gap-1.5 text-xs text-ink-faint dark:text-plate-ink-faint">
             <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
             <span>Estimated AI cost is a placeholder ($0.00) until real Gemini pricing is configured — token counts above are accurate.</span>
           </div>
         </div>
 
         {/* Account section */}
-        <div className="mt-6 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="mt-6 bg-paper-2 dark:bg-plate-card rounded-xl border border-ink/15 dark:border-plate-ink/20 shadow-sm overflow-hidden">
           <div className="p-6">
-            <div className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-gray-400 dark:text-slate-500 mb-3">
+            <div className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-ink-faint dark:text-plate-ink-faint mb-3">
               Account
             </div>
             <div className="flex items-center gap-3">
@@ -502,14 +502,14 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
                 {initialsOf(user?.user_metadata?.full_name || user?.email || '?')}
               </div>
               <div className="min-w-0">
-                <div className="text-[13.5px] font-bold text-gray-900 dark:text-white truncate">
+                <div className="text-[13.5px] font-bold text-ink dark:text-plate-ink truncate">
                   {user?.user_metadata?.full_name || 'Your account'}
                 </div>
-                <div className="text-xs text-gray-400 dark:text-slate-500 truncate">{user?.email}</div>
+                <div className="text-xs text-ink-faint dark:text-plate-ink-faint truncate">{user?.email}</div>
               </div>
             </div>
-            <div className="flex items-center justify-between mt-[18px] pt-4 border-t border-gray-100 dark:border-slate-800">
-              <span className="text-[12.5px] text-gray-500 dark:text-slate-400">Sign out of your Edamame account on this device.</span>
+            <div className="flex items-center justify-between mt-[18px] pt-4 border-t border-ink/10 dark:border-plate-ink/15">
+              <span className="text-[12.5px] text-ink-soft dark:text-plate-ink-soft">Sign out of your Edamame account on this device.</span>
               <button
                 onClick={handleSignOut}
                 className="btn-press flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-red-200 dark:border-red-900/40 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/30 dark:hover:bg-red-950/60 dark:text-red-400 font-bold text-xs transition-all flex-shrink-0"
@@ -523,7 +523,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
 
         {/* App info */}
         <div className="mt-6 px-2">
-          <p className="text-xs text-gray-400 dark:text-slate-700 text-center">
+          <p className="text-xs text-ink-faint dark:text-plate-ink-faint text-center">
             Edamame Legal Flow · Built for AU/NZ Immigration Practitioners ·{' '}
             <Link to="/" className="text-edamame-600 dark:text-edamame-400 hover:underline">
               View marketing site →

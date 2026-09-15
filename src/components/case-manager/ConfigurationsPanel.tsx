@@ -45,23 +45,23 @@ export const ConfigurationsPanel: React.FC<{ onClose: () => void }> = ({ onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden border border-gray-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+      <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden border border-ink/10 dark:border-plate-ink/15 animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="p-5 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
+        <div className="p-5 border-b border-ink/10 dark:border-plate-ink/15 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center">
               <Settings2 size={15} className="text-edamame" />
             </div>
             <div>
-              <h3 className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight">Case Manager Configurations</h3>
-              <p className="text-[11px] text-gray-400 dark:text-slate-500">
+              <h3 className="text-[15px] font-bold text-ink dark:text-plate-ink leading-tight">Case Manager Configurations</h3>
+              <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
                 Settings that apply across every case in this account
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft rounded-lg hover:bg-paper-2 dark:hover:bg-plate-card transition-colors"
           >
             <X size={18} />
           </button>
@@ -69,7 +69,7 @@ export const ConfigurationsPanel: React.FC<{ onClose: () => void }> = ({ onClose
 
         {/* Left nav of setting types + right detail pane */}
         <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[220px_1fr]">
-          <nav className="hidden sm:block border-r border-gray-100 dark:border-slate-800 p-3 space-y-1 overflow-y-auto custom-scrollbar">
+          <nav className="hidden sm:block border-r border-ink/10 dark:border-plate-ink/15 p-3 space-y-1 overflow-y-auto custom-scrollbar">
             {SETTING_TYPES.map(t => {
               const Icon = t.icon;
               const isActive = t.id === activeType;
@@ -80,7 +80,7 @@ export const ConfigurationsPanel: React.FC<{ onClose: () => void }> = ({ onClose
                   className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors ${
                     isActive
                       ? 'bg-edamame/[0.08] dark:bg-edamame/[0.12] text-edamame-700 dark:text-edamame-400'
-                      : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'
+                      : 'text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate'
                   }`}
                 >
                   <Icon size={14} className="mt-0.5 flex-shrink-0" />
@@ -143,8 +143,8 @@ const DocumentTypeSettings: React.FC = () => {
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-[14px] font-bold text-gray-900 dark:text-white">Document Type</h4>
-        <p className="text-[11.5px] text-gray-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+        <h4 className="text-[14px] font-bold text-ink dark:text-plate-ink">Document Type</h4>
+        <p className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5 leading-relaxed">
           The shared vocabulary for classifying Case Files and Document Checklist items. System defaults are locked —
           you can still choose which of them auto-link, and add your own types below.
         </p>
@@ -153,16 +153,16 @@ const DocumentTypeSettings: React.FC = () => {
       {/* Search + auto-link legend */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         <div className="relative flex-1">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 dark:text-slate-600" />
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft/40 dark:text-plate-ink-soft/40" />
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search by code, description or category…"
-            className="w-full pl-8 pr-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[12px] text-gray-700 dark:text-slate-200 outline-none focus:border-edamame transition-colors"
+            className="w-full pl-8 pr-3 py-2 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[12px] text-ink-soft dark:text-plate-ink-soft outline-none focus:border-edamame transition-colors"
           />
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-[11px] font-semibold text-gray-400 dark:text-slate-500">
+          <span className="text-[11px] font-semibold text-ink-faint dark:text-plate-ink-faint">
             {autoLinkCount} of {documentTypes.length} auto-link
           </span>
           <button
@@ -175,14 +175,14 @@ const DocumentTypeSettings: React.FC = () => {
       </div>
 
       {adding && (
-        <div className="rounded-xl border border-dashed border-gray-200 dark:border-slate-700 p-3.5 space-y-2">
+        <div className="rounded-xl border border-dashed border-ink/15 dark:border-plate-ink/20 p-3.5 space-y-2">
           <div className="flex flex-col sm:flex-row gap-2">
             <input
               value={form.code}
               onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })}
               maxLength={DOCUMENT_TYPE_CODE_MAX}
               placeholder="CODE"
-              className="sm:w-28 px-3 py-2 font-mono uppercase bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[12.5px] text-gray-800 dark:text-white outline-none focus:border-edamame"
+              className="sm:w-28 px-3 py-2 font-mono uppercase bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[12.5px] text-ink dark:text-plate-ink outline-none focus:border-edamame"
             />
             <input
               value={form.description}
@@ -190,12 +190,12 @@ const DocumentTypeSettings: React.FC = () => {
               maxLength={DOCUMENT_TYPE_DESCRIPTION_MAX}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
               placeholder="Description"
-              className="flex-1 min-w-0 px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[12.5px] text-gray-800 dark:text-white outline-none focus:border-edamame"
+              className="flex-1 min-w-0 px-3 py-2 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[12.5px] text-ink dark:text-plate-ink outline-none focus:border-edamame"
             />
             <select
               value={form.category}
               onChange={e => setForm({ ...form, category: e.target.value })}
-              className="sm:w-56 px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[12.5px] text-gray-800 dark:text-white outline-none focus:border-edamame"
+              className="sm:w-56 px-3 py-2 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[12.5px] text-ink dark:text-plate-ink outline-none focus:border-edamame"
             >
               {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -207,7 +207,7 @@ const DocumentTypeSettings: React.FC = () => {
               <Check size={13} /> Save
             </button>
           </div>
-          <p className="text-[10.5px] text-gray-400 dark:text-slate-500">
+          <p className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint">
             Code: up to {DOCUMENT_TYPE_CODE_MAX} characters, uppercase letters and digits only, unique within your firm.
           </p>
         </div>
@@ -221,16 +221,16 @@ const DocumentTypeSettings: React.FC = () => {
 
       {/* Column header with the auto-link hint */}
       <div className="flex items-center justify-end gap-1.5 pr-1">
-        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-400 dark:text-slate-500">Auto-link</span>
-        <span title={AUTO_LINK_HINT} className="text-gray-300 dark:text-slate-600 hover:text-edamame cursor-help">
+        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint dark:text-plate-ink-faint">Auto-link</span>
+        <span title={AUTO_LINK_HINT} className="text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-edamame cursor-help">
           <Info size={12} />
         </span>
       </div>
 
       {loading ? (
-        <div className="py-10 text-center text-[12px] text-gray-400 dark:text-slate-500">Loading document types…</div>
+        <div className="py-10 text-center text-[12px] text-ink-faint dark:text-plate-ink-faint">Loading document types…</div>
       ) : groups.length === 0 ? (
-        <div className="py-10 text-center text-[12px] text-gray-400 dark:text-slate-500">
+        <div className="py-10 text-center text-[12px] text-ink-faint dark:text-plate-ink-faint">
           {documentTypes.length === 0 ? 'No document types configured.' : `No document type matches "${query}".`}
         </div>
       ) : (
@@ -238,26 +238,26 @@ const DocumentTypeSettings: React.FC = () => {
           {groups.map(([category, types]) => {
             const isCollapsed = collapsed.has(category) && !query;
             return (
-              <div key={category} className="rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+              <div key={category} className="rounded-xl border border-ink/15 dark:border-plate-ink/20 overflow-hidden">
                 <button
                   onClick={() => toggleCollapsed(category)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 text-left bg-gray-50/60 dark:bg-slate-800/40"
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-left bg-paper-2/60 dark:bg-plate-card/40 dark:bg-plate-card/40"
                 >
-                  <span className="text-[12px] font-bold text-gray-900 dark:text-white">{category}</span>
+                  <span className="text-[12px] font-bold text-ink dark:text-plate-ink">{category}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10.5px] font-bold text-gray-400 dark:text-slate-500">{types.length}</span>
-                    {isCollapsed ? <ChevronRight size={13} className="text-gray-400" /> : <ChevronDown size={13} className="text-gray-400" />}
+                    <span className="text-[10.5px] font-bold text-ink-faint dark:text-plate-ink-faint">{types.length}</span>
+                    {isCollapsed ? <ChevronRight size={13} className="text-ink-faint dark:text-plate-ink-faint" /> : <ChevronDown size={13} className="text-ink-faint dark:text-plate-ink-faint" />}
                   </div>
                 </button>
                 {!isCollapsed && types.map(t => (
                   <div
                     key={t.id}
-                    className="flex items-center gap-3 px-4 py-2 border-t border-gray-100 dark:border-slate-800"
+                    className="flex items-center gap-3 px-4 py-2 border-t border-ink/10 dark:border-plate-ink/15"
                   >
-                    <span className="font-mono text-[11.5px] font-bold text-gray-800 dark:text-slate-200 w-16 flex-shrink-0">{t.code}</span>
-                    <span className="flex-1 min-w-0 text-[12px] text-gray-600 dark:text-slate-400 truncate">{t.description}</span>
+                    <span className="font-mono text-[11.5px] font-bold text-ink dark:text-plate-ink-soft w-16 flex-shrink-0">{t.code}</span>
+                    <span className="flex-1 min-w-0 text-[12px] text-ink-soft dark:text-plate-ink-soft truncate">{t.description}</span>
                     {t.isSystemDefault ? (
-                      <span title="System default — cannot be renamed, recoded or deleted" className="text-gray-300 dark:text-slate-600 flex-shrink-0">
+                      <span title="System default — cannot be renamed, recoded or deleted" className="text-ink-soft/40 dark:text-plate-ink-soft/40 flex-shrink-0">
                         <Lock size={11} />
                       </span>
                     ) : confirmDeleteId === t.id ? (
@@ -270,7 +270,7 @@ const DocumentTypeSettings: React.FC = () => {
                         </button>
                         <button
                           onClick={() => setConfirmDeleteId(null)}
-                          className="px-2 py-0.5 text-[10.5px] font-semibold rounded text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
+                          className="px-2 py-0.5 text-[10.5px] font-semibold rounded text-ink-soft dark:text-plate-ink-soft hover:text-ink-soft dark:hover:text-plate-ink"
                         >
                           Cancel
                         </button>
@@ -279,7 +279,7 @@ const DocumentTypeSettings: React.FC = () => {
                       <button
                         onClick={() => setConfirmDeleteId(t.id)}
                         title="Delete this firm-added document type"
-                        className="p-1 text-gray-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 flex-shrink-0"
+                        className="p-1 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-red-500 dark:hover:text-red-400 flex-shrink-0"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -300,7 +300,7 @@ const DocumentTypeSettings: React.FC = () => {
         </div>
       )}
 
-      <p className="text-[10.5px] text-gray-400 dark:text-slate-500 leading-relaxed">
+      <p className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint leading-relaxed">
         Changing an auto-link setting doesn't rewrite existing checklists straight away — it takes effect the next time
         a case's Document Checklist tab is opened or refreshed. Verified and Waived items are never changed by auto-link.
       </p>
