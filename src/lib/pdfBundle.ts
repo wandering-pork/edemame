@@ -61,9 +61,11 @@ export async function mergePdfs(loaded: LoadedPdf[]): Promise<{ bytes: Uint8Arra
   merged.setSubject('');
   merged.setKeywords([]);
 
-  // Try object-stream compression first; fall back if it produces larger output
-  let bytes = await merged.save({ useObjectStreams: true });
-  const fallback = await merged.save({ useObjectStreams: false });
+  // Try object-stream compression first; fall back if it produces larger output.
+  // addDefaultPage: false — pdf-lib otherwise inserts a blank page on save when
+  // `loaded` was empty, silently turning a 0-page merge into a 1-page PDF.
+  let bytes = await merged.save({ useObjectStreams: true, addDefaultPage: false });
+  const fallback = await merged.save({ useObjectStreams: false, addDefaultPage: false });
   if (fallback.length < bytes.length) bytes = fallback;
 
   return { bytes, pageMap };

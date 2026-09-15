@@ -11,6 +11,7 @@ import {
   formatBytes,
   createDownloadUrl,
   triggerDownload,
+  sanitiseFilenameSegment,
 } from '../lib/pdfBundle';
 
 const TARGET_BYTES = 4.9 * 1024 * 1024;
@@ -63,7 +64,7 @@ export const BundleBuilder820: React.FC<BundleBuilder820Props> = ({
 
   const totalTagged = ASPECT_ORDER_820.reduce((sum, k) => sum + grouped[k].length, 0);
   const populatedSlots = ASPECT_ORDER_820.filter(k => grouped[k].length > 0).length;
-  const lastName = applicant.name.split(/\s+/).pop() || 'Applicant';
+  const lastName = sanitiseFilenameSegment(applicant.name.split(/\s+/).pop() || 'Applicant');
   const dateStr = format(new Date(), 'yyyyMMdd');
 
   useEffect(() => {
