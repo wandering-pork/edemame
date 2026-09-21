@@ -11,7 +11,8 @@ import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
 import { CaseDetails } from './pages/CaseDetails';
 import { Clients } from './pages/Clients';
-import { VisaAdvisor } from './pages/VisaAdvisor';
+import { VisaAdvisor, OpenCaseParams } from './pages/VisaAdvisor';
+import { generateTasksFromCase } from './services/geminiService';
 import { Templates } from './pages/Templates';
 import { Settings } from './pages/Settings';
 import { TeamDashboard } from './pages/TeamDashboard';
@@ -552,6 +553,8 @@ const AppShell: React.FC = () => {
                 clients={clients}
                 templates={templates}
                 onEligibilityChecked={handleEligibilityChecked}
+                onAddClient={handleAddClient}
+                onTasksConfirmed={handleTasksConfirmed}
               />
             } />
             <Route path="/cases" element={
@@ -656,13 +659,81 @@ interface VisaAdvisorRouteProps {
   clients: Client[];
   templates: WorkflowTemplate[];
   onEligibilityChecked: (usage: { promptTokens: number; candidatesTokens: number; totalTokens: number; estimatedCostUsd: number }) => void;
+  onAddClient: (client: Client) => Promise<void>;
+  onTasksConfirmed: (tasks: Task[], newCase: Case) => Promise<void>;
 }
 
 const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
   const navigate = useNavigate();
 
-  const handleOpenNewCase = (templateKeyword: string) => {
-    navigate('/cases', { state: { suggestedTemplateKeyword: templateKeyword } });
+  const handleOpenNewCase = async ({ clientInfo, visaSubclass, visaName, caseDescription, onProgress }: OpenCaseParams) => {
+    onProgress('client');
+    // Reuse an existing client when name + DOB match, rather than creating a duplicate.
+    let client = props.clients.find(
+      (c) =>
+        c.name.trim().toLowerCase() === clientInfo.fullName.trim().toLowerCase() &&
+        (!clientInfo.dob || c.dob === clientInfo.dob)
+    );
+    if (!client) {
+      client = {
+        id: uuidv4(),
+        name: clientInfo.fullName || 'Unnamed Client',
+        dob: clientInfo.dob || '',
+        phone: '',
+        email: '',
+        address: '',
+        nationality: clientInfo.nationality || undefined,
+      };
+      await props.onAddClient(client);
+    }
+
+    const template = props.templates.find(
+      (t) => t.visaSubclass?.includes(visaSubclass) || t.title?.includes(visaName)
+    );
+
+    const startDate = new Date().toISOString().split('T')[0];
+    const newCaseId = uuidv4();
+
+    onProgress('plan');
+    let generatedTasks: Partial<Task>[] = [];
+    try {
+      generatedTasks = await generateTasksFromCase(
+        caseDescription,
+        template?.description || '',
+        startDate,
+        template?.visaSubclass,
+        template?.title,
+        template?.steps
+      );
+    } catch {
+      toast.error('Case created, but AI task generation failed — you can generate tasks from the case page.');
+    }
+
+    onProgress('finalizing');
+    const newCase: Case = {
+      id: newCaseId,
+      clientId: client.id,
+      title: `${template?.title || `Subclass ${visaSubclass}`} - ${client.name}`,
+      description: caseDescription,
+      templateId: template?.id || '',
+      status: 'open',
+      startDate,
+      createdAt: new Date().toISOString(),
+    };
+
+    const finalTasks: Task[] = generatedTasks.map((t, index) => ({
+      id: uuidv4(),
+      title: t.title || 'Untitled Task',
+      description: t.description || '',
+      date: t.date || startDate,
+      isCompleted: false,
+      priorityOrder: index,
+      generatedByAi: true,
+      caseId: newCaseId,
+    }));
+
+    await props.onTasksConfirmed(finalTasks, newCase);
+    navigate(`/cases/${newCaseId}`);
   };
 
   return (

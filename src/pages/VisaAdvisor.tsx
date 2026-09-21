@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Client, WorkflowTemplate } from '../types';
 import {
   ChevronRight,
@@ -58,11 +58,104 @@ interface EligibilityUsage {
   estimatedCostUsd: number;
 }
 
+export type OpenCaseStage = 'client' | 'plan' | 'finalizing';
+
+export interface OpenCaseParams {
+  clientInfo: { fullName: string; dob: string; nationality: string };
+  visaSubclass: string;
+  visaName: string;
+  caseDescription: string;
+  onProgress: (stage: OpenCaseStage) => void;
+}
+
+const openCaseStageLabels: Record<OpenCaseStage, string> = {
+  client: 'Setting up client…',
+  plan: 'Drafting task plan with AI…',
+  finalizing: 'Finalizing case…',
+};
+
 interface VisaAdvisorProps {
   clients: Client[];
   templates: WorkflowTemplate[];
-  onOpenNewCase: (templateKeyword: string) => void;
+  onOpenNewCase: (params: OpenCaseParams) => Promise<void>;
   onEligibilityChecked?: (usage: EligibilityUsage) => void;
+}
+
+const purposeLabels: Record<string, string> = {
+  work: 'Work / Employment',
+  study: 'Study',
+  family: 'Family Reunification',
+  pr: 'Permanent Residence',
+  visit: 'Visit / Tourism',
+};
+
+const durationLabels: Record<string, string> = {
+  short: '< 3 months',
+  medium: '3–12 months',
+  years: '1–4 years',
+  permanent: 'Permanently',
+};
+
+const detailFieldLabels: Record<string, string> = {
+  occupation: 'Occupation',
+  yearsExperience: 'Years of experience',
+  skillsAssessment: 'Skills assessment completed',
+  courseLevel: 'Course level',
+  financialSupport: 'Financial support confirmed',
+  relationshipType: 'Relationship type',
+  sponsorStatus: "Sponsor's AU status",
+  pointsScore: 'Self-assessed points score',
+  statePreference: 'Preferred state',
+  tripDuration: 'Trip duration',
+  strongTies: 'Strong ties to home country',
+};
+
+// Turns the wizard's collected answers + the chosen pathway's assessment into
+// the case notes a lawyer would otherwise type by hand into New Case Intake.
+function buildCaseDescription(wizardState: WizardState, visa: VisaOption): string {
+  const { clientInfo, goals, details, supportingFactors } = wizardState;
+  const lines: string[] = [];
+
+  lines.push(`Generated from Visa Eligibility Advisor — assessed pathway: ${visa.visaName} (subclass ${visa.visaSubclass}), verdict: ${verdictLabels[visa.verdict] ?? visa.verdict}.`);
+  lines.push('');
+  lines.push(`Currently in Australia: ${clientInfo.inAustralia ? 'Yes' : 'No'}${clientInfo.currentVisaStatus ? ` (${clientInfo.currentVisaStatus})` : ''}`);
+  if (goals.primaryPurpose) {
+    lines.push(`Primary purpose: ${purposeLabels[goals.primaryPurpose] ?? goals.primaryPurpose}`);
+  }
+  if (goals.intendedDuration) {
+    lines.push(`Intended duration of stay: ${durationLabels[goals.intendedDuration] ?? goals.intendedDuration}`);
+  }
+
+  const detailEntries = Object.entries(details).filter(([, v]) => v !== '' && v !== undefined && v !== null && v !== false);
+  if (detailEntries.length > 0) {
+    lines.push('');
+    lines.push('Pathway specifics:');
+    detailEntries.forEach(([key, value]) => {
+      const label = detailFieldLabels[key] ?? key;
+      lines.push(`- ${label}: ${value === true ? 'Yes' : value}`);
+    });
+  }
+
+  lines.push('');
+  lines.push('Supporting factors:');
+  if (supportingFactors.englishProficiency) {
+    lines.push(`- English proficiency: ${supportingFactors.englishProficiency}`);
+  }
+  lines.push(`- Health conditions requiring medical clearance: ${supportingFactors.healthConcerns ? 'Yes' : 'No'}`);
+  lines.push(`- Prior criminal history or visa refusals: ${supportingFactors.criminalHistory ? 'Yes' : 'No'}`);
+
+  if (visa.reasons.length > 0) {
+    lines.push('');
+    lines.push('Why this pathway was assessed as viable:');
+    visa.reasons.forEach((r) => lines.push(`- ${r}`));
+  }
+  if (visa.gaps.length > 0) {
+    lines.push('');
+    lines.push('Gaps to address before lodgement:');
+    visa.gaps.forEach((g) => lines.push(`- ${g}`));
+  }
+
+  return lines.join('\n');
 }
 
 // Verdict language per design spec: Strong match (green) / Possible (amber) / Unlikely (red),
@@ -170,7 +263,6 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   onEligibilityChecked,
 }) => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const clientId = searchParams.get('clientId');
   const prefilledClient = clientId
     ? clients.find((c) => c.id === clientId)
@@ -201,6 +293,8 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [report, setReport] = useState<EligibilityReport | null>(null);
   const [showAllPathways, setShowAllPathways] = useState(false);
+  const [openingCaseSubclass, setOpeningCaseSubclass] = useState<string | null>(null);
+  const [openingCaseStage, setOpeningCaseStage] = useState<OpenCaseStage>('client');
 
   const sortedOptions = useMemo(() => {
     if (!report) return [];
@@ -266,9 +360,23 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
     }));
   };
 
-  const handleOpenCase = (templateKeyword: string) => {
-    // Navigate to /cases and pass the template keyword via state
-    navigate('/cases', { state: { suggestedTemplateKeyword: templateKeyword } });
+  const handleOpenCase = async (visa: VisaOption) => {
+    setOpeningCaseSubclass(visa.visaSubclass);
+    setOpeningCaseStage('client');
+    try {
+      await onOpenNewCase({
+        clientInfo: wizardState.clientInfo,
+        visaSubclass: visa.visaSubclass,
+        visaName: visa.visaName,
+        caseDescription: buildCaseDescription(wizardState, visa),
+        onProgress: setOpeningCaseStage,
+      });
+      // On success the parent navigates away — no need to reset state here,
+      // and doing so would flash the idle button for a frame before unmount.
+    } catch (error) {
+      alert('Error: Could not create the case. Please try again.');
+      setOpeningCaseSubclass(null);
+    }
   };
 
   const first = wizardState.clientInfo.fullName ? wizardState.clientInfo.fullName.split(' ')[0] : null;
@@ -872,7 +980,9 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
               </div>
               <button
                 onClick={handleStartOver}
-                className="px-4 py-2 text-[13px] font-semibold text-ink-soft dark:text-plate-ink-soft bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors btn-press"
+                disabled={openingCaseSubclass !== null}
+                title={openingCaseSubclass !== null ? 'A case is being created — hang tight' : undefined}
+                className="px-4 py-2 text-[13px] font-semibold text-ink-soft dark:text-plate-ink-soft bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors btn-press disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Start Over
               </button>
@@ -907,10 +1017,22 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   </div>
                   {isQualified && (
                     <button
-                      onClick={() => handleOpenCase(best.visaSubclass)}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-edamame-500 hover:bg-edamame-600 text-white text-[13px] font-bold rounded-lg transition-colors btn-press whitespace-nowrap"
+                      onClick={() => handleOpenCase(best)}
+                      disabled={openingCaseSubclass !== null}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-edamame-500 hover:bg-edamame-600 text-white text-[13px] font-bold rounded-lg transition-colors btn-press whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed min-w-[172px]"
                     >
-                      Open Case <ArrowRight size={14} />
+                      {openingCaseSubclass === best.visaSubclass ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin flex-shrink-0" />
+                          <span className={openingCaseStage === 'plan' ? 'font-mono-ai' : ''}>
+                            {openCaseStageLabels[openingCaseStage]}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          Open Case <ArrowRight size={14} />
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
@@ -1037,10 +1159,22 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                         {isQualified && (
                           <div className="pt-3 border-t border-ink/15 dark:border-plate-ink/20">
                             <button
-                              onClick={() => handleOpenCase(visa.visaSubclass)}
-                              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-edamame-500 hover:bg-edamame-600 text-white text-[12.5px] font-bold rounded-lg transition-colors btn-press"
+                              onClick={() => handleOpenCase(visa)}
+                              disabled={openingCaseSubclass !== null}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-edamame-500 hover:bg-edamame-600 text-white text-[12.5px] font-bold rounded-lg transition-colors btn-press disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                              Open New Case <ArrowRight size={13} />
+                              {openingCaseSubclass === visa.visaSubclass ? (
+                                <>
+                                  <Loader2 size={13} className="animate-spin flex-shrink-0" />
+                                  <span className={openingCaseStage === 'plan' ? 'font-mono-ai' : ''}>
+                                    {openCaseStageLabels[openingCaseStage]}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  Open New Case <ArrowRight size={13} />
+                                </>
+                              )}
                             </button>
                           </div>
                         )}
