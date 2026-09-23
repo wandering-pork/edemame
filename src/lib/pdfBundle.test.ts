@@ -11,7 +11,7 @@ import {
   createDownloadUrl,
   type LoadedPdf,
 } from './pdfBundle';
-import { DOHA_MAX_BYTES, formatBytes as formatBytesFromAutoPackager } from './autoPackager';
+import { DOHA_MAX_BYTES, formatBytes as formatBytesFromDocumentCompressor } from './documentCompressor';
 
 function makeDoc(overrides: Partial<Document> = {}): Document {
   return {
@@ -307,8 +307,8 @@ describe('formatBytes', () => {
     expect(formatBytes(bytes)).toBe(expected);
   });
 
-  it('is the same function reference as the one re-exported from autoPackager.ts', () => {
-    expect(formatBytesFromAutoPackager).toBe(formatBytes);
+  it('is the same function reference as the one re-exported from documentCompressor.ts', () => {
+    expect(formatBytesFromDocumentCompressor).toBe(formatBytes);
   });
 });
 

@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Document } from '../types';
 
 // Mock the two heavier collaborators compressDocument delegates to for PDFs,
-// so these tests exercise autoPackager.ts's own decision logic (which path
-// to take, how to size/flag the result) without needing a real PDF parser,
-// pdf.js worker, or canvas.
+// so these tests exercise documentCompressor.ts's own decision logic (which
+// path to take, how to size/flag the result) without needing a real PDF
+// parser, pdf.js worker, or canvas.
 vi.mock('./pdfBundle', () => ({
   loadPdf: vi.fn(async (doc: Document, blob: Blob) => ({ doc, bytes: new Uint8Array(await blob.arrayBuffer()), pageCount: 1 })),
   mergePdfs: vi.fn(),
@@ -37,7 +37,7 @@ import {
   DOHA_MAX_BYTES,
   SAFE_TARGET_BYTES,
   IMAGE_TARGET_BYTES,
-} from './autoPackager';
+} from './documentCompressor';
 import { formatBytes as formatBytesFromPdfBundle } from './pdfBundle';
 
 function makeDoc(overrides: Partial<Document> = {}): Document {
@@ -598,7 +598,7 @@ describe('validateOutputNames', () => {
 });
 
 describe('formatBytes re-export identity', () => {
-  it('autoPackager re-exports the exact same function as pdfBundle', () => {
+  it('documentCompressor re-exports the exact same function as pdfBundle', () => {
     expect(formatBytes).toBe(formatBytesFromPdfBundle);
   });
 });

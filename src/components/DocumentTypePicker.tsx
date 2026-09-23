@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Check, ChevronDown, Tag } from 'lucide-react';
 import { useDocumentTypes } from '@/contexts/DocumentTypeContext';
 import { filterDocumentTypes, groupDocumentTypes, OTHER_DOCUMENT_TYPE_CODE } from '@/lib/documentTypes';
@@ -35,24 +36,65 @@ export const DocumentTypePicker: React.FC<DocumentTypePickerProps> = ({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Rendered in a portal (see below) so the dropdown can never be clipped by
+  // an ancestor's `overflow-hidden`/`overflow-auto` — it was previously
+  // absolutely-positioned inside the trigger's own container, which cut the
+  // panel off whenever that container (e.g. the Case Files upload staging
+  // list) was shorter than the open dropdown.
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const selected: DocumentType | undefined = value ? byCode.get(value) : undefined;
 
   const groups = useMemo(() => groupDocumentTypes(filterDocumentTypes(documentTypes, query)), [documentTypes, query]);
 
-  useEffect(() => {
-    if (open) inputRef.current?.focus();
-    else setQuery('');
+  const updatePanelPos = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const panelHeight = panelRef.current?.offsetHeight ?? 320;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < panelHeight && rect.top > spaceBelow;
+    setPanelPos({
+      top: openUpward ? Math.max(8, rect.top - panelHeight - 4) : rect.bottom + 4,
+      left: Math.min(rect.left, window.innerWidth - rect.width - 8),
+      width: rect.width,
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePanelPos();
+    inputRef.current?.focus();
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
+    // Recompute once the panel has actually rendered/sized itself, so an
+    // initial "open downward" guess flips to "open upward" if the real
+    // (filtered-results) height wouldn't fit.
+    updatePanelPos();
+  }, [open, groups.length]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    setQuery('');
+    const reposition = () => updatePanelPos();
     const onDocMouseDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', onDocMouseDown);
-    return () => document.removeEventListener('mousedown', onDocMouseDown);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
   }, [open]);
 
   const pick = (code: string) => {
@@ -63,6 +105,7 @@ export const DocumentTypePicker: React.FC<DocumentTypePickerProps> = ({
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         title={selected ? `${selected.code} — ${selected.description}` : placeholder}
@@ -89,8 +132,12 @@ export const DocumentTypePicker: React.FC<DocumentTypePickerProps> = ({
         <ChevronDown size={compact ? 11 : 13} className="ml-auto text-ink-faint dark:text-plate-ink-faint flex-shrink-0" />
       </button>
 
-      {open && (
-        <div className="absolute left-0 right-0 z-50 mt-1 min-w-[260px] bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/15 dark:border-plate-ink/20 overflow-hidden modal-content">
+      {open && panelPos && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: 'fixed', top: panelPos.top, left: panelPos.left, width: Math.max(panelPos.width, 260) }}
+          className="z-[70] bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/15 dark:border-plate-ink/20 overflow-hidden modal-content"
+        >
           <div className="relative border-b border-ink/10 dark:border-plate-ink/15">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft/40 dark:text-plate-ink-soft/40" />
             <input
@@ -150,7 +197,8 @@ export const DocumentTypePicker: React.FC<DocumentTypePickerProps> = ({
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

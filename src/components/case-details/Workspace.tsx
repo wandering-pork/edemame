@@ -23,7 +23,7 @@ const VIEW_ICONS: Record<CaseViewKind, React.ElementType> = {
 
 const TOOL_ICONS: Record<CaseToolKind, React.ElementType> = {
   'checklist-generator': Wand2,
-  'auto-packager': Package,
+  'document-compressor': Package,
   'bundle-builder-820': FolderKanban,
 };
 
