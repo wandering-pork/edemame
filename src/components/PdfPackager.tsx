@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import type { Document } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { immiAccountName, loadPdf, mergePdfs, formatBytes, createDownloadUrl, triggerDownload } from '../lib/pdfBundle';
-import { DOHA_MAX_BYTES } from '../lib/autoPackager';
+import { DOHA_MAX_BYTES } from '../lib/documentCompressor';
 
 interface PdfPackagerProps {
   caseId: string;

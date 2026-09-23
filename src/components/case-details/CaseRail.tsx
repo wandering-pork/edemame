@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileText, Image as ImageIcon, File as FileIcon, MoreVertical, AlertTriangle } from 'lucide-react';
 import type { Client, Document } from '../../types';
 import { DocumentUpload } from '../DocumentUpload';
-import { DOHA_MAX_BYTES } from '../../lib/autoPackager';
+import { DOHA_MAX_BYTES } from '../../lib/documentCompressor';
 
 export interface RailAlert {
   color: 'red' | 'amber' | 'blue';
