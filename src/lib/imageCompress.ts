@@ -1,11 +1,11 @@
 /**
- * Client-side raster image compression for the Auto-Packager.
+ * Client-side raster image compression for the Document Compressor.
  *
  * Uses the browser's Canvas API (createImageBitmap + canvas.toBlob) — no
  * external dependency needed, consistent with this being a client-only SPA.
  * Always re-encodes to JPEG: this both compresses (resize + quality) and
  * converts legacy formats (BMP/GIF) to the format DoHA prefers for ImmiAccount
- * uploads, per the Auto-Packager spec (issue #2).
+ * uploads, per the Document Compressor spec (originally issue #2).
  */
 
 export interface CompressImageResult {

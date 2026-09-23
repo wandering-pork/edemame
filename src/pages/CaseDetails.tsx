@@ -7,7 +7,7 @@ import { DocumentUpload } from '../components/DocumentUpload';
 import { DocumentList } from '../components/DocumentList';
 import { PdfPackager } from '../components/PdfPackager';
 import { BundleBuilder820 } from '../components/BundleBuilder820';
-import { AutoPackager } from '../components/AutoPackager';
+import { DocumentCompressor } from '../components/DocumentCompressor';
 import { CaseRail, RailAlert, CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
 import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList';
 import { AgentPanel } from '../components/case-details/AgentPanel';
@@ -79,7 +79,7 @@ const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
   notes: 'Notes',
   documents: 'Case Files',
   'checklist-generator': 'Document Checklist Generator',
-  'auto-packager': 'Auto-Packager',
+  'document-compressor': 'Document Compressor',
   'bundle-builder-820': '820 Bundle Builder',
 };
 
@@ -97,7 +97,7 @@ const RECOMMEND_KEYWORDS: Array<[CaseTabKind, RegExp]> = [
   ['tasks', /task|deadline|due date|schedule|overdue/i],
   ['notes', /note|summary|history|record/i],
   ['checklist-generator', /generate|missing document|category|categories/i],
-  ['auto-packager', /crusher|compress|5\s*mb|packager|auto-?packager/i],
+  ['document-compressor', /crusher|compress|5\s*mb|packager|document compressor|auto-?packager/i],
   ['bundle-builder-820', /820|bundle|submission/i],
 ];
 
@@ -155,7 +155,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [caseFilesSplit, setCaseFilesSplit] = useState(false);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
   const [recommendedViewKinds, setRecommendedViewKinds] = useState<CaseTabKind[]>(['checklist', 'tasks', 'notes']);
-  const [recommendedToolKinds, setRecommendedToolKinds] = useState<CaseTabKind[]>(['checklist-generator', 'auto-packager', 'bundle-builder-820']);
+  const [recommendedToolKinds, setRecommendedToolKinds] = useState<CaseTabKind[]>(['checklist-generator', 'document-compressor', 'bundle-builder-820']);
   const [messageRecommendations, setMessageRecommendations] = useState<Record<string, MessageRecommendation[]>>({});
 
   // ---- Top-bar menu state ----
@@ -177,10 +177,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // ---- 820 Submission Bundle Builder state ----
   const [showBundleBuilder, setShowBundleBuilder] = useState(false);
 
-  // ---- Auto-Packager state ----
-  const [showAutoPackager, setShowAutoPackager] = useState(false);
-  /** CF-2: files handed off from an over-the-limit Case Files upload attempt, pre-loaded into Auto-Packager's local-PC source. */
-  const [packagerInitialFiles, setPackagerInitialFiles] = useState<File[] | undefined>(undefined);
+  // ---- Document Compressor state ----
+  const [showDocumentCompressor, setShowDocumentCompressor] = useState(false);
+  /** CF-2: files handed off from an over-the-limit Case Files upload attempt, pre-loaded into the Document Compressor's local-PC source. */
+  const [compressorInitialFiles, setCompressorInitialFiles] = useState<File[] | undefined>(undefined);
+  /** "Compress" quick action on an oversized Case Files row — pre-selects that one document. */
+  const [compressorInitialDocIds, setCompressorInitialDocIds] = useState<string[] | undefined>(undefined);
 
   // ---- Chat state ----
   const [conversations, setConversations] = useState<FocusConversation[]>([]);
@@ -381,7 +383,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const openOrFocusTab = (kind: CaseTabKind, label?: string) => {
     if (kind === 'workspace') { setActiveTabId('workspace'); return; }
     if (kind === 'checklist-generator') { setShowChecklistGenerator(true); return; }
-    if (kind === 'auto-packager') { setShowPackager(true); return; }
+    if (kind === 'document-compressor') { setShowDocumentCompressor(true); return; }
     if (kind === 'bundle-builder-820') { setShowBundleBuilder(true); return; }
 
     const id = `tab:${kind}`;
@@ -423,8 +425,16 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   /** CF-2: user opted to compress an over-the-limit Case Files upload instead of re-browsing. */
   const handleRequestCompress = (files: File[]) => {
-    setPackagerInitialFiles(files);
-    setShowAutoPackager(true);
+    setCompressorInitialFiles(files);
+    setCompressorInitialDocIds(undefined);
+    setShowDocumentCompressor(true);
+  };
+
+  /** "Compress" quick action on an oversized row already in Case Files. */
+  const handleCompressDoc = (doc: Document) => {
+    setCompressorInitialFiles(undefined);
+    setCompressorInitialDocIds([doc.id]);
+    setShowDocumentCompressor(true);
   };
 
   // ---- Case handlers ----
@@ -670,7 +680,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       const matchedKinds = RECOMMEND_KEYWORDS.filter(([, re]) => re.test(combinedText)).map(([kind]) => kind);
       if (matchedKinds.length > 0) {
         const matchedViews = matchedKinds.filter(k => k === 'tasks' || k === 'checklist' || k === 'notes');
-        const matchedTools = matchedKinds.filter(k => k === 'checklist-generator' || k === 'auto-packager' || k === 'bundle-builder-820');
+        const matchedTools = matchedKinds.filter(k => k === 'checklist-generator' || k === 'document-compressor' || k === 'bundle-builder-820');
         if (matchedViews.length > 0) {
           setRecommendedViewKinds(prev => [...matchedViews, ...prev.filter(k => !matchedViews.includes(k))]);
         }
@@ -1022,7 +1032,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 <div className="absolute right-0 top-full mt-1.5 z-40 w-52 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
                   <button onClick={() => { openOrFocusTab('checklist'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
                   <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Workspace</button>
-                  <button onClick={() => { setShowAutoPackager(true); setMoreOpen(false); }} className={menuItemCls}>Auto-Packager</button>
+                  <button onClick={() => { setShowDocumentCompressor(true); setMoreOpen(false); }} className={menuItemCls}>Document Compressor</button>
                   {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && (
                     <button onClick={handleRunCrusher} className={menuItemCls}>Run Crusher</button>
                   )}
@@ -1146,7 +1156,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               ] as WorkspaceCatalogItem[]}
               toolCatalog={[
                 { kind: 'checklist-generator', label: 'Document Checklist Generator', description: 'Pick categories to generate a checklist from the system default + workflow template' },
-                ...(SUPPORTED_SUBCLASSES.includes(visaSubclass || '') ? [{ kind: 'auto-packager', label: 'Auto-Packager', description: 'Compress & bundle documents under 5MB' }] as WorkspaceCatalogItem[] : []),
+                { kind: 'document-compressor', label: 'Document Compressor', description: 'Compress documents to meet DoHA\'s 5MB-per-attachment requirement' },
                 ...(visaSubclass === '820' ? [{ kind: 'bundle-builder-820', label: '820 Bundle Builder', description: 'Build the ImmiAccount submission bundle' }] as WorkspaceCatalogItem[] : []),
               ]}
               recommendedViewKinds={recommendedViewKinds}
@@ -1215,7 +1225,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 }}
                 onRequestCompress={handleRequestCompress}
               />
-              <DocumentList caseId={currentCase.id} refreshKey={docRefreshKey} visaSubclass={visaSubclass} onDeleted={handleDocumentRemovedFromState} />
+              <DocumentList caseId={currentCase.id} refreshKey={docRefreshKey} visaSubclass={visaSubclass} onDeleted={handleDocumentRemovedFromState} onCompressDoc={handleCompressDoc} />
             </div>
           )}
 
@@ -1735,15 +1745,15 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         </div>
       )}
 
-      {/* Auto-Packager slide-over */}
-      {showAutoPackager && (
-        <AutoPackager
+      {/* Document Compressor slide-over */}
+      {showDocumentCompressor && (
+        <DocumentCompressor
           caseId={caseItem.id}
           documents={documents}
-          visaSubclass={visaSubclass}
           applicant={applicant ?? client}
-          initialLocalFiles={packagerInitialFiles}
-          onClose={() => { setShowAutoPackager(false); setPackagerInitialFiles(undefined); }}
+          initialLocalFiles={compressorInitialFiles}
+          initialCaseDocIds={compressorInitialDocIds}
+          onClose={() => { setShowDocumentCompressor(false); setCompressorInitialFiles(undefined); setCompressorInitialDocIds(undefined); }}
           onSaved={() => setDocRefreshKey(k => k + 1)}
         />
       )}

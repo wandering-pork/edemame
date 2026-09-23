@@ -3,7 +3,7 @@ import { FileText, Image as ImageIcon, File as FileIcon, AlertTriangle } from 'l
 import type { Document } from '../../types';
 import { CASE_FILE_DRAG_MIME } from './CaseRail';
 import { DocumentTypeBadge } from '../DocumentTypePicker';
-import { DOHA_MAX_BYTES } from '../../lib/autoPackager';
+import { DOHA_MAX_BYTES } from '../../lib/documentCompressor';
 
 function fileIconFor(fileType: string) {
   if (fileType.startsWith('image/')) return ImageIcon;

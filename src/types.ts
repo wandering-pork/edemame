@@ -248,7 +248,7 @@ export interface DocumentType {
 export type CaseViewKind = 'tasks' | 'checklist' | 'notes' | 'documents';
 
 /** Built-in Tool items surfaced from the Workspace "Tools" section. */
-export type CaseToolKind = 'checklist-generator' | 'auto-packager' | 'bundle-builder-820';
+export type CaseToolKind = 'checklist-generator' | 'document-compressor' | 'bundle-builder-820';
 
 export type CaseTabKind = 'workspace' | CaseViewKind | CaseToolKind;
 

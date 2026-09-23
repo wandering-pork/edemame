@@ -5,7 +5,7 @@ import {
   SUPPORTED_FORMATS_LABEL,
   CASE_FILES_MAX_BYTES,
 } from './supportedFormats';
-import { DOHA_MAX_BYTES } from './autoPackager';
+import { DOHA_MAX_BYTES } from './documentCompressor';
 
 describe('isSupportedDocumentFile', () => {
   it.each([
@@ -111,7 +111,7 @@ describe('constants coherence', () => {
   });
 });
 
-describe('auto-select eligibility (proxy for AutoPackager.tsx isAutoSelectEligible, not exported)', () => {
+describe('auto-select eligibility (proxy for DocumentCompressor.tsx isAutoSelectEligible, not exported)', () => {
   // isAutoSelectEligible(doc) = fileSize > DOHA_MAX_BYTES && isSupportedDocumentFile(...)
   // Re-implemented locally since the real predicate lives unexported inside a .tsx component.
   function isAutoSelectEligible(fileSize: number, fileName: string, fileType: string): boolean {

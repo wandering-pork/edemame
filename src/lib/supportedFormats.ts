@@ -1,8 +1,9 @@
 /**
- * Shared "what can Case Files / Auto-Packager accept" definitions, used by
- * both the Case Files upload dropzone (DocumentUpload.tsx) and the
- * Auto-Packager's local-PC file picker (AutoPackager.tsx) so the two stay
- * in sync rather than drifting into two different format matrices.
+ * Shared "what can Case Files / Document Compressor accept" definitions,
+ * used by both the Case Files upload dropzone (DocumentUpload.tsx) and the
+ * Document Compressor's local-PC file picker (DocumentCompressor.tsx) so
+ * the two stay in sync rather than drifting into two different format
+ * matrices.
  */
 
 /** react-dropzone `accept` map: mime type -> allowed extensions. */
@@ -22,12 +23,12 @@ export const SUPPORTED_FORMATS_LABEL = 'PDF, JPG, PNG, DOCX';
 /**
  * Case Files' upload ceiling (CF-1). Raised from the old hard 5 MB block so
  * oversized-but-realistic scans/bundles have somewhere to land before being
- * run through the Auto-Packager — DoHA's actual 5 MB limit is enforced per
- * output attachment by the packager, not at the Case Files upload gate.
+ * run through the Document Compressor — DoHA's actual 5 MB limit is enforced
+ * per output attachment by the compressor, not at the Case Files upload gate.
  */
 export const CASE_FILES_MAX_BYTES = 50 * 1024 * 1024;
 
-/** Whether a given file is one of the formats Case Files / Auto-Packager can handle. */
+/** Whether a given file is one of the formats Case Files / Document Compressor can handle. */
 export function isSupportedDocumentFile(file: { name: string; type: string }): boolean {
   const name = file.name.toLowerCase();
   if (file.type === 'application/pdf' || name.endsWith('.pdf')) return true;
