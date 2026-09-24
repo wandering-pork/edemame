@@ -10,13 +10,13 @@ interface TemplatesProps {
 }
 
 // Deterministic accent per visa subclass, matching the design handoff's
-// 186 (green/brand), 482 (blue), 490 (purple), 820 (amber) palette.
+// 186 (green/brand), 482 (blue), 491 (purple), 820 (amber) palette.
 // Any subclass not in this map falls back to a stable color chosen by
 // hashing the subclass/title, then cycling through the same palette.
 const subclassAccents: Record<string, { bar: string; icon: string }> = {
   '186': { bar: 'bg-edamame', icon: 'bg-edamame/10 text-edamame-600 dark:bg-edamame/15 dark:text-edamame-400' },
   '482': { bar: 'bg-blue-500', icon: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' },
-  '490': { bar: 'bg-violet-500', icon: 'bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400' },
+  '491': { bar: 'bg-violet-500', icon: 'bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400' },
   '820': { bar: 'bg-amber-500', icon: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
   '801': { bar: 'bg-amber-500', icon: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
   '500': { bar: 'bg-rose-500', icon: 'bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' },

@@ -81,7 +81,7 @@ const CHECKLIST_CATEGORIES: Record<string, CategoryDef[]> = {
         ['Approved Standard Business Sponsor (SBS) letter', 'Standard Business Sponsorship approval'],
         ['Nomination application (Form 1395)', undefined],
         ['Employment contract', 'Current employer — signed by both parties'],
-        ['Evidence salary meets current TSMIT threshold', undefined],
+        ['Evidence salary meets current income threshold', 'Core Skills Income Threshold (CSIT) — the renamed/indexed successor to TSMIT'],
         ['Skilling Australians Fund (SAF) levy receipt', undefined],
         ['Employer financials', 'Last 2 years of financial statements to demonstrate business viability'],
       ],
@@ -116,13 +116,14 @@ const CHECKLIST_CATEGORIES: Record<string, CategoryDef[]> = {
   ],
   '482': [
     {
-      category: '482 — Sponsor & Nomination Documents',
+      category: '482 — Sponsor & Nomination Documents (Skills in Demand visa)',
       items: [
         ['SBS approval evidence', 'Standard Business Sponsorship approval letter for employer'],
-        ['Labour Market Testing evidence', 'Minimum 2 job ads run for at least 28 days, stating salary'],
+        ['Stream confirmation', 'Core Skills, Specialist Skills, or Labour Agreement — confirm which stream the nomination is lodged under'],
+        ['Labour Market Testing evidence', 'Job ad(s) run for the required minimum period, stating salary, unless a current exemption applies'],
         ['Skilling Australians Fund (SAF) levy receipt', undefined],
         ['Employment contract', 'Position, salary, and conditions must match nomination'],
-        ['Evidence salary meets current TSMIT', undefined],
+        ['Evidence salary meets current income threshold', 'Core Skills Income Threshold (CSIT) or Specialist Skills Income Threshold (SSIT), whichever applies to the stream'],
       ],
     },
     {
@@ -135,7 +136,7 @@ const CHECKLIST_CATEGORIES: Record<string, CategoryDef[]> = {
     {
       category: '482 — Primary Applicant: Skills & Qualifications',
       items: [
-        ['Skills assessment (if applicable)', 'Occupation-dependent — confirm with DAMA/TSS requirements'],
+        ['Skills assessment (if applicable)', 'Occupation-dependent — confirm with current Skills in Demand visa / Designated Area Migration Agreement (DAMA) requirements'],
         ['Qualifications / degree certificates', 'Certified translations required for non-English documents'],
         ['English language test certificate', 'IELTS, PTE, or TOEFL as required by occupation'],
       ],
@@ -149,29 +150,32 @@ const CHECKLIST_CATEGORIES: Record<string, CategoryDef[]> = {
       ],
     },
   ],
-  '490': [
+  // Key is '491' (Skilled Work Regional (Provisional)) — "490" is not a current
+  // Australian visa subclass. See the header comment above `seedDefaultTemplates()`
+  // in `seedData.ts` for why the corresponding template's `id` stays `tpl-490`.
+  '491': [
     {
-      category: '490/491 — State / Territory Nomination',
+      category: '491 — State / Territory Nomination or Family Sponsorship',
       items: [
-        ['State nomination letter', 'From state/territory nominating authority'],
+        ['State/territory nomination letter, or family sponsorship approval', 'From the nominating authority, or evidence of an eligible family sponsor in a designated regional area'],
         ['SkillSelect EOI screenshot', 'Showing invitation to apply with points score'],
         ['Evidence of regional intent', 'Job offer, family connection, or settlement plans in regional area'],
       ],
     },
     {
-      category: '490/491 — Skills & Qualifications',
+      category: '491 — Skills & Qualifications',
       items: [
         ['Skills assessment certificate', 'From assessing authority relevant to nominated occupation'],
       ],
     },
     {
-      category: '490/491 — English Language',
+      category: '491 — English Language',
       items: [
         ['IELTS / PTE certificate', 'English proficiency — higher scores earn more points'],
       ],
     },
     {
-      category: '490/491 — Identity & Character',
+      category: '491 — Identity & Character',
       items: [
         ['Passport (all pages)', 'Valid for duration of intended stay'],
         ['AFP National Police Check', 'Less than 12 months old'],
@@ -215,9 +219,9 @@ const CHECKLIST_CATEGORIES: Record<string, CategoryDef[]> = {
     {
       category: '485 — Qualification & Stream',
       items: [
-        ['Qualification/course completion letter', 'Evidence the Australian study requirement (typically 2 academic years) was met'],
-        ['Confirmation of Enrolment (CoE)', 'For the completed CRICOS-registered course'],
-        ['Skills assessment (if applicable)', 'Required for some pathways/streams — confirm against current requirements'],
+        ['Qualification/course completion letter', 'From the CRICOS-registered provider, confirming the Australian study requirement (typically 2 academic years) was met — this is the primary evidence, not the CoE'],
+        ['Academic transcript', 'For the completed course'],
+        ['Skills assessment (Post-Vocational Education Work stream)', 'Required before lodgement for this stream; generally not required for the Post-Higher Education Work stream — confirm against current requirements'],
       ],
     },
     {
@@ -279,7 +283,6 @@ const CHECKLIST_CATEGORIES: Record<string, CategoryDef[]> = {
     {
       category: '417 — Identity & Character',
       items: [
-        ['Functional English evidence', 'If requested — e.g. English-speaking country passport or prior study'],
         ['Medical examination results', 'If required based on intended activities or country of origin'],
         ['Police clearances', 'If requested by the Department'],
       ],

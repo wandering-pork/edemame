@@ -3,7 +3,7 @@
 Templates define the standard procedure the AI follows to generate a case's task schedule. There
 are two kinds: **built-in templates** covering every visa subclass the Visa Eligibility Advisor can
 assess — Skilled Independent 189, Skilled Nominated 190, TSS 482, ENS 186, Student 500, Skilled
-Work Regional 490, Partner 820/801, Temporary Graduate 485, Visitor 600, and Working Holiday 417 —
+Work Regional (Provisional) 491, Partner 820/801, Temporary Graduate 485, Visitor 600, and Working Holiday 417 —
 and **custom templates** you create yourself.
 
 ## Browsing templates

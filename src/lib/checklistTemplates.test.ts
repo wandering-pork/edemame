@@ -10,7 +10,7 @@ import { SYSTEM_DOCUMENT_TYPES } from './documentTypes';
  * either side is caught: adding a subclass to the Advisor without a matching
  * template/checklist fails this test, and vice versa.
  */
-const ADVISOR_SUBCLASSES = ['189', '190', '482', '186', '500', '820', '485', '600', '417', '490'];
+const ADVISOR_SUBCLASSES = ['189', '190', '482', '186', '500', '820', '485', '600', '417', '491'];
 
 describe('Advisor subclass coverage', () => {
   it('every Advisor subclass has a system workflow template', () => {

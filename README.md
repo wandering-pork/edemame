@@ -48,7 +48,7 @@ It replaces the fragmented, rule-based tools that dominate the incumbent market 
 - **Drag-and-drop document upload** (PDF, DOCX, images) with file-type icons and image thumbnails.
 - **Partner 820 Bundle Builder** — Australia's Partner visa requires evidence grouped by *aspects of the relationship* (Financial / Household / Social / Commitment) plus identity, sponsor, and police/health slots. Edamame tags each document by aspect, suggests tags via filename heuristics, and auto-produces ImmiAccount-ready bundles.
 - **PDF Packager** — Merges selected documents into one or more PDFs, auto-split to a configurable size target (default 5 MB) to fit ImmiAccount upload limits. Built on `pdf-lib`.
-- **Checklist Templates** — Pre-built document requirement checklists per visa subclass (186, 482, 490, 820) with status tracking (`pending` / `uploaded` / `verified` / `waived`).
+- **Checklist Templates** — Pre-built document requirement checklists per visa subclass (186, 482, 491, 820) with status tracking (`pending` / `uploaded` / `verified` / `waived`).
 - **OPFS file storage** — Document blobs are stored in the browser's Origin Private File System, keeping files local and private.
 
 ### Team Collaboration

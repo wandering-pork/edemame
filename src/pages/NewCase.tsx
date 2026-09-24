@@ -37,7 +37,7 @@ const DESCRIPTION_HINTS: Record<string, string> = {
 • Preferred visa duration (1–4 years) and pathway to PR intent
 • Dependants to include (names, ages, relationship)`,
 
-  '490': `What to include for Subclass 490 (Skilled Regional):
+  '491': `What to include for Subclass 491 (Skilled Work Regional — Provisional):
 • Current visa status & expiry date (onshore / offshore?)
 • Nominated occupation (ANZSCO code) and current points score
 • Skills assessment — body (TRA/ACS/Engineers Australia/etc.), status, outcome
@@ -72,7 +72,7 @@ const DESCRIPTION_HINTS: Record<string, string> = {
 const GUIDED_CHIPS: Record<string, string[]> = {
   '186': ['Current visa + expiry', 'Stream: TRT or DE?', 'Employer + tenure', 'English evidence', 'Deadlines or complications'],
   '482': ['Current visa + expiry', 'Stream: ST/MT/LA?', 'Employer + sponsorship', 'English evidence', 'Deadlines or complications'],
-  '490': ['Current visa + expiry', 'Occupation + points', 'Skills assessment', 'English evidence', 'Deadlines or complications'],
+  '491': ['Current visa + expiry', 'Occupation + points', 'Skills assessment', 'English evidence', 'Deadlines or complications'],
   '820': ['Current visa + expiry', 'Sponsor details', 'Relationship length', 'Cohabitation evidence', 'Deadlines or complications'],
   default: ['Current visa + expiry', 'Immigration goal', 'Key prerequisites done', 'Deadlines or complications'],
 };

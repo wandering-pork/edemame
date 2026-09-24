@@ -41,10 +41,10 @@ Originally built with [Google AI Studio](https://ai.studio/apps/1c0e5b8b-4436-4c
 |----------|-----------|
 | Skilled Independent 189 | Points-tested, no sponsor |
 | Skilled Nominated 190 | State-nominated skilled migration |
-| Temporary Skill Shortage 482 | Employer-sponsored temporary work |
+| Skills in Demand 482 | Employer-sponsored temporary work (rebranded from Temporary Skill Shortage, Dec 2024) |
 | Employer Nomination Scheme 186 | Employer-sponsored permanent residency |
 | Student Visa 500 | Australian student visa |
-| Skilled Work Regional 490 | Points-tested, state/family-nominated regional |
+| Skilled Work Regional (Provisional) 491 | Points-tested, state/family-nominated regional |
 | Partner Visa 820/801 | Onshore partner visa |
 | Temporary Graduate 485 | Post-study work stream |
 | Visitor Visa 600 | Temporary visitor |
@@ -205,7 +205,7 @@ The passport scanner streamlines client intake by automatically extracting passp
 
 ## Visa Eligibility Advisor
 
-Assess visa eligibility across 10 Australian visa types (189, 190, 482, 186, 500, 490, 820, 485, 600, 417):
+Assess visa eligibility across 10 Australian visa types (189, 190, 482, 186, 500, 491, 820, 485, 600, 417):
 
 1. Click **Visa Advisor** in the sidebar (or **Check Eligibility** on any client card)
 2. Complete a 4-step wizard:
@@ -218,7 +218,7 @@ Assess visa eligibility across 10 Australian visa types (189, 190, 482, 186, 500
    - Each card shows key reasons and gaps to address
 5. Click **Open New Case** on any qualified visa → creates case with that visa template pre-selected
 
-**Assessed Visa Types:** Skilled Independent (189), Skilled Nominated (190), Temporary Skill Shortage (482), Employer Nominated Scheme (186), Student (500), Partner (820), Temporary Graduate (485), Visitor (600), Working Holiday (417)
+**Assessed Visa Types:** Skilled Independent (189), Skilled Nominated (190), Skills in Demand (482), Employer Nominated Scheme (186), Student (500), Skilled Work Regional Provisional (491), Partner (820), Temporary Graduate (485), Visitor (600), Working Holiday (417)
 
 ---
 
