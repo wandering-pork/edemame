@@ -11,6 +11,7 @@ import {
   Search,
 } from 'lucide-react';
 import type { Case, Client, Task, TeamMember, ActivityEvent } from '../types';
+import { toLocalISODate } from '../lib/dates';
 
 interface TeamDashboardProps {
   teamMembers: TeamMember[];
@@ -61,7 +62,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
   const [assignTarget, setAssignTarget] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const today = useMemo(() => toLocalISODate(), []);
 
   // Per-member open tasks, for the 3-column Team View board.
   const memberColumns = useMemo(() => {

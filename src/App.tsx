@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Toaster, toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { Sidebar } from './components/Sidebar';
@@ -22,6 +22,8 @@ import LandingPage from './pages/LandingPage';
 import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote, UsageEvent } from './types';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
+import { toLocalISODate } from './lib/dates';
+import { resolveAdvisorClient } from './lib/resolveAdvisorClient';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
@@ -173,7 +175,7 @@ const AppShell: React.FC = () => {
   useEffect(() => {
     if (loading || tasks.length === 0) return;
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalISODate();
 
     const overdueTasks = tasks.filter(t => !t.isCompleted && t.date < today);
     if (overdueTasks.length === 0) return;
@@ -458,6 +460,11 @@ const AppShell: React.FC = () => {
     setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
   }, [repos]);
 
+  const handleDeleteClient = useCallback(async (id: string) => {
+    await repos.clients.delete(id);
+    setClients(prev => prev.filter(c => c.id !== id));
+  }, [repos]);
+
   if (loading) {
     return (
       <div className={theme === 'dark' ? 'dark' : ''}>
@@ -554,6 +561,7 @@ const AppShell: React.FC = () => {
                 templates={templates}
                 onEligibilityChecked={handleEligibilityChecked}
                 onAddClient={handleAddClient}
+                onDeleteClient={handleDeleteClient}
                 onTasksConfirmed={handleTasksConfirmed}
               />
             } />
@@ -660,42 +668,41 @@ interface VisaAdvisorRouteProps {
   templates: WorkflowTemplate[];
   onEligibilityChecked: (usage: { promptTokens: number; candidatesTokens: number; totalTokens: number; estimatedCostUsd: number }) => void;
   onAddClient: (client: Client) => Promise<void>;
+  onDeleteClient: (id: string) => Promise<void>;
   onTasksConfirmed: (tasks: Task[], newCase: Case) => Promise<void>;
 }
 
 const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Tracks whether the user is still looking at the Visa Advisor page when the
+  // (possibly slow, AI-backed) case creation finishes, so a navigation triggered
+  // after they've already clicked away doesn't yank them somewhere unexpected.
+  const locationRef = useRef(location.pathname);
+  useEffect(() => {
+    locationRef.current = location.pathname;
+  }, [location.pathname]);
 
-  const handleOpenNewCase = async ({ clientInfo, visaSubclass, visaName, caseDescription, onProgress }: OpenCaseParams) => {
-    onProgress('client');
-    // Reuse an existing client when name + DOB match, rather than creating a duplicate.
-    let client = props.clients.find(
-      (c) =>
-        c.name.trim().toLowerCase() === clientInfo.fullName.trim().toLowerCase() &&
-        (!clientInfo.dob || c.dob === clientInfo.dob)
-    );
-    if (!client) {
-      client = {
-        id: uuidv4(),
-        name: clientInfo.fullName || 'Unnamed Client',
-        dob: clientInfo.dob || '',
-        phone: '',
-        email: '',
-        address: '',
-        nationality: clientInfo.nationality || undefined,
-      };
-      await props.onAddClient(client);
-    }
-
-    const template = props.templates.find(
-      (t) => t.visaSubclass?.includes(visaSubclass) || t.title?.includes(visaName)
+  const handleOpenNewCase = async ({ clientId, clientInfo, visaSubclass, visaName, caseDescription, onProgress }: OpenCaseParams) => {
+    // Exact subclass match only — a template whose visaSubclass lists several
+    // subclasses (e.g. "820/801") is split and compared per-entry rather than
+    // matched with substring/title fuzziness, which could pick the wrong template.
+    const template = props.templates.find((t) =>
+      (t.visaSubclass || '')
+        .split('/')
+        .map((s) => s.trim())
+        .includes(visaSubclass)
     );
 
-    const startDate = new Date().toISOString().split('T')[0];
+    const startDate = toLocalISODate();
     const newCaseId = uuidv4();
 
+    // Generate the AI task plan first: if it fails there's nothing to roll back,
+    // and if it succeeds we don't want to have already created a client for a
+    // case that then fails to save.
     onProgress('plan');
     let generatedTasks: Partial<Task>[] = [];
+    let aiGenerationFailed = false;
     try {
       generatedTasks = await generateTasksFromCase(
         caseDescription,
@@ -706,7 +713,36 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
         template?.steps
       );
     } catch {
-      toast.error('Case created, but AI task generation failed — you can generate tasks from the case page.');
+      aiGenerationFailed = true;
+    }
+
+    onProgress('client');
+    const resolution = resolveAdvisorClient(props.clients, clientInfo, clientId);
+    let client: Client;
+    let createdNewClient = false;
+    if (resolution.kind === 'existing') {
+      client = resolution.client;
+    } else {
+      const notesLines = [`In Australia: ${clientInfo.inAustralia ? 'Yes' : 'No'}`];
+      if (clientInfo.currentVisaStatus) {
+        notesLines.push(`Current visa status: ${clientInfo.currentVisaStatus}`);
+      }
+      client = {
+        id: uuidv4(),
+        name: clientInfo.fullName,
+        dob: clientInfo.dob || '',
+        phone: '',
+        email: '',
+        address: '',
+        nationality: clientInfo.nationality || undefined,
+        role: 'applicant',
+        notes: notesLines.join('\n'),
+      };
+      await props.onAddClient(client);
+      createdNewClient = true;
+      if (resolution.sameNameCandidates.length > 0) {
+        toast(`Created a new client — an existing client named ${clientInfo.fullName} has a different or missing date of birth.`);
+      }
     }
 
     onProgress('finalizing');
@@ -732,8 +768,36 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
       caseId: newCaseId,
     }));
 
-    await props.onTasksConfirmed(finalTasks, newCase);
-    navigate(`/cases/${newCaseId}`);
+    try {
+      await props.onTasksConfirmed(finalTasks, newCase);
+    } catch (err) {
+      // Don't leave an orphaned client behind for a case that never got saved.
+      if (createdNewClient) {
+        try {
+          await props.onDeleteClient(client.id);
+        } catch (cleanupErr) {
+          console.error('Failed to roll back newly created client after case creation failed:', cleanupErr);
+        }
+      }
+      throw err;
+    }
+
+    // Only mention the AI failure once the case itself is safely saved — no
+    // point alarming the user about tasks if the whole thing is about to fail.
+    if (aiGenerationFailed) {
+      toast.error('AI task generation failed — the case will be created without tasks. You can generate them from the case page.');
+    }
+
+    if (locationRef.current === '/visa-advisor') {
+      navigate(`/cases/${newCaseId}`);
+    } else {
+      toast.success(`Case created: ${newCase.title}`, {
+        action: {
+          label: 'View case',
+          onClick: () => navigate(`/cases/${newCaseId}`),
+        },
+      });
+    }
   };
 
   return (
