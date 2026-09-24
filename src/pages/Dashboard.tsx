@@ -14,6 +14,7 @@ import { buildWindow, computeAutoWindowStart, jumpWeek, stepDay } from '../lib/c
 import { overdueTasksFor, dueTodayTasksFor, waitingTasksFor, buildAttentionItems, deadlineAttentionItemsFor, mergeAttentionItems } from '../lib/attention';
 import { allDeadlines } from '../lib/deadlines';
 import { isTaskClosed } from '../lib/taskStatus';
+import { isCaseClosed } from '../lib/caseStage';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 
 interface DashboardProps {
@@ -183,7 +184,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   // ── Stat cards ─────────────────────────────────────────────────────────
-  const activeCases = useMemo(() => cases.filter(c => c.status === 'open' || c.status === 'in_progress'), [cases]);
+  const activeCases = useMemo(() => cases.filter(c => !isCaseClosed(c) && !c.onHold), [cases]);
   const newCasesThisMonth = useMemo(
     () => cases.filter(c => c.createdAt && isSameMonth(new Date(c.createdAt), now)).length,
     [cases]

@@ -145,7 +145,7 @@ export async function openCaseFromAdvisor(params: OpenCaseParams, deps: OpenCase
     title,
     description: caseDescription,
     templateId: template?.id || '',
-    status: 'open',
+    stage: 'draft',
     startDate,
     createdAt: (deps.now ?? (() => new Date().toISOString()))(),
     visaSubclass,

@@ -1,4 +1,5 @@
 import { Case, WorkflowTemplate } from '../types';
+import { isCaseClosed } from './caseStage';
 
 /**
  * Finds an existing, non-closed case for `clientId` whose workflow template
@@ -23,7 +24,7 @@ export function findOpenCaseForSubclass(
 ): Case | null {
   for (const c of cases) {
     if (c.clientId !== clientId) continue;
-    if (c.status === 'closed') continue;
+    if (isCaseClosed(c)) continue;
     const rawSubclass = c.visaSubclass ?? templates.find((t) => t.id === c.templateId)?.visaSubclass;
     if (!rawSubclass) continue;
     const subclasses = rawSubclass.split('/').map((s) => s.trim());

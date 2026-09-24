@@ -253,7 +253,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       title: `${selectedTemplate?.title} - ${selectedClient.name}`,
       description: description,
       templateId: templateId,
-      status: 'open',
+      stage: 'draft',
       startDate: startDate,
       createdAt: new Date().toISOString(),
       visaSubclass: selectedTemplate?.visaSubclass,

@@ -153,6 +153,15 @@ create policy "owners remove members" on firm_members
 create or replace function firm_members_guard()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
+  -- The "members update self" policy below only checks that the row being
+  -- updated (and the new row) belongs to the caller's own user_id — it does
+  -- NOT stop the caller from changing firm_id (part of the primary key) to a
+  -- firm they were never invited to, which would self-grant membership of an
+  -- arbitrary firm. firm_id/user_id are immutable for every caller, including
+  -- owners; accept-invite always inserts a new row rather than moving one.
+  if new.firm_id is distinct from old.firm_id or new.user_id is distinct from old.user_id then
+    raise exception 'firm_id and user_id cannot be changed; remove and re-add the member instead';
+  end if;
   -- non-owners may only change their own availability (server-side service
   -- role calls have no auth.uid() and skip this check)
   if (select auth.uid()) is not null and not has_firm_role(new.firm_id, array['owner'])

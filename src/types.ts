@@ -67,7 +67,7 @@ export interface CaseAssignmentEvent {
 
 export interface ActivityEvent {
   id: string;
-  type: 'case_created' | 'case_assigned' | 'case_updated' | 'task_completed' | 'task_assigned' | 'task_status_changed' | 'member_added' | 'deadline_added' | 'deadline_resolved';
+  type: 'case_created' | 'case_assigned' | 'case_updated' | 'case_stage_changed' | 'task_completed' | 'task_assigned' | 'task_status_changed' | 'member_added' | 'deadline_added' | 'deadline_resolved';
   actorId?: string; // TeamMember id responsible
   subjectId?: string; // caseId / taskId / memberId
   summary: string;
@@ -244,7 +244,21 @@ export interface Deadline {
   userId?: string;
 }
 
+/** @deprecated legacy case status — replaced by `CaseStage`. Kept as a read-only fallback for `normalizeCase()` and one release of derived writes on the cloud row. See `lib/caseStage.ts`. */
 export type CaseStatus = 'open' | 'in_progress' | 'on_hold' | 'closed';
+
+/**
+ * Case lifecycle stage (Step 1 · Foundations 1C), replacing `CaseStatus`.
+ * `pre_lodgement`: draft → ready_to_lodge. `with_department`: lodged,
+ * info_requested, decision. `closed` is its own group. See
+ * `lib/caseStage.ts` for the transition rules, labels and stage groups.
+ */
+export type CaseStage =
+  | 'draft' | 'assessment' | 'engaged' | 'preparing' | 'ready_to_lodge'
+  | 'lodged' | 'info_requested' | 'decision' | 'closed';
+
+/** Required when a case's `stage` is `closed` — see `lib/caseStage.ts`'s `outcomeRequired()`. */
+export type CaseOutcome = 'granted' | 'refused' | 'withdrawn' | 'lapsed';
 
 export interface Case {
   id: string;
@@ -252,7 +266,19 @@ export interface Case {
   title: string;
   description: string;
   templateId: string;
-  status: CaseStatus;
+  /**
+   * Lifecycle stage. Always present on a case read through a repository —
+   * both repositories normalize legacy rows/files (which only have `status`)
+   * via `lib/caseStage.ts`'s `normalizeCase()` on every read. New cases start
+   * at `draft` (see `pages/NewCase.tsx`, `lib/openCaseFromAdvisor.ts`).
+   */
+  stage: CaseStage;
+  /** Set when `stage` is `closed`; a closed case with none prompts the agent for one when next opened. */
+  outcome?: CaseOutcome;
+  /** Pause flag, orthogonal to `stage` — a case can be on hold at any pre-lodgement/with-department stage. */
+  onHold?: boolean;
+  /** @deprecated legacy; read-only fallback for `normalizeCase()`. New code should read/write `stage`/`outcome`/`onHold` instead. */
+  status?: CaseStatus;
   startDate: string;
   createdAt: string;
   userId?: string;

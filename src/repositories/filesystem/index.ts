@@ -1,6 +1,7 @@
 import { readJson, writeJson, deleteEntry, listFiles, listDirNames, writeBlob, readBlob } from '@/lib/fsStorage';
 import { normalizeTask } from '@/lib/taskStatus';
 import { normalizeTemplate } from '@/lib/templateTiming';
+import { normalizeCase } from '@/lib/caseStage';
 import type {
   Client,
   Case,
@@ -96,21 +97,25 @@ class FsCaseRepository implements ICaseRepository {
   constructor(private root: FileSystemDirectoryHandle) {}
 
   async getAll(): Promise<Case[]> {
-    return readAllInDir<Case>(this.root, 'cases');
+    const cases = await readAllInDir<Case>(this.root, 'cases');
+    return cases.map(normalizeCase);
   }
 
   async getById(id: string): Promise<Case | undefined> {
-    return (await readJson<Case>(this.root, `cases/${id}.json`)) ?? undefined;
+    const c = await readJson<Case>(this.root, `cases/${id}.json`);
+    return c ? normalizeCase(c) : undefined;
   }
 
   async create(item: Case): Promise<Case> {
-    await writeJson(this.root, `cases/${item.id}.json`, item);
-    return item;
+    const normalized = normalizeCase(item);
+    await writeJson(this.root, `cases/${item.id}.json`, normalized);
+    return normalized;
   }
 
   async update(item: Case): Promise<Case> {
-    await writeJson(this.root, `cases/${item.id}.json`, item);
-    return item;
+    const normalized = normalizeCase(item);
+    await writeJson(this.root, `cases/${item.id}.json`, normalized);
+    return normalized;
   }
 
   async delete(id: string): Promise<void> {

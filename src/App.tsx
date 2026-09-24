@@ -25,6 +25,7 @@ import { seedDefaultTemplates } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { toLocalISODate } from './lib/dates';
 import { isTaskClosed, TASK_STATUS_LABELS } from './lib/taskStatus';
+import { CASE_STAGE_LABELS } from './lib/caseStage';
 import { allDeadlines } from './lib/deadlines';
 import { buildDeadlineAlerts } from './lib/deadlineAlerts';
 import { initialsOfName } from './lib/firmDirectory';
@@ -283,6 +284,26 @@ const AppShell: React.FC = () => {
       });
     }
   }, [repos, deadlines, pushActivity, currentUserId]);
+
+  // --- Case Actions ---
+  // Applies a case update (stage/outcome/onHold, or any other case edit) and,
+  // when the stage changed, writes a `case_stage_changed` ActivityEvent — the
+  // one place besides CaseDetails.tsx's own title/description edit that
+  // writes to a case, so the activity log stays consistent regardless of
+  // which control made the change.
+  const handleUpdateCase = useCallback(async (updated: Case) => {
+    const prev = cases.find(c => c.id === updated.id);
+    await repos.cases.update(updated);
+    setCases(prevList => prevList.map(c => c.id === updated.id ? updated : c));
+    if (prev && prev.stage !== updated.stage) {
+      pushActivity({
+        type: 'case_stage_changed',
+        actorId: currentUserId,
+        subjectId: updated.id,
+        summary: `Case "${updated.title}" moved from ${CASE_STAGE_LABELS[prev.stage]} to ${CASE_STAGE_LABELS[updated.stage]}.`,
+      });
+    }
+  }, [repos, cases, pushActivity, currentUserId]);
 
   // --- Task Actions ---
   const handleAddTask = useCallback(async (task: Task) => {
@@ -652,6 +673,7 @@ const AppShell: React.FC = () => {
                 tasks={tasks}
                 templates={templates}
                 teamMembers={teamMembers}
+                deadlines={deadlines}
                 onTasksConfirmed={handleTasksConfirmed}
                 onAssignCase={handleAssignCase}
               />
@@ -669,6 +691,7 @@ const AppShell: React.FC = () => {
                 deadlines={deadlines}
                 onAddDeadline={handleAddDeadline}
                 onUpdateDeadline={handleUpdateDeadline}
+                onUpdateCase={handleUpdateCase}
               />
             } />
             <Route path="/templates" element={
@@ -716,6 +739,7 @@ interface CaseDetailsRouteProps {
   deadlines: Deadline[];
   onAddDeadline: (deadline: Deadline) => void;
   onUpdateDeadline: (deadline: Deadline) => void;
+  onUpdateCase: (caseItem: Case) => void;
 }
 
 const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
@@ -745,6 +769,7 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       deadlines={props.deadlines}
       onAddDeadline={props.onAddDeadline}
       onUpdateDeadline={props.onUpdateDeadline}
+      onUpdateCase={props.onUpdateCase}
       onBack={() => navigate('/cases')}
     />
   );
