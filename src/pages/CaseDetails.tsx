@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Case, Client, Task, CaseStage, CaseOutcome, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useFirm } from '../contexts/FirmContext';
+import { canDeleteFirmData } from '../lib/firmDirectory';
 import { CaseNotes } from '../components/CaseNotes';
 import { DocumentUpload } from '../components/DocumentUpload';
 import { DocumentList } from '../components/DocumentList';
@@ -149,6 +151,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const navigate = useNavigate();
   const { session } = useAuth();
   const { documentTypes, byCode: documentTypesByCode } = useDocumentTypes();
+  // RLS is the real enforcement (firms migration's "firm rows delete" policy
+  // on `cases` is owner/agent only) — this only hides the control for a role
+  // that would be rejected server-side anyway. `role` is null in local mode,
+  // where deletes stay allowed (single user, always their own data).
+  const { role: firmRole } = useFirm();
+  const canDeleteCase = canDeleteFirmData(firmRole);
 
   // ---- Task state ----
   const [offsetModal, setOffsetModal] = useState<{ taskId: string, newDate: string } | null>(null);
@@ -1365,13 +1373,17 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   >
                     Edit case
                   </button>
-                  <div className="h-px bg-paper-2 dark:bg-plate-card my-1" />
-                  <button
-                    onClick={() => { setShowDeleteConfirm(true); setMoreOpen(false); }}
-                    className="w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  >
-                    Delete case
-                  </button>
+                  {canDeleteCase && (
+                    <>
+                      <div className="h-px bg-paper-2 dark:bg-plate-card my-1" />
+                      <button
+                        onClick={() => { setShowDeleteConfirm(true); setMoreOpen(false); }}
+                        className="w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      >
+                        Delete case
+                      </button>
+                    </>
+                  )}
                 </div>
               </>
             )}
