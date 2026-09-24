@@ -40,6 +40,10 @@ where status = 'on_hold' and on_hold = false;
 
 alter table cases alter column stage set not null;
 
+-- Default so the previously deployed frontend (which doesn't send stage)
+-- can still insert cases between this migration and the new deploy.
+alter table cases alter column stage set default 'draft';
+
 alter table cases add constraint cases_stage_check
   check (stage in (
     'draft', 'assessment', 'engaged', 'preparing', 'ready_to_lodge',

@@ -26,5 +26,9 @@ where status is null;
 
 alter table tasks alter column status set not null;
 
+-- Default so the previously deployed frontend (which doesn't send status)
+-- can still insert tasks between this migration and the new deploy.
+alter table tasks alter column status set default 'not_started';
+
 alter table tasks add constraint tasks_status_check
   check (status in ('not_started', 'in_progress', 'waiting_client', 'waiting_third_party', 'not_applicable', 'done'));
