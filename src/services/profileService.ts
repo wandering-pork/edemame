@@ -8,6 +8,8 @@ export interface Profile {
   sidebarCollapsed: boolean;
   linkedFolderName: string | null;
   linkedAt: string | null;
+  /** The firm this user is currently acting as (Step 1 · 1F). Cloud-only; null in local mode and for a cloud user with no firm yet. */
+  currentFirmId: string | null;
 }
 
 interface ProfileRow {
@@ -17,6 +19,7 @@ interface ProfileRow {
   sidebar_collapsed: boolean;
   linked_folder_name: string | null;
   linked_at: string | null;
+  current_firm_id: string | null;
 }
 
 function fromRow(row: ProfileRow): Profile {
@@ -27,6 +30,7 @@ function fromRow(row: ProfileRow): Profile {
     sidebarCollapsed: row.sidebar_collapsed,
     linkedFolderName: row.linked_folder_name,
     linkedAt: row.linked_at,
+    currentFirmId: row.current_firm_id ?? null,
   };
 }
 
@@ -56,6 +60,8 @@ export interface ProfileUpdate {
   sidebarCollapsed?: boolean;
   linkedFolderName?: string | null;
   linkedAt?: string | null;
+  /** Self-heal path only — normally set server-side by the `create_firm`/accept-invite RPCs, not through this update. See FirmContext.tsx. */
+  currentFirmId?: string | null;
 }
 
 export async function updateProfile(userId: string, update: ProfileUpdate): Promise<Profile> {
@@ -65,6 +71,7 @@ export async function updateProfile(userId: string, update: ProfileUpdate): Prom
   if (update.sidebarCollapsed !== undefined) patch.sidebar_collapsed = update.sidebarCollapsed;
   if (update.linkedFolderName !== undefined) patch.linked_folder_name = update.linkedFolderName;
   if (update.linkedAt !== undefined) patch.linked_at = update.linkedAt;
+  if (update.currentFirmId !== undefined) patch.current_firm_id = update.currentFirmId;
 
   const { data, error } = await supabase
     .from('profiles')

@@ -10,6 +10,8 @@ interface ProfileContextValue {
   /** Creates the profile row for a brand-new user completing onboarding. */
   completeOnboarding: (storageMode: StorageMode) => Promise<Profile>;
   updateProfile: (update: ProfileUpdate) => Promise<void>;
+  /** Re-reads the profile row from storage without going through updateProfile — used after a server-side change (e.g. create_firm/accept-invite RPCs set current_firm_id directly). */
+  refetchProfile: () => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -37,6 +39,9 @@ function isDevProfile(userId: string): (value: unknown) => value is Profile {
   };
 }
 
+// Dev-offline mode has no real Supabase project behind it, so firms (which
+// need real RPCs) never apply here — currentFirmId always normalizes to null.
+
 function readDevProfile(userId: string): Profile | null {
   const profile = readValidatedJson(devProfileStorageKey(userId), isDevProfile(userId));
   if (!profile) return null;
@@ -45,6 +50,7 @@ function readDevProfile(userId: string): Profile | null {
     ...profile,
     linkedFolderName: profile.linkedFolderName ?? null,
     linkedAt: profile.linkedAt ?? null,
+    currentFirmId: null,
   };
 }
 
@@ -65,6 +71,7 @@ function defaultDevProfile(userId: string, storageMode: StorageMode): Profile {
     sidebarCollapsed: false,
     linkedFolderName: null,
     linkedAt: null,
+    currentFirmId: null,
   };
 }
 
@@ -116,6 +123,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         sidebarCollapsed: update.sidebarCollapsed !== undefined ? update.sidebarCollapsed : current.sidebarCollapsed,
         linkedFolderName: update.linkedFolderName !== undefined ? update.linkedFolderName : current.linkedFolderName,
         linkedAt: update.linkedAt !== undefined ? update.linkedAt : current.linkedAt,
+        currentFirmId: null,
       };
       saveDevProfile(updated);
       setProfile(updated);
@@ -125,8 +133,17 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     setProfile(updated);
   }, [userId]);
 
+  const refetchProfile = useCallback(async () => {
+    if (DEV_OFFLINE_AUTH) {
+      setProfile(readDevProfile(userId));
+      return;
+    }
+    const p = await getProfile(userId);
+    setProfile(p);
+  }, [userId]);
+
   return (
-    <ProfileContext.Provider value={{ profile, loading, completeOnboarding, updateProfile }}>
+    <ProfileContext.Provider value={{ profile, loading, completeOnboarding, updateProfile, refetchProfile }}>
       {children}
     </ProfileContext.Provider>
   );

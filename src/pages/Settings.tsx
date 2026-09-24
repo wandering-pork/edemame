@@ -6,11 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useLocalFolder } from '@/contexts/LocalFolderContext';
 import { useRepositories } from '@/contexts/RepositoryContext';
+import { useFirm } from '@/contexts/FirmContext';
 import { createCloudRepositories } from '@/repositories/cloud';
 import { createFilesystemRepositories } from '@/repositories/filesystem';
 import { copyAllData, clearAll } from '@/repositories/migrate';
 import type { Repositories } from '@/repositories/types';
-import { isSupabaseConfigured } from '@/lib/supabaseClient';
+import { isSupabaseConfigured, supabase } from '@/lib/supabaseClient';
 import { saveHandle } from '@/lib/folderHandleStore';
 
 const initialsOf = (s: string) =>
@@ -31,9 +32,11 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
   const [hasChanges, setHasChanges] = useState(false);
   const [saved, setSaved] = useState(false);
   const { user, signOut } = useAuth();
-  const { profile, updateProfile } = useProfile();
+  const { profile, updateProfile, refetchProfile } = useProfile();
   const { changeFolder } = useLocalFolder();
   const repositories = useRepositories();
+  const { members: firmMembers } = useFirm();
+  const activeFirmMemberCount = firmMembers.filter(m => m.status === 'active').length;
   const [changingFolder, setChangingFolder] = useState(false);
   const [changeResult, setChangeResult] = useState<string | null>(null);
   const [switchingMode, setSwitchingMode] = useState(false);
@@ -95,7 +98,19 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
     setSwitchingMode(true);
     setSwitchProgress('Preparing...');
     try {
-      const cloudRepos = createCloudRepositories(user!.id);
+      // Firms are cloud-only (Step 1 · 1F) — a local-mode user has no firm
+      // yet. Create a personal one now so the copied data has somewhere to
+      // land; they can invite colleagues into it afterwards.
+      let firmId = profile?.currentFirmId ?? null;
+      if (!firmId) {
+        const { data, error } = await supabase.rpc('create_firm', {
+          firm_name: `${user?.user_metadata?.full_name || user?.email || 'My'}'s firm`,
+        });
+        if (error) throw error;
+        firmId = data as string;
+        await refetchProfile();
+      }
+      const cloudRepos = createCloudRepositories(user!.id, firmId);
       await clearAll(cloudRepos, entity => setSwitchProgress(`Clearing ${entity}...`));
       await copyAllData(repositories, cloudRepos, entity => setSwitchProgress(`Copying ${entity}...`));
 
@@ -131,6 +146,13 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
   const handleSwitchToLocal = async () => {
     if (!('showDirectoryPicker' in window)) {
       setSwitchError('Local storage requires Chrome or Edge.');
+      return;
+    }
+    // Local mode is single-user by construction (a linked folder belongs to
+    // one person) — a multi-person firm has nowhere for its other members'
+    // access to go if the data moves into one member's folder.
+    if (activeFirmMemberCount > 1) {
+      setSwitchError('Your firm has more than one active member, so it can\'t switch to local storage. Remove the other members first, or keep using cloud storage.');
       return;
     }
     let handle: FileSystemDirectoryHandle;
@@ -441,7 +463,8 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
             ) : (
               <button
                 onClick={handleSwitchToLocal}
-                disabled={switchingMode}
+                disabled={switchingMode || activeFirmMemberCount > 1}
+                title={activeFirmMemberCount > 1 ? "Your firm has more than one active member — local storage is single-user only." : undefined}
                 className="btn-press flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-paper-2 hover:bg-paper-2/70 text-ink-soft dark:bg-plate-card dark:hover:bg-plate dark:text-plate-ink-soft transition-all disabled:opacity-50 flex-shrink-0"
               >
                 <HardDrive size={15} />
@@ -449,6 +472,12 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
               </button>
             )}
           </div>
+          {profile?.storageMode === 'cloud' && activeFirmMemberCount > 1 && (
+            <div className="px-6 pb-5 -mt-2 flex items-start gap-1.5 text-xs text-ink-faint dark:text-plate-ink-faint">
+              <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+              <span>Local storage is single-user, so it's unavailable while your firm has more than one active member.</span>
+            </div>
+          )}
           {switchError && (
             <div className="px-6 pb-5 -mt-2 flex items-start gap-1.5 text-xs text-red-500 dark:text-red-400">
               <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />

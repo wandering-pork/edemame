@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRepositories } from '@/contexts/RepositoryContext';
+import { useFirm } from '@/contexts/FirmContext';
+import { canDeleteFirmData } from '@/lib/firmDirectory';
 import { format } from 'date-fns';
 import { FileText, Image, Download, Trash2, File, Eye, AlertTriangle } from 'lucide-react';
 import type { Document, Aspect820 } from '../types';
@@ -41,6 +43,12 @@ interface DocumentListProps {
 
 export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, visaSubclass, excludeIds, onDeleted }) => {
   const repos = useRepositories();
+  // RLS is the real enforcement (see the firms migration's delete policies on
+  // `documents`) — this only hides the control for a role that would be
+  // rejected server-side anyway. `role` is null in local mode, where deletes
+  // stay allowed (single user, always their own data).
+  const { role } = useFirm();
+  const canDelete = canDeleteFirmData(role);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -258,7 +266,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, 
                 <Download className="w-4 h-4" />
               </button>
 
-              {confirmDeleteId === doc.id ? (
+              {canDelete && (confirmDeleteId === doc.id ? (
                 <div className="flex items-center gap-1 ml-1">
                   <button
                     onClick={() => handleDelete(doc.id)}
@@ -281,7 +289,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, 
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-              )}
+              ))}
             </div>
           </div>
         );

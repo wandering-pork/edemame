@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { RepositoryProvider, useRepositories } from './contexts/RepositoryContext';
+import { RepositoryProvider, useRepositories, useStorageMode } from './contexts/RepositoryContext';
 import { DocumentTypeProvider } from './contexts/DocumentTypeContext';
 import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
@@ -21,16 +21,20 @@ import { TeamMembers } from './pages/TeamMembers';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
 import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote, UsageEvent, Deadline } from './types';
-import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
+import { seedDefaultTemplates } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { toLocalISODate } from './lib/dates';
 import { isTaskClosed, TASK_STATUS_LABELS } from './lib/taskStatus';
 import { allDeadlines } from './lib/deadlines';
 import { buildDeadlineAlerts } from './lib/deadlineAlerts';
+import { initialsOfName } from './lib/firmDirectory';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
 import { LocalFolderProvider, useLocalFolder } from './contexts/LocalFolderContext';
+import { FirmProvider, useFirm } from './contexts/FirmContext';
+import { CreateFirmGate } from './components/CreateFirmGate';
+import { InviteAccept } from './pages/InviteAccept';
 import { LinkFolderGate } from './components/LinkFolderGate';
 import { isSupabaseConfigured } from './lib/supabaseClient';
 
@@ -40,9 +44,11 @@ import { isSupabaseConfigured } from './lib/supabaseClient';
 
 const AppShell: React.FC = () => {
   const repos = useRepositories();
+  const storageMode = useStorageMode();
   const { collapsed } = useSidebar();
   const { user } = useAuth();
   const { profile, updateProfile } = useProfile();
+  const { firm, teamMembers: firmTeamMembers } = useFirm();
   // Safe: AppShell is only ever rendered inside ProtectedRoute, once a profile exists.
   const currentUserId = user!.id;
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -53,9 +59,14 @@ const AppShell: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadWarning, setLoadWarning] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [localTeamMembers, setLocalTeamMembers] = useState<TeamMember[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+
+  // Cloud mode: team = the firm's real member directory (FirmContext), never
+  // the team_members table. Local mode: team is just "you" — see
+  // repos.teamMembers below, which is only read/written in local mode.
+  const teamMembers = storageMode === 'cloud' ? firmTeamMembers : localTeamMembers;
 
   const pushActivity = useCallback(async (ev: Omit<ActivityEvent, 'id' | 'createdAt'> & { createdAt?: string }) => {
     const created = await repos.activity.create({
@@ -66,33 +77,18 @@ const AppShell: React.FC = () => {
     setActivity(prev => [...prev, created]);
   }, [repos]);
 
-  const pushUsageEvent = useCallback(async (ev: Omit<UsageEvent, 'id' | 'createdAt' | 'userId'>) => {
-    await repos.usage.create({ ...ev, id: uuidv4(), userId: currentUserId, createdAt: new Date().toISOString() });
-  }, [repos, currentUserId]);
+  const pushUsageEvent = useCallback(async (ev: Omit<UsageEvent, 'id' | 'createdAt' | 'userId' | 'firmId'>) => {
+    await repos.usage.create({ ...ev, id: uuidv4(), userId: currentUserId, firmId: firm?.id, createdAt: new Date().toISOString() });
+  }, [repos, currentUserId, firm]);
 
-  // First-launch backfill: spread any unowned cases/tasks across the seeded team
-  // so the Team Dashboard has meaningful distribution on first load.
-  useEffect(() => {
-    if (loading || teamMembers.length === 0) return;
-    const unowned = cases.filter(c => !c.caseOwner);
-    if (unowned.length === 0) return;
-    setCases(prev => prev.map((c, idx) => {
-      if (c.caseOwner) return c;
-      const owner = teamMembers[idx % teamMembers.length];
-      return { ...c, caseOwner: owner.id };
-    }));
-    setTasks(prev => prev.map(t => {
-      if (t.assignedTo) return t;
-      const parentCase = cases.find(c => c.id === t.caseId);
-      if (!parentCase) return t;
-      const caseIdx = cases.findIndex(c => c.id === parentCase.id);
-      const owner = teamMembers[caseIdx % teamMembers.length];
-      return { ...t, assignedTo: owner.id };
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, teamMembers.length]);
+  // Load all data from repositories on mount, and (cloud mode only) refetch
+  // cases/tasks/deadlines whenever the tab regains focus, so a change made by
+  // another firm member on another device shows up without a full reload.
+  // There is no realtime subscription yet (Step 1 · 1F item #6) — this is a
+  // manual pull, debounced to at most once per 30s, and last write wins on
+  // conflicting edits (no merge/CRDT).
+  const lastFocusRefetch = useRef(0);
 
-  // Load all data from repositories on mount
   useEffect(() => {
     let cancelled = false;
     async function loadData() {
@@ -103,7 +99,7 @@ const AppShell: React.FC = () => {
           repos.clients.getAll(),
           repos.cases.getAll(),
           repos.notifications.getAll(),
-          repos.teamMembers.getAll(),
+          storageMode === 'local' ? repos.teamMembers.getAll() : Promise.resolve([]),
           repos.activity.getAll(),
           repos.deadlines.getAll(),
         ]);
@@ -112,36 +108,41 @@ const AppShell: React.FC = () => {
         // System default templates are hardcoded in-app, never persisted — merge in every load.
         setTemplates([...seedDefaultTemplates(), ...customTemplates]);
 
-        let resolvedTeam = team;
-        if (resolvedTeam.length === 0) {
-          const seeded = seedDefaultTeam({
-            id: currentUserId,
-            name: user!.user_metadata?.full_name || user!.email || 'You',
-            email: user!.email || '',
-          });
-          // Persist each seed member independently: a single failed write must not
-          // abort the whole load and leave the user staring at an empty app. Anything
-          // that fails to persist still shows up for this session from memory.
-          let seedWriteFailed = false;
-          resolvedTeam = await Promise.all(seeded.map(async m => {
+        if (storageMode === 'local') {
+          let resolvedTeam = team;
+          if (resolvedTeam.length === 0) {
+            // Local mode is single-user by construction (a linked folder
+            // belongs to one person) — the team is just the signed-in user,
+            // no fictional collaborators (see Step 1 · 1F: the old
+            // seedDefaultTeam()/round-robin backfill is retired).
+            const you: TeamMember = {
+              id: currentUserId,
+              name: user!.user_metadata?.full_name || user!.email || 'You',
+              email: user!.email || '',
+              avatar: initialsOfName(user!.user_metadata?.full_name || user!.email || 'You'),
+              role: 'partner',
+              caseCount: 0,
+              activeTaskCount: 0,
+              status: 'available',
+              joinedAt: new Date().toISOString(),
+            };
             try {
-              return await repos.teamMembers.create(m);
+              resolvedTeam = [await repos.teamMembers.create(you)];
             } catch (err) {
-              seedWriteFailed = true;
-              console.error(`Failed to persist seed team member "${m.name}" (${m.id}) — continuing with the in-memory copy:`, err);
-              return m;
+              console.error('Failed to persist the solo local-mode team member — continuing with the in-memory copy:', err);
+              resolvedTeam = [you];
+              if (!cancelled) {
+                setLoadWarning('Some starter data could not be saved to your storage, so it may disappear on reload. See the browser console for details.');
+              }
             }
-          }));
-          if (seedWriteFailed && !cancelled) {
-            setLoadWarning('Some starter data could not be saved to your storage, so it may disappear on reload. See the browser console for details.');
           }
+          setLocalTeamMembers(resolvedTeam);
         }
 
         setTasks(t);
         setClients(cl);
         setCases(cs);
         setNotifications(notifs);
-        setTeamMembers(resolvedTeam);
         setActivity(activityEvents);
         setDeadlines(deadlineRecords);
       } catch (err) {
@@ -155,7 +156,26 @@ const AppShell: React.FC = () => {
     }
     loadData();
     return () => { cancelled = true; };
-  }, [repos]);
+  }, [repos, storageMode, currentUserId]);
+
+  useEffect(() => {
+    if (storageMode !== 'cloud') return;
+    const REFETCH_MIN_INTERVAL_MS = 30_000;
+    const onFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusRefetch.current < REFETCH_MIN_INTERVAL_MS) return;
+      lastFocusRefetch.current = now;
+      Promise.all([repos.cases.getAll(), repos.tasks.getAll(), repos.deadlines.getAll()])
+        .then(([cs, t, d]) => {
+          setCases(cs);
+          setTasks(t);
+          setDeadlines(d);
+        })
+        .catch(err => console.error('Refetch-on-focus failed:', err));
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [storageMode, repos]);
 
   const handleThemeChange = (newTheme: Theme) => {
     updateProfile({ theme: newTheme });
@@ -424,10 +444,12 @@ const AppShell: React.FC = () => {
     setTemplates(prev => prev.filter(t => t.id !== id));
   }, [repos]);
 
-  // --- Team Actions ---
+  // --- Team Actions (local mode only — cloud mode manages the firm's real
+  // members through invites/roles, see pages/TeamMembers.tsx and
+  // contexts/FirmContext.tsx) ---
   const handleAddTeamMember = useCallback(async (member: TeamMember) => {
     await repos.teamMembers.create(member);
-    setTeamMembers(prev => [...prev, member]);
+    setLocalTeamMembers(prev => [...prev, member]);
     pushActivity({
       type: 'member_added',
       actorId: currentUserId,
@@ -440,13 +462,13 @@ const AppShell: React.FC = () => {
 
   const handleUpdateTeamMember = useCallback(async (member: TeamMember) => {
     await repos.teamMembers.update(member);
-    setTeamMembers(prev => prev.map(m => m.id === member.id ? member : m));
+    setLocalTeamMembers(prev => prev.map(m => m.id === member.id ? member : m));
   }, [repos]);
 
   const handleDeleteTeamMember = useCallback(async (id: string) => {
     const member = teamMembers.find(m => m.id === id);
     await repos.teamMembers.delete(id);
-    setTeamMembers(prev => prev.filter(m => m.id !== id));
+    setLocalTeamMembers(prev => prev.filter(m => m.id !== id));
     // Clear assignments so the UI doesn't orphan-reference the removed id.
     const clearedCases = cases.map(c => c.caseOwner === id ? { ...c, caseOwner: undefined } : c);
     const clearedTasks = tasks.map(t => t.assignedTo === id ? { ...t, assignedTo: undefined } : t);
@@ -869,15 +891,7 @@ const StorageGate: React.FC = () => {
   }
 
   if (profile.storageMode === 'cloud') {
-    return (
-      <RepositoryProvider storageMode={profile.storageMode}>
-        <DocumentTypeProvider>
-          <SidebarProvider>
-            <AppShell />
-          </SidebarProvider>
-        </DocumentTypeProvider>
-      </RepositoryProvider>
-    );
+    return <CloudAppGate />;
   }
 
   if (folderStatus !== 'ready') {
@@ -904,6 +918,30 @@ const StorageGate: React.FC = () => {
   );
 };
 
+/**
+ * Cloud mode's app-shell gate (Step 1 · 1F): a firm is required before any
+ * repository can be created (every cloud table is firm-scoped), so this sits
+ * between StorageGate and RepositoryProvider/AppShell. A brand-new cloud user
+ * with no firm yet (and no pending invite already accepted — see
+ * pages/InviteAccept.tsx) sees CreateFirmGate instead of the app shell.
+ */
+const CloudAppGate: React.FC = () => {
+  const { firm, loading } = useFirm();
+
+  if (loading) return <Spinner />;
+  if (!firm) return <CreateFirmGate />;
+
+  return (
+    <RepositoryProvider storageMode="cloud" firmId={firm.id}>
+      <DocumentTypeProvider>
+        <SidebarProvider>
+          <AppShell />
+        </SidebarProvider>
+      </DocumentTypeProvider>
+    </RepositoryProvider>
+  );
+};
+
 const AppRoutes: React.FC = () => {
   const { user } = useAuth();
 
@@ -916,11 +954,19 @@ const AppRoutes: React.FC = () => {
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
       <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
       <Route element={<ProtectedRoute />}>
+        {/* Accepting a firm invite needs a session but not a resolved profile/firm — see pages/InviteAccept.tsx. ProtectedRoute already redirects a signed-out visitor to /login and back here (location.state.from), via LandingPage's own sign-in flow. */}
+        <Route path="/invite/:token" element={
+          <ProfileProvider>
+            <InviteAccept />
+          </ProfileProvider>
+        } />
         <Route path="/*" element={
           <ProfileProvider>
-            <LocalFolderProvider>
-              <StorageGate />
-            </LocalFolderProvider>
+            <FirmProvider>
+              <LocalFolderProvider>
+                <StorageGate />
+              </LocalFolderProvider>
+            </FirmProvider>
           </ProfileProvider>
         } />
       </Route>

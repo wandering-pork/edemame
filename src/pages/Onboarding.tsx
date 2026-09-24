@@ -74,6 +74,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             <p className="text-sm text-ink-soft dark:text-plate-ink-soft leading-relaxed">
               All data stays on this device. No account required. Full privacy compliance.
             </p>
+            <p className="text-xs text-ink-faint dark:text-plate-ink-faint font-medium mt-2">
+              Single-user only — team logins need Cloud Storage.
+            </p>
             {!localStorageSupported && (
               <p className="text-xs text-amber-600 dark:text-amber-500 font-medium mt-3">
                 Requires Chrome or Edge
@@ -114,6 +117,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             </h2>
             <p className="text-sm text-ink-soft dark:text-plate-ink-soft leading-relaxed">
               Multi-device access. Team collaboration. Requires account.
+            </p>
+            <p className="text-xs text-ink-faint dark:text-plate-ink-faint font-medium mt-2">
+              You'll create a firm next so your team can share one workspace.
             </p>
             {selected === 'cloud' && (
               <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-edamame-500 flex items-center justify-center">
