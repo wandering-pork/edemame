@@ -91,9 +91,41 @@ export interface UsageEvent {
   createdAt: string; // ISO
 }
 
+// ---------------------------------------------------------------------------
+// Template task timing (Step 1 · 1E, and the DeadlineKind used by 1D's
+// Deadline entity — defined here since 1E's `StepAnchor` references it and
+// this file has no dependency on the (not-yet-built) Deadline entity itself).
+// ---------------------------------------------------------------------------
+
+export type DeadlineKind =
+  | 'visa_expiry' | 'passport_expiry'
+  | 's56_response' | 's57_response'
+  | 'nomination_validity' | 'invitation_window'
+  | 'other';
+
+export type StepAnchor =
+  | { type: 'case_start' }
+  | { type: 'previous_step' }
+  | { type: 'step'; stepKey: string; edge: 'start' | 'done' }
+  | { type: 'deadline'; kind: DeadlineKind };      // e.g. invitation received
+
+export interface StepTiming {
+  anchor: StepAnchor;
+  offsetDays: number;                       // from the anchor
+  durationDays?: { min: number; max: number }; // how long the step itself takes
+  /** Set by law: agent can't move it (e.g. lodge ≤60 days after invitation). */
+  fixed: boolean;
+}
+
 export interface WorkflowStep {
+  /** Stable id, so anchors survive reordering. Steps missing one (custom/legacy templates) get one assigned by `lib/templateTiming.ts`'s `normalizeTemplate()`. */
+  key: string;
   title: string;
   description: string;
+  /** Absent = old/custom template with no timing data yet; scheduler falls back to today's AI-only behaviour. */
+  timing?: StepTiming;
+  /** Must be done before the case can advance (feeds the 1C At Risk rule "a gate task is overdue"). */
+  isGate?: boolean;
 }
 
 export interface WorkflowTemplate {
@@ -107,6 +139,23 @@ export interface WorkflowTemplate {
   sourceUrl?: string;
   /** Provenance for system-default templates: ISO date (YYYY-MM-DD) content was last verified. */
   lastVerified?: string;
+  /**
+   * Template schema/content revision. Optional (rather than the plan's
+   * required `version: number`) because custom templates created via
+   * `pages/Templates.tsx` today are built with just `{ title, description }`
+   * and no `steps`/`version` at all — making it required would break that
+   * call site and every persisted custom template with no migration in this
+   * slice. Absent = version 1 semantics (pre-1E behaviour, `templateVersion`
+   * on `Case` unset). System templates in `lib/seedData.ts` set this to `1`.
+   */
+  version?: number;
+  /**
+   * Whether a registered agent has reviewed this template's step `timing`
+   * data. Ships `false` on every system template (see `seedData.ts`) — the
+   * Templates page shows "Timing not yet reviewed by a registered agent"
+   * until someone signs it off.
+   */
+  timingVerified?: boolean;
 }
 
 export interface Client {
