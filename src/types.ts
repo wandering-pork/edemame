@@ -31,6 +31,28 @@ export interface Task {
   userId?: string;
   /** ID of the team member this task is assigned to. */
   assignedTo?: string;
+  /**
+   * The `WorkflowStep.key` this task was generated from (Step 1 · 1E). Unset
+   * for manually-added tasks and AI suggestions accepted without an anchor
+   * step. Feeds `lib/risk.ts` rule 2 (gate-task-overdue) and
+   * `lib/scheduleFromTemplate.ts`'s `reschedule()`, which only recalculates
+   * tasks carrying a `stepKey`.
+   */
+  stepKey?: string;
+  /**
+   * Set once a task's date has been edited by hand (any manual date change —
+   * `TaskDetailModal`, `CaseDetails`' inline date edit/"set today", or a
+   * Dashboard calendar drag). `reschedule()` never recalculates a locked
+   * task's date.
+   */
+  dateLocked?: boolean;
+  /**
+   * True when `date` is provisional — computed from a duration estimate
+   * because the step's real anchor (a deadline, or another step's completion)
+   * isn't known yet. See `lib/scheduleFromTemplate.ts`. The UI shows
+   * "Estimated" on these tasks.
+   */
+  datePending?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +284,14 @@ export interface Case {
    * up the case's template's `visaSubclass` where both are available.
    */
   visaSubclass?: string;
+  /**
+   * The `WorkflowTemplate.version` used the last time this case's tasks were
+   * generated/rescheduled from a template (Step 1 · 1E). Unset for cases with
+   * no timed-template plan (AI-only flow, or no template). Records "which
+   * template, which version" per the plan — not yet surfaced in the UI beyond
+   * that provenance.
+   */
+  templateVersion?: number;
 }
 
 // ---------------------------------------------------------------------------

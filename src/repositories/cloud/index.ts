@@ -187,6 +187,10 @@ function caseToRow(userId: string, c: Case) {
     applicant_id: normalized.applicantId ?? null,
     case_number: normalized.caseNumber ?? null,
     visa_subclass: normalized.visaSubclass ?? null,
+    // `template_version` column added by
+    // `supabase/migrations/20260926000250_task_step_fields.sql` (not yet
+    // applied to production — see CLAUDE.md's manual-apply migration list).
+    template_version: normalized.templateVersion ?? null,
   };
 }
 
@@ -209,6 +213,7 @@ function rowToCase(row: any): Case {
     applicantId: row.applicant_id ?? undefined,
     caseNumber: row.case_number ?? undefined,
     visaSubclass: row.visa_subclass ?? undefined,
+    templateVersion: row.template_version ?? undefined,
   });
 }
 
@@ -270,6 +275,12 @@ function taskToRow(userId: string, t: Task) {
     case_id: task.caseId ?? null,
     generated_by_ai: task.generatedByAi ?? null,
     assigned_to: task.assignedTo ?? null,
+    // `step_key`/`date_locked`/`date_pending` columns added by
+    // `supabase/migrations/20260926000250_task_step_fields.sql` (not yet
+    // applied to production — see CLAUDE.md's manual-apply migration list).
+    step_key: task.stepKey ?? null,
+    date_locked: task.dateLocked ?? null,
+    date_pending: task.datePending ?? null,
   };
 }
 
@@ -287,6 +298,9 @@ function rowToTask(row: any): Task {
     generatedByAi: row.generated_by_ai ?? undefined,
     userId: row.user_id,
     assignedTo: row.assigned_to ?? undefined,
+    stepKey: row.step_key ?? undefined,
+    dateLocked: row.date_locked ?? undefined,
+    datePending: row.date_pending ?? undefined,
   });
 }
 

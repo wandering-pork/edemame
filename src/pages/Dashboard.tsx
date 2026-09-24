@@ -32,7 +32,7 @@ interface DashboardProps {
     taskId: string,
     newDate: string,
     offsetFuture: boolean,
-    taskPatch?: { title?: string; description?: string },
+    taskPatch?: { title?: string; description?: string; dateLocked?: boolean },
   ) => void;
   onAddTask: (task: Task) => void;
   /**
@@ -335,7 +335,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       return;
     }
     const newDate = format(day, 'yyyy-MM-dd');
-    onMoveTaskDate(draggingTaskId, newDate, false);
+    // A calendar drag is a manual date edit — see `Task.dateLocked`.
+    onMoveTaskDate(draggingTaskId, newDate, false, { dateLocked: true });
     setDraggingTaskId(null);
   };
 

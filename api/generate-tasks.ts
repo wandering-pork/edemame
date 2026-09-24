@@ -10,12 +10,20 @@ interface VercelResponse extends ServerResponse {
   json(data: any): VercelResponse;
 }
 
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { caseDescription, workflowDescription, startDate, visaSubclass, workflowTitle, steps, excludeItems } = req.body;
+  const {
+    caseDescription, workflowDescription, startDate, visaSubclass, workflowTitle, steps, excludeItems,
+    // Step 1 · 1E "AI suggestions instead of whole plans" (see docs/plans/step-1-foundations.md's
+    // "Generation flow"): mode: 'additions' asks for extra tasks the template's own scheduled
+    // steps don't cover, instead of a whole plan. Legacy (no mode) behaviour is unchanged below.
+    mode, scheduledSteps,
+  } = req.body;
 
   if (!caseDescription || !startDate) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -26,11 +34,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "API key not configured" });
   }
 
+  if (mode === "additions") {
+    return handleAdditions(res, apiKey, { caseDescription, startDate, visaSubclass, workflowTitle, scheduledSteps, excludeItems });
+  }
+  return handleLegacyPlan(res, apiKey, { caseDescription, workflowDescription, startDate, visaSubclass, workflowTitle, steps, excludeItems });
+}
+
+// ---------------------------------------------------------------------------
+// Legacy mode — a whole plan, one task per generated item (unchanged).
+// ---------------------------------------------------------------------------
+
+async function handleLegacyPlan(res: VercelResponse, apiKey: string, params: {
+  caseDescription: string; workflowDescription?: string; startDate: string; visaSubclass?: string;
+  workflowTitle?: string; steps?: Array<{ title: string; description: string }>; excludeItems?: string[];
+}) {
+  const { caseDescription, workflowDescription, startDate, visaSubclass, workflowTitle, steps, excludeItems } = params;
+
   // Build the structured steps section if steps array is provided
   const stepsSection = Array.isArray(steps) && steps.length > 0
-    ? steps.map((s: { title: string; description: string }, i: number) =>
-        `${i + 1}. ${s.title}${s.description ? `: ${s.description}` : ''}`
-      ).join('\n')
+    ? steps.map((s, i) => `${i + 1}. ${s.title}${s.description ? `: ${s.description}` : ''}`).join('\n')
     : workflowDescription || 'Follow standard immigration workflow procedures';
 
   const visaLabel = visaSubclass
@@ -79,37 +101,31 @@ Generate 10–15 specific tasks that realistically schedule this case from start
 Tailor the tasks to the client's specific background and circumstances noted above.`;
 
   try {
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
+    const response = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: "You are a precise Australian immigration case manager. Generate task lists that are specific, actionable, and correctly timed for Australian visa processing. Output only valid JSON." }],
         },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: "You are a precise Australian immigration case manager. Generate task lists that are specific, actionable, and correctly timed for Australian visa processing. Output only valid JSON." }],
-          },
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  title: { type: "string", description: "The title of the task" },
-                  description: { type: "string", description: "A brief description of what needs to be done" },
-                  daysOffset: { type: "integer", description: "Number of days from the start date this task should be scheduled" },
-                },
-                required: ["title", "description", "daysOffset"],
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "The title of the task" },
+                description: { type: "string", description: "A brief description of what needs to be done" },
+                daysOffset: { type: "integer", description: "Number of days from the start date this task should be scheduled" },
               },
+              required: ["title", "description", "daysOffset"],
             },
           },
-        }),
-      }
-    );
+        },
+      }),
+    });
 
     if (!response.ok) {
       const errorData = await response.text();
@@ -132,5 +148,109 @@ Tailor the tasks to the client's specific background and circumstances noted abo
   } catch (error) {
     console.error("Gemini API Error:", error);
     return res.status(500).json({ error: "Failed to generate tasks" });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// mode: 'additions' — extra tasks only, tailored to the case, that the
+// template's own deterministically-scheduled steps don't already cover.
+// ---------------------------------------------------------------------------
+
+async function handleAdditions(res: VercelResponse, apiKey: string, params: {
+  caseDescription: string; startDate: string; visaSubclass?: string; workflowTitle?: string;
+  scheduledSteps?: Array<{ title: string; date: string; stepKey?: string }>; excludeItems?: string[];
+}) {
+  const { caseDescription, startDate, visaSubclass, workflowTitle, scheduledSteps, excludeItems } = params;
+
+  const visaLabel = visaSubclass
+    ? `Australian Subclass ${visaSubclass}${workflowTitle ? ` — ${workflowTitle}` : ''}`
+    : workflowTitle || 'Immigration';
+
+  const scheduledSection = Array.isArray(scheduledSteps) && scheduledSteps.length > 0
+    ? scheduledSteps.map((s, i) => `${i + 1}. ${s.title} — due ${s.date}${s.stepKey ? ` (key: ${s.stepKey})` : ''}`).join('\n')
+    : '(no steps scheduled yet)';
+
+  const excludeSection = Array.isArray(excludeItems) && excludeItems.length > 0
+    ? `\nAlso already tracked as separate tasks — don't duplicate:\n${excludeItems.map((g: string) => `- ${g}`).join('\n')}\n`
+    : '';
+
+  const prompt = `You are a senior Australian immigration case manager at a registered migration agency.
+
+VISA APPLICATION TYPE: ${visaLabel}
+
+CLIENT PROFILE & CASE NOTES:
+${caseDescription}
+
+The case's task plan already has these steps scheduled from its workflow template — do NOT propose a task that duplicates or restates any of them:
+${scheduledSection}
+${excludeSection}
+Case Start Date: ${startDate}
+
+TASK:
+Suggest a small number (0–5) of ADDITIONAL tasks this specific case needs that the scheduled steps above don't already cover — things tailored to this client's particular circumstances (e.g. an unusual document, a follow-up on a specific fact mentioned in the case notes, a risk worth flagging). Do not restate or re-time the scheduled steps themselves. If nothing case-specific needs adding, return an empty list — do not pad with generic tasks.
+
+For each suggestion, give:
+- title: a short, specific, actionable task title
+- description: what needs to be done and why
+- reason: one sentence on why this case in particular needs it (not on the template)
+- anchorStepKey: the "key" of the scheduled step above this should be timed relative to, if any (omit if it should be timed from the case start date instead)
+- offsetDays: days after the anchor step's due date (or after the case start date, if no anchorStepKey) this task should be due`;
+
+  try {
+    const response = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: "You are a precise Australian immigration case manager. You only suggest additional, non-duplicate tasks tailored to this specific case. Output only valid JSON." }],
+        },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "object",
+            properties: {
+              additions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    description: { type: "string" },
+                    reason: { type: "string" },
+                    anchorStepKey: { type: "string" },
+                    offsetDays: { type: "integer" },
+                  },
+                  required: ["title", "description", "reason", "offsetDays"],
+                },
+              },
+            },
+            required: ["additions"],
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("Gemini API error:", response.status, errorData);
+      return res.status(502).json({ error: "Gemini API request failed" });
+    }
+
+    const data = await response.json();
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{"additions":[]}';
+
+    let parsed: { additions?: unknown[] };
+    try {
+      parsed = JSON.parse(responseText);
+    } catch {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { additions: [] };
+    }
+
+    return res.status(200).json({ additions: Array.isArray(parsed.additions) ? parsed.additions : [] });
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    return res.status(500).json({ error: "Failed to generate task suggestions" });
   }
 }

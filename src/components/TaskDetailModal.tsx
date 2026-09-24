@@ -25,7 +25,7 @@ interface TaskDetailModalProps {
     taskId: string,
     newDate: string,
     offsetFuture: boolean,
-    taskPatch?: { title?: string; description?: string },
+    taskPatch?: { title?: string; description?: string; dateLocked?: boolean },
   ) => void;
   /** When the case link is followed. Lets the host close its own surrounding UI. */
   onNavigateAway?: () => void;
@@ -106,14 +106,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const dateChanged = date !== task.date;
     if (dateChanged && onMoveTaskDate) {
       // Keeps day-ordering consistent with drag-and-drop; see onMoveTaskDate.
+      // A manual date edit locks the date so `reschedule()` never overwrites
+      // it again — see `Task.dateLocked`.
       onMoveTaskDate(
         task.id,
         date,
         false,
-        textChanged ? { title: trimmedTitle, description } : undefined,
+        { ...(textChanged ? { title: trimmedTitle, description } : {}), dateLocked: true },
       );
     } else if (textChanged || dateChanged) {
-      onUpdateTask?.({ ...task, title: trimmedTitle, description, date });
+      onUpdateTask?.({ ...task, title: trimmedTitle, description, date, dateLocked: dateChanged ? true : task.dateLocked });
     }
     onClose();
   };
@@ -221,8 +223,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft mb-1">
+            <label className="block text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft mb-1 flex items-center gap-1.5">
               Due Date
+              {task.datePending && date === task.date && (
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                  title="Computed from a duration estimate — will firm up once the real anchor is known."
+                >
+                  Estimated
+                </span>
+              )}
             </label>
             <input
               type="date"
