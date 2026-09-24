@@ -16,6 +16,7 @@ import type {
   FocusConversation,
   UsageEvent,
   EligibilityAssessment,
+  Deadline,
 } from '@/types';
 import type {
   IClientRepository,
@@ -32,6 +33,7 @@ import type {
   IDocumentTypeRepository,
   IChatRepository,
   IEligibilityRepository,
+  IDeadlineRepository,
   Repositories,
 } from '@/repositories/types';
 
@@ -1002,6 +1004,86 @@ class CloudEligibilityRepository implements IEligibilityRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Deadlines
+// ---------------------------------------------------------------------------
+
+export function deadlineToRow(userId: string, d: Deadline) {
+  return {
+    id: d.id,
+    user_id: userId,
+    kind: d.kind,
+    title: d.title,
+    due_date: d.dueDate,
+    case_id: d.caseId ?? null,
+    client_id: d.clientId ?? null,
+    triggered_on: d.triggeredOn ?? null,
+    status: d.status,
+    resolved_at: d.resolvedAt ?? null,
+    notes: d.notes ?? null,
+    created_at: d.createdAt,
+  };
+}
+
+export function rowToDeadline(row: any): Deadline {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    kind: row.kind,
+    title: row.title,
+    dueDate: row.due_date,
+    caseId: row.case_id ?? undefined,
+    clientId: row.client_id ?? undefined,
+    triggeredOn: row.triggered_on ?? undefined,
+    status: row.status,
+    resolvedAt: row.resolved_at ?? undefined,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+class CloudDeadlineRepository implements IDeadlineRepository {
+  constructor(private userId: string) {}
+
+  async getAll(): Promise<Deadline[]> {
+    const rows = await fetchAllRows('deadlines', q => q.eq('user_id', this.userId));
+    return rows.map(rowToDeadline);
+  }
+
+  async getById(id: string): Promise<Deadline | undefined> {
+    const { data, error } = await supabase.from('deadlines').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data ? rowToDeadline(data) : undefined;
+  }
+
+  async create(item: Deadline): Promise<Deadline> {
+    const { error } = await supabase.from('deadlines').upsert(deadlineToRow(this.userId, item), { onConflict: 'id' });
+    if (error) throw error;
+    return item;
+  }
+
+  async update(item: Deadline): Promise<Deadline> {
+    const { error } = await supabase.from('deadlines').upsert(deadlineToRow(this.userId, item), { onConflict: 'id' });
+    if (error) throw error;
+    return item;
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('deadlines').delete().eq('user_id', this.userId).eq('id', id);
+    if (error) throw error;
+  }
+
+  async getByCaseId(caseId: string): Promise<Deadline[]> {
+    const rows = await fetchAllRows('deadlines', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    return rows.map(rowToDeadline);
+  }
+
+  async getByClientId(clientId: string): Promise<Deadline[]> {
+    const rows = await fetchAllRows('deadlines', q => q.eq('user_id', this.userId).eq('client_id', clientId));
+    return rows.map(rowToDeadline);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -1021,5 +1103,6 @@ export function createCloudRepositories(userId: string): Repositories {
     documentTypes: new CloudDocumentTypeRepository(userId),
     chat: new CloudChatRepository(userId),
     eligibility: new CloudEligibilityRepository(userId),
+    deadlines: new CloudDeadlineRepository(userId),
   };
 }

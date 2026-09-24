@@ -1,4 +1,4 @@
-import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation, UsageEvent, EligibilityAssessment } from '../types';
+import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation, UsageEvent, EligibilityAssessment, Deadline } from '../types';
 
 // Generic CRUD interface
 export interface IRepository<T> {
@@ -95,6 +95,18 @@ export interface IEligibilityRepository extends IRepository<EligibilityAssessmen
   getByClientId(clientId: string): Promise<EligibilityAssessment[]>;
 }
 
+/**
+ * `Deadline` entity (Step 1 · 1D). Not scoped to a case the way `caseNotes`/
+ * `documents` are — a deadline may be client-level only (e.g. passport
+ * expiry, once that stops being purely derived) — so it gets its own
+ * `getAll` rather than living only behind `getByCaseId`, same reasoning as
+ * `IEligibilityRepository`.
+ */
+export interface IDeadlineRepository extends IRepository<Deadline> {
+  getByCaseId(caseId: string): Promise<Deadline[]>;
+  getByClientId(clientId: string): Promise<Deadline[]>;
+}
+
 export interface Repositories {
   clients: IClientRepository;
   cases: ICaseRepository;
@@ -110,4 +122,5 @@ export interface Repositories {
   documentTypes: IDocumentTypeRepository;
   chat: IChatRepository;
   eligibility: IEligibilityRepository;
+  deadlines: IDeadlineRepository;
 }

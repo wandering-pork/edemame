@@ -22,11 +22,15 @@ Five cards at the top summarise your workload:
 
 ## Needs Attention
 
-Below the stat cards, **Needs Attention** lists your most urgent items, following one rule:
+Below the stat cards, **Needs Attention** lists your most urgent items. Open deadlines (see
+"Deadlines" in the Case Manager manual) that are due within 14 days rank **above** tasks, most
+consequential first — an s56/s57 response window outranks an invitation window, which outranks
+nomination validity, then visa expiry, then passport expiry. Among tasks, the rule stays
 **overdue first, then due today**. Each item shows the client, the case, and the due date.
-Click an item to open that task (use its **Go to Case** button from there if you need the case
-itself). When there are more than five items, a **View all N** link expands the full list in
-place.
+Clicking a task item opens that task (use its **Go to Case** button from there if you need the
+case itself); clicking a deadline item goes straight to its case, or to the client's page for a
+deadline with no case (e.g. a bare passport expiry). When there are more than five items, a
+**View all N** link expands the full list in place.
 
 ## Task status
 
