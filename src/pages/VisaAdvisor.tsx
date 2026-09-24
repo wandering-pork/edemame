@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Client, WorkflowTemplate } from '../types';
 import {
   ChevronRight,
@@ -58,10 +59,21 @@ interface EligibilityUsage {
   estimatedCostUsd: number;
 }
 
-export type OpenCaseStage = 'client' | 'plan' | 'finalizing';
+// Order reflects the actual sequence handleOpenNewCase runs in: the AI task plan
+// is drafted first (so nothing has to be rolled back if it fails), then the client
+// is resolved/created, then the case itself is saved.
+export type OpenCaseStage = 'plan' | 'client' | 'finalizing';
 
 export interface OpenCaseParams {
-  clientInfo: { fullName: string; dob: string; nationality: string };
+  /** id of a client the page was pre-loaded for (`?clientId=`) — takes precedence over name/DOB matching. */
+  clientId?: string;
+  clientInfo: {
+    fullName: string;
+    dob: string;
+    nationality: string;
+    inAustralia: boolean;
+    currentVisaStatus: string;
+  };
   visaSubclass: string;
   visaName: string;
   caseDescription: string;
@@ -69,8 +81,8 @@ export interface OpenCaseParams {
 }
 
 const openCaseStageLabels: Record<OpenCaseStage, string> = {
-  client: 'Setting up client…',
   plan: 'Drafting task plan with AI…',
+  client: 'Setting up client…',
   finalizing: 'Finalizing case…',
 };
 
@@ -303,7 +315,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
     );
   }, [report]);
 
+  const isStep1Valid = wizardState.clientInfo.fullName.trim().length > 0;
+
   const handleNext = () => {
+    if (wizardState.currentStep === 1 && !isStep1Valid) return;
     if (wizardState.currentStep < 3) {
       setWizardState((prev) => ({
         ...prev,
@@ -344,7 +359,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
       setWizardState((prev) => ({ ...prev, step: 'report' }));
       if (data.usage) onEligibilityChecked?.(data.usage);
     } catch (error) {
-      alert('Error: Could not assess eligibility. Please try again.');
+      toast.error('Could not assess eligibility. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -362,9 +377,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
   const handleOpenCase = async (visa: VisaOption) => {
     setOpeningCaseSubclass(visa.visaSubclass);
-    setOpeningCaseStage('client');
+    setOpeningCaseStage('plan');
     try {
       await onOpenNewCase({
+        clientId: prefilledClient?.id,
         clientInfo: wizardState.clientInfo,
         visaSubclass: visa.visaSubclass,
         visaName: visa.visaName,
@@ -374,7 +390,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
       // On success the parent navigates away — no need to reset state here,
       // and doing so would flash the idle button for a frame before unmount.
     } catch (error) {
-      alert('Error: Could not create the case. Please try again.');
+      toast.error('Could not create the case. Please try again.');
       setOpeningCaseSubclass(null);
     }
   };
@@ -476,6 +492,11 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                       className={inputClass}
                       placeholder="e.g. John Doe"
                     />
+                    {!isStep1Valid && (
+                      <p className="text-[11px] text-red-500 dark:text-red-400 mt-1.5">
+                        A name is required to continue.
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -935,7 +956,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
               <button
                 onClick={handleNext}
-                disabled={isLoading}
+                disabled={isLoading || (wizardState.currentStep === 1 && !isStep1Valid)}
                 className="flex items-center gap-2 px-5 py-2 text-[13.5px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed transition-all btn-press"
               >
                 {isLoading ? (
@@ -1016,24 +1037,31 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                     </p>
                   </div>
                   {isQualified && (
-                    <button
-                      onClick={() => handleOpenCase(best)}
-                      disabled={openingCaseSubclass !== null}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-edamame-500 hover:bg-edamame-600 text-white text-[13px] font-bold rounded-lg transition-colors btn-press whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed min-w-[172px]"
-                    >
-                      {openingCaseSubclass === best.visaSubclass ? (
-                        <>
-                          <Loader2 size={14} className="animate-spin flex-shrink-0" />
-                          <span className={openingCaseStage === 'plan' ? 'font-mono-ai' : ''}>
-                            {openCaseStageLabels[openingCaseStage]}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          Open Case <ArrowRight size={14} />
-                        </>
+                    <div className="flex flex-col items-end gap-1.5">
+                      {best.verdict === 'possibly_qualifies' && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap bg-amber-100 dark:bg-amber-500/15 text-[#B45309] dark:text-amber-400">
+                          Possible match
+                        </span>
                       )}
-                    </button>
+                      <button
+                        onClick={() => handleOpenCase(best)}
+                        disabled={openingCaseSubclass !== null}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-edamame-500 hover:bg-edamame-600 text-white text-[13px] font-bold rounded-lg transition-colors btn-press whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed min-w-[172px]"
+                      >
+                        {openingCaseSubclass === best.visaSubclass ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin flex-shrink-0" />
+                            <span className={openingCaseStage === 'plan' ? 'font-mono-ai' : ''}>
+                              {openCaseStageLabels[openingCaseStage]}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            Open Case <ArrowRight size={14} />
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -1158,6 +1186,13 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
 
                         {isQualified && (
                           <div className="pt-3 border-t border-ink/15 dark:border-plate-ink/20">
+                            {visa.verdict === 'possibly_qualifies' && (
+                              <div className="flex justify-end mb-1.5">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap bg-amber-100 dark:bg-amber-500/15 text-[#B45309] dark:text-amber-400">
+                                  Possible match
+                                </span>
+                              </div>
+                            )}
                             <button
                               onClick={() => handleOpenCase(visa)}
                               disabled={openingCaseSubclass !== null}
@@ -1172,7 +1207,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                                 </>
                               ) : (
                                 <>
-                                  Open New Case <ArrowRight size={13} />
+                                  Open Case <ArrowRight size={13} />
                                 </>
                               )}
                             </button>

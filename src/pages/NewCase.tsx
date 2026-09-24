@@ -4,6 +4,7 @@ import { generateTasksFromCase } from '../services/geminiService';
 import { WorkflowTemplate, Task, Client, Case } from '../types';
 import { Sparkles, Calendar, Loader2, Save, User, ChevronDown, ChevronUp, List, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { toLocalISODate } from '../lib/dates';
 
 interface NewCaseProps {
   templates: WorkflowTemplate[];
@@ -104,7 +105,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
   const [clientId, setClientId] = useState('');
   const [description, setDescription] = useState('');
   const [templateId, setTemplateId] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(toLocalISODate());
 
   // Client/applicant split
   const [splitRoles, setSplitRoles] = useState(false);
