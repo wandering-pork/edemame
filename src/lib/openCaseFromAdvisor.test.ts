@@ -123,7 +123,7 @@ describe('openCaseFromAdvisor', () => {
       title: 'Student (Subclass 500) - Jane Doe',
       description: 'summary',
       templateId: 'tpl-500',
-      status: 'open',
+      stage: 'draft',
       startDate: '2026-09-24',
       createdAt: '2026-09-24T01:00:00.000Z',
       visaSubclass: '500',

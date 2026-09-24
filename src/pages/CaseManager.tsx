@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Case, Client, Task, WorkflowTemplate, TeamMember } from '../types';
-import { Search, Plus, FileText, X, ChevronRight, Calendar, UserPlus, Settings2 } from 'lucide-react';
+import { Case, Client, Task, WorkflowTemplate, TeamMember, DocumentChecklistItem, Deadline } from '../types';
+import { Search, Plus, FileText, X, ChevronRight, Calendar, UserPlus, Settings2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { NewCase } from './NewCase';
 import { ConfigurationsPanel } from '../components/case-manager/ConfigurationsPanel';
 import { isTaskClosed } from '../lib/taskStatus';
+import { CASE_STAGE_LABELS, CASE_STAGE_STEPPER, CASE_STAGE_GROUP_LABELS, caseStageGroup, CaseStageGroup } from '../lib/caseStage';
+import { computeCaseRisk } from '../lib/risk';
+import { useRepositories } from '../contexts/RepositoryContext';
 
 interface CaseManagerProps {
   cases: Case[];
@@ -13,44 +16,35 @@ interface CaseManagerProps {
   tasks: Task[];
   templates: WorkflowTemplate[];
   teamMembers?: TeamMember[];
+  deadlines?: Deadline[];
   onTasksConfirmed: (tasks: Task[], newCase: Case) => void;
   onAssignCase?: (caseId: string, newOwnerId: string, note?: string) => void;
 }
 
-type StatusFilter = 'all' | 'active' | 'pending' | 'at-risk' | 'completed';
+type GroupFilter = 'all' | CaseStageGroup;
 
-const FILTERS: { key: StatusFilter; label: string }[] = [
+const GROUP_FILTERS: { key: GroupFilter; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'active', label: 'Active' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'at-risk', label: 'At Risk' },
-  { key: 'completed', label: 'Completed' },
+  { key: 'pre_lodgement', label: CASE_STAGE_GROUP_LABELS.pre_lodgement },
+  { key: 'with_department', label: CASE_STAGE_GROUP_LABELS.with_department },
+  { key: 'closed', label: CASE_STAGE_GROUP_LABELS.closed },
 ];
 
-const STATUS_STYLES: Record<Exclude<StatusFilter, 'all'>, { dot: string; bg: string; text: string; label: string }> = {
-  active: {
-    dot: '#10B981',
-    bg: 'bg-green-50 dark:bg-green-900/20',
-    text: 'text-[#047857] dark:text-[#4ADE80]',
-    label: 'Active',
-  },
-  pending: {
+const GROUP_STYLES: Record<CaseStageGroup, { dot: string; bg: string; text: string }> = {
+  pre_lodgement: {
     dot: '#F59E0B',
     bg: 'bg-amber-50 dark:bg-amber-900/20',
     text: 'text-[#B45309] dark:text-[#FBBF24]',
-    label: 'Pending',
   },
-  'at-risk': {
-    dot: '#EF4444',
-    bg: 'bg-red-50 dark:bg-red-900/20',
-    text: 'text-[#B91C1C] dark:text-[#F87171]',
-    label: 'At Risk',
+  with_department: {
+    dot: '#8B5CF6',
+    bg: 'bg-purple-50 dark:bg-purple-900/20',
+    text: 'text-[#6D28D9] dark:text-[#C4B5FD]',
   },
-  completed: {
+  closed: {
     dot: '#94A3B8',
     bg: 'bg-slate-100 dark:bg-slate-800',
     text: 'text-slate-600 dark:text-slate-300',
-    label: 'Completed',
   },
 };
 
@@ -74,7 +68,6 @@ const initialsOf = (name: string): string =>
     .toUpperCase();
 
 interface RowStatus {
-  status: Exclude<StatusFilter, 'all'>;
   progress: number;
   completedTasks: number;
   totalTasks: number;
@@ -93,12 +86,7 @@ const computeRowStatus = (caseTasks: Task[]): RowStatus => {
   const nextTask = pending[0];
   const isNextOverdue = !!nextTask && new Date(nextTask.date) < new Date();
 
-  let status: Exclude<StatusFilter, 'all'> = 'active';
-  if (progress === 100) status = 'completed';
-  else if (progress === 0) status = 'pending';
-  else if (pending.some(t => new Date(t.date) < new Date())) status = 'at-risk';
-
-  return { status, progress, completedTasks, totalTasks, nextTask, isNextOverdue };
+  return { progress, completedTasks, totalTasks, nextTask, isNextOverdue };
 };
 
 export const CaseManager: React.FC<CaseManagerProps> = ({
@@ -107,19 +95,25 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   tasks,
   templates,
   teamMembers = [],
+  deadlines = [],
   onTasksConfirmed,
   onAssignCase,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const repos = useRepositories();
   const [showIntake, setShowIntake] = useState(false);
   const [showConfigurations, setShowConfigurations] = useState(false);
   const [suggestedTemplateKeyword, setSuggestedTemplateKeyword] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
+  const [atRiskOnly, setAtRiskOnly] = useState(false);
   const [assignModalCaseId, setAssignModalCaseId] = useState<string | null>(null);
   const [assignTarget, setAssignTarget] = useState<string>('');
   const [assignNote, setAssignNote] = useState('');
+  // At Risk rule 3 only applies to cases at ready_to_lodge — checklists are
+  // fetched just for those (few of them), per lib/risk.ts's doc comment.
+  const [checklistsByCase, setChecklistsByCase] = useState<Record<string, DocumentChecklistItem[]>>({});
 
   // Auto-open intake form with suggested template if coming from VisaAdvisor
   useEffect(() => {
@@ -131,6 +125,19 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
       window.history.replaceState({}, document.title);
     }
   }, [location]);
+
+  useEffect(() => {
+    const readyToLodgeIds = cases.filter(c => c.stage === 'ready_to_lodge').map(c => c.id);
+    if (readyToLodgeIds.length === 0) return;
+    let cancelled = false;
+    Promise.all(readyToLodgeIds.map(id => repos.checklist.getByCaseId(id).then(items => [id, items] as const)))
+      .then(entries => {
+        if (cancelled) return;
+        setChecklistsByCase(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [cases, repos.checklist]);
 
   const handleViewDetails = (caseId: string) => {
     navigate(`/cases/${caseId}`);
@@ -157,20 +164,25 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
       const template = templates.find(t => t.id === c.templateId);
       const owner = teamMembers.find(m => m.id === c.caseOwner);
       const rowStatus = computeRowStatus(caseTasks);
-      return { case: c, client, applicant, template, owner, ...rowStatus };
+      const group = caseStageGroup(c.stage);
+      const risk = computeCaseRisk(c, tasks, deadlines, checklistsByCase[c.id]);
+      return { case: c, client, applicant, template, owner, group, risk, ...rowStatus };
     });
-  }, [searchedCases, clients, tasks, templates, teamMembers]);
+  }, [searchedCases, clients, tasks, templates, teamMembers, deadlines, checklistsByCase]);
 
   const filterCounts = useMemo(() => {
-    const counts: Record<StatusFilter, number> = { all: rows.length, active: 0, pending: 0, 'at-risk': 0, completed: 0 };
-    rows.forEach(r => { counts[r.status]++; });
+    const counts: Record<GroupFilter, number> = { all: rows.length, pre_lodgement: 0, with_department: 0, closed: 0 };
+    rows.forEach(r => { counts[r.group]++; });
     return counts;
   }, [rows]);
 
+  const atRiskCount = useMemo(() => rows.filter(r => r.risk.atRisk).length, [rows]);
+
   const filteredRows = useMemo(() => {
-    if (statusFilter === 'all') return rows;
-    return rows.filter(r => r.status === statusFilter);
-  }, [rows, statusFilter]);
+    let list = groupFilter === 'all' ? rows : rows.filter(r => r.group === groupFilter);
+    if (atRiskOnly) list = list.filter(r => r.risk.atRisk);
+    return list;
+  }, [rows, groupFilter, atRiskOnly]);
 
   if (showIntake) {
     return (
@@ -239,19 +251,31 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
 
         {/* Filter chips + count */}
         <div className="flex items-center gap-2 mt-5 flex-wrap">
-          {FILTERS.map(f => (
+          {GROUP_FILTERS.map(f => (
             <button
               key={f.key}
-              onClick={() => setStatusFilter(f.key)}
+              onClick={() => setGroupFilter(f.key)}
               className={`btn-press px-3.5 py-1.5 rounded-full border text-[12px] font-semibold transition-colors whitespace-nowrap ${
-                statusFilter === f.key
+                groupFilter === f.key
                   ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-900/20 text-edamame-700 dark:text-edamame-400'
                   : 'border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame-500'
               }`}
             >
-              {f.label}
+              {f.label} {f.key !== 'all' && `(${filterCounts[f.key]})`}
             </button>
           ))}
+          {/* At Risk overlays any group filter rather than being one itself */}
+          <button
+            onClick={() => setAtRiskOnly(v => !v)}
+            className={`btn-press inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[12px] font-semibold transition-colors whitespace-nowrap ${
+              atRiskOnly
+                ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-[#B91C1C] dark:text-[#F87171]'
+                : 'border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-red-400'
+            }`}
+          >
+            <AlertTriangle size={12} strokeWidth={2} />
+            At Risk ({atRiskCount})
+          </button>
           <span className="ml-auto text-[12px] text-ink-faint dark:text-plate-ink-faint whitespace-nowrap">
             {filteredRows.length} {filteredRows.length === 1 ? 'case' : 'cases'}
             {searchTerm && <span className="ml-1 italic">matching "{searchTerm}"</span>}
@@ -273,8 +297,9 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
               const c = r.case;
               const client = r.client;
               const hue = hueFromId(client?.id || c.clientId || c.id);
-              const statusStyle = STATUS_STYLES[r.status];
+              const groupStyle = GROUP_STYLES[r.group];
               const ref = `#${c.id.slice(0, 8).toUpperCase()}`;
+              const stepperIndex = CASE_STAGE_STEPPER.indexOf(c.stage === 'info_requested' ? 'lodged' : c.stage);
 
               return (
                 <div
@@ -282,10 +307,10 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                   onClick={() => handleViewDetails(c.id)}
                   className="table-row-hover hover:bg-paper-2 dark:hover:bg-plate/60 relative flex items-center gap-4 px-5 pl-6 py-[15px] border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0"
                 >
-                  {/* Status edge */}
+                  {/* Stage-group edge, red when at risk */}
                   <div
                     className="absolute left-0 top-[10px] bottom-[10px] w-[3.5px] rounded-sm"
-                    style={{ background: statusStyle.dot }}
+                    style={{ background: r.risk.atRisk ? '#EF4444' : groupStyle.dot }}
                   />
 
                   {/* Avatar */}
@@ -342,30 +367,52 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                     )}
                   </div>
 
-                  {/* Progress */}
-                  <div className="w-[112px] flex-shrink-0">
-                    <div className="font-mono flex justify-between text-[10.5px] text-ink-faint dark:text-plate-ink-faint">
-                      <span className="font-medium text-ink dark:text-plate-ink">{r.progress}%</span>
-                      <span>{r.completedTasks}/{r.totalTasks}</span>
+                  {/* Stage stepper — compact dots along CASE_STAGE_STEPPER, task count secondary */}
+                  <div className="hidden sm:flex flex-col gap-1 w-[132px] flex-shrink-0" title={CASE_STAGE_LABELS[c.stage]}>
+                    <div className="flex items-center gap-[3px]">
+                      {CASE_STAGE_STEPPER.map((s, i) => (
+                        <span
+                          key={s}
+                          className={`h-1.5 flex-1 rounded-full ${
+                            i < stepperIndex ? 'bg-edamame-500' : i === stepperIndex ? 'bg-edamame-500' : 'bg-paper-2 dark:bg-plate'
+                          } ${i === stepperIndex ? 'ring-2 ring-edamame-500/30' : ''}`}
+                        />
+                      ))}
                     </div>
-                    <div className="h-[5px] rounded-full bg-paper-2 dark:bg-plate overflow-hidden mt-[5px]">
-                      <div
-                        className="progress-fill h-full rounded-full bg-edamame-500"
-                        style={{ width: `${r.progress}%` }}
-                      />
-                    </div>
+                    <span className="text-[10px] text-ink-faint dark:text-plate-ink-faint font-mono">
+                      {r.completedTasks}/{r.totalTasks} tasks
+                    </span>
                   </div>
 
-                  {/* Status chip */}
+                  {/* Stage chip */}
                   <span
-                    className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-[3px] rounded-md flex-shrink-0 ${statusStyle.bg} ${statusStyle.text}`}
+                    className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-[3px] rounded-md flex-shrink-0 ${groupStyle.bg} ${groupStyle.text}`}
                   >
                     <span
                       className="badge-pulse w-1.5 h-1.5 rounded-full"
-                      style={{ background: statusStyle.dot }}
+                      style={{ background: groupStyle.dot }}
                     />
-                    {statusStyle.label}
+                    {CASE_STAGE_LABELS[c.stage]}
                   </span>
+
+                  {/* At Risk badge — reasons visible on hover/focus, not only a title attribute */}
+                  {r.risk.atRisk && (
+                    <span
+                      tabIndex={0}
+                      className="group/risk relative inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-[3px] rounded-md flex-shrink-0 bg-red-50 dark:bg-red-900/20 text-[#B91C1C] dark:text-[#F87171] focus-ring outline-none"
+                    >
+                      <AlertTriangle size={11} strokeWidth={2.2} />
+                      At Risk
+                      <span
+                        role="tooltip"
+                        className="pointer-events-none absolute left-0 top-full mt-1.5 z-20 w-56 p-2.5 rounded-lg bg-ink dark:bg-plate-card border border-plate-ink/10 text-plate-ink dark:text-plate-ink text-[11px] font-normal leading-snug opacity-0 group-hover/risk:opacity-100 group-focus/risk:opacity-100 transition-opacity shadow-lg"
+                      >
+                        <ul className="list-disc pl-3.5 space-y-0.5">
+                          {r.risk.reasons.map((reason, i) => <li key={i}>{reason}</li>)}
+                        </ul>
+                      </span>
+                    </span>
+                  )}
 
                   {/* Owner / assign */}
                   {r.owner ? (

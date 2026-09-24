@@ -19,7 +19,7 @@ function makeCase(overrides: Partial<Case> = {}): Case {
     title: 'Case',
     description: '',
     templateId: 'tpl-1',
-    status: 'open',
+    stage: 'preparing',
     startDate: '2026-01-01',
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -29,7 +29,7 @@ function makeCase(overrides: Partial<Case> = {}): Case {
 describe('findOpenCaseForSubclass', () => {
   it('finds a non-closed case for the client whose template matches the subclass', () => {
     const templates = [makeTemplate({ id: 'tpl-1', visaSubclass: '500' })];
-    const target = makeCase({ id: 'case-1', clientId: 'client-1', templateId: 'tpl-1', status: 'open' });
+    const target = makeCase({ id: 'case-1', clientId: 'client-1', templateId: 'tpl-1', stage: 'preparing' });
     const cases = [target];
     expect(findOpenCaseForSubclass(cases, templates, 'client-1', '500')).toBe(target);
   });
@@ -49,7 +49,7 @@ describe('findOpenCaseForSubclass', () => {
 
   it('ignores closed cases', () => {
     const templates = [makeTemplate({ id: 'tpl-1', visaSubclass: '500' })];
-    const cases = [makeCase({ clientId: 'client-1', templateId: 'tpl-1', status: 'closed' })];
+    const cases = [makeCase({ clientId: 'client-1', templateId: 'tpl-1', stage: 'closed' })];
     expect(findOpenCaseForSubclass(cases, templates, 'client-1', '500')).toBeNull();
   });
 

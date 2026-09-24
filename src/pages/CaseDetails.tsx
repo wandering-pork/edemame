@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind } from '../types';
+import { Case, Client, Task, CaseStage, CaseOutcome, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useAuth } from '../contexts/AuthContext';
 import { CaseNotes } from '../components/CaseNotes';
@@ -21,6 +21,7 @@ import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplat
 import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib/caseTabsStore';
 import { displayCaseNumber } from '../lib/caseNumber';
 import { isTaskClosed, isWaiting, withStatus, TASK_STATUS_LABELS, TASK_STATUS_ORDER } from '../lib/taskStatus';
+import { CASE_STAGE_LABELS, CASE_STAGE_ORDER, evaluateTransition, outcomeRequired } from '../lib/caseStage';
 import { allDeadlines, daysLeft, urgency } from '../lib/deadlines';
 import { toLocalISODate, addDaysISO } from '../lib/dates';
 import { useNavigate } from 'react-router-dom';
@@ -72,6 +73,7 @@ interface CaseDetailsProps {
   deadlines: Deadline[];
   onAddDeadline: (deadline: Deadline) => void;
   onUpdateDeadline: (deadline: Deadline) => void;
+  onUpdateCase: (caseItem: Case) => void;
   onBack: () => void;
 }
 
@@ -140,6 +142,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   deadlines,
   onAddDeadline,
   onUpdateDeadline,
+  onUpdateCase,
   onBack
 }) => {
   const repos = useRepositories();
@@ -206,6 +209,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [statusOpen, setStatusOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
+  // ---- Stage control state ----
+  // A backward move (e.g. lodged -> preparing) needs an inline confirm before
+  // it's applied; moving to `closed` needs an outcome picked first. Both are
+  // staged here rather than applied immediately from the stage menu.
+  const [backwardConfirmStage, setBackwardConfirmStage] = useState<CaseStage | null>(null);
+  const [outcomePickerOpen, setOutcomePickerOpen] = useState(false);
+  const [outcomeDraft, setOutcomeDraft] = useState<CaseOutcome | ''>('');
+
   // ---- Agent panel state (closed by default per design) ----
   const [agentOpen, setAgentOpen] = useState(false);
 
@@ -270,11 +281,23 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const overdueCount = pendingTasks.filter(t => new Date(t.date) < new Date()).length;
   const outstandingDocs = checklist.length > 0 ? checklist.length - uploadedCount : 0;
 
-  const STATUS_META: Record<CaseStatus, { label: string; chip: string; dot: string }> = {
-    open: { label: 'Open', chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
-    in_progress: { label: 'In Progress', chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
-    on_hold: { label: 'On Hold', chip: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
-    closed: { label: 'Closed', chip: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300', dot: 'bg-green-500' },
+  const STAGE_META: Record<CaseStage, { chip: string; dot: string }> = {
+    draft: { chip: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300', dot: 'bg-slate-400' },
+    assessment: { chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+    engaged: { chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+    preparing: { chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+    ready_to_lodge: { chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+    lodged: { chip: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+    info_requested: { chip: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
+    decision: { chip: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+    closed: { chip: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300', dot: 'bg-green-500' },
+  };
+
+  const OUTCOME_LABELS: Record<CaseOutcome, string> = {
+    granted: 'Granted',
+    refused: 'Refused',
+    withdrawn: 'Withdrawn',
+    lapsed: 'Lapsed',
   };
 
   // Rail alerts (overdue red, docs outstanding amber, passport expiry red)
@@ -499,10 +522,52 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   // ---- Case handlers ----
-  const handleStatusChange = async (newStatus: CaseStatus) => {
-    const updated = { ...currentCase, status: newStatus };
-    await repos.cases.update(updated);
+  const applyStageChange = (newStage: CaseStage, outcome?: CaseOutcome) => {
+    const updated: Case = { ...currentCase, stage: newStage, outcome: newStage === 'closed' ? outcome : undefined };
     setCurrentCase(updated);
+    onUpdateCase(updated);
+  };
+
+  /**
+   * Every stage move is allowed — see `lib/caseStage.ts`'s `evaluateTransition()`
+   * — but a backward move or a move to `closed` needs an inline confirm/pick
+   * before it's applied, rather than `window.confirm`/`window.prompt`.
+   */
+  const handleStageSelect = (newStage: CaseStage) => {
+    setStatusOpen(false);
+    if (newStage === currentCase.stage) return;
+    const transition = evaluateTransition(currentCase.stage, newStage);
+    if (transition.requiresOutcome) {
+      setBackwardConfirmStage(null);
+      setOutcomeDraft('');
+      setOutcomePickerOpen(true);
+      return;
+    }
+    if (transition.isBackward) {
+      setOutcomePickerOpen(false);
+      setBackwardConfirmStage(newStage);
+      return;
+    }
+    applyStageChange(newStage);
+  };
+
+  const confirmBackwardMove = () => {
+    if (!backwardConfirmStage) return;
+    applyStageChange(backwardConfirmStage);
+    setBackwardConfirmStage(null);
+  };
+
+  const confirmOutcome = () => {
+    if (!outcomeDraft) return;
+    applyStageChange('closed', outcomeDraft);
+    setOutcomePickerOpen(false);
+    setOutcomeDraft('');
+  };
+
+  const handleToggleOnHold = () => {
+    const updated: Case = { ...currentCase, onHold: !currentCase.onHold };
+    setCurrentCase(updated);
+    onUpdateCase(updated);
   };
 
   const handleSaveCase = async () => {
@@ -727,7 +792,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         `Client: ${client.name}`,
         applicant && applicant.id !== client.id ? `Applicant: ${applicant.name}` : null,
         visaSubclass ? `Visa Type: Subclass ${visaSubclass}` : null,
-        `Status: ${caseItem.status}`,
+        `Stage: ${CASE_STAGE_LABELS[caseItem.stage]}${caseItem.onHold ? ' (on hold)' : ''}`,
         `Progress: ${completedTasks.length}/${caseTasks.length} tasks completed (${progress}%)`,
         pendingTasks.length > 0 ? `Next task: ${pendingTasks[0]?.title}` : null,
         checklist.length > 0 ? `Documents: ${uploadedCount}/${checklist.length} collected` : null,
@@ -1088,7 +1153,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   // ---- Render ----
-  const status = STATUS_META[currentCase.status];
+  const stageMeta = STAGE_META[currentCase.stage];
+  const needsOutcomePrompt = currentCase.stage === 'closed' && !currentCase.outcome;
 
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
@@ -1116,30 +1182,104 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          {/* Status chip dropdown */}
+          {/* On hold toggle */}
+          <button
+            onClick={handleToggleOnHold}
+            title={currentCase.onHold ? 'Take this case off hold' : 'Put this case on hold'}
+            className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
+              currentCase.onHold
+                ? 'border-orange-400 bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300'
+                : 'border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame'
+            }`}
+          >
+            {currentCase.onHold ? 'On hold' : 'Not on hold'}
+          </button>
+
+          {/* Stage chip dropdown */}
           <div className="relative">
             <button
               onClick={() => setStatusOpen(o => !o)}
-              className={`inline-flex items-center gap-1.5 text-[11px] font-bold pl-2.5 pr-2 py-1.5 rounded-lg transition-colors ${status.chip}`}
+              className={`inline-flex items-center gap-1.5 text-[11px] font-bold pl-2.5 pr-2 py-1.5 rounded-lg transition-colors ${stageMeta.chip}`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full badge-pulse ${status.dot}`} />
-              {status.label}
+              <span className={`w-1.5 h-1.5 rounded-full badge-pulse ${stageMeta.dot}`} />
+              {CASE_STAGE_LABELS[currentCase.stage]}
+              {currentCase.stage === 'closed' && currentCase.outcome && (
+                <span className="opacity-70">· {OUTCOME_LABELS[currentCase.outcome]}</span>
+              )}
               <ChevronDown size={12} />
             </button>
             {statusOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setStatusOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-40 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
-                  {(['open', 'in_progress', 'on_hold', 'closed'] as CaseStatus[]).map(s => (
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-48 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content max-h-80 overflow-y-auto">
+                  {CASE_STAGE_ORDER.map(s => (
                     <button
                       key={s}
-                      onClick={() => { handleStatusChange(s); setStatusOpen(false); }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold hover:bg-paper-2 dark:hover:bg-plate transition-colors ${currentCase.status === s ? 'text-ink dark:text-plate-ink' : 'text-ink-soft dark:text-plate-ink-soft'}`}
+                      onClick={() => handleStageSelect(s)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold hover:bg-paper-2 dark:hover:bg-plate transition-colors ${currentCase.stage === s ? 'text-ink dark:text-plate-ink' : 'text-ink-soft dark:text-plate-ink-soft'}`}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[s].dot}`} />
-                      {STATUS_META[s].label}
+                      <span className={`w-1.5 h-1.5 rounded-full ${STAGE_META[s].dot}`} />
+                      {CASE_STAGE_LABELS[s]}
                     </button>
                   ))}
+                </div>
+              </>
+            )}
+
+            {/* Backward-move confirm — inline, never window.confirm */}
+            {backwardConfirmStage && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setBackwardConfirmStage(null)} />
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-64 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-3 modal-content">
+                  <p className="text-[12px] text-ink dark:text-plate-ink font-semibold mb-1">Move stage backward?</p>
+                  <p className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mb-3">
+                    This moves the case from {CASE_STAGE_LABELS[currentCase.stage]} back to {CASE_STAGE_LABELS[backwardConfirmStage]}.
+                  </p>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button onClick={() => setBackwardConfirmStage(null)} className="px-3 py-1.5 text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={confirmBackwardMove} className="px-3 py-1.5 text-[11.5px] font-semibold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg transition-colors">
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Outcome picker — required before a move to Closed applies */}
+            {outcomePickerOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setOutcomePickerOpen(false)} />
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-64 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-3 modal-content">
+                  <p className="text-[12px] text-ink dark:text-plate-ink font-semibold mb-2">Outcome</p>
+                  <div className="space-y-1 mb-3">
+                    {(['granted', 'refused', 'withdrawn', 'lapsed'] as CaseOutcome[]).map(o => (
+                      <button
+                        key={o}
+                        onClick={() => setOutcomeDraft(o)}
+                        className={`w-full text-left px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+                          outcomeDraft === o
+                            ? 'bg-edamame-50 dark:bg-edamame-900/20 text-edamame-700 dark:text-edamame-400'
+                            : 'text-ink-soft dark:text-plate-ink-soft hover:bg-paper dark:hover:bg-plate'
+                        }`}
+                      >
+                        {OUTCOME_LABELS[o]}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button onClick={() => setOutcomePickerOpen(false)} className="px-3 py-1.5 text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg transition-colors">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmOutcome}
+                      disabled={!outcomeDraft}
+                      className="px-3 py-1.5 text-[11.5px] font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed rounded-lg transition-colors"
+                    >
+                      Close case
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -1238,6 +1378,22 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Closed with no recorded outcome — prompt for one inline whenever the case is opened. */}
+      {needsOutcomePrompt && (
+        <div className="mt-3 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-300/60 dark:border-amber-700/40">
+          <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400 flex-shrink-0" strokeWidth={1.8} />
+          <span className="text-[12.5px] text-amber-800 dark:text-amber-300 font-semibold flex-1">
+            This case is closed with no recorded outcome.
+          </span>
+          <button
+            onClick={() => { setOutcomeDraft(''); setOutcomePickerOpen(true); }}
+            className="text-[12px] font-bold text-amber-800 dark:text-amber-300 underline hover:no-underline"
+          >
+            Set outcome
+          </button>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════
           3-COLUMN GRID

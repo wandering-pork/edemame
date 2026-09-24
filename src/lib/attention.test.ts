@@ -68,7 +68,7 @@ describe('buildAttentionItems', () => {
   const client: Client = { id: 'cl1', name: 'Jane Doe', dob: '', phone: '', email: '', address: '' };
   const kase: Case = {
     id: 'case1', clientId: 'cl1', title: 'Partner Visa', description: '', templateId: '',
-    status: 'open', startDate: '2026-01-01', createdAt: '2026-01-01',
+    stage: 'preparing', startDate: '2026-01-01', createdAt: '2026-01-01',
   };
   const getCaseAndClient = (caseId?: string) => (caseId === 'case1' ? { case: kase, client } : {});
   const formatDate = (d: string) => d;
@@ -103,7 +103,7 @@ describe('deadlineAttentionItemsFor', () => {
   const client: Client = { id: 'cl1', name: 'Jane Doe', dob: '', phone: '', email: '', address: '' };
   const kase: Case = {
     id: 'case1', clientId: 'cl1', title: 'Partner Visa', description: '', templateId: '',
-    status: 'open', startDate: '2026-01-01', createdAt: '2026-01-01',
+    stage: 'preparing', startDate: '2026-01-01', createdAt: '2026-01-01',
   };
   const getCaseAndClient = (caseId?: string) => (caseId === 'case1' ? { case: kase, client } : {});
   const getClientById = (clientId?: string) => (clientId === 'cl1' ? client : undefined);

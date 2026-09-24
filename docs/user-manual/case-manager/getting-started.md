@@ -22,6 +22,37 @@ to open a read-only view of the full report (inputs summary and every assessed p
 verdict, reasons, and gaps) without leaving the case. See
 [Visa Eligibility Advisor](../visa-advisor/getting-started.md) for how that report is produced.
 
+## Case stage, on hold, and At Risk
+
+Every case moves through a **stage**, shown as a chip in the case header and grouped on the Case
+Manager list into three boards: **Pre-lodgement** (Draft → Assessment → Engaged → Preparing →
+Ready to lodge), **With Department** (Lodged, Info requested, Decision), and **Closed**. A new case
+always starts at **Draft**.
+
+Click the stage chip to move a case to any other stage — there's no fixed one-way path, since a real
+case can go backward (a decision gets reopened, a lodgement is withdrawn and re-prepared). Moving a
+case to an earlier stage asks for a quick confirm first. **Lodged** and **Info requested** are treated
+as the same step in the stage picker, since a case toggles between the two rather than progressing
+through both — no confirm is needed either way.
+
+Moving a case to **Closed** requires picking an **outcome** first: Granted, Refused, Withdrawn, or
+Lapsed. If a case is already closed with no outcome on file (this can happen to cases closed before
+outcomes existed), an amber banner appears at the top of the case asking you to set one.
+
+**On hold** is a separate pause flag next to the stage chip — a case can be on hold at any
+pre-lodgement or with-department stage. It doesn't change the stage itself.
+
+**At Risk** is never set manually — it's computed live from the case's own data and shown as a red
+badge on the Case Manager list (hover or focus it to see the specific reasons) and as a red edge on
+the row. A case is flagged At Risk when any of the following is true:
+- it has an open deadline due within 14 days,
+- it has an overdue task,
+- it's at **Ready to lodge** and a document checklist item is still outstanding, or
+- it has an s56/s57 statutory response deadline due within 7 days.
+
+Use the **At Risk** chip on the Case Manager list to filter down to just those cases, alongside (not
+instead of) the Pre-lodgement/With Department/Closed board filters.
+
 ## Landing on the Workspace tab
 
 Every time you open a case, you land on the **Workspace** tab. This is the AI-assisted entry point
@@ -56,7 +87,7 @@ what lets a file link itself to a Document Checklist item automatically — see
 ## Using the case-aware chat (Focus Mode Agent)
 
 Every case has a chat panel on the right-hand side of Case Details. This agent already knows the
-case's client, visa subclass, status, task progress, and document checklist — you don't need to
+case's client, visa subclass, stage, task progress, and document checklist — you don't need to
 repeat that context.
 
 You can ask it to:

@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { normalizeTask } from '@/lib/taskStatus';
 import { normalizeTemplate } from '@/lib/templateTiming';
+import { normalizeCase, deriveLegacyStatus } from '@/lib/caseStage';
 import type {
   Client,
   Case,
@@ -162,32 +163,44 @@ class CloudClientRepository implements IClientRepository {
 // ---------------------------------------------------------------------------
 
 function caseToRow(userId: string, c: Case) {
+  const normalized = normalizeCase(c);
   return {
-    id: c.id,
+    id: normalized.id,
     user_id: userId,
-    client_id: c.clientId,
-    title: c.title,
-    description: c.description,
-    template_id: c.templateId,
-    status: c.status,
-    start_date: c.startDate,
-    created_at: c.createdAt,
-    case_owner: c.caseOwner ?? null,
-    assignment_history: c.assignmentHistory ?? null,
-    applicant_id: c.applicantId ?? null,
-    case_number: c.caseNumber ?? null,
-    visa_subclass: c.visaSubclass ?? null,
+    client_id: normalized.clientId,
+    title: normalized.title,
+    description: normalized.description,
+    template_id: normalized.templateId,
+    // `stage`/`outcome`/`on_hold` columns added by
+    // `supabase/migrations/20260926000050_add_case_stage.sql` (not yet
+    // applied to production — see CLAUDE.md's manual-apply migration list).
+    // `status` is kept for one release as a derived mirror so any remaining
+    // reader of the legacy column keeps working — see `deriveLegacyStatus()`.
+    stage: normalized.stage,
+    outcome: normalized.outcome ?? null,
+    on_hold: normalized.onHold ?? false,
+    status: deriveLegacyStatus(normalized),
+    start_date: normalized.startDate,
+    created_at: normalized.createdAt,
+    case_owner: normalized.caseOwner ?? null,
+    assignment_history: normalized.assignmentHistory ?? null,
+    applicant_id: normalized.applicantId ?? null,
+    case_number: normalized.caseNumber ?? null,
+    visa_subclass: normalized.visaSubclass ?? null,
   };
 }
 
 function rowToCase(row: any): Case {
-  return {
+  return normalizeCase({
     id: row.id,
     clientId: row.client_id,
     title: row.title,
     description: row.description,
     templateId: row.template_id,
-    status: row.status,
+    stage: row.stage ?? undefined,
+    outcome: row.outcome ?? undefined,
+    onHold: row.on_hold ?? undefined,
+    status: row.status ?? undefined,
     startDate: row.start_date,
     createdAt: row.created_at,
     userId: row.user_id,
@@ -196,7 +209,7 @@ function rowToCase(row: any): Case {
     applicantId: row.applicant_id ?? undefined,
     caseNumber: row.case_number ?? undefined,
     visaSubclass: row.visa_subclass ?? undefined,
-  };
+  });
 }
 
 class CloudCaseRepository implements ICaseRepository {
@@ -214,15 +227,17 @@ class CloudCaseRepository implements ICaseRepository {
   }
 
   async create(item: Case): Promise<Case> {
-    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, item), { onConflict: 'id' });
+    const normalized = normalizeCase(item);
+    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, normalized), { onConflict: 'id' });
     if (error) throw error;
-    return item;
+    return normalized;
   }
 
   async update(item: Case): Promise<Case> {
-    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, item), { onConflict: 'id' });
+    const normalized = normalizeCase(item);
+    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, normalized), { onConflict: 'id' });
     if (error) throw error;
-    return item;
+    return normalized;
   }
 
   async delete(id: string): Promise<void> {
