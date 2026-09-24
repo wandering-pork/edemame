@@ -127,7 +127,7 @@ A firm/account-level **Document Type** reference list is the shared vocabulary b
 2. 4-step wizard collects: personal info → immigration goal → conditional details → supporting factors
 3. On submit, POSTs collected data to `/api/check-eligibility` via `VisaAdvisor.tsx`
 4. Vercel function calls Gemini 3.5 Flash with visa assessment prompt
-5. Returns JSON with visa verdict cards: 9 Australian visa subclasses (189, 190, 482, 186, 500, 820, 485, 600, 417)
+5. Returns JSON with visa verdict cards: 10 Australian visa subclasses (189, 190, 482, 186, 500, 820, 485, 600, 417, 491). Every subclass the Advisor can return has a matching system workflow template (`src/lib/seedData.ts`) and document checklist (`CHECKLIST_CATEGORIES` in `src/lib/checklistTemplates.ts`), so "Open Case" always gets a real template and generated checklist rather than falling back to a bare/empty one.
 6. Each card shows verdict (qualifies/possibly/unlikely/needs_more_info), reasons, and gaps
 7. "Open Case" button on qualified visas reuses or creates the client from the wizard answers, drafts the AI task plan from the eligibility assessment, creates the case directly, and navigates to its detail page (button shows staged progress; Start Over is disabled while creating)
 
@@ -152,7 +152,7 @@ A firm/account-level **Document Type** reference list is the shared vocabulary b
 
 ### Seed Data
 
-Hardcoded in `App.tsx`: 5 clients, 4 cases, 8 tasks, 5 Australian visa workflow templates (Student 500, Skilled 190, Partner 820/801, Visitor 600, Graduate 485). No persistence layer yet — state resets on reload.
+Client/case/task seed data is hardcoded in `App.tsx`; state resets on reload as there's no persistence layer for it. System default workflow templates are a separate, always-on set from `src/lib/seedData.ts`'s `seedDefaultTemplates()` (merged into app state on every load — see "Local-First Storage"), covering all 10 visa subclasses the Visa Eligibility Advisor can return: Skilled Independent 189, Skilled Nominated 190, Skills in Demand 482 (rebranded from TSS, Dec 2024), ENS 186, Student 500, Skilled Work Regional (Provisional) 491 (not "490" — that is not a current subclass; the system template's `id` stays `tpl-490` for backward compatibility, see the comment above `seedDefaultTemplates()`), Partner 820/801, Temporary Graduate 485, Visitor 600, Working Holiday 417.
 
 ## Keeping the User Manual in Sync
 

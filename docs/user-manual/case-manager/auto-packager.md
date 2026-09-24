@@ -31,7 +31,7 @@ screen is skipped — Auto-Packager opens directly with that file loaded.)
 From there it walks through four steps:
 
 1. **Assign** — the case's document checklist (generated from the visa subclass template, e.g.
-   186/482/490/820) appears as a set of slots on the left; the source files appear as a pool on the
+   186/482/491/820) appears as a set of slots on the left; the source files appear as a pool on the
    right. Drag a document onto the slot it belongs to. Files already under 5 MB are accepted
    immediately; oversized ones show an amber warning icon. Drop a document back into the pool to
    unassign it. Use **Change source** in the footer to switch between Case Files and local PC.

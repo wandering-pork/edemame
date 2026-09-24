@@ -83,6 +83,10 @@ export interface WorkflowTemplate {
   visaSubclass?: string;
   steps?: WorkflowStep[];
   userId?: string | null; // null = system default
+  /** Provenance for system-default templates: the official page(s) content was checked against. */
+  sourceUrl?: string;
+  /** Provenance for system-default templates: ISO date (YYYY-MM-DD) content was last verified. */
+  lastVerified?: string;
 }
 
 export interface Client {
