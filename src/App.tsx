@@ -366,6 +366,11 @@ const AppShell: React.FC = () => {
     setTemplates(prev => [...prev, template]);
   }, [repos]);
 
+  const handleUpdateTemplate = useCallback(async (template: WorkflowTemplate) => {
+    await repos.templates.update(template);
+    setTemplates(prev => prev.map(t => (t.id === template.id ? template : t)));
+  }, [repos]);
+
   const handleDeleteTemplate = useCallback(async (id: string) => {
     await repos.templates.delete(id);
     setTemplates(prev => prev.filter(t => t.id !== id));
@@ -595,7 +600,9 @@ const AppShell: React.FC = () => {
             <Route path="/templates" element={
               <Templates
                 templates={templates}
+                currentUserId={currentUserId}
                 onAddTemplate={handleAddTemplate}
+                onUpdateTemplate={handleUpdateTemplate}
                 onDeleteTemplate={handleDeleteTemplate}
               />
             } />

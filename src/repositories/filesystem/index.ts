@@ -1,5 +1,6 @@
 import { readJson, writeJson, deleteEntry, listFiles, listDirNames, writeBlob, readBlob } from '@/lib/fsStorage';
 import { normalizeTask } from '@/lib/taskStatus';
+import { normalizeTemplate } from '@/lib/templateTiming';
 import type {
   Client,
   Case,
@@ -172,11 +173,13 @@ class FsTemplateRepository implements ITemplateRepository {
   constructor(private root: FileSystemDirectoryHandle) {}
 
   async getAll(): Promise<WorkflowTemplate[]> {
-    return readAllInDir<WorkflowTemplate>(this.root, 'templates');
+    const templates = await readAllInDir<WorkflowTemplate>(this.root, 'templates');
+    return templates.map(normalizeTemplate);
   }
 
   async getById(id: string): Promise<WorkflowTemplate | undefined> {
-    return (await readJson<WorkflowTemplate>(this.root, `templates/${id}.json`)) ?? undefined;
+    const template = await readJson<WorkflowTemplate>(this.root, `templates/${id}.json`);
+    return template ? normalizeTemplate(template) : undefined;
   }
 
   async create(item: WorkflowTemplate): Promise<WorkflowTemplate> {

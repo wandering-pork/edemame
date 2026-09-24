@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import { normalizeTask } from '@/lib/taskStatus';
+import { normalizeTemplate } from '@/lib/templateTiming';
 import type {
   Client,
   Case,
@@ -330,18 +331,28 @@ function templateToRow(userId: string, t: WorkflowTemplate) {
     description: t.description,
     visa_subclass: t.visaSubclass ?? null,
     steps: t.steps ?? null,
+    // `version`/`timing_verified` columns added by
+    // `supabase/migrations/20260926000200_template_version.sql` (not yet
+    // applied to production — see CLAUDE.md's manual-apply migration list).
+    // Like `case_number`/`visa_subclass` before it, this migration must be
+    // applied *before* this frontend build reaches production, or PostgREST
+    // rejects every custom-template insert/update with an unknown-column error.
+    version: t.version ?? null,
+    timing_verified: t.timingVerified ?? null,
   };
 }
 
 function rowToTemplate(row: any): WorkflowTemplate {
-  return {
+  return normalizeTemplate({
     id: row.id,
     title: row.title,
     description: row.description,
     visaSubclass: row.visa_subclass ?? undefined,
     steps: row.steps ?? undefined,
     userId: row.user_id,
-  };
+    version: row.version ?? undefined,
+    timingVerified: row.timing_verified ?? undefined,
+  });
 }
 
 class CloudTemplateRepository implements ITemplateRepository {
