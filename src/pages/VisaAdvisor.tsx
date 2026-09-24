@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Client, WorkflowTemplate } from '../types';
+import { Client, WorkflowTemplate, Case } from '../types';
 import {
   ChevronRight,
   ChevronLeft,
@@ -14,6 +14,14 @@ import {
   Check,
   Sparkles,
 } from 'lucide-react';
+import {
+  OpenCasePanel,
+  OpenCaseClientChoice,
+  OpenCasePanelResult,
+  OpenCaseStage,
+} from '../components/visa-advisor/OpenCasePanel';
+
+export type { OpenCaseStage, OpenCaseClientChoice };
 
 interface WizardState {
   step: 'input' | 'report';
@@ -59,36 +67,28 @@ interface EligibilityUsage {
   estimatedCostUsd: number;
 }
 
-// Order reflects the actual sequence handleOpenNewCase runs in: the AI task plan
-// is drafted first (so nothing has to be rolled back if it fails), then the client
-// is resolved/created, then the case itself is saved.
-export type OpenCaseStage = 'plan' | 'client' | 'finalizing';
-
+// Everything the confirmation panel decided, executed exactly as confirmed —
+// no re-resolution of the client happens once this reaches the caller. Stage
+// order reflects the actual sequence handleOpenNewCase runs in: the AI task
+// plan (if requested) is drafted first (so nothing has to be rolled back if it
+// fails), then the client is resolved/created, then the case itself is saved.
 export interface OpenCaseParams {
-  /** id of a client the page was pre-loaded for (`?clientId=`) — takes precedence over name/DOB matching. */
-  clientId?: string;
-  clientInfo: {
-    fullName: string;
-    dob: string;
-    nationality: string;
-    inAustralia: boolean;
-    currentVisaStatus: string;
-  };
+  client: OpenCaseClientChoice;
+  /** Workflow template id to use, or `null` for "No template (general case)". */
+  templateId: string | null;
+  title: string;
+  /** When false, the 'plan' stage is skipped entirely and no tasks are generated. */
+  generateTasks: boolean;
   visaSubclass: string;
   visaName: string;
   caseDescription: string;
   onProgress: (stage: OpenCaseStage) => void;
 }
 
-const openCaseStageLabels: Record<OpenCaseStage, string> = {
-  plan: 'Drafting task plan with AI…',
-  client: 'Setting up client…',
-  finalizing: 'Finalizing case…',
-};
-
 interface VisaAdvisorProps {
   clients: Client[];
   templates: WorkflowTemplate[];
+  cases: Case[];
   onOpenNewCase: (params: OpenCaseParams) => Promise<void>;
   onEligibilityChecked?: (usage: EligibilityUsage) => void;
 }
@@ -271,6 +271,7 @@ const labelClass =
 export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   clients,
   templates,
+  cases,
   onOpenNewCase,
   onEligibilityChecked,
 }) => {
@@ -307,6 +308,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   const [showAllPathways, setShowAllPathways] = useState(false);
   const [openingCaseSubclass, setOpeningCaseSubclass] = useState<string | null>(null);
   const [openingCaseStage, setOpeningCaseStage] = useState<OpenCaseStage>('client');
+  // The pathway a user clicked "Open Case" on, pending confirmation in the panel.
+  // `null` while no panel is open — separate from `openingCaseSubclass`, which
+  // only becomes non-null once the user actually confirms and creation starts.
+  const [pendingVisa, setPendingVisa] = useState<VisaOption | null>(null);
 
   const sortedOptions = useMemo(() => {
     if (!report) return [];
@@ -375,13 +380,23 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
     }));
   };
 
-  const handleOpenCase = async (visa: VisaOption) => {
+  // Clicking "Open Case" just opens the confirmation panel — nothing is
+  // created until the user reviews and confirms in handleConfirmOpenCase.
+  const handleOpenCase = (visa: VisaOption) => {
+    setPendingVisa(visa);
+  };
+
+  const handleConfirmOpenCase = async (result: OpenCasePanelResult) => {
+    if (!pendingVisa) return;
+    const visa = pendingVisa;
     setOpeningCaseSubclass(visa.visaSubclass);
-    setOpeningCaseStage('plan');
+    setOpeningCaseStage(result.generateTasks ? 'plan' : 'client');
     try {
       await onOpenNewCase({
-        clientId: prefilledClient?.id,
-        clientInfo: wizardState.clientInfo,
+        client: result.client,
+        templateId: result.templateId,
+        title: result.title,
+        generateTasks: result.generateTasks,
         visaSubclass: visa.visaSubclass,
         visaName: visa.visaName,
         caseDescription: buildCaseDescription(wizardState, visa),
@@ -390,6 +405,8 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
       // On success the parent navigates away — no need to reset state here,
       // and doing so would flash the idle button for a frame before unmount.
     } catch (error) {
+      // Keep the panel open with the user's choices intact so they can retry
+      // without re-entering everything.
       toast.error('Could not create the case. Please try again.');
       setOpeningCaseSubclass(null);
     }
@@ -1001,7 +1018,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
               </div>
               <button
                 onClick={handleStartOver}
-                disabled={openingCaseSubclass !== null}
+                disabled={openingCaseSubclass !== null || pendingVisa !== null}
                 title={openingCaseSubclass !== null ? 'A case is being created — hang tight' : undefined}
                 className="px-4 py-2 text-[13px] font-semibold text-ink-soft dark:text-plate-ink-soft bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors btn-press disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -1045,21 +1062,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                       )}
                       <button
                         onClick={() => handleOpenCase(best)}
-                        disabled={openingCaseSubclass !== null}
+                        disabled={openingCaseSubclass !== null || pendingVisa !== null}
                         className="flex items-center justify-center gap-2 px-4 py-2.5 bg-edamame-500 hover:bg-edamame-600 text-white text-[13px] font-bold rounded-lg transition-colors btn-press whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed min-w-[172px]"
                       >
-                        {openingCaseSubclass === best.visaSubclass ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin flex-shrink-0" />
-                            <span className={openingCaseStage === 'plan' ? 'font-mono-ai' : ''}>
-                              {openCaseStageLabels[openingCaseStage]}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            Open Case <ArrowRight size={14} />
-                          </>
-                        )}
+                        Open Case <ArrowRight size={14} />
                       </button>
                     </div>
                   )}
@@ -1195,21 +1201,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             )}
                             <button
                               onClick={() => handleOpenCase(visa)}
-                              disabled={openingCaseSubclass !== null}
+                              disabled={openingCaseSubclass !== null || pendingVisa !== null}
                               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-edamame-500 hover:bg-edamame-600 text-white text-[12.5px] font-bold rounded-lg transition-colors btn-press disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                              {openingCaseSubclass === visa.visaSubclass ? (
-                                <>
-                                  <Loader2 size={13} className="animate-spin flex-shrink-0" />
-                                  <span className={openingCaseStage === 'plan' ? 'font-mono-ai' : ''}>
-                                    {openCaseStageLabels[openingCaseStage]}
-                                  </span>
-                                </>
-                              ) : (
-                                <>
-                                  Open Case <ArrowRight size={13} />
-                                </>
-                              )}
+                              Open Case <ArrowRight size={13} />
                             </button>
                           </div>
                         )}
@@ -1236,6 +1231,22 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
           </div>
         )}
       </div>
+
+      {pendingVisa && (
+        <OpenCasePanel
+          visaSubclass={pendingVisa.visaSubclass}
+          visaName={pendingVisa.visaName}
+          clientInfo={wizardState.clientInfo}
+          prefilledClientId={prefilledClient?.id}
+          clients={clients}
+          templates={templates}
+          cases={cases}
+          isSubmitting={openingCaseSubclass === pendingVisa.visaSubclass}
+          stage={openingCaseStage}
+          onConfirm={handleConfirmOpenCase}
+          onCancel={() => setPendingVisa(null)}
+        />
+      )}
     </div>
   );
 };

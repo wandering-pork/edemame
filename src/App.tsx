@@ -23,7 +23,6 @@ import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification,
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { toLocalISODate } from './lib/dates';
-import { resolveAdvisorClient } from './lib/resolveAdvisorClient';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
@@ -559,6 +558,7 @@ const AppShell: React.FC = () => {
               <VisaAdvisorRoute
                 clients={clients}
                 templates={templates}
+                cases={cases}
                 onEligibilityChecked={handleEligibilityChecked}
                 onAddClient={handleAddClient}
                 onDeleteClient={handleDeleteClient}
@@ -666,6 +666,7 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
 interface VisaAdvisorRouteProps {
   clients: Client[];
   templates: WorkflowTemplate[];
+  cases: Case[];
   onEligibilityChecked: (usage: { promptTokens: number; candidatesTokens: number; totalTokens: number; estimatedCostUsd: number }) => void;
   onAddClient: (client: Client) => Promise<void>;
   onDeleteClient: (id: string) => Promise<void>;
@@ -683,73 +684,71 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
     locationRef.current = location.pathname;
   }, [location.pathname]);
 
-  const handleOpenNewCase = async ({ clientId, clientInfo, visaSubclass, visaName, caseDescription, onProgress }: OpenCaseParams) => {
-    // Exact subclass match only — a template whose visaSubclass lists several
-    // subclasses (e.g. "820/801") is split and compared per-entry rather than
-    // matched with substring/title fuzziness, which could pick the wrong template.
-    const template = props.templates.find((t) =>
-      (t.visaSubclass || '')
-        .split('/')
-        .map((s) => s.trim())
-        .includes(visaSubclass)
-    );
+  const handleOpenNewCase = async ({ client: clientChoice, templateId, title, generateTasks, visaSubclass, visaName, caseDescription, onProgress }: OpenCaseParams) => {
+    const template = templateId ? props.templates.find((t) => t.id === templateId) : undefined;
 
     const startDate = toLocalISODate();
     const newCaseId = uuidv4();
 
-    // Generate the AI task plan first: if it fails there's nothing to roll back,
-    // and if it succeeds we don't want to have already created a client for a
-    // case that then fails to save.
-    onProgress('plan');
+    // Generate the AI task plan first (only if the user asked for one in the
+    // confirmation panel): if it fails there's nothing to roll back, and if it
+    // succeeds we don't want to have already created a client for a case that
+    // then fails to save.
     let generatedTasks: Partial<Task>[] = [];
     let aiGenerationFailed = false;
-    try {
-      generatedTasks = await generateTasksFromCase(
-        caseDescription,
-        template?.description || '',
-        startDate,
-        template?.visaSubclass,
-        template?.title,
-        template?.steps
-      );
-    } catch {
-      aiGenerationFailed = true;
+    if (generateTasks) {
+      onProgress('plan');
+      try {
+        generatedTasks = await generateTasksFromCase(
+          caseDescription,
+          template?.description || '',
+          startDate,
+          template?.visaSubclass,
+          template?.title,
+          template?.steps
+        );
+      } catch {
+        aiGenerationFailed = true;
+      }
     }
 
     onProgress('client');
-    const resolution = resolveAdvisorClient(props.clients, clientInfo, clientId);
+    // The confirmation panel already resolved which client to use (or gathered
+    // the details for a new one) — execute exactly what the user confirmed,
+    // no re-resolution here.
     let client: Client;
     let createdNewClient = false;
-    if (resolution.kind === 'existing') {
-      client = resolution.client;
+    if (clientChoice.kind === 'existing') {
+      const existing = props.clients.find((c) => c.id === clientChoice.id);
+      if (!existing) {
+        throw new Error('The selected client no longer exists. Please reopen the confirmation panel.');
+      }
+      client = existing;
     } else {
-      const notesLines = [`In Australia: ${clientInfo.inAustralia ? 'Yes' : 'No'}`];
-      if (clientInfo.currentVisaStatus) {
-        notesLines.push(`Current visa status: ${clientInfo.currentVisaStatus}`);
+      const notesLines = [`In Australia: ${clientChoice.inAustralia ? 'Yes' : 'No'}`];
+      if (clientChoice.currentVisaStatus) {
+        notesLines.push(`Current visa status: ${clientChoice.currentVisaStatus}`);
       }
       client = {
         id: uuidv4(),
-        name: clientInfo.fullName,
-        dob: clientInfo.dob || '',
-        phone: '',
-        email: '',
+        name: clientChoice.fullName,
+        dob: clientChoice.dob || '',
+        phone: clientChoice.phone || '',
+        email: clientChoice.email || '',
         address: '',
-        nationality: clientInfo.nationality || undefined,
+        nationality: clientChoice.nationality || undefined,
         role: 'applicant',
         notes: notesLines.join('\n'),
       };
       await props.onAddClient(client);
       createdNewClient = true;
-      if (resolution.sameNameCandidates.length > 0) {
-        toast(`Created a new client — an existing client named ${clientInfo.fullName} has a different or missing date of birth.`);
-      }
     }
 
     onProgress('finalizing');
     const newCase: Case = {
       id: newCaseId,
       clientId: client.id,
-      title: `${template?.title || `Subclass ${visaSubclass}`} - ${client.name}`,
+      title,
       description: caseDescription,
       templateId: template?.id || '',
       status: 'open',
@@ -804,6 +803,7 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
     <VisaAdvisor
       clients={props.clients}
       templates={props.templates}
+      cases={props.cases}
       onOpenNewCase={handleOpenNewCase}
       onEligibilityChecked={props.onEligibilityChecked}
     />
