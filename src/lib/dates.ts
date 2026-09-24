@@ -27,3 +27,15 @@ export function addDaysISO(iso: string, days: number): string {
   d.setDate(d.getDate() + days);
   return toLocalISODate(d);
 }
+
+/**
+ * Whole-day difference `b - a` between two YYYY-MM-DD date strings (positive
+ * when `b` is after `a`), computed on local midnight calendar instants so it
+ * isn't thrown off by DST transitions falling between the two dates.
+ */
+export function diffDaysISO(a: string, b: string): number {
+  const da = new Date(`${a}T00:00:00`);
+  const db = new Date(`${b}T00:00:00`);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.round((db.getTime() - da.getTime()) / msPerDay);
+}
