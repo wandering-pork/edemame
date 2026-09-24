@@ -165,7 +165,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
       const owner = teamMembers.find(m => m.id === c.caseOwner);
       const rowStatus = computeRowStatus(caseTasks);
       const group = caseStageGroup(c.stage);
-      const risk = computeCaseRisk(c, tasks, deadlines, checklistsByCase[c.id]);
+      const risk = computeCaseRisk(c, tasks, deadlines, checklistsByCase[c.id], new Date(), template?.steps);
       return { case: c, client, applicant, template, owner, group, risk, ...rowStatus };
     });
   }, [searchedCases, clients, tasks, templates, teamMembers, deadlines, checklistsByCase]);

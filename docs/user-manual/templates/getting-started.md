@@ -68,3 +68,11 @@ which you can then edit freely.
 
 Custom templates have a delete (trash) icon on their card. Built-in templates are marked
 **System** and can't be deleted.
+
+## How timing affects task generation
+
+Once a template has timing set on its steps, New Case and the Visa Advisor's Open Case panel stop
+asking the AI for a whole plan and instead build one task per step deterministically from that
+timing — see "Generating tasks" in [Case Manager](../case-manager/getting-started.md). Templates
+with no timing set yet keep the old AI-only behaviour. Either way, case-specific extra tasks can
+still be suggested by AI from the case page once the plan exists.

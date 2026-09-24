@@ -27,6 +27,7 @@ import { toLocalISODate } from './lib/dates';
 import { isTaskClosed, TASK_STATUS_LABELS } from './lib/taskStatus';
 import { CASE_STAGE_LABELS } from './lib/caseStage';
 import { allDeadlines } from './lib/deadlines';
+import { knownAnchorsFromDeadlines, rescheduleCaseTasks } from './lib/tasksFromTemplate';
 import { buildDeadlineAlerts } from './lib/deadlineAlerts';
 import { initialsOfName } from './lib/firmDirectory';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
@@ -259,22 +260,51 @@ const AppShell: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deadlines, clients, loading]);
 
+  // --- Rescheduling (Step 1 · 1E) ---
+  // Recomputes a case's own template-generated tasks (those carrying a
+  // `stepKey`) whenever a new anchor becomes known — a step is marked done,
+  // or a deadline for the case is added/updated (see
+  // `lib/tasksFromTemplate.ts`'s `rescheduleCaseTasks`). Locked or closed
+  // tasks are never touched. Takes explicit `tasksSnapshot`/`deadlinesSnapshot`
+  // rather than reading the `tasks`/`deadlines` state directly, since callers
+  // invoke this right after applying an update those states haven't
+  // necessarily re-rendered with yet.
+  const rescheduleCaseFromSnapshot = useCallback(async (caseId: string, tasksSnapshot: Task[], deadlinesSnapshot: Deadline[]) => {
+    const caseItem = cases.find(c => c.id === caseId);
+    const template = caseItem ? templates.find(t => t.id === caseItem.templateId) : undefined;
+    if (!caseItem || !template?.steps?.length) return;
+
+    const caseDeadlines = deadlinesSnapshot.filter(d => d.caseId === caseId);
+    const caseTasksAll = tasksSnapshot.filter(t => t.caseId === caseId);
+    const knownAnchors = knownAnchorsFromDeadlines(caseDeadlines);
+    const changed = rescheduleCaseTasks(template.steps, caseItem.startDate, knownAnchors, caseTasksAll);
+    if (changed.length === 0) return;
+
+    await Promise.all(changed.map(t => repos.tasks.update(t)));
+    setTasks(prev => prev.map(t => changed.find(c => c.id === t.id) ?? t));
+  }, [cases, templates, repos]);
+
   // --- Deadline Actions ---
   const handleAddDeadline = useCallback(async (deadline: Deadline) => {
     await repos.deadlines.create(deadline);
-    setDeadlines(prev => [...prev, deadline]);
+    const nextDeadlines = [...deadlines, deadline];
+    setDeadlines(nextDeadlines);
     pushActivity({
       type: 'deadline_added',
       actorId: currentUserId,
       subjectId: deadline.id,
       summary: `Deadline "${deadline.title}" added, due ${deadline.dueDate}.`,
     });
-  }, [repos, pushActivity, currentUserId]);
+    if (deadline.caseId) {
+      rescheduleCaseFromSnapshot(deadline.caseId, tasks, nextDeadlines);
+    }
+  }, [repos, deadlines, tasks, pushActivity, currentUserId, rescheduleCaseFromSnapshot]);
 
   const handleUpdateDeadline = useCallback(async (updated: Deadline) => {
     const prev = deadlines.find(d => d.id === updated.id);
     await repos.deadlines.update(updated);
-    setDeadlines(prevList => prevList.map(d => d.id === updated.id ? updated : d));
+    const nextDeadlines = deadlines.map(d => d.id === updated.id ? updated : d);
+    setDeadlines(nextDeadlines);
     if (prev && prev.status === 'open' && updated.status !== 'open') {
       pushActivity({
         type: 'deadline_resolved',
@@ -283,7 +313,10 @@ const AppShell: React.FC = () => {
         summary: `Deadline "${updated.title}" marked ${updated.status}.`,
       });
     }
-  }, [repos, deadlines, pushActivity, currentUserId]);
+    if (updated.caseId) {
+      rescheduleCaseFromSnapshot(updated.caseId, tasks, nextDeadlines);
+    }
+  }, [repos, deadlines, tasks, pushActivity, currentUserId, rescheduleCaseFromSnapshot]);
 
   // --- Case Actions ---
   // Applies a case update (stage/outcome/onHold, or any other case edit) and,
@@ -315,10 +348,19 @@ const AppShell: React.FC = () => {
     });
   }, [repos]);
 
+  // Bulk add — used by CaseDetails' "Generate plan from template" (Step 1 ·
+  // 1E), which creates every step's task in one go rather than one at a time.
+  const handleAddTasks = useCallback(async (newTasks: Task[]) => {
+    if (newTasks.length === 0) return;
+    await repos.tasks.createMany(newTasks);
+    setTasks(prev => [...prev, ...newTasks]);
+  }, [repos]);
+
   const handleUpdateTask = useCallback(async (updatedTask: Task) => {
     const prev = tasks.find(t => t.id === updatedTask.id);
     await repos.tasks.update(updatedTask);
-    setTasks(prevTasks => prevTasks.map(t => t.id === updatedTask.id ? updatedTask : t));
+    const nextTasks = tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
+    setTasks(nextTasks);
     if (prev && prev.status !== updatedTask.status) {
       if (updatedTask.status === 'done') {
         toast.success(`Task completed: ${updatedTask.title}`);
@@ -329,8 +371,13 @@ const AppShell: React.FC = () => {
         subjectId: updatedTask.id,
         summary: `"${updatedTask.title}" moved from ${TASK_STATUS_LABELS[prev.status]} to ${TASK_STATUS_LABELS[updatedTask.status]}.`,
       });
+      // A step's task closing is a new "step done" anchor for the rest of the
+      // case's template plan — see `rescheduleCaseFromSnapshot`.
+      if (updatedTask.caseId && updatedTask.stepKey && isTaskClosed(updatedTask) && !isTaskClosed(prev)) {
+        rescheduleCaseFromSnapshot(updatedTask.caseId, nextTasks, deadlines);
+      }
     }
-  }, [repos, tasks, pushActivity, currentUserId]);
+  }, [repos, tasks, deadlines, pushActivity, currentUserId, rescheduleCaseFromSnapshot]);
 
   const handleDeleteTask = useCallback(async (id: string) => {
     await repos.tasks.delete(id);
@@ -365,7 +412,7 @@ const AppShell: React.FC = () => {
     taskId: string,
     newDate: string,
     offsetFuture: boolean = false,
-    taskPatch?: { title?: string; description?: string },
+    taskPatch?: { title?: string; description?: string; dateLocked?: boolean },
   ) => {
     setTasks(prev => {
       const task = prev.find(t => t.id === taskId);
@@ -687,6 +734,7 @@ const AppShell: React.FC = () => {
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
                 onAddTask={handleAddTask}
+                onAddTasks={handleAddTasks}
                 onMoveTaskDate={handleMoveTaskDate}
                 deadlines={deadlines}
                 onAddDeadline={handleAddDeadline}
@@ -730,11 +778,12 @@ interface CaseDetailsRouteProps {
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onAddTask: (task: Task) => void;
+  onAddTasks: (tasks: Task[]) => void;
   onMoveTaskDate: (
     taskId: string,
     newDate: string,
     offsetFuture: boolean,
-    taskPatch?: { title?: string; description?: string },
+    taskPatch?: { title?: string; description?: string; dateLocked?: boolean },
   ) => void;
   deadlines: Deadline[];
   onAddDeadline: (deadline: Deadline) => void;
@@ -765,6 +814,7 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       onUpdateTask={props.onUpdateTask}
       onDeleteTask={props.onDeleteTask}
       onAddTask={props.onAddTask}
+      onAddTasks={props.onAddTasks}
       onMoveTaskDate={props.onMoveTaskDate}
       deadlines={props.deadlines}
       onAddDeadline={props.onAddDeadline}

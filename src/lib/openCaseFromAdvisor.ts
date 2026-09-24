@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Case, Client, Task, WorkflowTemplate } from '../types';
 import { toLocalISODate } from './dates';
 import { buildGapTasks } from './gapTasks';
+import { buildTemplateTaskDrafts, templateHasTiming } from './tasksFromTemplate';
 
 export type OpenCaseClientChoice =
   | { kind: 'existing'; id: string }
@@ -91,21 +92,33 @@ export async function openCaseFromAdvisor(params: OpenCaseParams, deps: OpenCase
 
   let generatedTasks: Partial<Task>[] = [];
   let aiGenerationFailed = false;
+  // Step 1 · 1E: a template with real step timing gets its plan built
+  // deterministically from the scheduler rather than asked of the AI — see
+  // "Generation flow" in docs/plans/step-1-foundations.md. AI-only templates
+  // (no timing data yet) keep today's behaviour unchanged. Either way, extra
+  // case-specific tasks can be suggested afterwards from the case page
+  // (`CaseDetails.tsx`'s "Suggest extra tasks with AI"), so nothing is lost.
+  const usesTimedTemplate = !!template && templateHasTiming(template);
   if (generateTasks) {
     onProgress('plan');
-    try {
-      generatedTasks = await deps.generateTasks(
-        caseDescription,
-        template?.description || '',
-        startDate,
-        template?.visaSubclass,
-        template?.title,
-        template?.steps,
-        // Gaps already tracked as fixed tasks below shouldn't be duplicated by the AI plan.
-        gapTasks ? gaps : undefined
-      );
-    } catch {
-      aiGenerationFailed = true;
+    if (usesTimedTemplate) {
+      const { drafts } = buildTemplateTaskDrafts(template!.steps!, startDate);
+      generatedTasks = drafts;
+    } else {
+      try {
+        generatedTasks = await deps.generateTasks(
+          caseDescription,
+          template?.description || '',
+          startDate,
+          template?.visaSubclass,
+          template?.title,
+          template?.steps,
+          // Gaps already tracked as fixed tasks below shouldn't be duplicated by the AI plan.
+          gapTasks ? gaps : undefined
+        );
+      } catch {
+        aiGenerationFailed = true;
+      }
     }
   }
 
@@ -149,6 +162,7 @@ export async function openCaseFromAdvisor(params: OpenCaseParams, deps: OpenCase
     startDate,
     createdAt: (deps.now ?? (() => new Date().toISOString()))(),
     visaSubclass,
+    templateVersion: generateTasks && usesTimedTemplate ? template!.version : undefined,
   };
 
   // Fixed (non-AI) gap tasks go first, ahead of the AI-generated plan.
@@ -161,8 +175,10 @@ export async function openCaseFromAdvisor(params: OpenCaseParams, deps: OpenCase
     status: 'not_started',
     isCompleted: false,
     priorityOrder: gapTaskList.length + index,
-    generatedByAi: true,
+    generatedByAi: t.generatedByAi ?? true,
     caseId: newCaseId,
+    stepKey: t.stepKey,
+    datePending: t.datePending,
   }));
 
   try {

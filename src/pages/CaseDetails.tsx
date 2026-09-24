@@ -26,6 +26,8 @@ import { isTaskClosed, isWaiting, withStatus, TASK_STATUS_LABELS, TASK_STATUS_OR
 import { CASE_STAGE_LABELS, CASE_STAGE_ORDER, evaluateTransition, outcomeRequired } from '../lib/caseStage';
 import { allDeadlines, daysLeft, urgency } from '../lib/deadlines';
 import { toLocalISODate, addDaysISO } from '../lib/dates';
+import { buildTemplateTaskDrafts, knownAnchorsFromDeadlines, templateHasTiming } from '../lib/tasksFromTemplate';
+import { suggestAdditions, TaskSuggestion } from '../services/geminiService';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -54,6 +56,7 @@ import {
   Columns2,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 import type { Document, EligibilityAssessment } from '../types';
 
 interface CaseDetailsProps {
@@ -65,11 +68,13 @@ interface CaseDetailsProps {
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
   onAddTask: (task: Task) => void;
+  /** Bulk add — used by "Generate plan from template" (Step 1 · 1E). */
+  onAddTasks: (tasks: Task[]) => void;
   onMoveTaskDate: (
     taskId: string,
     newDate: string,
     offsetFuture: boolean,
-    taskPatch?: { title?: string; description?: string },
+    taskPatch?: { title?: string; description?: string; dateLocked?: boolean },
   ) => void;
   /** Every deadline currently loaded — filtered to this case (+ the client's passport-expiry deadline) below. */
   deadlines: Deadline[];
@@ -140,6 +145,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   onUpdateTask,
   onDeleteTask,
   onAddTask,
+  onAddTasks,
   onMoveTaskDate,
   deadlines,
   onAddDeadline,
@@ -168,6 +174,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // When a task row's status menu picks "Not applicable", a reason must be
   // entered and confirmed inline before the status change is applied.
   const [naReasonDraft, setNaReasonDraft] = useState<{ taskId: string; reason: string } | null>(null);
+
+  // ---- Generate-from-template / AI suggestions state (Step 1 · 1E) ----
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<TaskSuggestion[]>([]);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   // ---- Deadline panel state ----
   const [showAddDeadline, setShowAddDeadline] = useState(false);
@@ -662,7 +674,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     if (futureTasks.length > 0) {
       setOffsetModal({ taskId, newDate: editingDate.date });
     } else {
-      onMoveTaskDate(taskId, editingDate.date, false);
+      onMoveTaskDate(taskId, editingDate.date, false, { dateLocked: true });
     }
     setEditingDate(null);
   };
@@ -676,7 +688,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     if (futureTasks.length > 0) {
       setOffsetModal({ taskId, newDate: today });
     } else {
-      onMoveTaskDate(taskId, today, false);
+      onMoveTaskDate(taskId, today, false, { dateLocked: true });
     }
   };
 
@@ -718,9 +730,85 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setIsTaskModalOpen(false);
   };
 
+  // ---- Generate plan from template (Step 1 · 1E) ----
+  // Deterministic — one task per timed step, dated by `scheduleFromTemplate`.
+  // Only offered while the case has none of that template's step tasks yet.
+  const handleGeneratePlanFromTemplate = () => {
+    if (!workflowTemplate?.steps?.length || generatingPlan) return;
+    setGeneratingPlan(true);
+    try {
+      const knownAnchors = knownAnchorsFromDeadlines(caseDeadlines);
+      const { drafts } = buildTemplateTaskDrafts(workflowTemplate.steps, caseItem.startDate, knownAnchors);
+      const newTasks: Task[] = drafts.map((d, index) => ({
+        id: uuidv4(),
+        caseId: caseItem.id,
+        priorityOrder: index,
+        assignedTo: caseItem.caseOwner,
+        ...d,
+      }));
+      onAddTasks(newTasks);
+      if (workflowTemplate.version !== undefined) {
+        onUpdateCase({ ...currentCase, templateVersion: workflowTemplate.version });
+      }
+      toast.success(`${newTasks.length} task${newTasks.length === 1 ? '' : 's'} generated from the template`);
+    } finally {
+      setGeneratingPlan(false);
+    }
+  };
+
+  // ---- Suggest extra tasks with AI (Step 1 · 1E) ----
+  const handleSuggestAdditions = async () => {
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const scheduledSteps = caseTasks
+        .filter(t => t.stepKey)
+        .map(t => ({ title: t.title, date: t.date, stepKey: t.stepKey }));
+      const results = await suggestAdditions(
+        caseItem.description,
+        caseItem.startDate,
+        visaSubclass,
+        workflowTemplate?.title,
+        scheduledSteps,
+      );
+      setSuggestions(results);
+      if (results.length === 0) {
+        toast.info('No additional tasks suggested for this case');
+      }
+    } catch {
+      setSuggestError('Failed to fetch task suggestions. Please try again.');
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  const acceptSuggestion = (index: number) => {
+    const s = suggestions[index];
+    if (!s) return;
+    const anchorTask = s.anchorStepKey ? caseTasks.find(t => t.stepKey === s.anchorStepKey) : undefined;
+    const baseDate = anchorTask?.date ?? caseItem.startDate;
+    onAddTask({
+      id: uuidv4(),
+      caseId: caseItem.id,
+      title: s.title,
+      description: s.description,
+      date: addDaysISO(baseDate, s.offsetDays || 0),
+      status: 'not_started',
+      isCompleted: false,
+      priorityOrder: 999,
+      generatedByAi: true,
+      assignedTo: caseItem.caseOwner,
+    });
+    setSuggestions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const rejectSuggestion = (index: number) => {
+    setSuggestions(prev => prev.filter((_, i) => i !== index));
+  };
+
   const confirmOffset = (offset: boolean) => {
     if (offsetModal) {
-      onMoveTaskDate(offsetModal.taskId, offsetModal.newDate, offset);
+      onMoveTaskDate(offsetModal.taskId, offsetModal.newDate, offset, { dateLocked: true });
       setOffsetModal(null);
     }
   };
@@ -1058,6 +1146,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             {waiting && (
               <span className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 whitespace-nowrap">
                 {TASK_STATUS_LABELS[task.status]}
+              </span>
+            )}
+            {task.datePending && !closed && (
+              <span
+                className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 whitespace-nowrap"
+                title="Computed from a duration estimate — will firm up once the real anchor is known."
+              >
+                Estimated
               </span>
             )}
           </div>
@@ -1721,6 +1817,69 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   </div>
                 )}
               </section>
+
+              {templateHasTiming(workflowTemplate) && !caseTasks.some(t => t.stepKey) && (
+                <section className="rounded-xl border border-dashed border-edamame-300 dark:border-edamame-700 p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[12.5px] font-bold text-ink dark:text-plate-ink">No tasks yet</div>
+                    <p className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint mt-0.5">
+                      "{workflowTemplate?.title}" has step timing — generate this case's plan from it.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleGeneratePlanFromTemplate}
+                    disabled={generatingPlan}
+                    className="btn-press flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-edamame hover:bg-edamame-600 text-white text-[12px] font-bold transition-colors disabled:opacity-50"
+                  >
+                    <Sparkles size={14} />
+                    Generate plan from template
+                  </button>
+                </section>
+              )}
+
+              {caseTasks.some(t => t.stepKey) && (
+                <section>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">AI suggestions</span>
+                    <button
+                      onClick={handleSuggestAdditions}
+                      disabled={suggesting}
+                      className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors disabled:opacity-50"
+                    >
+                      <Sparkles size={12} />
+                      {suggesting ? 'Thinking…' : 'Suggest extra tasks with AI'}
+                    </button>
+                  </div>
+                  {suggestError && (
+                    <p className="mt-2 text-[11.5px] text-red-600 dark:text-red-400">{suggestError}</p>
+                  )}
+                  {suggestions.length > 0 && (
+                    <div className="mt-2.5 space-y-2">
+                      {suggestions.map((s, i) => (
+                        <div key={i} className="p-3 rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card">
+                          <div className="text-[13px] font-semibold text-ink dark:text-plate-ink">{s.title}</div>
+                          <p className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5">{s.description}</p>
+                          <p className="text-[11px] italic text-ink-faint dark:text-plate-ink-faint mt-1">Why: {s.reason}</p>
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <button
+                              onClick={() => acceptSuggestion(i)}
+                              className="px-2.5 py-1 text-[11px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-md transition-colors"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => rejectSuggestion(i)}
+                              className="px-2.5 py-1 text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper dark:hover:bg-plate rounded-md transition-colors"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
 
               <section>
                 <div className="flex items-center justify-between mb-2.5">

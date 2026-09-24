@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeCaseRisk } from './risk';
-import type { Case, Deadline, DocumentChecklistItem, Task } from '../types';
+import type { Case, Deadline, DocumentChecklistItem, Task, WorkflowStep } from '../types';
 
 const TODAY = new Date('2026-09-24T00:00:00');
 
@@ -122,6 +122,29 @@ describe('computeCaseRisk', () => {
       TODAY,
     );
     expect(risk.reasons.some(r => r.includes('statutory'))).toBe(false);
+  });
+
+  it('rule 2 (1E): flags an overdue gate task by stepKey/isGate', () => {
+    const steps: WorkflowStep[] = [
+      { key: 'gate-step', title: 'Lodge', description: '', isGate: true },
+      { key: 'normal-step', title: 'Follow up', description: '', isGate: false },
+    ];
+    const gateOverdue = computeCaseRisk(
+      makeCase(), [makeTask({ date: '2026-09-01', stepKey: 'gate-step' })], [], undefined, TODAY, steps,
+    );
+    expect(gateOverdue.atRisk).toBe(true);
+
+    const nonGateOverdue = computeCaseRisk(
+      makeCase(), [makeTask({ date: '2026-09-01', stepKey: 'normal-step' })], [], undefined, TODAY, steps,
+    );
+    expect(nonGateOverdue.atRisk).toBe(false);
+  });
+
+  it('rule 2 (1E): falls back to "any overdue task" when the stepKey has no matching template step', () => {
+    const risk = computeCaseRisk(
+      makeCase(), [makeTask({ date: '2026-09-01', stepKey: 'unknown-step' })], [], undefined, TODAY, [],
+    );
+    expect(risk.atRisk).toBe(true);
   });
 
   it('combines multiple reasons', () => {
