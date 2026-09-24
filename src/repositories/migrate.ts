@@ -49,6 +49,10 @@ export async function clearAll(
   const documentTypes = await dest.documentTypes.getAll();
   await Promise.all(documentTypes.map(t => dest.documentTypes.delete(t.id)));
 
+  report('existing eligibility assessments');
+  const eligibilityAssessments = await dest.eligibility.getAll();
+  await Promise.all(eligibilityAssessments.map(a => dest.eligibility.delete(a.id)));
+
   report('existing templates');
   const templates = await dest.templates.getAll();
   await Promise.all(templates.map(t => dest.templates.delete(t.id)));
@@ -100,6 +104,10 @@ export async function copyAllData(
   report('document types');
   const documentTypes = await source.documentTypes.getAll();
   await dest.documentTypes.createMany(documentTypes);
+
+  report('eligibility assessments');
+  const eligibilityAssessments = await source.eligibility.getAll();
+  await Promise.all(eligibilityAssessments.map(a => dest.eligibility.create(a)));
 
   const caseIds = cases.map(c => c.id);
 

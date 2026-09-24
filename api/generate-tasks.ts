@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { caseDescription, workflowDescription, startDate, visaSubclass, workflowTitle, steps } = req.body;
+  const { caseDescription, workflowDescription, startDate, visaSubclass, workflowTitle, steps, excludeItems } = req.body;
 
   if (!caseDescription || !startDate) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -37,6 +37,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ? `Australian Subclass ${visaSubclass}${workflowTitle ? ` — ${workflowTitle}` : ''}`
     : workflowTitle || 'Immigration';
 
+  const excludeSection = Array.isArray(excludeItems) && excludeItems.length > 0
+    ? `\nThese gaps are already tracked as tasks — don't create duplicate tasks for them:\n${excludeItems.map((g: string) => `- ${g}`).join('\n')}\n`
+    : '';
+
   const prompt = `You are a senior Australian immigration case manager at a registered migration agency.
 
 VISA APPLICATION TYPE: ${visaLabel}
@@ -46,7 +50,7 @@ ${caseDescription}
 
 WORKFLOW STEPS TO FOLLOW:
 ${stepsSection}
-
+${excludeSection}
 Application Start Date: ${startDate}
 
 TASK:
