@@ -129,7 +129,7 @@ A firm/account-level **Document Type** reference list is the shared vocabulary b
 4. Vercel function calls Gemini 3.5 Flash with visa assessment prompt
 5. Returns JSON with visa verdict cards: 9 Australian visa subclasses (189, 190, 482, 186, 500, 820, 485, 600, 417)
 6. Each card shows verdict (qualifies/possibly/unlikely/needs_more_info), reasons, and gaps
-7. "Open New Case" button on qualified visas navigates to CaseManager with template pre-selected via URL state
+7. "Open Case" button on qualified visas reuses or creates the client from the wizard answers, drafts the AI task plan from the eligibility assessment, creates the case directly, and navigates to its detail page (button shows staged progress; Start Over is disabled while creating)
 
 ### Key Conventions
 
