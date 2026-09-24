@@ -24,6 +24,7 @@ import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification,
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { toLocalISODate } from './lib/dates';
+import { isTaskClosed, TASK_STATUS_LABELS } from './lib/taskStatus';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
@@ -177,7 +178,7 @@ const AppShell: React.FC = () => {
 
     const today = toLocalISODate();
 
-    const overdueTasks = tasks.filter(t => !t.isCompleted && t.date < today);
+    const overdueTasks = tasks.filter(t => !isTaskClosed(t) && t.date < today);
     if (overdueTasks.length === 0) return;
 
     const createMissing = async () => {
@@ -229,13 +230,15 @@ const AppShell: React.FC = () => {
     const prev = tasks.find(t => t.id === updatedTask.id);
     await repos.tasks.update(updatedTask);
     setTasks(prevTasks => prevTasks.map(t => t.id === updatedTask.id ? updatedTask : t));
-    if (updatedTask.isCompleted && prev && !prev.isCompleted) {
-      toast.success(`Task completed: ${updatedTask.title}`);
+    if (prev && prev.status !== updatedTask.status) {
+      if (updatedTask.status === 'done') {
+        toast.success(`Task completed: ${updatedTask.title}`);
+      }
       pushActivity({
-        type: 'task_completed',
+        type: 'task_status_changed',
         actorId: updatedTask.assignedTo || currentUserId,
         subjectId: updatedTask.id,
-        summary: `Task completed: "${updatedTask.title}".`,
+        summary: `"${updatedTask.title}" moved from ${TASK_STATUS_LABELS[prev.status]} to ${TASK_STATUS_LABELS[updatedTask.status]}.`,
       });
     }
   }, [repos, tasks, pushActivity, currentUserId]);
@@ -285,7 +288,7 @@ const AppShell: React.FC = () => {
 
       const updated = prev.map(t => {
         if (t.id === taskId) return { ...t, ...taskPatch, date: newDate, priorityOrder: 999 };
-        if (offsetFuture && t.caseId === task.caseId && !t.isCompleted) {
+        if (offsetFuture && t.caseId === task.caseId && !isTaskClosed(t)) {
           const tDate = new Date(t.date);
           if (tDate > oldDate) {
             const updatedDate = new Date(tDate.getTime() + (diffDays * 24 * 60 * 60 * 1000));

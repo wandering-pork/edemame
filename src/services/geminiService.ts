@@ -40,6 +40,7 @@ export const generateTasksFromCase = async (
       title: item.title,
       description: item.description,
       date: taskDate.toISOString().split("T")[0],
+      status: 'not_started',
       isCompleted: false,
       generatedByAi: true,
     };

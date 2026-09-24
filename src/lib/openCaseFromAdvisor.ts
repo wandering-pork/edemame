@@ -158,6 +158,7 @@ export async function openCaseFromAdvisor(params: OpenCaseParams, deps: OpenCase
     title: t.title || 'Untitled Task',
     description: t.description || '',
     date: t.date || startDate,
+    status: 'not_started',
     isCompleted: false,
     priorityOrder: gapTaskList.length + index,
     generatedByAi: true,

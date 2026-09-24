@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
+import { normalizeTask } from '@/lib/taskStatus';
 import type {
   Client,
   Case,
@@ -237,33 +238,38 @@ class CloudCaseRepository implements ICaseRepository {
 // ---------------------------------------------------------------------------
 
 function taskToRow(userId: string, t: Task) {
+  const task = normalizeTask(t);
   return {
-    id: t.id,
+    id: task.id,
     user_id: userId,
-    title: t.title,
-    description: t.description,
-    date: t.date,
-    is_completed: t.isCompleted,
-    priority_order: t.priorityOrder,
-    case_id: t.caseId ?? null,
-    generated_by_ai: t.generatedByAi ?? null,
-    assigned_to: t.assignedTo ?? null,
+    title: task.title,
+    description: task.description,
+    date: task.date,
+    is_completed: task.isCompleted,
+    status: task.status,
+    status_reason: task.statusReason ?? null,
+    priority_order: task.priorityOrder,
+    case_id: task.caseId ?? null,
+    generated_by_ai: task.generatedByAi ?? null,
+    assigned_to: task.assignedTo ?? null,
   };
 }
 
 function rowToTask(row: any): Task {
-  return {
+  return normalizeTask({
     id: row.id,
     title: row.title,
     description: row.description,
     date: row.date,
     isCompleted: row.is_completed,
+    status: row.status ?? undefined,
+    statusReason: row.status_reason ?? undefined,
     priorityOrder: row.priority_order,
     caseId: row.case_id ?? undefined,
     generatedByAi: row.generated_by_ai ?? undefined,
     userId: row.user_id,
     assignedTo: row.assigned_to ?? undefined,
-  };
+  });
 }
 
 class CloudTaskRepository implements ITaskRepository {
@@ -281,15 +287,17 @@ class CloudTaskRepository implements ITaskRepository {
   }
 
   async create(item: Task): Promise<Task> {
-    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, item), { onConflict: 'id' });
+    const normalized = normalizeTask(item);
+    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, normalized), { onConflict: 'id' });
     if (error) throw error;
-    return item;
+    return normalized;
   }
 
   async update(item: Task): Promise<Task> {
-    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, item), { onConflict: 'id' });
+    const normalized = normalizeTask(item);
+    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, normalized), { onConflict: 'id' });
     if (error) throw error;
-    return item;
+    return normalized;
   }
 
   async delete(id: string): Promise<void> {

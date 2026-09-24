@@ -5,6 +5,7 @@ import { Search, Plus, FileText, X, ChevronRight, Calendar, UserPlus, Settings2 
 import { format } from 'date-fns';
 import { NewCase } from './NewCase';
 import { ConfigurationsPanel } from '../components/case-manager/ConfigurationsPanel';
+import { isTaskClosed } from '../lib/taskStatus';
 
 interface CaseManagerProps {
   cases: Case[];
@@ -82,12 +83,12 @@ interface RowStatus {
 }
 
 const computeRowStatus = (caseTasks: Task[]): RowStatus => {
-  const completedTasks = caseTasks.filter(t => t.isCompleted).length;
+  const completedTasks = caseTasks.filter(isTaskClosed).length;
   const totalTasks = caseTasks.length;
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const pending = caseTasks
-    .filter(t => !t.isCompleted)
+    .filter(t => !isTaskClosed(t))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const nextTask = pending[0];
   const isNextOverdue = !!nextTask && new Date(nextTask.date) < new Date();

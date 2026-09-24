@@ -5,22 +5,37 @@ your cases, and a week-at-a-glance view of scheduled tasks.
 
 ## Stat cards
 
-Four cards at the top summarise your workload:
+Five cards at the top summarise your workload:
 
 - **Cases in motion** — cases currently open or in progress, with how many were created this
   month.
 - **Tasks due this week** — how many tasks are due in the next 7 days, and how many of those are
   due today.
-- **Overdue** — incomplete tasks whose due date has already passed, with the next one to deal with
-  named underneath.
+- **Overdue** — open tasks whose due date has already passed, with the next one to deal with
+  named underneath. Tasks whose status is "Waiting on client" or "Waiting on third party" are
+  never counted here, even if their due date has passed — they're blocked on someone outside the
+  firm, not sitting in your backlog. See "Task status" below.
 - **Docs outstanding** — documents still pending or linked (not yet verified) across active
   document checklists, when checklist data is available for the case.
+- **Waiting on client** — open tasks currently in a waiting status, tracked separately from
+  Overdue so "N overdue" always means work your team still owes, not work you're blocked on.
 
 ## Needs Attention
 
-Below the stat cards, **Needs Attention** lists your most urgent items — overdue tasks first, then
-tasks due today — each showing the client, the case, and the due date. Click an item to jump
-straight to that case.
+Below the stat cards, **Needs Attention** lists your most urgent items, following one rule:
+**overdue first, then due today**. Each item shows the client, the case, and the due date.
+Click an item to open that task (use its **Go to Case** button from there if you need the case
+itself). When there are more than five items, a **View all N** link expands the full list in
+place.
+
+## Task status
+
+Every task has one of six statuses: **Not started**, **In progress**, **Waiting on client**,
+**Waiting on third party**, **Not applicable**, or **Done**. Click a task to open it, then use the
+status menu to change it — or click the circular checkbox for a one-click **Mark done** (click it
+again to reopen the task). Choosing **Not applicable** asks for a short reason before it's applied;
+the reason is shown on the task afterwards. Waiting statuses show as a distinct amber chip, never
+red, even past their due date, since the delay isn't the firm's.
 
 ## Agent activity
 
@@ -69,5 +84,5 @@ the task for viewing or editing.
 ## Creating a task from the Dashboard
 
 Click **New Task** in the top-right corner, fill in a title, description, and due date, link it to
-a case, and save. It immediately appears on the week board and counts towards the stat cards and
-Needs Attention if it's overdue or due today.
+a case, and save. It starts out **Not started** and immediately appears on the week board and
+counts towards the stat cards and Needs Attention if it's overdue or due today.

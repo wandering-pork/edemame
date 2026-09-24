@@ -264,6 +264,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       title: t.title || 'Untitled Task',
       description: t.description || '',
       date: t.date || startDate,
+      status: 'not_started',
       isCompleted: false,
       priorityOrder: index,
       generatedByAi: true,

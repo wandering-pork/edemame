@@ -1,9 +1,29 @@
 
+/**
+ * Where a task currently stands in its lifecycle. Replaces the old boolean
+ * `isCompleted` (see `Task.isCompleted` and `lib/taskStatus.ts`).
+ */
+export type TaskStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'waiting_client'
+  | 'waiting_third_party'
+  | 'not_applicable'
+  | 'done';
+
 export interface Task {
   id: string;
   title: string;
   description: string;
   date: string; // YYYY-MM-DD
+  status: TaskStatus;
+  /** Required when status is 'not_applicable' — see `lib/taskStatus.ts`'s `withStatus()`. */
+  statusReason?: string;
+  /**
+   * @deprecated Derived from `status` (`status === 'done' || status === 'not_applicable'`).
+   * Kept in sync by `lib/taskStatus.ts` for one release so old call sites/tabs
+   * that still read it keep working — prefer `isTaskClosed(task)`.
+   */
   isCompleted: boolean;
   priorityOrder: number;
   caseId?: string;
@@ -47,7 +67,7 @@ export interface CaseAssignmentEvent {
 
 export interface ActivityEvent {
   id: string;
-  type: 'case_created' | 'case_assigned' | 'case_updated' | 'task_completed' | 'task_assigned' | 'member_added';
+  type: 'case_created' | 'case_assigned' | 'case_updated' | 'task_completed' | 'task_assigned' | 'task_status_changed' | 'member_added';
   actorId?: string; // TeamMember id responsible
   subjectId?: string; // caseId / taskId / memberId
   summary: string;

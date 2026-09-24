@@ -20,6 +20,7 @@ import { recalcAutoLinks, recalcAutoLinkForItem } from '../lib/autoLink';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
 import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib/caseTabsStore';
 import { displayCaseNumber } from '../lib/caseNumber';
+import { isTaskClosed, isWaiting, withStatus, TASK_STATUS_LABELS, TASK_STATUS_ORDER } from '../lib/taskStatus';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -30,7 +31,6 @@ import {
   Trash2,
   Edit2,
   Check,
-  RotateCcw,
   X,
   Save,
   ChevronDown,
@@ -130,6 +130,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [taskForm, setTaskForm] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd') });
+  // When a task row's status menu picks "Not applicable", a reason must be
+  // entered and confirmed inline before the status change is applied.
+  const [naReasonDraft, setNaReasonDraft] = useState<{ taskId: string; reason: string } | null>(null);
 
   // ---- Case edit/delete state ----
   const [currentCase, setCurrentCase] = useState<Case>(caseItem);
@@ -204,11 +207,11 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.priorityOrder - b.priorityOrder);
   }, [tasks, caseItem.id]);
 
-  const completedTasks = caseTasks.filter(t => t.isCompleted);
-  const pendingTasks = caseTasks.filter(t => !t.isCompleted);
+  const completedTasks = caseTasks.filter(isTaskClosed);
+  const pendingTasks = caseTasks.filter(t => !isTaskClosed(t));
   const progress = caseTasks.length > 0 ? Math.round((completedTasks.length / caseTasks.length) * 100) : 0;
 
-  const hasOverdue = pendingTasks.some(t => new Date(t.date) < new Date());
+  const hasOverdue = pendingTasks.some(t => !isWaiting(t) && new Date(t.date) < new Date());
   const passportExpiry = client.passportExpiry ? new Date(client.passportExpiry) : null;
   const daysToPassportExpiry = passportExpiry ? Math.floor((passportExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
   const uploadedCount = checklist.filter(c => c.status === 'linked' || c.status === 'verified').length;
@@ -495,7 +498,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const handleSetToday = (taskId: string) => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const task = tasks.find(t => t.id === taskId);
-    if (!task || task.date === today || task.isCompleted) return;
+    if (!task || task.date === today || isTaskClosed(task)) return;
 
     const futureTasks = pendingTasks.filter(t => t.id !== taskId && new Date(t.date) > new Date(task.date));
     if (futureTasks.length > 0) {
@@ -534,6 +537,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         title: taskForm.title,
         description: taskForm.description,
         date: taskForm.date,
+        status: 'not_started',
         isCompleted: false,
         priorityOrder: 999,
         generatedByAi: false
@@ -829,40 +833,92 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- Task row completion toggle ----
   const toggleTaskComplete = (task: Task) => {
-    onUpdateTask({ ...task, isCompleted: !task.isCompleted });
+    onUpdateTask(withStatus(task, isTaskClosed(task) ? 'not_started' : 'done'));
+  };
+
+  const setTaskStatus = (task: Task, status: Task['status']) => {
+    if (status === 'not_applicable') {
+      setNaReasonDraft({ taskId: task.id, reason: task.statusReason ?? '' });
+      return;
+    }
+    setNaReasonDraft(null);
+    onUpdateTask(withStatus(task, status));
+  };
+
+  const confirmNaReason = (task: Task) => {
+    if (!naReasonDraft || naReasonDraft.taskId !== task.id || !naReasonDraft.reason.trim()) return;
+    onUpdateTask(withStatus(task, 'not_applicable', naReasonDraft.reason));
+    setNaReasonDraft(null);
   };
 
   // ---- Task row renderer (shared by pending + completed lists) ----
   const rowMenuCls = 'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
-  const renderTaskRow = (task: Task, isCompleted: boolean) => {
-    const overdue = !isCompleted && new Date(task.date) < new Date();
+  const renderTaskRow = (task: Task, closed: boolean) => {
+    const waiting = isWaiting(task);
+    const overdue = !closed && !waiting && new Date(task.date) < new Date();
     const editing = editingDate?.taskId === task.id;
+    const editingNa = naReasonDraft?.taskId === task.id;
     return (
       <div key={task.id} className="task-card group relative flex items-center gap-3 px-[18px] py-3 border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0">
         {/* Left edge — red when overdue */}
         <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${overdue ? 'bg-red-500' : 'bg-transparent'}`} />
 
-        {/* Circular checkbox — direct toggle */}
+        {/* Circular checkbox — one-click "Mark done" / reopen */}
         <button
           onClick={() => toggleTaskComplete(task)}
-          title={isCompleted ? 'Mark as pending' : 'Mark as complete'}
+          title={closed ? 'Reopen task' : 'Mark done'}
           className={`check-btn w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-            isCompleted
+            closed
               ? 'bg-edamame border-[1.5px] border-edamame'
               : 'border-[1.5px] border-ink/20 dark:border-plate-ink/25 hover:border-edamame'
           }`}
         >
-          {isCompleted && <Check size={11} className="text-white" strokeWidth={3} />}
+          {closed && <Check size={11} className="text-white" strokeWidth={3} />}
         </button>
 
         {/* Title + description */}
         <div className="flex-1 min-w-0">
-          <div className={`text-[13.5px] font-semibold tracking-tight leading-snug ${isCompleted ? 'line-through text-ink-faint dark:text-plate-ink-faint' : 'text-ink dark:text-plate-ink'}`}>
-            {task.title}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className={`text-[13.5px] font-semibold tracking-tight leading-snug ${closed ? 'line-through text-ink-faint dark:text-plate-ink-faint' : 'text-ink dark:text-plate-ink'}`}>
+              {task.title}
+            </div>
+            {waiting && (
+              <span className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 whitespace-nowrap">
+                {TASK_STATUS_LABELS[task.status]}
+              </span>
+            )}
           </div>
-          {task.description && !isCompleted && (
+          {task.description && !closed && (
             <div className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint mt-0.5 truncate">{task.description}</div>
+          )}
+          {task.status === 'not_applicable' && task.statusReason && (
+            <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-0.5 italic truncate">N/A: {task.statusReason}</div>
+          )}
+          {editingNa && (
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <input
+                type="text"
+                autoFocus
+                value={naReasonDraft!.reason}
+                onChange={e => setNaReasonDraft({ taskId: task.id, reason: e.target.value })}
+                placeholder="Why is this task not applicable?"
+                className="flex-1 min-w-0 px-2 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+              />
+              <button
+                onClick={() => confirmNaReason(task)}
+                disabled={!naReasonDraft!.reason.trim()}
+                className="px-2 py-1 text-[11px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setNaReasonDraft(null)}
+                className="px-1.5 py-1 text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft"
+              >
+                Cancel
+              </button>
+            </div>
           )}
         </div>
 
@@ -878,10 +934,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           />
         ) : (
           <button
-            onClick={() => { if (!isCompleted) setEditingDate({ taskId: task.id, date: task.date }); }}
-            disabled={isCompleted}
+            onClick={() => { if (!closed) setEditingDate({ taskId: task.id, date: task.date }); }}
+            disabled={closed}
             className={`text-[11.5px] font-bold whitespace-nowrap flex-shrink-0 ${
-              overdue ? 'text-red-600 dark:text-red-400' : isCompleted ? 'text-ink-soft/40 dark:text-plate-ink-soft/40' : 'text-ink-soft dark:text-plate-ink-soft hover:text-edamame'
+              overdue ? 'text-red-600 dark:text-red-400' : closed ? 'text-ink-soft/40 dark:text-plate-ink-soft/40' : 'text-ink-soft dark:text-plate-ink-soft hover:text-edamame'
             }`}
           >
             {format(new Date(task.date), 'MMM d')}
@@ -899,12 +955,21 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           {activeDropdown === task.id && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setActiveDropdown(null)} />
-              <div className="absolute right-0 top-full mt-1 z-40 w-44 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
-                {isCompleted ? (
-                  <button onClick={() => { onUpdateTask({ ...task, isCompleted: false }); setActiveDropdown(null); }} className={rowMenuCls}>
-                    <RotateCcw size={14} className="text-orange-400" />Revert to pending
+              <div className="absolute right-0 top-full mt-1 z-40 w-52 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
+                <div className="px-3 pt-1.5 pb-1 text-[9.5px] font-bold uppercase tracking-wide text-ink-soft/60 dark:text-plate-ink-soft/60">
+                  Set status
+                </div>
+                {TASK_STATUS_ORDER.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => { setTaskStatus(task, s); if (s !== 'not_applicable') setActiveDropdown(null); }}
+                    className={`${rowMenuCls} ${task.status === s ? 'text-edamame font-semibold' : ''}`}
+                  >
+                    {task.status === s && <Check size={12} className="text-edamame" />}
+                    <span className={task.status === s ? '' : 'ml-[18px]'}>{TASK_STATUS_LABELS[s]}</span>
                   </button>
-                ) : (
+                ))}
+                {!closed && (
                   <button onClick={() => { handleSetToday(task.id); setActiveDropdown(null); }} className={rowMenuCls}>
                     <Calendar size={14} className="text-edamame" />Set to today
                   </button>
@@ -1590,7 +1655,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   placeholder="Add more details..."
                 />
               </div>
-              {!editingTask?.isCompleted && (
+              {!(editingTask && isTaskClosed(editingTask)) && (
                 <div>
                   <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Planned Date</label>
                   <div className="flex gap-2">

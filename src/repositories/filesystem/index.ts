@@ -1,4 +1,5 @@
 import { readJson, writeJson, deleteEntry, listFiles, listDirNames, writeBlob, readBlob } from '@/lib/fsStorage';
+import { normalizeTask } from '@/lib/taskStatus';
 import type {
   Client,
   Case,
@@ -127,21 +128,25 @@ class FsTaskRepository implements ITaskRepository {
   constructor(private root: FileSystemDirectoryHandle) {}
 
   async getAll(): Promise<Task[]> {
-    return readAllInDir<Task>(this.root, 'tasks');
+    const tasks = await readAllInDir<Task>(this.root, 'tasks');
+    return tasks.map(normalizeTask);
   }
 
   async getById(id: string): Promise<Task | undefined> {
-    return (await readJson<Task>(this.root, `tasks/${id}.json`)) ?? undefined;
+    const task = await readJson<Task>(this.root, `tasks/${id}.json`);
+    return task ? normalizeTask(task) : undefined;
   }
 
   async create(item: Task): Promise<Task> {
-    await writeJson(this.root, `tasks/${item.id}.json`, item);
-    return item;
+    const normalized = normalizeTask(item);
+    await writeJson(this.root, `tasks/${item.id}.json`, normalized);
+    return normalized;
   }
 
   async update(item: Task): Promise<Task> {
-    await writeJson(this.root, `tasks/${item.id}.json`, item);
-    return item;
+    const normalized = normalizeTask(item);
+    await writeJson(this.root, `tasks/${item.id}.json`, normalized);
+    return normalized;
   }
 
   async delete(id: string): Promise<void> {

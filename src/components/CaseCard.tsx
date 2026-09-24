@@ -4,6 +4,7 @@ import { ProgressRing } from './ProgressRing';
 import { StatusBadge, StatusCardBorder } from './StatusBadge';
 import { ChevronRight, Calendar, AlertCircle, UserPlus } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
+import { isTaskClosed, isWaiting } from '../lib/taskStatus';
 
 interface CaseCardProps {
   case: Case;
@@ -26,7 +27,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({
   className = '',
   applicant,
 }) => {
-  const completedTasks = tasks.filter(t => t.isCompleted).length;
+  const completedTasks = tasks.filter(isTaskClosed).length;
   const totalTasks = tasks.length;
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
@@ -36,13 +37,13 @@ export const CaseCard: React.FC<CaseCardProps> = ({
   else if (progress === 0) status = 'pending';
   else {
     // Check for overdue tasks
-    const hasOverdue = tasks.some(t => !t.isCompleted && new Date(t.date) < new Date());
+    const hasOverdue = tasks.some(t => !isTaskClosed(t) && !isWaiting(t) && new Date(t.date) < new Date());
     if (hasOverdue) status = 'at-risk';
   }
 
   // Find next task
   const nextTask = tasks
-    .filter(t => !t.isCompleted && new Date(t.date) >= new Date())
+    .filter(t => !isTaskClosed(t) && new Date(t.date) >= new Date())
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
 
   const caseStartDate = tasks.length > 0
