@@ -229,7 +229,14 @@ begin
       union select user_id from cases
       union select user_id from tasks
       union select user_id from workflow_templates
+      union select user_id from case_notes
+      union select user_id from documents
+      union select user_id from team_members
+      union select user_id from activity_events
+      union select user_id from checklist_items
+      union select user_id from focus_conversations
       union select user_id from document_types
+      union select user_id from usage_events
       union select user_id from eligibility_assessments
       union select user_id from deadlines
     ) x
