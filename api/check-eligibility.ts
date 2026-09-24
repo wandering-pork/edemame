@@ -50,7 +50,7 @@ Return ONLY valid JSON (no markdown, no extra text):
   "suggestedTemplateKeyword": "190"
 }
 
-Assess: 189, 190, 482, 186, 500, 820, 485, 600, 417`;
+Assess: 189, 190, 482, 186, 500, 820, 485, 600, 417, 490`;
 
   try {
     const response = await fetch(

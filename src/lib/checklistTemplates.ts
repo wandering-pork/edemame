@@ -19,6 +19,61 @@ interface CategoryDef {
 }
 
 const CHECKLIST_CATEGORIES: Record<string, CategoryDef[]> = {
+  '189': [
+    {
+      category: '189 — Skills & Points',
+      items: [
+        ['SkillSelect EOI screenshot', 'Showing invitation to apply with points score'],
+        ['Skills assessment certificate', 'From assessing authority relevant to the nominated occupation'],
+        ['Points test evidence', 'Documents supporting each points claim (age, work experience, qualifications, etc.)'],
+      ],
+    },
+    {
+      category: '189 — English Language',
+      items: [
+        ['IELTS / PTE / TOEFL certificate', 'Superior English earns maximum points'],
+      ],
+    },
+    {
+      category: '189 — Identity & Character',
+      items: [
+        ['Passport (all pages)', 'Valid for at least 12 months from lodgement'],
+        ['AFP National Police Check', 'Less than 12 months old at lodgement'],
+        ['Overseas police clearances', 'All countries of residence for 12+ months after age 16'],
+        ['Medical examination results', 'Conducted by Bupa-approved panel physician'],
+      ],
+    },
+  ],
+  '190': [
+    {
+      category: '190 — State Nomination',
+      items: [
+        ['State nomination letter', 'From state/territory nominating authority'],
+        ['SkillSelect EOI screenshot', 'Showing invitation to apply with points score'],
+      ],
+    },
+    {
+      category: '190 — Skills & Qualifications',
+      items: [
+        ['Skills assessment certificate', 'From assessing authority relevant to the nominated occupation'],
+      ],
+    },
+    {
+      category: '190 — English Language',
+      items: [
+        ['IELTS / PTE certificate', 'English proficiency — higher scores earn more points'],
+      ],
+    },
+    {
+      category: '190 — Identity & Character',
+      items: [
+        ['Passport (all pages)', 'Valid for duration of intended stay'],
+        ['AFP National Police Check', 'Less than 12 months old'],
+        ['Overseas police clearances', 'All countries of residence after age 16 for 12+ months'],
+        ['Medical examination results', 'Bupa panel physician'],
+      ],
+    },
+  ],
   '186': [
     {
       category: '186 — Sponsor & Nomination Documents',
@@ -122,6 +177,111 @@ const CHECKLIST_CATEGORIES: Record<string, CategoryDef[]> = {
         ['AFP National Police Check', 'Less than 12 months old'],
         ['Overseas police clearances', 'All countries of residence after age 16 for 12+ months'],
         ['Medical examination results', 'Bupa panel physician'],
+      ],
+    },
+  ],
+  '500': [
+    {
+      category: '500 — Enrolment & Study',
+      items: [
+        ['Confirmation of Enrolment (CoE)', 'From the CRICOS-registered education provider for each course'],
+        ['Genuine Student (GS) statement', 'Addressing ties to home country, course suitability, and study/career intent'],
+        ['Academic transcripts', 'Evidence of prior academic results relevant to the course'],
+      ],
+    },
+    {
+      category: '500 — Financial & Health Cover',
+      items: [
+        ['Evidence of financial capacity', 'Funds for tuition, living costs, and travel — check current minimum requirement'],
+        ['Overseas Student Health Cover (OSHC)', 'Covering the full intended stay for all family members included'],
+      ],
+    },
+    {
+      category: '500 — English Language',
+      items: [
+        ['IELTS / PTE / TOEFL certificate', 'If required by the provider or Department'],
+      ],
+    },
+    {
+      category: '500 — Identity & Character',
+      items: [
+        ['Passport (all pages)', 'Valid for the intended duration of study'],
+        ['Medical examination results', 'If required based on country of origin or stay length'],
+        ['Police clearances', 'If required (e.g. stays over 12 months)'],
+      ],
+    },
+  ],
+  '485': [
+    {
+      category: '485 — Qualification & Stream',
+      items: [
+        ['Qualification/course completion letter', 'Evidence the Australian study requirement (typically 2 academic years) was met'],
+        ['Confirmation of Enrolment (CoE)', 'For the completed CRICOS-registered course'],
+        ['Skills assessment (if applicable)', 'Required for some pathways/streams — confirm against current requirements'],
+      ],
+    },
+    {
+      category: '485 — English Language',
+      items: [
+        ['IELTS / PTE / TOEFL certificate', 'Competent English required, taken within the required window'],
+      ],
+    },
+    {
+      category: '485 — Health & Character',
+      items: [
+        ['Health insurance evidence', 'Adequate arrangements for the duration of the visa'],
+        ['Passport (all pages)', 'Valid for the intended visa period'],
+        ['AFP National Police Check', 'Less than 12 months old'],
+        ['Overseas police clearances', 'All countries of residence for 12+ months after age 16'],
+        ['Medical examination results', 'Bupa panel physician'],
+      ],
+    },
+  ],
+  '600': [
+    {
+      category: '600 — Purpose & Itinerary',
+      items: [
+        ['Travel itinerary', 'Intended travel dates, accommodation, and activities'],
+        ['Invitation letter', 'For the Sponsored Family stream or business visits, from the host/sponsor in Australia'],
+      ],
+    },
+    {
+      category: '600 — Financial Capacity & Ties',
+      items: [
+        ['Evidence of financial capacity', 'Sufficient funds to support the visit without working'],
+        ['Evidence of ties to home country', 'Employment, family, property, or other strong incentive to return'],
+      ],
+    },
+    {
+      category: '600 — Identity & Character',
+      items: [
+        ['Passport (all pages)', 'Valid for the intended stay'],
+        ['Medical examination results', 'If required based on intended stay length and country of origin'],
+        ['Police clearances', 'If requested by the Department — not always required for short visits'],
+      ],
+    },
+  ],
+  '417': [
+    {
+      category: '417 — Eligibility',
+      items: [
+        ['Passport (all pages)', 'From a country eligible for subclass 417, valid for the intended stay'],
+        ['Evidence of age', 'Confirming applicant is within the current age limit for the passport country'],
+      ],
+    },
+    {
+      category: '417 — Funds & Travel',
+      items: [
+        ['Evidence of funds', 'Sufficient funds to support the initial period of stay — check current minimum requirement'],
+        ['Outbound/onward travel evidence', 'Return or onward ticket, or funds to purchase one'],
+      ],
+    },
+    {
+      category: '417 — Identity & Character',
+      items: [
+        ['Functional English evidence', 'If requested — e.g. English-speaking country passport or prior study'],
+        ['Medical examination results', 'If required based on intended activities or country of origin'],
+        ['Police clearances', 'If requested by the Department'],
       ],
     },
   ],

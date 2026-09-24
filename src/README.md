@@ -30,7 +30,7 @@ Originally built with [Google AI Studio](https://ai.studio/apps/1c0e5b8b-4436-4c
 - **Case Management** — Create and track immigration cases linked to clients and workflow templates
 - **AI Task Generation** — Google Gemini produces a structured task schedule from a case description and workflow guide
 - **Passport Scanner (OCR)** — Upload passport images and auto-extract personal details using Gemini Vision API; includes manual entry fallback
-- **Visa Eligibility Advisor** — 4-step wizard collects client profile and assesses eligibility across 9 Australian visa types; suggests recommended pathway and can pre-select template for new cases
+- **Visa Eligibility Advisor** — 4-step wizard collects client profile and assesses eligibility across 10 Australian visa types; suggests recommended pathway and can pre-select template for new cases
 - **Client Management** — Store and manage client personal information; quick visa eligibility check from client card
 - **Workflow Templates** — Predefined procedures for common visa types, fully editable
 - **Dark / Light Mode** — Theme preference persisted in `localStorage`
@@ -39,11 +39,16 @@ Originally built with [Google AI Studio](https://ai.studio/apps/1c0e5b8b-4436-4c
 
 | Template | Visa Type |
 |----------|-----------|
-| Student Visa 500 | Australian student visa |
+| Skilled Independent 189 | Points-tested, no sponsor |
 | Skilled Nominated 190 | State-nominated skilled migration |
+| Temporary Skill Shortage 482 | Employer-sponsored temporary work |
+| Employer Nomination Scheme 186 | Employer-sponsored permanent residency |
+| Student Visa 500 | Australian student visa |
+| Skilled Work Regional 490 | Points-tested, state/family-nominated regional |
 | Partner Visa 820/801 | Onshore partner visa |
-| Visitor Visa 600 | Temporary visitor |
 | Temporary Graduate 485 | Post-study work stream |
+| Visitor Visa 600 | Temporary visitor |
+| Working Holiday 417 | Working holiday for eligible passport countries |
 
 ---
 
@@ -200,7 +205,7 @@ The passport scanner streamlines client intake by automatically extracting passp
 
 ## Visa Eligibility Advisor
 
-Assess visa eligibility across 9 Australian visa types:
+Assess visa eligibility across 10 Australian visa types (189, 190, 482, 186, 500, 490, 820, 485, 600, 417):
 
 1. Click **Visa Advisor** in the sidebar (or **Check Eligibility** on any client card)
 2. Complete a 4-step wizard:
