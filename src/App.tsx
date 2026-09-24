@@ -11,7 +11,7 @@ import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
 import { CaseDetails } from './pages/CaseDetails';
 import { Clients } from './pages/Clients';
-import { VisaAdvisor, OpenCaseParams } from './pages/VisaAdvisor';
+import { VisaAdvisor, OpenCaseParams, OpenCaseOutcome } from './pages/VisaAdvisor';
 import { generateTasksFromCase } from './services/geminiService';
 import { Templates } from './pages/Templates';
 import { Settings } from './pages/Settings';
@@ -23,7 +23,7 @@ import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification,
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { toLocalISODate } from './lib/dates';
-import { resolveAdvisorClient } from './lib/resolveAdvisorClient';
+import { buildGapTasks } from './lib/gapTasks';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
@@ -353,7 +353,7 @@ const AppShell: React.FC = () => {
       subjectId: caseWithOwner.id,
       summary: `New case created: "${caseWithOwner.title}".`,
     });
-    const visaSubclass = templates.find(t => t.id === caseWithOwner.templateId)?.visaSubclass;
+    const visaSubclass = caseWithOwner.visaSubclass ?? templates.find(t => t.id === caseWithOwner.templateId)?.visaSubclass;
     pushUsageEvent({ type: 'case_created', metadata: { visaSubclass, templateId: caseWithOwner.templateId } });
   }, [repos, currentUserId, pushActivity, pushUsageEvent, cases, templates]);
 
@@ -559,6 +559,7 @@ const AppShell: React.FC = () => {
               <VisaAdvisorRoute
                 clients={clients}
                 templates={templates}
+                cases={cases}
                 onEligibilityChecked={handleEligibilityChecked}
                 onAddClient={handleAddClient}
                 onDeleteClient={handleDeleteClient}
@@ -648,7 +649,7 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       caseItem={caseItem}
       client={client}
       applicant={applicant}
-      visaSubclass={template?.visaSubclass}
+      visaSubclass={caseItem.visaSubclass ?? template?.visaSubclass}
       tasks={props.tasks}
       onUpdateTask={props.onUpdateTask}
       onDeleteTask={props.onDeleteTask}
@@ -666,6 +667,7 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
 interface VisaAdvisorRouteProps {
   clients: Client[];
   templates: WorkflowTemplate[];
+  cases: Case[];
   onEligibilityChecked: (usage: { promptTokens: number; candidatesTokens: number; totalTokens: number; estimatedCostUsd: number }) => void;
   onAddClient: (client: Client) => Promise<void>;
   onDeleteClient: (id: string) => Promise<void>;
@@ -683,90 +685,94 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
     locationRef.current = location.pathname;
   }, [location.pathname]);
 
-  const handleOpenNewCase = async ({ clientId, clientInfo, visaSubclass, visaName, caseDescription, onProgress }: OpenCaseParams) => {
-    // Exact subclass match only — a template whose visaSubclass lists several
-    // subclasses (e.g. "820/801") is split and compared per-entry rather than
-    // matched with substring/title fuzziness, which could pick the wrong template.
-    const template = props.templates.find((t) =>
-      (t.visaSubclass || '')
-        .split('/')
-        .map((s) => s.trim())
-        .includes(visaSubclass)
-    );
+  const handleOpenNewCase = async ({ client: clientChoice, templateId, title, generateTasks, visaSubclass, visaName, caseDescription, gapTasks, gaps, onProgress }: OpenCaseParams): Promise<OpenCaseOutcome> => {
+    const template = templateId ? props.templates.find((t) => t.id === templateId) : undefined;
 
     const startDate = toLocalISODate();
     const newCaseId = uuidv4();
 
-    // Generate the AI task plan first: if it fails there's nothing to roll back,
-    // and if it succeeds we don't want to have already created a client for a
-    // case that then fails to save.
-    onProgress('plan');
+    // Generate the AI task plan first (only if the user asked for one in the
+    // confirmation panel): if it fails there's nothing to roll back, and if it
+    // succeeds we don't want to have already created a client for a case that
+    // then fails to save.
     let generatedTasks: Partial<Task>[] = [];
     let aiGenerationFailed = false;
-    try {
-      generatedTasks = await generateTasksFromCase(
-        caseDescription,
-        template?.description || '',
-        startDate,
-        template?.visaSubclass,
-        template?.title,
-        template?.steps
-      );
-    } catch {
-      aiGenerationFailed = true;
+    if (generateTasks) {
+      onProgress('plan');
+      try {
+        generatedTasks = await generateTasksFromCase(
+          caseDescription,
+          template?.description || '',
+          startDate,
+          template?.visaSubclass,
+          template?.title,
+          template?.steps,
+          // Gaps already tracked as fixed tasks below shouldn't be duplicated by the AI plan.
+          gapTasks ? gaps : undefined
+        );
+      } catch {
+        aiGenerationFailed = true;
+      }
     }
 
     onProgress('client');
-    const resolution = resolveAdvisorClient(props.clients, clientInfo, clientId);
+    // The confirmation panel already resolved which client to use (or gathered
+    // the details for a new one) — execute exactly what the user confirmed,
+    // no re-resolution here.
     let client: Client;
     let createdNewClient = false;
-    if (resolution.kind === 'existing') {
-      client = resolution.client;
+    if (clientChoice.kind === 'existing') {
+      const existing = props.clients.find((c) => c.id === clientChoice.id);
+      if (!existing) {
+        throw new Error('The selected client no longer exists. Please reopen the confirmation panel.');
+      }
+      client = existing;
     } else {
-      const notesLines = [`In Australia: ${clientInfo.inAustralia ? 'Yes' : 'No'}`];
-      if (clientInfo.currentVisaStatus) {
-        notesLines.push(`Current visa status: ${clientInfo.currentVisaStatus}`);
+      const notesLines = [`In Australia: ${clientChoice.inAustralia ? 'Yes' : 'No'}`];
+      if (clientChoice.currentVisaStatus) {
+        notesLines.push(`Current visa status: ${clientChoice.currentVisaStatus}`);
       }
       client = {
         id: uuidv4(),
-        name: clientInfo.fullName,
-        dob: clientInfo.dob || '',
-        phone: '',
-        email: '',
+        name: clientChoice.fullName,
+        dob: clientChoice.dob || '',
+        phone: clientChoice.phone || '',
+        email: clientChoice.email || '',
         address: '',
-        nationality: clientInfo.nationality || undefined,
+        nationality: clientChoice.nationality || undefined,
         role: 'applicant',
         notes: notesLines.join('\n'),
       };
       await props.onAddClient(client);
       createdNewClient = true;
-      if (resolution.sameNameCandidates.length > 0) {
-        toast(`Created a new client — an existing client named ${clientInfo.fullName} has a different or missing date of birth.`);
-      }
     }
 
     onProgress('finalizing');
     const newCase: Case = {
       id: newCaseId,
       clientId: client.id,
-      title: `${template?.title || `Subclass ${visaSubclass}`} - ${client.name}`,
+      title,
       description: caseDescription,
       templateId: template?.id || '',
       status: 'open',
       startDate,
       createdAt: new Date().toISOString(),
+      visaSubclass,
     };
 
-    const finalTasks: Task[] = generatedTasks.map((t, index) => ({
+    // Fixed (non-AI) gap tasks go first, ahead of the AI-generated plan.
+    const gapTaskList: Task[] = gapTasks ? buildGapTasks(gaps, newCaseId, startDate) : [];
+    const aiTasks: Task[] = generatedTasks.map((t, index) => ({
       id: uuidv4(),
       title: t.title || 'Untitled Task',
       description: t.description || '',
       date: t.date || startDate,
       isCompleted: false,
-      priorityOrder: index,
+      priorityOrder: gapTaskList.length + index,
       generatedByAi: true,
       caseId: newCaseId,
     }));
+    const finalTasks: Task[] = [...gapTaskList, ...aiTasks];
 
     try {
       await props.onTasksConfirmed(finalTasks, newCase);
@@ -798,12 +804,15 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
         },
       });
     }
+
+    return { caseId: newCaseId, clientId: client.id };
   };
 
   return (
     <VisaAdvisor
       clients={props.clients}
       templates={props.templates}
+      cases={props.cases}
       onOpenNewCase={handleOpenNewCase}
       onEligibilityChecked={props.onEligibilityChecked}
     />

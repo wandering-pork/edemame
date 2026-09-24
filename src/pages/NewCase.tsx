@@ -255,7 +255,8 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       templateId: templateId,
       status: 'open',
       startDate: startDate,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      visaSubclass: selectedTemplate?.visaSubclass,
     };
 
     const finalTasks: Task[] = generatedTasks.map((t, index) => ({

@@ -1,19 +1,29 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Client, WorkflowTemplate } from '../types';
+import { v4 as uuidv4 } from 'uuid';
+import { Client, WorkflowTemplate, Case, EligibilityAssessment, EligibilityAssessmentOption } from '../types';
+import { useRepositories } from '../contexts/RepositoryContext';
 import {
   ChevronRight,
   ChevronLeft,
   Loader2,
-  CheckCircle,
-  AlertCircle,
   HelpCircle,
-  XCircle,
   ArrowRight,
   Check,
   Sparkles,
 } from 'lucide-react';
+import {
+  OpenCasePanel,
+  OpenCaseClientChoice,
+  OpenCasePanelResult,
+  OpenCaseStage,
+} from '../components/visa-advisor/OpenCasePanel';
+import { PathwayCard } from '../components/visa-advisor/PathwayCard';
+import { verdictColors, verdictLabels, verdictRank, verdictIcon } from '../components/visa-advisor/verdictStyles';
+import { buildEligibilitySummary } from '../lib/eligibilitySummary';
+
+export type { OpenCaseStage, OpenCaseClientChoice };
 
 interface WizardState {
   step: 'input' | 'report';
@@ -37,13 +47,9 @@ interface WizardState {
   };
 }
 
-interface VisaOption {
-  visaSubclass: string;
-  visaName: string;
-  verdict: 'qualifies' | 'possibly_qualifies' | 'unlikely' | 'needs_more_info';
-  reasons: string[];
-  gaps: string[];
-}
+// Structurally identical to EligibilityAssessmentOption (types.ts) — aliased
+// here since the wizard/report code predates that shared type.
+type VisaOption = EligibilityAssessmentOption;
 
 interface EligibilityReport {
   visaOptions: VisaOption[];
@@ -59,37 +65,40 @@ interface EligibilityUsage {
   estimatedCostUsd: number;
 }
 
-// Order reflects the actual sequence handleOpenNewCase runs in: the AI task plan
-// is drafted first (so nothing has to be rolled back if it fails), then the client
-// is resolved/created, then the case itself is saved.
-export type OpenCaseStage = 'plan' | 'client' | 'finalizing';
-
+// Everything the confirmation panel decided, executed exactly as confirmed —
+// no re-resolution of the client happens once this reaches the caller. Stage
+// order reflects the actual sequence handleOpenNewCase runs in: the AI task
+// plan (if requested) is drafted first (so nothing has to be rolled back if it
+// fails), then the client is resolved/created, then the case itself is saved.
 export interface OpenCaseParams {
-  /** id of a client the page was pre-loaded for (`?clientId=`) — takes precedence over name/DOB matching. */
-  clientId?: string;
-  clientInfo: {
-    fullName: string;
-    dob: string;
-    nationality: string;
-    inAustralia: boolean;
-    currentVisaStatus: string;
-  };
+  client: OpenCaseClientChoice;
+  /** Workflow template id to use, or `null` for "No template (general case)". */
+  templateId: string | null;
+  title: string;
+  /** When false, the 'plan' stage is skipped entirely and no tasks are generated. */
+  generateTasks: boolean;
   visaSubclass: string;
   visaName: string;
   caseDescription: string;
+  /** When true, App.tsx creates one fixed (non-AI) task per entry in `gaps`. */
+  gapTasks: boolean;
+  /** The selected pathway's gaps — used both to build gap tasks and to tell
+   *  AI task generation not to duplicate them (see `excludeItems`). */
+  gaps: string[];
   onProgress: (stage: OpenCaseStage) => void;
 }
 
-const openCaseStageLabels: Record<OpenCaseStage, string> = {
-  plan: 'Drafting task plan with AI…',
-  client: 'Setting up client…',
-  finalizing: 'Finalizing case…',
-};
+/** Result of a successful case creation, so the caller can link the saved assessment to it. */
+export interface OpenCaseOutcome {
+  caseId: string;
+  clientId: string;
+}
 
 interface VisaAdvisorProps {
   clients: Client[];
   templates: WorkflowTemplate[];
-  onOpenNewCase: (params: OpenCaseParams) => Promise<void>;
+  cases: Case[];
+  onOpenNewCase: (params: OpenCaseParams) => Promise<OpenCaseOutcome>;
   onEligibilityChecked?: (usage: EligibilityUsage) => void;
 }
 
@@ -99,151 +108,6 @@ const purposeLabels: Record<string, string> = {
   family: 'Family Reunification',
   pr: 'Permanent Residence',
   visit: 'Visit / Tourism',
-};
-
-const durationLabels: Record<string, string> = {
-  short: '< 3 months',
-  medium: '3–12 months',
-  years: '1–4 years',
-  permanent: 'Permanently',
-};
-
-const detailFieldLabels: Record<string, string> = {
-  occupation: 'Occupation',
-  yearsExperience: 'Years of experience',
-  skillsAssessment: 'Skills assessment completed',
-  courseLevel: 'Course level',
-  financialSupport: 'Financial support confirmed',
-  relationshipType: 'Relationship type',
-  sponsorStatus: "Sponsor's AU status",
-  pointsScore: 'Self-assessed points score',
-  statePreference: 'Preferred state',
-  tripDuration: 'Trip duration',
-  strongTies: 'Strong ties to home country',
-};
-
-// Turns the wizard's collected answers + the chosen pathway's assessment into
-// the case notes a lawyer would otherwise type by hand into New Case Intake.
-function buildCaseDescription(wizardState: WizardState, visa: VisaOption): string {
-  const { clientInfo, goals, details, supportingFactors } = wizardState;
-  const lines: string[] = [];
-
-  lines.push(`Generated from Visa Eligibility Advisor — assessed pathway: ${visa.visaName} (subclass ${visa.visaSubclass}), verdict: ${verdictLabels[visa.verdict] ?? visa.verdict}.`);
-  lines.push('');
-  lines.push(`Currently in Australia: ${clientInfo.inAustralia ? 'Yes' : 'No'}${clientInfo.currentVisaStatus ? ` (${clientInfo.currentVisaStatus})` : ''}`);
-  if (goals.primaryPurpose) {
-    lines.push(`Primary purpose: ${purposeLabels[goals.primaryPurpose] ?? goals.primaryPurpose}`);
-  }
-  if (goals.intendedDuration) {
-    lines.push(`Intended duration of stay: ${durationLabels[goals.intendedDuration] ?? goals.intendedDuration}`);
-  }
-
-  const detailEntries = Object.entries(details).filter(([, v]) => v !== '' && v !== undefined && v !== null && v !== false);
-  if (detailEntries.length > 0) {
-    lines.push('');
-    lines.push('Pathway specifics:');
-    detailEntries.forEach(([key, value]) => {
-      const label = detailFieldLabels[key] ?? key;
-      lines.push(`- ${label}: ${value === true ? 'Yes' : value}`);
-    });
-  }
-
-  lines.push('');
-  lines.push('Supporting factors:');
-  if (supportingFactors.englishProficiency) {
-    lines.push(`- English proficiency: ${supportingFactors.englishProficiency}`);
-  }
-  lines.push(`- Health conditions requiring medical clearance: ${supportingFactors.healthConcerns ? 'Yes' : 'No'}`);
-  lines.push(`- Prior criminal history or visa refusals: ${supportingFactors.criminalHistory ? 'Yes' : 'No'}`);
-
-  if (visa.reasons.length > 0) {
-    lines.push('');
-    lines.push('Why this pathway was assessed as viable:');
-    visa.reasons.forEach((r) => lines.push(`- ${r}`));
-  }
-  if (visa.gaps.length > 0) {
-    lines.push('');
-    lines.push('Gaps to address before lodgement:');
-    visa.gaps.forEach((g) => lines.push(`- ${g}`));
-  }
-
-  return lines.join('\n');
-}
-
-// Verdict language per design spec: Strong match (green) / Possible (amber) / Unlikely (red),
-// plus a neutral treatment for "needs more info" which has no equivalent in the prototype.
-const verdictColors: Record<
-  string,
-  { cardBg: string; cardBorder: string; badgeBg: string; badgeText: string; titleText: string; bar: string; iconText: string }
-> = {
-  qualifies: {
-    cardBg: 'bg-emerald-50/70 dark:bg-emerald-500/[0.06]',
-    cardBorder: 'border-emerald-200 dark:border-emerald-800/60',
-    badgeBg: 'bg-emerald-100 dark:bg-emerald-500/15',
-    badgeText: 'text-[#047857] dark:text-emerald-400',
-    titleText: 'text-ink dark:text-plate-ink',
-    bar: 'bg-[#10B981]',
-    iconText: 'text-emerald-600 dark:text-emerald-400',
-  },
-  possibly_qualifies: {
-    cardBg: 'bg-amber-50/70 dark:bg-amber-500/[0.06]',
-    cardBorder: 'border-amber-200 dark:border-amber-800/60',
-    badgeBg: 'bg-amber-100 dark:bg-amber-500/15',
-    badgeText: 'text-[#B45309] dark:text-amber-400',
-    titleText: 'text-ink dark:text-plate-ink',
-    bar: 'bg-[#F59E0B]',
-    iconText: 'text-amber-600 dark:text-amber-400',
-  },
-  unlikely: {
-    cardBg: 'bg-red-50/70 dark:bg-red-500/[0.06]',
-    cardBorder: 'border-red-200 dark:border-red-800/60',
-    badgeBg: 'bg-red-100 dark:bg-red-500/15',
-    badgeText: 'text-[#B91C1C] dark:text-red-400',
-    titleText: 'text-ink dark:text-plate-ink',
-    bar: 'bg-[#EF4444]',
-    iconText: 'text-red-600 dark:text-red-400',
-  },
-  needs_more_info: {
-    cardBg: 'bg-paper-2 dark:bg-plate-card/40',
-    cardBorder: 'border-ink/15 dark:border-plate-ink/20',
-    badgeBg: 'bg-paper-2 dark:bg-plate-card/60',
-    badgeText: 'text-ink-soft dark:text-plate-ink-soft',
-    titleText: 'text-ink dark:text-plate-ink',
-    bar: 'bg-slate-400',
-    iconText: 'text-ink-soft dark:text-plate-ink-soft',
-  },
-};
-
-const verdictLabels: Record<string, string> = {
-  qualifies: 'Strong match',
-  possibly_qualifies: 'Possible',
-  unlikely: 'Unlikely',
-  needs_more_info: 'Needs more info',
-};
-
-// Only used to render a match-strength bar when we can infer one from the verdict
-// (the API doesn't return a numeric score, so this is a coarse visual proxy, not a real %).
-const verdictBarWidth: Record<string, string> = {
-  qualifies: '88%',
-  possibly_qualifies: '60%',
-  unlikely: '25%',
-  needs_more_info: '0%',
-};
-
-// Ordering used to pick the "best" pathway and sort the report — mirrors the
-// confidence implied by verdictBarWidth above, not a real numeric score.
-const verdictRank: Record<string, number> = {
-  qualifies: 3,
-  possibly_qualifies: 2,
-  unlikely: 1,
-  needs_more_info: 0,
-};
-
-const verdictIcon: Record<string, React.ElementType> = {
-  qualifies: CheckCircle,
-  possibly_qualifies: AlertCircle,
-  unlikely: XCircle,
-  needs_more_info: HelpCircle,
 };
 
 const stepLabels = ['Prospect', 'Intent', 'Background'];
@@ -271,9 +135,11 @@ const labelClass =
 export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   clients,
   templates,
+  cases,
   onOpenNewCase,
   onEligibilityChecked,
 }) => {
+  const repos = useRepositories();
   const [searchParams] = useSearchParams();
   const clientId = searchParams.get('clientId');
   const prefilledClient = clientId
@@ -307,6 +173,14 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   const [showAllPathways, setShowAllPathways] = useState(false);
   const [openingCaseSubclass, setOpeningCaseSubclass] = useState<string | null>(null);
   const [openingCaseStage, setOpeningCaseStage] = useState<OpenCaseStage>('client');
+  // The pathway a user clicked "Open Case" on, pending confirmation in the panel.
+  // `null` while no panel is open — separate from `openingCaseSubclass`, which
+  // only becomes non-null once the user actually confirms and creation starts.
+  const [pendingVisa, setPendingVisa] = useState<VisaOption | null>(null);
+  // The persisted EligibilityAssessment for the current report — created as
+  // soon as the report comes back (whether or not a case is ever opened from
+  // it), then updated with caseId/clientId/selectedSubclass once one is.
+  const [assessment, setAssessment] = useState<EligibilityAssessment | null>(null);
 
   const sortedOptions = useMemo(() => {
     if (!report) return [];
@@ -358,6 +232,28 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
       setShowAllPathways(false);
       setWizardState((prev) => ({ ...prev, step: 'report' }));
       if (data.usage) onEligibilityChecked?.(data.usage);
+
+      // Save the assessment as soon as the report comes back, whether or not
+      // a case is ever opened from it — a failure here shouldn't block the
+      // report from showing, so it's logged rather than surfaced as a toast.
+      const newAssessment: EligibilityAssessment = {
+        id: uuidv4(),
+        clientId: prefilledClient?.id,
+        createdAt: new Date().toISOString(),
+        inputs: {
+          clientInfo: wizardState.clientInfo,
+          goals: wizardState.goals,
+          details: wizardState.details,
+          supportingFactors: wizardState.supportingFactors,
+        },
+        options: data.result.visaOptions,
+      };
+      try {
+        await repos.eligibility.create(newAssessment);
+        setAssessment(newAssessment);
+      } catch (saveError) {
+        console.error('Failed to save eligibility assessment:', saveError);
+      }
     } catch (error) {
       toast.error('Could not assess eligibility. Please try again.');
     } finally {
@@ -368,6 +264,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   const handleStartOver = () => {
     setReport(null);
     setShowAllPathways(false);
+    setAssessment(null);
     setWizardState((prev) => ({
       ...prev,
       step: 'input',
@@ -375,21 +272,54 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
     }));
   };
 
-  const handleOpenCase = async (visa: VisaOption) => {
+  // Clicking "Open Case" just opens the confirmation panel — nothing is
+  // created until the user reviews and confirms in handleConfirmOpenCase.
+  const handleOpenCase = (visa: VisaOption) => {
+    setPendingVisa(visa);
+  };
+
+  const handleConfirmOpenCase = async (result: OpenCasePanelResult) => {
+    if (!pendingVisa) return;
+    const visa = pendingVisa;
     setOpeningCaseSubclass(visa.visaSubclass);
-    setOpeningCaseStage('plan');
+    setOpeningCaseStage(result.generateTasks ? 'plan' : 'client');
     try {
-      await onOpenNewCase({
-        clientId: prefilledClient?.id,
-        clientInfo: wizardState.clientInfo,
+      const outcome = await onOpenNewCase({
+        client: result.client,
+        templateId: result.templateId,
+        title: result.title,
+        generateTasks: result.generateTasks,
         visaSubclass: visa.visaSubclass,
         visaName: visa.visaName,
-        caseDescription: buildCaseDescription(wizardState, visa),
+        caseDescription: buildEligibilitySummary(
+          visa,
+          wizardState.goals.primaryPurpose ? purposeLabels[wizardState.goals.primaryPurpose] : undefined
+        ),
+        gapTasks: result.gapTasks,
+        gaps: visa.gaps,
         onProgress: setOpeningCaseStage,
       });
-      // On success the parent navigates away — no need to reset state here,
-      // and doing so would flash the idle button for a frame before unmount.
+      // On success the parent navigates away — no need to reset the "opening"
+      // state here, and doing so would flash the idle button for a frame
+      // before unmount. Link the saved assessment to the case that was just
+      // opened from it, though — that's local state only the parent doesn't have.
+      if (assessment) {
+        const updated: EligibilityAssessment = {
+          ...assessment,
+          caseId: outcome.caseId,
+          clientId: outcome.clientId,
+          selectedSubclass: visa.visaSubclass,
+        };
+        try {
+          await repos.eligibility.update(updated);
+          setAssessment(updated);
+        } catch (linkError) {
+          console.error('Failed to link the eligibility assessment to the new case:', linkError);
+        }
+      }
     } catch (error) {
+      // Keep the panel open with the user's choices intact so they can retry
+      // without re-entering everything.
       toast.error('Could not create the case. Please try again.');
       setOpeningCaseSubclass(null);
     }
@@ -1001,7 +931,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
               </div>
               <button
                 onClick={handleStartOver}
-                disabled={openingCaseSubclass !== null}
+                disabled={openingCaseSubclass !== null || pendingVisa !== null}
                 title={openingCaseSubclass !== null ? 'A case is being created — hang tight' : undefined}
                 className="px-4 py-2 text-[13px] font-semibold text-ink-soft dark:text-plate-ink-soft bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors btn-press disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -1045,21 +975,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                       )}
                       <button
                         onClick={() => handleOpenCase(best)}
-                        disabled={openingCaseSubclass !== null}
+                        disabled={openingCaseSubclass !== null || pendingVisa !== null}
                         className="flex items-center justify-center gap-2 px-4 py-2.5 bg-edamame-500 hover:bg-edamame-600 text-white text-[13px] font-bold rounded-lg transition-colors btn-press whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed min-w-[172px]"
                       >
-                        {openingCaseSubclass === best.visaSubclass ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin flex-shrink-0" />
-                            <span className={openingCaseStage === 'plan' ? 'font-mono-ai' : ''}>
-                              {openCaseStageLabels[openingCaseStage]}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            Open Case <ArrowRight size={14} />
-                          </>
-                        )}
+                        Open Case <ArrowRight size={14} />
                       </button>
                     </div>
                   )}
@@ -1113,79 +1032,14 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
               </h3>
               <div className="flex flex-col gap-3">
                 {(showAllPathways ? sortedOptions : top3).map((visa) => {
-                  const colors = verdictColors[visa.verdict] ?? verdictColors.needs_more_info;
                   const isQualified = visa.verdict === 'qualifies' || visa.verdict === 'possibly_qualifies';
                   return (
-                    <div
+                    <PathwayCard
                       key={visa.visaSubclass}
-                      className={`card-lift rounded-xl border p-5 transition-all ${colors.cardBg} ${colors.cardBorder}`}
-                    >
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <span className={`text-[14.5px] font-bold tracking-tight ${colors.titleText}`}>
-                          {visa.visaName}
-                        </span>
-                        <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-paper-2 dark:bg-plate-card/60 text-ink-soft dark:text-plate-ink-soft uppercase tracking-wide">
-                          SC-{visa.visaSubclass}
-                        </span>
-                        <span
-                          className={`ml-auto text-[10.5px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap ${colors.badgeBg} ${colors.badgeText}`}
-                        >
-                          {verdictLabels[visa.verdict] ?? visa.verdict}
-                        </span>
-                      </div>
-
-                      {/* Match strength bar — no numeric score comes back from the API,
-                          so this reflects the verdict tier rather than an exact percentage. */}
-                      {visa.verdict !== 'needs_more_info' && (
-                        <div className="flex items-center gap-2.5 mt-3">
-                          <div className="flex-1 h-1.5 rounded-full bg-paper-2 dark:bg-plate-card/60 overflow-hidden">
-                            <div
-                              className={`progress-fill h-full rounded-full ${colors.bar}`}
-                              style={{ width: verdictBarWidth[visa.verdict] }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-3 mt-3.5">
-                        <div>
-                          <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink-soft dark:text-plate-ink-soft mb-1.5">
-                            Why
-                          </p>
-                          <ul className="space-y-1">
-                            {visa.reasons.map((reason, i) => (
-                              <li
-                                key={i}
-                                className="text-[12.5px] text-ink-soft dark:text-plate-ink-soft flex items-start gap-2 leading-relaxed"
-                              >
-                                <span className="text-edamame-500 flex-shrink-0">·</span>
-                                {reason}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-
-                        {visa.gaps.length > 0 && (
-                          <div>
-                            <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink-soft dark:text-plate-ink-soft mb-1.5">
-                              Gaps to Address
-                            </p>
-                            <ul className="space-y-1">
-                              {visa.gaps.map((gap, i) => (
-                                <li
-                                  key={i}
-                                  className="text-[12.5px] text-ink-soft dark:text-plate-ink-soft flex items-start gap-2 leading-relaxed"
-                                >
-                                  <span className="text-amber-500 flex-shrink-0">!</span>
-                                  {gap}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {isQualified && (
-                          <div className="pt-3 border-t border-ink/15 dark:border-plate-ink/20">
+                      visa={visa}
+                      action={
+                        isQualified ? (
+                          <>
                             {visa.verdict === 'possibly_qualifies' && (
                               <div className="flex justify-end mb-1.5">
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap bg-amber-100 dark:bg-amber-500/15 text-[#B45309] dark:text-amber-400">
@@ -1195,26 +1049,15 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                             )}
                             <button
                               onClick={() => handleOpenCase(visa)}
-                              disabled={openingCaseSubclass !== null}
+                              disabled={openingCaseSubclass !== null || pendingVisa !== null}
                               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-edamame-500 hover:bg-edamame-600 text-white text-[12.5px] font-bold rounded-lg transition-colors btn-press disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                              {openingCaseSubclass === visa.visaSubclass ? (
-                                <>
-                                  <Loader2 size={13} className="animate-spin flex-shrink-0" />
-                                  <span className={openingCaseStage === 'plan' ? 'font-mono-ai' : ''}>
-                                    {openCaseStageLabels[openingCaseStage]}
-                                  </span>
-                                </>
-                              ) : (
-                                <>
-                                  Open Case <ArrowRight size={13} />
-                                </>
-                              )}
+                              Open Case <ArrowRight size={13} />
                             </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                          </>
+                        ) : undefined
+                      }
+                    />
                   );
                 })}
               </div>
@@ -1236,6 +1079,23 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
           </div>
         )}
       </div>
+
+      {pendingVisa && (
+        <OpenCasePanel
+          visaSubclass={pendingVisa.visaSubclass}
+          visaName={pendingVisa.visaName}
+          gaps={pendingVisa.gaps}
+          clientInfo={wizardState.clientInfo}
+          prefilledClientId={prefilledClient?.id}
+          clients={clients}
+          templates={templates}
+          cases={cases}
+          isSubmitting={openingCaseSubclass === pendingVisa.visaSubclass}
+          stage={openingCaseStage}
+          onConfirm={handleConfirmOpenCase}
+          onCancel={() => setPendingVisa(null)}
+        />
+      )}
     </div>
   );
 };

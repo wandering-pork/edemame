@@ -1,4 +1,4 @@
-import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation, UsageEvent } from '../types';
+import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation, UsageEvent, EligibilityAssessment } from '../types';
 
 // Generic CRUD interface
 export interface IRepository<T> {
@@ -84,6 +84,17 @@ export interface IChatRepository {
   setForCase(caseId: string, conversations: FocusConversation[]): Promise<void>;
 }
 
+/**
+ * Persisted Visa Eligibility Advisor reports. Not scoped to a case the way
+ * `caseNotes`/`documents` are — a record may exist with no `caseId` yet (an
+ * assessment nobody has opened a case from) — so it gets its own `getAll`
+ * rather than living only behind `getByCaseId`.
+ */
+export interface IEligibilityRepository extends IRepository<EligibilityAssessment> {
+  getByCaseId(caseId: string): Promise<EligibilityAssessment[]>;
+  getByClientId(clientId: string): Promise<EligibilityAssessment[]>;
+}
+
 export interface Repositories {
   clients: IClientRepository;
   cases: ICaseRepository;
@@ -98,4 +109,5 @@ export interface Repositories {
   checklist: IChecklistRepository;
   documentTypes: IDocumentTypeRepository;
   chat: IChatRepository;
+  eligibility: IEligibilityRepository;
 }

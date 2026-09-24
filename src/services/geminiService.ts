@@ -6,7 +6,9 @@ export const generateTasksFromCase = async (
   startDate: string,
   visaSubclass?: string,
   workflowTitle?: string,
-  steps?: WorkflowStep[]
+  steps?: WorkflowStep[],
+  /** Items already tracked as separate fixed tasks (e.g. Visa Advisor gap tasks) — the AI is told not to duplicate them. */
+  excludeItems?: string[]
 ): Promise<Partial<Task>[]> => {
   const response = await fetch("/api/generate-tasks", {
     method: "POST",
@@ -18,6 +20,7 @@ export const generateTasksFromCase = async (
       visaSubclass,
       workflowTitle,
       steps,
+      excludeItems,
     }),
   });
 

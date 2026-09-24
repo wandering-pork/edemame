@@ -15,3 +15,15 @@ export function toLocalISODate(d: Date = new Date()): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Adds `days` (positive or negative) to a YYYY-MM-DD date string and returns
+ * the result as a YYYY-MM-DD string, computed on local calendar fields (via
+ * `toLocalISODate`) so it doesn't fall prey to the UTC pitfall described
+ * above.
+ */
+export function addDaysISO(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return toLocalISODate(d);
+}
