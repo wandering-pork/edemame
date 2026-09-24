@@ -14,6 +14,7 @@ import { AgentPanel } from '../components/case-details/AgentPanel';
 import { Workspace, WorkspaceCatalogItem, MessageRecommendation } from '../components/case-details/Workspace';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
 import { DocumentTypePicker, DocumentTypeBadge } from '../components/DocumentTypePicker';
+import { EligibilityAssessmentModal } from '../components/visa-advisor/EligibilityAssessmentModal';
 import { useDocumentTypes } from '../contexts/DocumentTypeContext';
 import { recalcAutoLinks, recalcAutoLinkForItem } from '../lib/autoLink';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
@@ -47,7 +48,7 @@ import {
   Columns2,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Document } from '../types';
+import type { Document, EligibilityAssessment } from '../types';
 
 interface CaseDetailsProps {
   caseItem: Case;
@@ -182,6 +183,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   /** CF-2: files handed off from an over-the-limit Case Files upload attempt, pre-loaded into Auto-Packager's local-PC source. */
   const [packagerInitialFiles, setPackagerInitialFiles] = useState<File[] | undefined>(undefined);
 
+  // ---- Eligibility assessment state ----
+  const [eligibilityAssessment, setEligibilityAssessment] = useState<EligibilityAssessment | null>(null);
+  const [showEligibilityAssessment, setShowEligibilityAssessment] = useState(false);
+
   // ---- Chat state ----
   const [conversations, setConversations] = useState<FocusConversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -271,6 +276,17 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     }).catch(() => { if (!cancelled) setWorkflowTemplate(undefined); });
     return () => { cancelled = true; };
   }, [caseItem.templateId, repos.templates]);
+
+  // Load the eligibility assessment this case was opened from (Visa Advisor), if any.
+  useEffect(() => {
+    let cancelled = false;
+    repos.eligibility.getByCaseId(caseItem.id).then(assessments => {
+      if (cancelled) return;
+      const latest = [...assessments].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      setEligibilityAssessment(latest ?? null);
+    }).catch(() => { if (!cancelled) setEligibilityAssessment(null); });
+    return () => { cancelled = true; };
+  }, [caseItem.id, repos.eligibility]);
 
   // Restore only pinned tabs + the last active tab on entry to this case; discard the rest.
   useEffect(() => {
@@ -983,6 +999,16 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               <ShieldCheck size={13} strokeWidth={1.8} />
               <span className="hidden md:inline">Eligibility</span>
             </button>
+            {eligibilityAssessment && (
+              <button
+                onClick={() => setShowEligibilityAssessment(true)}
+                title="View the eligibility assessment this case was opened from"
+                className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
+              >
+                <ShieldCheck size={13} strokeWidth={1.8} />
+                <span className="hidden md:inline">Eligibility assessment</span>
+              </button>
+            )}
           </div>
 
           {/* Add Task */}
@@ -1733,6 +1759,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Eligibility assessment read-only view */}
+      {showEligibilityAssessment && eligibilityAssessment && (
+        <EligibilityAssessmentModal
+          assessment={eligibilityAssessment}
+          onClose={() => setShowEligibilityAssessment(false)}
+        />
       )}
 
       {/* Auto-Packager slide-over */}

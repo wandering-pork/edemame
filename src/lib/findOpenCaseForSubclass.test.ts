@@ -68,4 +68,19 @@ describe('findOpenCaseForSubclass', () => {
   it('returns null when there are no cases at all', () => {
     expect(findOpenCaseForSubclass([], [], 'client-1', '500')).toBeNull();
   });
+
+  it('prefers the case\'s own visaSubclass over its template\'s', () => {
+    const templates = [makeTemplate({ id: 'tpl-1', visaSubclass: '190' })];
+    const target = makeCase({ clientId: 'client-1', templateId: 'tpl-1', visaSubclass: '500' });
+    const cases = [target];
+    expect(findOpenCaseForSubclass(cases, templates, 'client-1', '500')).toBe(target);
+    expect(findOpenCaseForSubclass(cases, templates, 'client-1', '190')).toBeNull();
+  });
+
+  it('falls back to the template when the case has no visaSubclass of its own', () => {
+    const templates = [makeTemplate({ id: 'tpl-1', visaSubclass: '500' })];
+    const target = makeCase({ clientId: 'client-1', templateId: 'tpl-1' });
+    const cases = [target];
+    expect(findOpenCaseForSubclass(cases, templates, 'client-1', '500')).toBe(target);
+  });
 });

@@ -26,6 +26,8 @@ export interface OpenCasePanelResult {
   templateId: string | null;
   title: string;
   generateTasks: boolean;
+  /** Whether to create one fixed (non-AI) task per gap — see the "Add a task for each gap" checkbox below. */
+  gapTasks: boolean;
 }
 
 // Sentinel used only inside the <select> to represent "create a new client" —
@@ -47,6 +49,8 @@ const stageLabels: Record<OpenCaseStage, string> = {
 interface OpenCasePanelProps {
   visaSubclass: string;
   visaName: string;
+  /** Gaps from the assessed pathway — drives the optional "Add a task for each gap" checkbox. */
+  gaps: string[];
   clientInfo: {
     fullName: string;
     dob: string;
@@ -79,6 +83,7 @@ const inputClass =
 export const OpenCasePanel: React.FC<OpenCasePanelProps> = ({
   visaSubclass,
   visaName,
+  gaps,
   clientInfo,
   prefilledClientId,
   clients,
@@ -127,6 +132,7 @@ export const OpenCasePanel: React.FC<OpenCasePanelProps> = ({
   }, [selectedTemplate?.id, clientDisplayName, titleEdited]);
 
   const [generateTasks, setGenerateTasks] = useState(true);
+  const [gapTasks, setGapTasks] = useState(false);
 
   const conflictingCase = useMemo(() => {
     if (clientChoice.kind !== 'existing') return null;
@@ -165,6 +171,7 @@ export const OpenCasePanel: React.FC<OpenCasePanelProps> = ({
       templateId: templateId ?? null,
       title: title.trim(),
       generateTasks,
+      gapTasks,
     });
   };
 
@@ -383,6 +390,22 @@ export const OpenCasePanel: React.FC<OpenCasePanelProps> = ({
               Generate AI task plan
             </label>
           </div>
+
+          {/* Add a task for each gap — off by default */}
+          {gaps.length > 0 && (
+            <div>
+              <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={gapTasks}
+                  onChange={(e) => setGapTasks(e.target.checked)}
+                  disabled={isSubmitting}
+                  className="w-4 h-4 rounded accent-edamame-500"
+                />
+                Add a task for each gap ({gaps.length})
+              </label>
+            </div>
+          )}
         </div>
 
         <div className="px-6 py-4 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex items-center justify-end gap-2 flex-shrink-0">

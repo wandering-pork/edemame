@@ -126,6 +126,70 @@ export interface Case {
    * `displayCaseNumber()` from lib/caseNumber.ts to render a stable fallback.
    */
   caseNumber?: string;
+  /**
+   * The visa subclass this case targets, e.g. "820". Set at creation from the
+   * assessed pathway (Visa Advisor "Open Case") or the selected workflow
+   * template's `visaSubclass` (New Case Intake). Optional because cases
+   * created before this field existed have none — prefer this over looking
+   * up the case's template's `visaSubclass` where both are available.
+   */
+  visaSubclass?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Visa Eligibility Advisor — persisted assessments
+// ---------------------------------------------------------------------------
+
+export type EligibilityVerdict = 'qualifies' | 'possibly_qualifies' | 'unlikely' | 'needs_more_info';
+
+/** One assessed pathway in an `EligibilityAssessment.options` array. */
+export interface EligibilityAssessmentOption {
+  visaSubclass: string;
+  visaName: string;
+  verdict: EligibilityVerdict;
+  reasons: string[];
+  gaps: string[];
+}
+
+/** The wizard answers an `EligibilityAssessment` was generated from. */
+export interface EligibilityAssessmentInputs {
+  clientInfo: {
+    fullName: string;
+    dob: string;
+    nationality: string;
+    inAustralia: boolean;
+    currentVisaStatus: string;
+  };
+  goals: {
+    primaryPurpose: string;
+    intendedDuration: string;
+  };
+  details: Record<string, any>;
+  supportingFactors: {
+    englishProficiency: string;
+    healthConcerns: boolean;
+    criminalHistory: boolean;
+  };
+}
+
+/**
+ * A saved Visa Eligibility Advisor report (GitHub issue #52/#55 follow-up).
+ * Created whenever `/api/check-eligibility` returns a report, whether or not
+ * a case is ever opened from it — `clientId` is set if the advisor was opened
+ * from a client's page, and `caseId`/`selectedSubclass` are filled in later
+ * if/when a case is opened from one of the assessed pathways. See
+ * `repos.eligibility` and CLAUDE.md's "Local-First Storage" section.
+ */
+export interface EligibilityAssessment {
+  id: string;
+  clientId?: string;
+  caseId?: string;
+  createdAt: string; // ISO
+  inputs: EligibilityAssessmentInputs;
+  options: EligibilityAssessmentOption[];
+  /** The subclass a case was actually opened for, once one has been. */
+  selectedSubclass?: string;
+  userId?: string;
 }
 
 export interface CaseNote {

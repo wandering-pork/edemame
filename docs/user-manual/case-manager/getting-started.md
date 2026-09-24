@@ -15,6 +15,13 @@ a running number for that year). It's the reference to quote when discussing a f
 type it straight into the search bar at the top of the screen to jump to the case. Cases created
 before case numbers were introduced show a reference derived from their internal id instead.
 
+A case's header shows an **Eligibility** button (opens the Visa Advisor pre-filled with this
+client) and, only when this case has a saved assessment behind it — either opened directly from a
+Visa Advisor pathway, or matched up after the fact — an **Eligibility assessment** button. Click it
+to open a read-only view of the full report (inputs summary and every assessed pathway with its
+verdict, reasons, and gaps) without leaving the case. See
+[Visa Eligibility Advisor](../visa-advisor/getting-started.md) for how that report is produced.
+
 ## Landing on the Workspace tab
 
 Every time you open a case, you land on the **Workspace** tab. This is the AI-assisted entry point

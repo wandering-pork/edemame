@@ -13,6 +13,7 @@ import type {
   DocumentType,
   FocusConversation,
   UsageEvent,
+  EligibilityAssessment,
 } from '@/types';
 import type {
   IClientRepository,
@@ -28,6 +29,7 @@ import type {
   IChecklistRepository,
   IDocumentTypeRepository,
   IChatRepository,
+  IEligibilityRepository,
   Repositories,
 } from '@/repositories/types';
 
@@ -446,6 +448,46 @@ class FsChatRepository implements IChatRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Eligibility Assessments — one file per record
+// ---------------------------------------------------------------------------
+
+class FsEligibilityRepository implements IEligibilityRepository {
+  constructor(private root: FileSystemDirectoryHandle) {}
+
+  async getAll(): Promise<EligibilityAssessment[]> {
+    return readAllInDir<EligibilityAssessment>(this.root, 'eligibility-assessments');
+  }
+
+  async getById(id: string): Promise<EligibilityAssessment | undefined> {
+    return (await readJson<EligibilityAssessment>(this.root, `eligibility-assessments/${id}.json`)) ?? undefined;
+  }
+
+  async create(item: EligibilityAssessment): Promise<EligibilityAssessment> {
+    await writeJson(this.root, `eligibility-assessments/${item.id}.json`, item);
+    return item;
+  }
+
+  async update(item: EligibilityAssessment): Promise<EligibilityAssessment> {
+    await writeJson(this.root, `eligibility-assessments/${item.id}.json`, item);
+    return item;
+  }
+
+  async delete(id: string): Promise<void> {
+    await deleteEntry(this.root, `eligibility-assessments/${id}.json`);
+  }
+
+  async getByCaseId(caseId: string): Promise<EligibilityAssessment[]> {
+    const all = await this.getAll();
+    return all.filter(a => a.caseId === caseId);
+  }
+
+  async getByClientId(clientId: string): Promise<EligibilityAssessment[]> {
+    const all = await this.getAll();
+    return all.filter(a => a.clientId === clientId);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -464,5 +506,6 @@ export function createFilesystemRepositories(root: FileSystemDirectoryHandle): R
     checklist: new FsChecklistRepository(root),
     documentTypes: new FsDocumentTypeRepository(root),
     chat: new FsChatRepository(root),
+    eligibility: new FsEligibilityRepository(root),
   };
 }

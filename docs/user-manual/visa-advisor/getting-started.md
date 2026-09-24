@@ -31,6 +31,11 @@ match is not certain. Click **Show the other N pathways assessed** to see pathwa
 
 **Start Over** clears the report and returns to Step 1. It's disabled while a case is being opened.
 
+The report is saved as soon as it comes back — whether or not you ever open a case from it — so
+nothing is lost if you close the tab. If you do open a case from one of the pathways, that saved
+assessment is linked to the case and you can reopen it later from the case page (see "Opening a
+case" below).
+
 ## Opening a case
 
 Clicking **Open Case** on a pathway opens a confirmation panel — nothing is created until you
@@ -49,6 +54,10 @@ review it and click **Confirm**. The panel shows:
   updating to match your client/template choice until you type in it yourself.
 - **Generate AI task plan** — on by default. Turn it off to create the case without an AI-drafted
   task schedule (you can still generate one later from the case page).
+- **Add a task for each gap (N)** — shown only when the pathway has gaps to address; off by
+  default. Turn it on to create one fixed task per gap (due a week out, listed ahead of any
+  AI-generated tasks) instead of just noting the gaps in the report. When this is on, the AI task
+  plan is told about the gaps so it doesn't draft duplicate tasks for them.
 - **Existing-case warning** — if the client you've chosen already has an open case for the same
   visa subclass, a warning appears with a link to it; you must explicitly check "Create anyway"
   before Confirm is enabled.
@@ -61,6 +70,10 @@ Once the case is created you're taken straight to its detail page. If the AI tas
 generate, the case is still created (without tasks) and a toast lets you know you can generate them
 from the case page. If you navigate away from Visa Advisor before creation finishes, a toast with a
 **View case** action appears instead of navigating out from under you.
+
+The case's notes get a short summary of the assessed pathway (not the full report) with a pointer
+to **Eligibility assessment** on the case — see `case-manager/getting-started.md` — which opens the
+full report you saw here, read-only.
 
 This assessment is general information about visa pathways, not immigration advice — eligibility is
 ultimately assessed by the Department of Home Affairs at lodgement.

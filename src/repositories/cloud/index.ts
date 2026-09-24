@@ -13,6 +13,7 @@ import type {
   DocumentType,
   FocusConversation,
   UsageEvent,
+  EligibilityAssessment,
 } from '@/types';
 import type {
   IClientRepository,
@@ -28,6 +29,7 @@ import type {
   IChecklistRepository,
   IDocumentTypeRepository,
   IChatRepository,
+  IEligibilityRepository,
   Repositories,
 } from '@/repositories/types';
 
@@ -170,6 +172,7 @@ function caseToRow(userId: string, c: Case) {
     assignment_history: c.assignmentHistory ?? null,
     applicant_id: c.applicantId ?? null,
     case_number: c.caseNumber ?? null,
+    visa_subclass: c.visaSubclass ?? null,
   };
 }
 
@@ -188,6 +191,7 @@ function rowToCase(row: any): Case {
     assignmentHistory: row.assignment_history ?? undefined,
     applicantId: row.applicant_id ?? undefined,
     caseNumber: row.case_number ?? undefined,
+    visaSubclass: row.visa_subclass ?? undefined,
   };
 }
 
@@ -907,6 +911,78 @@ class CloudChatRepository implements IChatRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Eligibility Assessments — account-level, optionally linked to a case/client
+// ---------------------------------------------------------------------------
+
+export function eligibilityAssessmentToRow(userId: string, a: EligibilityAssessment) {
+  return {
+    id: a.id,
+    user_id: userId,
+    client_id: a.clientId ?? null,
+    case_id: a.caseId ?? null,
+    created_at: a.createdAt,
+    inputs: a.inputs,
+    options: a.options,
+    selected_subclass: a.selectedSubclass ?? null,
+  };
+}
+
+export function rowToEligibilityAssessment(row: any): EligibilityAssessment {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    clientId: row.client_id ?? undefined,
+    caseId: row.case_id ?? undefined,
+    createdAt: row.created_at,
+    inputs: row.inputs,
+    options: row.options,
+    selectedSubclass: row.selected_subclass ?? undefined,
+  };
+}
+
+class CloudEligibilityRepository implements IEligibilityRepository {
+  constructor(private userId: string) {}
+
+  async getAll(): Promise<EligibilityAssessment[]> {
+    const rows = await fetchAllRows('eligibility_assessments', q => q.eq('user_id', this.userId));
+    return rows.map(rowToEligibilityAssessment);
+  }
+
+  async getById(id: string): Promise<EligibilityAssessment | undefined> {
+    const { data, error } = await supabase.from('eligibility_assessments').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data ? rowToEligibilityAssessment(data) : undefined;
+  }
+
+  async create(item: EligibilityAssessment): Promise<EligibilityAssessment> {
+    const { error } = await supabase.from('eligibility_assessments').upsert(eligibilityAssessmentToRow(this.userId, item), { onConflict: 'id' });
+    if (error) throw error;
+    return item;
+  }
+
+  async update(item: EligibilityAssessment): Promise<EligibilityAssessment> {
+    const { error } = await supabase.from('eligibility_assessments').upsert(eligibilityAssessmentToRow(this.userId, item), { onConflict: 'id' });
+    if (error) throw error;
+    return item;
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('eligibility_assessments').delete().eq('user_id', this.userId).eq('id', id);
+    if (error) throw error;
+  }
+
+  async getByCaseId(caseId: string): Promise<EligibilityAssessment[]> {
+    const rows = await fetchAllRows('eligibility_assessments', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    return rows.map(rowToEligibilityAssessment);
+  }
+
+  async getByClientId(clientId: string): Promise<EligibilityAssessment[]> {
+    const rows = await fetchAllRows('eligibility_assessments', q => q.eq('user_id', this.userId).eq('client_id', clientId));
+    return rows.map(rowToEligibilityAssessment);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -925,5 +1001,6 @@ export function createCloudRepositories(userId: string): Repositories {
     checklist: new CloudChecklistRepository(userId),
     documentTypes: new CloudDocumentTypeRepository(userId),
     chat: new CloudChatRepository(userId),
+    eligibility: new CloudEligibilityRepository(userId),
   };
 }

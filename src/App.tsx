@@ -11,7 +11,7 @@ import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
 import { CaseDetails } from './pages/CaseDetails';
 import { Clients } from './pages/Clients';
-import { VisaAdvisor, OpenCaseParams } from './pages/VisaAdvisor';
+import { VisaAdvisor, OpenCaseParams, OpenCaseOutcome } from './pages/VisaAdvisor';
 import { generateTasksFromCase } from './services/geminiService';
 import { Templates } from './pages/Templates';
 import { Settings } from './pages/Settings';
@@ -23,6 +23,7 @@ import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification,
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { toLocalISODate } from './lib/dates';
+import { buildGapTasks } from './lib/gapTasks';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
@@ -352,7 +353,7 @@ const AppShell: React.FC = () => {
       subjectId: caseWithOwner.id,
       summary: `New case created: "${caseWithOwner.title}".`,
     });
-    const visaSubclass = templates.find(t => t.id === caseWithOwner.templateId)?.visaSubclass;
+    const visaSubclass = caseWithOwner.visaSubclass ?? templates.find(t => t.id === caseWithOwner.templateId)?.visaSubclass;
     pushUsageEvent({ type: 'case_created', metadata: { visaSubclass, templateId: caseWithOwner.templateId } });
   }, [repos, currentUserId, pushActivity, pushUsageEvent, cases, templates]);
 
@@ -648,7 +649,7 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       caseItem={caseItem}
       client={client}
       applicant={applicant}
-      visaSubclass={template?.visaSubclass}
+      visaSubclass={caseItem.visaSubclass ?? template?.visaSubclass}
       tasks={props.tasks}
       onUpdateTask={props.onUpdateTask}
       onDeleteTask={props.onDeleteTask}
@@ -684,7 +685,7 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
     locationRef.current = location.pathname;
   }, [location.pathname]);
 
-  const handleOpenNewCase = async ({ client: clientChoice, templateId, title, generateTasks, visaSubclass, visaName, caseDescription, onProgress }: OpenCaseParams) => {
+  const handleOpenNewCase = async ({ client: clientChoice, templateId, title, generateTasks, visaSubclass, visaName, caseDescription, gapTasks, gaps, onProgress }: OpenCaseParams): Promise<OpenCaseOutcome> => {
     const template = templateId ? props.templates.find((t) => t.id === templateId) : undefined;
 
     const startDate = toLocalISODate();
@@ -705,7 +706,9 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
           startDate,
           template?.visaSubclass,
           template?.title,
-          template?.steps
+          template?.steps,
+          // Gaps already tracked as fixed tasks below shouldn't be duplicated by the AI plan.
+          gapTasks ? gaps : undefined
         );
       } catch {
         aiGenerationFailed = true;
@@ -754,18 +757,22 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
       status: 'open',
       startDate,
       createdAt: new Date().toISOString(),
+      visaSubclass,
     };
 
-    const finalTasks: Task[] = generatedTasks.map((t, index) => ({
+    // Fixed (non-AI) gap tasks go first, ahead of the AI-generated plan.
+    const gapTaskList: Task[] = gapTasks ? buildGapTasks(gaps, newCaseId, startDate) : [];
+    const aiTasks: Task[] = generatedTasks.map((t, index) => ({
       id: uuidv4(),
       title: t.title || 'Untitled Task',
       description: t.description || '',
       date: t.date || startDate,
       isCompleted: false,
-      priorityOrder: index,
+      priorityOrder: gapTaskList.length + index,
       generatedByAi: true,
       caseId: newCaseId,
     }));
+    const finalTasks: Task[] = [...gapTaskList, ...aiTasks];
 
     try {
       await props.onTasksConfirmed(finalTasks, newCase);
@@ -797,6 +804,8 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
         },
       });
     }
+
+    return { caseId: newCaseId, clientId: client.id };
   };
 
   return (
