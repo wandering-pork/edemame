@@ -53,6 +53,10 @@ export async function clearAll(
   const eligibilityAssessments = await dest.eligibility.getAll();
   await Promise.all(eligibilityAssessments.map(a => dest.eligibility.delete(a.id)));
 
+  report('existing deadlines');
+  const deadlines = await dest.deadlines.getAll();
+  await Promise.all(deadlines.map(d => dest.deadlines.delete(d.id)));
+
   report('existing templates');
   const templates = await dest.templates.getAll();
   await Promise.all(templates.map(t => dest.templates.delete(t.id)));
@@ -108,6 +112,10 @@ export async function copyAllData(
   report('eligibility assessments');
   const eligibilityAssessments = await source.eligibility.getAll();
   await Promise.all(eligibilityAssessments.map(a => dest.eligibility.create(a)));
+
+  report('deadlines');
+  const deadlines = await source.deadlines.getAll();
+  await Promise.all(deadlines.map(d => dest.deadlines.create(d)));
 
   const caseIds = cases.map(c => c.id);
 

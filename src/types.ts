@@ -67,7 +67,7 @@ export interface CaseAssignmentEvent {
 
 export interface ActivityEvent {
   id: string;
-  type: 'case_created' | 'case_assigned' | 'case_updated' | 'task_completed' | 'task_assigned' | 'task_status_changed' | 'member_added';
+  type: 'case_created' | 'case_assigned' | 'case_updated' | 'task_completed' | 'task_assigned' | 'task_status_changed' | 'member_added' | 'deadline_added' | 'deadline_resolved';
   actorId?: string; // TeamMember id responsible
   subjectId?: string; // caseId / taskId / memberId
   summary: string;
@@ -173,6 +173,35 @@ export interface Client {
   userId?: string;
   role?: 'client' | 'applicant' | 'sponsor' | 'employer';
   notes?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Deadlines (Step 1 · 1D)
+// ---------------------------------------------------------------------------
+
+/**
+ * An external, consequential date the agent doesn't control — as opposed to
+ * a Task, whose date the agent sets. See `lib/deadlines.ts` for urgency and
+ * ranking, and `repos.deadlines` / CLAUDE.md's "Local-First Storage" section
+ * for storage.
+ */
+export type DeadlineStatus = 'open' | 'met' | 'missed' | 'dismissed';
+
+export interface Deadline {
+  id: string;
+  kind: DeadlineKind;
+  title: string;
+  dueDate: string; // YYYY-MM-DD
+  caseId?: string;
+  clientId?: string;
+  /** When the triggering event happened (e.g. s56 letter received, invitation date). */
+  triggeredOn?: string;
+  status: DeadlineStatus;
+  /** ISO timestamp — set when status moves from 'open' to 'met'/'missed'/'dismissed'. */
+  resolvedAt?: string;
+  notes?: string;
+  createdAt: string; // ISO
+  userId?: string;
 }
 
 export type CaseStatus = 'open' | 'in_progress' | 'on_hold' | 'closed';

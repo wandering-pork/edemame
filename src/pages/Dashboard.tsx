@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Task, Case, Client, TeamMember, ActivityEvent, DocumentChecklistItem } from '../types';
+import { useNavigate } from 'react-router-dom';
+import { Task, Case, Client, TeamMember, ActivityEvent, DocumentChecklistItem, Deadline } from '../types';
 import {
   format,
   isSameDay,
@@ -10,7 +11,8 @@ import {
 import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight, SkipBack, SkipForward } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { buildWindow, computeAutoWindowStart, jumpWeek, stepDay } from '../lib/calendarWindow';
-import { overdueTasksFor, dueTodayTasksFor, waitingTasksFor, buildAttentionItems } from '../lib/attention';
+import { overdueTasksFor, dueTodayTasksFor, waitingTasksFor, buildAttentionItems, deadlineAttentionItemsFor, mergeAttentionItems } from '../lib/attention';
+import { allDeadlines } from '../lib/deadlines';
 import { isTaskClosed } from '../lib/taskStatus';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 
@@ -18,6 +20,8 @@ interface DashboardProps {
   tasks: Task[];
   cases: Case[];
   clients: Client[];
+  /** Optional — App.tsx loads `deadlines` from `repos.deadlines`; when absent, "Needs attention" shows tasks only. */
+  deadlines?: Deadline[];
   teamMembers?: TeamMember[];
   currentUserId?: string;
   onUpdateTask: (task: Task) => void;
@@ -91,6 +95,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   tasks,
   cases,
   clients,
+  deadlines = [],
   teamMembers = [],
   currentUserId,
   activity = [],
@@ -100,6 +105,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onDeleteTask,
   onMoveTaskDate,
 }) => {
+  const navigate = useNavigate();
   const [boardScope, setBoardScope] = useState<ScopeFilter>(currentUserId ? 'mine' : 'all');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), caseId: '' });
@@ -245,12 +251,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // ── Needs attention ───────────────────────────────────────────────────
   const [showAllAttention, setShowAllAttention] = useState(false);
   const ATTENTION_VISIBLE_DEFAULT = 5;
-  const allAttentionItems = useMemo(
+  const getClientById = (clientId?: string) => (clientId ? clients.find(c => c.id === clientId) : undefined);
+  const taskAttentionItems = useMemo(
     () => buildAttentionItems(overdueTasks, dueTodayTasks, getCaseAndClient, iso => format(new Date(iso), 'd MMM')),
     [overdueTasks, dueTodayTasks, cases, clients]
   );
+  const deadlineAttentionItems = useMemo(
+    () => deadlineAttentionItemsFor(allDeadlines(deadlines, clients), today, getCaseAndClient, getClientById),
+    [deadlines, clients, cases, today.getTime()]
+  );
+  // Deadlines at urgency ≥ soon rank above tasks, ranked by consequence — see plan 1D.
+  const allAttentionItems = useMemo(
+    () => mergeAttentionItems(deadlineAttentionItems, taskAttentionItems),
+    [deadlineAttentionItems, taskAttentionItems]
+  );
   const attentionItems = showAllAttention ? allAttentionItems : allAttentionItems.slice(0, ATTENTION_VISIBLE_DEFAULT);
   const hiddenAttentionCount = allAttentionItems.length - attentionItems.length;
+
+  const handleAttentionItemClick = (item: (typeof allAttentionItems)[number]) => {
+    if (item.kind === 'deadline') {
+      if (item.caseId) {
+        navigate(`/cases/${item.caseId}`);
+      } else if (item.clientId) {
+        navigate('/clients', { state: { focusClientId: item.clientId } });
+      }
+      return;
+    }
+    setSelectedTaskId(item.id);
+  };
 
   // ── Agent activity ────────────────────────────────────────────────────
   const activityItems = useMemo(() => {
@@ -389,7 +417,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {attentionItems.map(item => (
                   <div
                     key={item.id}
-                    onClick={() => setSelectedTaskId(item.id)}
+                    onClick={() => handleAttentionItemClick(item)}
                     className="flex items-center gap-3 px-5 py-3 border-t border-ink/10 dark:border-plate-ink/15 cursor-pointer transition-colors hover:bg-paper-2 dark:hover:bg-plate/60"
                   >
                     <span
@@ -403,7 +431,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5 truncate">{item.sub}</div>
                     </div>
                     <span className="text-xs font-semibold text-edamame-600 dark:text-edamame-400 whitespace-nowrap">
-                      View task →
+                      {item.kind === 'deadline' ? (item.caseId ? 'View case →' : 'View client →') : 'View task →'}
                     </span>
                   </div>
                 ))}

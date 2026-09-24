@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate } from '../types';
+import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useAuth } from '../contexts/AuthContext';
 import { CaseNotes } from '../components/CaseNotes';
@@ -21,12 +21,15 @@ import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplat
 import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib/caseTabsStore';
 import { displayCaseNumber } from '../lib/caseNumber';
 import { isTaskClosed, isWaiting, withStatus, TASK_STATUS_LABELS, TASK_STATUS_ORDER } from '../lib/taskStatus';
+import { allDeadlines, daysLeft, urgency } from '../lib/deadlines';
+import { toLocalISODate, addDaysISO } from '../lib/dates';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Calendar,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Plus,
   Trash2,
   Edit2,
@@ -65,8 +68,26 @@ interface CaseDetailsProps {
     offsetFuture: boolean,
     taskPatch?: { title?: string; description?: string },
   ) => void;
+  /** Every deadline currently loaded — filtered to this case (+ the client's passport-expiry deadline) below. */
+  deadlines: Deadline[];
+  onAddDeadline: (deadline: Deadline) => void;
+  onUpdateDeadline: (deadline: Deadline) => void;
   onBack: () => void;
 }
+
+const DEADLINE_KIND_LABELS: Record<DeadlineKind, string> = {
+  visa_expiry: 'Visa expiry',
+  passport_expiry: 'Passport expiry',
+  s56_response: 's56 response',
+  s57_response: 's57 response',
+  nomination_validity: 'Nomination validity',
+  invitation_window: 'Invitation window',
+  other: 'Other',
+};
+
+const DEADLINE_KIND_ORDER: DeadlineKind[] = [
+  's56_response', 's57_response', 'invitation_window', 'nomination_validity', 'visa_expiry', 'passport_expiry', 'other',
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -116,6 +137,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   onDeleteTask,
   onAddTask,
   onMoveTaskDate,
+  deadlines,
+  onAddDeadline,
+  onUpdateDeadline,
   onBack
 }) => {
   const repos = useRepositories();
@@ -133,6 +157,22 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // When a task row's status menu picks "Not applicable", a reason must be
   // entered and confirmed inline before the status change is applied.
   const [naReasonDraft, setNaReasonDraft] = useState<{ taskId: string; reason: string } | null>(null);
+
+  // ---- Deadline panel state ----
+  const [showAddDeadline, setShowAddDeadline] = useState(false);
+  const [deadlineForm, setDeadlineForm] = useState<{ kind: DeadlineKind; title: string; dueDate: string; notes: string }>({
+    kind: 'other',
+    title: '',
+    dueDate: toLocalISODate(),
+    notes: '',
+  });
+  // s56/s57 quick-add: the agent enters the received date, the due date defaults to
+  // received + 28 days (editable — response periods vary by request) and must be confirmed.
+  const [quickAddKind, setQuickAddKind] = useState<'s56_response' | 's57_response' | null>(null);
+  const [quickAddForm, setQuickAddForm] = useState<{ receivedDate: string; dueDate: string }>({
+    receivedDate: toLocalISODate(),
+    dueDate: addDaysISO(toLocalISODate(), 28),
+  });
 
   // ---- Case edit/delete state ----
   const [currentCase, setCurrentCase] = useState<Case>(caseItem);
@@ -206,6 +246,18 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       .filter(t => t.caseId === caseItem.id)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.priorityOrder - b.priorityOrder);
   }, [tasks, caseItem.id]);
+
+  // Case-linked stored deadlines, plus the client's passport-expiry deadline
+  // (stored if the agent has one on record, derived/virtual otherwise) — see
+  // lib/deadlines.ts's allDeadlines(). Client-level deadlines of any other
+  // kind aren't included here; passport expiry is the only kind derived in
+  // this slice (visa expiry becomes derived once Step 2 records grants).
+  const caseDeadlines = useMemo(() => {
+    const relevant = deadlines.filter(
+      d => d.caseId === caseItem.id || (d.clientId === client.id && d.kind === 'passport_expiry'),
+    );
+    return allDeadlines(relevant, [client]).sort((a, b) => daysLeft(a, new Date()) - daysLeft(b, new Date()));
+  }, [deadlines, caseItem.id, client]);
 
   const completedTasks = caseTasks.filter(isTaskClosed);
   const pendingTasks = caseTasks.filter(t => !isTaskClosed(t));
@@ -464,6 +516,53 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const handleDeleteCase = async () => {
     await repos.cases.delete(currentCase.id);
     onBack();
+  };
+
+  // ---- Deadline handlers ----
+  const handleAddDeadlineSubmit = () => {
+    if (!deadlineForm.title.trim() || !deadlineForm.dueDate) return;
+    onAddDeadline({
+      id: uuidv4(),
+      kind: deadlineForm.kind,
+      title: deadlineForm.title.trim(),
+      dueDate: deadlineForm.dueDate,
+      caseId: caseItem.id,
+      clientId: client.id,
+      status: 'open',
+      notes: deadlineForm.notes.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    });
+    setDeadlineForm({ kind: 'other', title: '', dueDate: toLocalISODate(), notes: '' });
+    setShowAddDeadline(false);
+  };
+
+  const openQuickAdd = (kind: 's56_response' | 's57_response') => {
+    setQuickAddKind(kind);
+    setQuickAddForm({ receivedDate: toLocalISODate(), dueDate: addDaysISO(toLocalISODate(), 28) });
+  };
+
+  const handleQuickAddReceivedDateChange = (receivedDate: string) => {
+    setQuickAddForm({ receivedDate, dueDate: addDaysISO(receivedDate, 28) });
+  };
+
+  const handleQuickAddSubmit = () => {
+    if (!quickAddKind || !quickAddForm.dueDate) return;
+    onAddDeadline({
+      id: uuidv4(),
+      kind: quickAddKind,
+      title: DEADLINE_KIND_LABELS[quickAddKind],
+      dueDate: quickAddForm.dueDate,
+      triggeredOn: quickAddForm.receivedDate,
+      caseId: caseItem.id,
+      clientId: client.id,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+    });
+    setQuickAddKind(null);
+  };
+
+  const resolveDeadline = (deadline: Deadline, status: 'met' | 'missed' | 'dismissed') => {
+    onUpdateDeadline({ ...deadline, status, resolvedAt: new Date().toISOString() });
   };
 
   // ---- Task handlers ----
@@ -1257,6 +1356,204 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           {/* ── TASKS ── */}
           {activeTabId === 'tab:tasks' && (
             <div className="mt-4 space-y-6">
+              {/* ── Deadlines ── */}
+              <section>
+                <div className="flex items-center justify-between mb-2.5 gap-2 flex-wrap">
+                  <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">
+                    Deadlines <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {caseDeadlines.length}</span>
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => openQuickAdd('s56_response')}
+                      className="btn-press px-2.5 py-1 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
+                    >
+                      + s56
+                    </button>
+                    <button
+                      onClick={() => openQuickAdd('s57_response')}
+                      className="btn-press px-2.5 py-1 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
+                    >
+                      + s57
+                    </button>
+                    <button
+                      onClick={() => setShowAddDeadline(o => !o)}
+                      className="btn-press inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-edamame hover:bg-edamame-600 text-white text-[11px] font-bold transition-colors"
+                    >
+                      <Plus size={12} strokeWidth={2.2} />
+                      Add deadline
+                    </button>
+                  </div>
+                </div>
+
+                {/* s56/s57 quick-add form */}
+                {quickAddKind && (
+                  <div className="mb-2.5 p-3 rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card space-y-2">
+                    <div className="text-[11.5px] font-bold text-ink dark:text-plate-ink">{DEADLINE_KIND_LABELS[quickAddKind]}</div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <label className="text-[11px] text-ink-soft dark:text-plate-ink-soft flex items-center gap-1.5">
+                        Received
+                        <input
+                          type="date"
+                          value={quickAddForm.receivedDate}
+                          onChange={e => handleQuickAddReceivedDateChange(e.target.value)}
+                          className="px-1.5 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                        />
+                      </label>
+                      <label className="text-[11px] text-ink-soft dark:text-plate-ink-soft flex items-center gap-1.5">
+                        Due
+                        <input
+                          type="date"
+                          value={quickAddForm.dueDate}
+                          onChange={e => setQuickAddForm(f => ({ ...f, dueDate: e.target.value }))}
+                          className="px-1.5 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                        />
+                      </label>
+                    </div>
+                    <p className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint">
+                      Defaults to 28 days after the received date — response periods vary by request, so confirm the actual date on the letter.
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={handleQuickAddSubmit}
+                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-md"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setQuickAddKind(null)}
+                        className="px-2 py-1 text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add deadline form */}
+                {showAddDeadline && (
+                  <div className="mb-2.5 p-3 rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <select
+                        value={deadlineForm.kind}
+                        onChange={e => setDeadlineForm(f => ({ ...f, kind: e.target.value as DeadlineKind }))}
+                        className="px-2 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                      >
+                        {DEADLINE_KIND_ORDER.map(k => (
+                          <option key={k} value={k}>{DEADLINE_KIND_LABELS[k]}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={deadlineForm.title}
+                        onChange={e => setDeadlineForm(f => ({ ...f, title: e.target.value }))}
+                        placeholder="Title"
+                        className="flex-1 min-w-[140px] px-2 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                      />
+                      <input
+                        type="date"
+                        value={deadlineForm.dueDate}
+                        onChange={e => setDeadlineForm(f => ({ ...f, dueDate: e.target.value }))}
+                        className="px-1.5 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      value={deadlineForm.notes}
+                      onChange={e => setDeadlineForm(f => ({ ...f, notes: e.target.value }))}
+                      placeholder="Notes (optional)"
+                      className="w-full px-2 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={handleAddDeadlineSubmit}
+                        disabled={!deadlineForm.title.trim()}
+                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setShowAddDeadline(false)}
+                        className="px-2 py-1 text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {caseDeadlines.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-ink/15 dark:border-plate-ink/20 p-6 text-center">
+                    <p className="text-[12.5px] text-ink-faint dark:text-plate-ink-faint">No deadlines tracked for this case</p>
+                  </div>
+                ) : (
+                  <div className="bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl overflow-hidden">
+                    {caseDeadlines.map(d => {
+                      const isVirtual = d.id.startsWith('passport:');
+                      const days = daysLeft(d, new Date());
+                      const u = urgency(d, new Date());
+                      const urgencyMeta: Record<typeof u, { chip: string; label: string }> = {
+                        none: { chip: 'bg-slate-500/[0.1] text-ink-soft dark:text-plate-ink-soft', label: days < 0 ? `overdue ${Math.abs(days)}d` : `${days}d left` },
+                        soon: { chip: 'bg-amber-500/[0.13] text-amber-700 dark:text-amber-400', label: `${days}d left` },
+                        urgent: { chip: 'bg-orange-500/[0.15] text-orange-700 dark:text-orange-400', label: `${days}d left` },
+                        critical: { chip: 'bg-red-500/[0.15] text-red-700 dark:text-red-400', label: days < 0 ? `overdue ${Math.abs(days)}d` : `${days}d left` },
+                      };
+                      const meta = urgencyMeta[u];
+                      const missedCandidate = !isVirtual && d.status === 'open' && days < 0;
+                      return (
+                        <div key={d.id} className="px-[18px] py-3 border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0">
+                          <div className="flex items-center gap-3">
+                            <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${meta.chip}`}>
+                              {meta.label}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13px] font-semibold text-ink dark:text-plate-ink truncate">
+                                {d.title}
+                                <span className="ml-1.5 text-[10px] font-semibold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wide">
+                                  {DEADLINE_KIND_LABELS[d.kind]}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-0.5">
+                                Due {format(new Date(`${d.dueDate}T00:00:00`), 'MMM d, yyyy')}
+                                {isVirtual && ' · auto-tracked from client passport'}
+                                {d.status !== 'open' && ` · ${d.status}`}
+                              </div>
+                            </div>
+                            {!isVirtual && d.status === 'open' && (
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  onClick={() => resolveDeadline(d, 'met')}
+                                  className="px-2 py-1 text-[10.5px] font-bold rounded-md bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/[0.22] transition-colors"
+                                >
+                                  Mark met
+                                </button>
+                                <button
+                                  onClick={() => resolveDeadline(d, 'missed')}
+                                  className="px-2 py-1 text-[10.5px] font-bold rounded-md bg-red-500/[0.13] text-red-700 dark:text-red-400 hover:bg-red-500/[0.22] transition-colors"
+                                >
+                                  Mark missed
+                                </button>
+                                <button
+                                  onClick={() => resolveDeadline(d, 'dismissed')}
+                                  className="px-2 py-1 text-[10.5px] font-semibold rounded-md text-ink-soft dark:text-plate-ink-soft hover:bg-paper dark:hover:bg-plate transition-colors"
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {missedCandidate && (
+                            <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                              <AlertTriangle size={12} strokeWidth={2} />
+                              Missed? This deadline is overdue and still open — mark it met or missed above.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
               <section>
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">

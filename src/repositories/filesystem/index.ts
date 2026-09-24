@@ -15,6 +15,7 @@ import type {
   FocusConversation,
   UsageEvent,
   EligibilityAssessment,
+  Deadline,
 } from '@/types';
 import type {
   IClientRepository,
@@ -31,6 +32,7 @@ import type {
   IDocumentTypeRepository,
   IChatRepository,
   IEligibilityRepository,
+  IDeadlineRepository,
   Repositories,
 } from '@/repositories/types';
 
@@ -493,6 +495,46 @@ class FsEligibilityRepository implements IEligibilityRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Deadlines — one file per record
+// ---------------------------------------------------------------------------
+
+class FsDeadlineRepository implements IDeadlineRepository {
+  constructor(private root: FileSystemDirectoryHandle) {}
+
+  async getAll(): Promise<Deadline[]> {
+    return readAllInDir<Deadline>(this.root, 'deadlines');
+  }
+
+  async getById(id: string): Promise<Deadline | undefined> {
+    return (await readJson<Deadline>(this.root, `deadlines/${id}.json`)) ?? undefined;
+  }
+
+  async create(item: Deadline): Promise<Deadline> {
+    await writeJson(this.root, `deadlines/${item.id}.json`, item);
+    return item;
+  }
+
+  async update(item: Deadline): Promise<Deadline> {
+    await writeJson(this.root, `deadlines/${item.id}.json`, item);
+    return item;
+  }
+
+  async delete(id: string): Promise<void> {
+    await deleteEntry(this.root, `deadlines/${id}.json`);
+  }
+
+  async getByCaseId(caseId: string): Promise<Deadline[]> {
+    const all = await this.getAll();
+    return all.filter(d => d.caseId === caseId);
+  }
+
+  async getByClientId(clientId: string): Promise<Deadline[]> {
+    const all = await this.getAll();
+    return all.filter(d => d.clientId === clientId);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -512,5 +554,6 @@ export function createFilesystemRepositories(root: FileSystemDirectoryHandle): R
     documentTypes: new FsDocumentTypeRepository(root),
     chat: new FsChatRepository(root),
     eligibility: new FsEligibilityRepository(root),
+    deadlines: new FsDeadlineRepository(root),
   };
 }

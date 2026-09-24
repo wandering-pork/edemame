@@ -20,11 +20,13 @@ import { TeamDashboard } from './pages/TeamDashboard';
 import { TeamMembers } from './pages/TeamMembers';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
-import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote, UsageEvent } from './types';
+import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote, UsageEvent, Deadline } from './types';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { toLocalISODate } from './lib/dates';
 import { isTaskClosed, TASK_STATUS_LABELS } from './lib/taskStatus';
+import { allDeadlines } from './lib/deadlines';
+import { buildDeadlineAlerts } from './lib/deadlineAlerts';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
@@ -53,6 +55,7 @@ const AppShell: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [deadlines, setDeadlines] = useState<Deadline[]>([]);
 
   const pushActivity = useCallback(async (ev: Omit<ActivityEvent, 'id' | 'createdAt'> & { createdAt?: string }) => {
     const created = await repos.activity.create({
@@ -94,7 +97,7 @@ const AppShell: React.FC = () => {
     let cancelled = false;
     async function loadData() {
       try {
-        const [t, customTemplates, cl, cs, notifs, team, activityEvents] = await Promise.all([
+        const [t, customTemplates, cl, cs, notifs, team, activityEvents, deadlineRecords] = await Promise.all([
           repos.tasks.getAll(),
           repos.templates.getAll(),
           repos.clients.getAll(),
@@ -102,6 +105,7 @@ const AppShell: React.FC = () => {
           repos.notifications.getAll(),
           repos.teamMembers.getAll(),
           repos.activity.getAll(),
+          repos.deadlines.getAll(),
         ]);
         if (cancelled) return;
 
@@ -139,6 +143,7 @@ const AppShell: React.FC = () => {
         setNotifications(notifs);
         setTeamMembers(resolvedTeam);
         setActivity(activityEvents);
+        setDeadlines(deadlineRecords);
       } catch (err) {
         console.error('Failed to load data from repositories:', err);
         if (!cancelled) {
@@ -215,6 +220,49 @@ const AppShell: React.FC = () => {
     createMissing();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, loading]);
+
+  // Auto-generate deadline-approaching notifications (14/7/2-day thresholds), including
+  // the derived passport-expiry deadline — see lib/deadlineAlerts.ts. Checked on app load;
+  // there's no background job (Step 1 · 1D). Deduplicated by buildDeadlineAlerts against
+  // notifications already created, so a reload never creates the same alert twice.
+  useEffect(() => {
+    if (loading) return;
+    const today = new Date();
+    const toCreate = buildDeadlineAlerts(allDeadlines(deadlines, clients), notifications, today);
+    if (toCreate.length === 0) return;
+
+    (async () => {
+      const created = await Promise.all(toCreate.map(n => repos.notifications.create(n)));
+      setNotifications(prev => [...prev, ...created]);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deadlines, clients, loading]);
+
+  // --- Deadline Actions ---
+  const handleAddDeadline = useCallback(async (deadline: Deadline) => {
+    await repos.deadlines.create(deadline);
+    setDeadlines(prev => [...prev, deadline]);
+    pushActivity({
+      type: 'deadline_added',
+      actorId: currentUserId,
+      subjectId: deadline.id,
+      summary: `Deadline "${deadline.title}" added, due ${deadline.dueDate}.`,
+    });
+  }, [repos, pushActivity, currentUserId]);
+
+  const handleUpdateDeadline = useCallback(async (updated: Deadline) => {
+    const prev = deadlines.find(d => d.id === updated.id);
+    await repos.deadlines.update(updated);
+    setDeadlines(prevList => prevList.map(d => d.id === updated.id ? updated : d));
+    if (prev && prev.status === 'open' && updated.status !== 'open') {
+      pushActivity({
+        type: 'deadline_resolved',
+        actorId: currentUserId,
+        subjectId: updated.id,
+        summary: `Deadline "${updated.title}" marked ${updated.status}.`,
+      });
+    }
+  }, [repos, deadlines, pushActivity, currentUserId]);
 
   // --- Task Actions ---
   const handleAddTask = useCallback(async (task: Task) => {
@@ -519,6 +567,7 @@ const AppShell: React.FC = () => {
                 tasks={tasks}
                 cases={cases}
                 clients={clients}
+                deadlines={deadlines}
                 teamMembers={teamMembers}
                 currentUserId={currentUserId}
                 onUpdateTask={handleUpdateTask}
@@ -590,6 +639,9 @@ const AppShell: React.FC = () => {
                 onDeleteTask={handleDeleteTask}
                 onAddTask={handleAddTask}
                 onMoveTaskDate={handleMoveTaskDate}
+                deadlines={deadlines}
+                onAddDeadline={handleAddDeadline}
+                onUpdateDeadline={handleUpdateDeadline}
               />
             } />
             <Route path="/templates" element={
@@ -632,6 +684,9 @@ interface CaseDetailsRouteProps {
     offsetFuture: boolean,
     taskPatch?: { title?: string; description?: string },
   ) => void;
+  deadlines: Deadline[];
+  onAddDeadline: (deadline: Deadline) => void;
+  onUpdateDeadline: (deadline: Deadline) => void;
 }
 
 const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
@@ -658,6 +713,9 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       onDeleteTask={props.onDeleteTask}
       onAddTask={props.onAddTask}
       onMoveTaskDate={props.onMoveTaskDate}
+      deadlines={props.deadlines}
+      onAddDeadline={props.onAddDeadline}
+      onUpdateDeadline={props.onUpdateDeadline}
       onBack={() => navigate('/cases')}
     />
   );
