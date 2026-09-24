@@ -19,7 +19,7 @@ export function gapTaskTitle(gap: string): string {
  * `GAP_TASK_DUE_OFFSET_DAYS` after the case start date. Used by the Visa
  * Advisor "Open Case" confirmation panel's optional "Add a task for each gap"
  * checkbox (default off — see `OpenCasePanel.tsx` / `OpenCaseParams.gapTasks`
- * in `App.tsx`'s `VisaAdvisorRoute.handleOpenNewCase`), which places these
+ * in `lib/openCaseFromAdvisor.ts`), which places these
  * ahead of any AI-generated tasks.
  */
 export function buildGapTasks(
