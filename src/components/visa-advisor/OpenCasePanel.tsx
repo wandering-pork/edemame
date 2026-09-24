@@ -7,19 +7,7 @@ import { resolveAdvisorClient } from '../../lib/resolveAdvisorClient';
 import { matchTemplate } from '../../lib/matchTemplate';
 import { findOpenCaseForSubclass } from '../../lib/findOpenCaseForSubclass';
 import { displayCaseNumber } from '../../lib/caseNumber';
-
-export type OpenCaseClientChoice =
-  | { kind: 'existing'; id: string }
-  | {
-      kind: 'new';
-      fullName: string;
-      dob: string;
-      nationality: string;
-      email?: string;
-      phone?: string;
-      inAustralia: boolean;
-      currentVisaStatus: string;
-    };
+import type { OpenCaseClientChoice, OpenCaseStage } from '../../lib/openCaseFromAdvisor';
 
 export interface OpenCasePanelResult {
   client: OpenCaseClientChoice;
@@ -37,8 +25,6 @@ const NEW_CLIENT_OPTION = '__new_client__';
 // "nothing chosen yet" (undefined), which keeps Confirm disabled until the
 // user makes a deliberate pick when there was no exact-subclass match.
 const NO_TEMPLATE_OPTION = '__no_template__';
-
-export type OpenCaseStage = 'plan' | 'client' | 'finalizing';
 
 const stageLabels: Record<OpenCaseStage, string> = {
   plan: 'Drafting task plan with AI…',

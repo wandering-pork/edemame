@@ -13,17 +13,11 @@ import {
   Check,
   Sparkles,
 } from 'lucide-react';
-import {
-  OpenCasePanel,
-  OpenCaseClientChoice,
-  OpenCasePanelResult,
-  OpenCaseStage,
-} from '../components/visa-advisor/OpenCasePanel';
+import { OpenCasePanel, OpenCasePanelResult } from '../components/visa-advisor/OpenCasePanel';
+import type { OpenCaseParams, OpenCaseOutcome, OpenCaseStage } from '../lib/openCaseFromAdvisor';
 import { PathwayCard } from '../components/visa-advisor/PathwayCard';
 import { verdictColors, verdictLabels, verdictRank, verdictIcon } from '../components/visa-advisor/verdictStyles';
 import { buildEligibilitySummary } from '../lib/eligibilitySummary';
-
-export type { OpenCaseStage, OpenCaseClientChoice };
 
 interface WizardState {
   step: 'input' | 'report';
@@ -63,35 +57,6 @@ interface EligibilityUsage {
   candidatesTokens: number;
   totalTokens: number;
   estimatedCostUsd: number;
-}
-
-// Everything the confirmation panel decided, executed exactly as confirmed —
-// no re-resolution of the client happens once this reaches the caller. Stage
-// order reflects the actual sequence handleOpenNewCase runs in: the AI task
-// plan (if requested) is drafted first (so nothing has to be rolled back if it
-// fails), then the client is resolved/created, then the case itself is saved.
-export interface OpenCaseParams {
-  client: OpenCaseClientChoice;
-  /** Workflow template id to use, or `null` for "No template (general case)". */
-  templateId: string | null;
-  title: string;
-  /** When false, the 'plan' stage is skipped entirely and no tasks are generated. */
-  generateTasks: boolean;
-  visaSubclass: string;
-  visaName: string;
-  caseDescription: string;
-  /** When true, App.tsx creates one fixed (non-AI) task per entry in `gaps`. */
-  gapTasks: boolean;
-  /** The selected pathway's gaps — used both to build gap tasks and to tell
-   *  AI task generation not to duplicate them (see `excludeItems`). */
-  gaps: string[];
-  onProgress: (stage: OpenCaseStage) => void;
-}
-
-/** Result of a successful case creation, so the caller can link the saved assessment to it. */
-export interface OpenCaseOutcome {
-  caseId: string;
-  clientId: string;
 }
 
 interface VisaAdvisorProps {

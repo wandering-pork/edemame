@@ -11,7 +11,8 @@ import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
 import { CaseDetails } from './pages/CaseDetails';
 import { Clients } from './pages/Clients';
-import { VisaAdvisor, OpenCaseParams, OpenCaseOutcome } from './pages/VisaAdvisor';
+import { VisaAdvisor } from './pages/VisaAdvisor';
+import { openCaseFromAdvisor, OpenCaseParams, OpenCaseOutcome } from './lib/openCaseFromAdvisor';
 import { generateTasksFromCase } from './services/geminiService';
 import { Templates } from './pages/Templates';
 import { Settings } from './pages/Settings';
@@ -23,7 +24,6 @@ import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification,
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { toLocalISODate } from './lib/dates';
-import { buildGapTasks } from './lib/gapTasks';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
@@ -685,108 +685,15 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
     locationRef.current = location.pathname;
   }, [location.pathname]);
 
-  const handleOpenNewCase = async ({ client: clientChoice, templateId, title, generateTasks, visaSubclass, visaName, caseDescription, gapTasks, gaps, onProgress }: OpenCaseParams): Promise<OpenCaseOutcome> => {
-    const template = templateId ? props.templates.find((t) => t.id === templateId) : undefined;
-
-    const startDate = toLocalISODate();
-    const newCaseId = uuidv4();
-
-    // Generate the AI task plan first (only if the user asked for one in the
-    // confirmation panel): if it fails there's nothing to roll back, and if it
-    // succeeds we don't want to have already created a client for a case that
-    // then fails to save.
-    let generatedTasks: Partial<Task>[] = [];
-    let aiGenerationFailed = false;
-    if (generateTasks) {
-      onProgress('plan');
-      try {
-        generatedTasks = await generateTasksFromCase(
-          caseDescription,
-          template?.description || '',
-          startDate,
-          template?.visaSubclass,
-          template?.title,
-          template?.steps,
-          // Gaps already tracked as fixed tasks below shouldn't be duplicated by the AI plan.
-          gapTasks ? gaps : undefined
-        );
-      } catch {
-        aiGenerationFailed = true;
-      }
-    }
-
-    onProgress('client');
-    // The confirmation panel already resolved which client to use (or gathered
-    // the details for a new one) — execute exactly what the user confirmed,
-    // no re-resolution here.
-    let client: Client;
-    let createdNewClient = false;
-    if (clientChoice.kind === 'existing') {
-      const existing = props.clients.find((c) => c.id === clientChoice.id);
-      if (!existing) {
-        throw new Error('The selected client no longer exists. Please reopen the confirmation panel.');
-      }
-      client = existing;
-    } else {
-      const notesLines = [`In Australia: ${clientChoice.inAustralia ? 'Yes' : 'No'}`];
-      if (clientChoice.currentVisaStatus) {
-        notesLines.push(`Current visa status: ${clientChoice.currentVisaStatus}`);
-      }
-      client = {
-        id: uuidv4(),
-        name: clientChoice.fullName,
-        dob: clientChoice.dob || '',
-        phone: clientChoice.phone || '',
-        email: clientChoice.email || '',
-        address: '',
-        nationality: clientChoice.nationality || undefined,
-        role: 'applicant',
-        notes: notesLines.join('\n'),
-      };
-      await props.onAddClient(client);
-      createdNewClient = true;
-    }
-
-    onProgress('finalizing');
-    const newCase: Case = {
-      id: newCaseId,
-      clientId: client.id,
-      title,
-      description: caseDescription,
-      templateId: template?.id || '',
-      status: 'open',
-      startDate,
-      createdAt: new Date().toISOString(),
-      visaSubclass,
-    };
-
-    // Fixed (non-AI) gap tasks go first, ahead of the AI-generated plan.
-    const gapTaskList: Task[] = gapTasks ? buildGapTasks(gaps, newCaseId, startDate) : [];
-    const aiTasks: Task[] = generatedTasks.map((t, index) => ({
-      id: uuidv4(),
-      title: t.title || 'Untitled Task',
-      description: t.description || '',
-      date: t.date || startDate,
-      isCompleted: false,
-      priorityOrder: gapTaskList.length + index,
-      generatedByAi: true,
-      caseId: newCaseId,
-    }));
-    const finalTasks: Task[] = [...gapTaskList, ...aiTasks];
-
-    try {
-      await props.onTasksConfirmed(finalTasks, newCase);
-    } catch (err) {
-      // Don't leave an orphaned client behind for a case that never got saved.
-      if (createdNewClient) {
-        try {
-          await props.onDeleteClient(client.id);
-        } catch (cleanupErr) {
-          console.error('Failed to roll back newly created client after case creation failed:', cleanupErr);
-        }
-      }
-      throw err;
-    }
+  const handleOpenNewCase = async (params: OpenCaseParams): Promise<OpenCaseOutcome> => {
+    const { caseId, clientId, aiGenerationFailed } = await openCaseFromAdvisor(params, {
+      clients: props.clients,
+      templates: props.templates,
+      generateTasks: generateTasksFromCase,
+      addClient: props.onAddClient,
+      deleteClient: props.onDeleteClient,
+      createCase: props.onTasksConfirmed,
+    });
 
     // Only mention the AI failure once the case itself is safely saved — no
     // point alarming the user about tasks if the whole thing is about to fail.
@@ -795,17 +702,17 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
     }
 
     if (locationRef.current === '/visa-advisor') {
-      navigate(`/cases/${newCaseId}`);
+      navigate(`/cases/${caseId}`);
     } else {
-      toast.success(`Case created: ${newCase.title}`, {
+      toast.success(`Case created: ${params.title}`, {
         action: {
           label: 'View case',
-          onClick: () => navigate(`/cases/${newCaseId}`),
+          onClick: () => navigate(`/cases/${caseId}`),
         },
       });
     }
 
-    return { caseId: newCaseId, clientId: client.id };
+    return { caseId, clientId };
   };
 
   return (
