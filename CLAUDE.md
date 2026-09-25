@@ -110,10 +110,11 @@ type existed.
 Registration/login gates the **entire app** (not just cloud storage mode) via Supabase Auth (email/password).
 
 1. `AuthProvider` (`src/contexts/AuthContext.tsx`) wraps the whole router in `App.tsx`, resolving `supabase.auth.getSession()` on mount and subscribing to `onAuthStateChange`.
-2. `ProtectedRoute` (`src/components/ProtectedRoute.tsx`) reads `useAuth()` — redirects to `/login` if no session, shows a spinner while `loading` is true. It gates `/onboarding` and the `/*` app-shell route; `/`, `/login`, `/register`, and `/reset-password` stay public.
-3. `pages/Register.tsx` calls `signUp(email, password, fullName)` — full name is stored in Supabase's `user_metadata.full_name` (no separate `profiles` table). If Supabase requires email confirmation, the page shows a "check your email" state instead of navigating away.
-4. `pages/Login.tsx` calls `signIn(email, password)`, with a "Forgot password?"/"Send reset link" action that calls `resetPassword(email)` — `AuthContext.tsx`'s `resetPassword()` passes `redirectTo: {origin}/reset-password`, so the emailed link lands on `pages/ResetPassword.tsx`. That page reads `useAuth()`'s `session` (Supabase's client auto-detects the recovery token in the URL and establishes a short-lived recovery session, firing `onAuthStateChange` with `PASSWORD_RECOVERY`, which `AuthProvider`'s existing subscription already picks up) to decide between showing the "set a new password" form or an expired-link message, then calls `updatePassword(newPassword)` (`AuthContext.tsx`, wraps `supabase.auth.updateUser({ password })`). `/reset-password` is registered in `App.tsx` as a fully public route, deliberately outside `ProtectedRoute`/`ProfileProvider`/the onboarding-and-firm-gate tree, so nothing redirects the recovery session away before the form renders and it works whether or not the user has a profile yet. Shared password rules (`validateNewPassword`, min length) live in `lib/passwordValidation.ts`, used by both the sign-up form and this page.
+2. `ProtectedRoute` (`src/components/ProtectedRoute.tsx`) reads `useAuth()` — redirects to `/login` if no session, shows a spinner while `loading` is true. It gates `/invite/:token` and the `/*` app-shell route (see `components/AccountSetupGate.tsx` below); `/`, `/login`, `/register`, and `/reset-password` stay public — sign-up and sign-in are both embedded in `pages/LandingPage.tsx` (a sheet/scroll-to-section, not separate pages; `/login` and `/register` are kept only as deep links into it).
+3. `LandingPage.tsx`'s sign-up form calls `signUp(email, password, fullName, { company })` — full name is stored in Supabase's `user_metadata.full_name` (no separate `profiles` table). If Supabase requires email confirmation, the page shows a "check your email" state instead of navigating away.
+4. `LandingPage.tsx`'s sign-in form calls `signIn(email, password)`, with a "Send reset link" action that calls `resetPassword(email)` — `AuthContext.tsx`'s `resetPassword()` passes `redirectTo: {origin}/reset-password`, so the emailed link lands on `pages/ResetPassword.tsx`. That page reads `useAuth()`'s `session` (Supabase's client auto-detects the recovery token in the URL and establishes a short-lived recovery session, firing `onAuthStateChange` with `PASSWORD_RECOVERY`, which `AuthProvider`'s existing subscription already picks up) to decide between showing the "set a new password" form or an expired-link message, then calls `updatePassword(newPassword, extraMetadata?)` (`AuthContext.tsx`, wraps `supabase.auth.updateUser({ password, data: extraMetadata })` — a successful reset here also passes `{ password_set: true }`, so an invited user who resets their password instead of using the account-setup form isn't gated again afterward). `/reset-password` is registered in `App.tsx` as a fully public route, deliberately outside `ProtectedRoute`/`ProfileProvider`/the onboarding-and-firm-gate tree, so nothing redirects the recovery session away before the form renders and it works whether or not the user has a profile yet. Shared password rules (`validateNewPassword`, min length) live in `lib/passwordValidation.ts`, used by both the sign-up form and this page. `signUp`/`signIn`/`resetPassword`/`updatePassword` all pass their raw Supabase error through `lib/authErrors.ts`'s `mapAuthError(raw, context)` before returning it, so `LandingPage.tsx`/`ResetPassword.tsx` never show GoTrue's raw wording (e.g. `over_email_send_rate_limit`/"email rate limit exceeded", which Supabase's built-in sender hits easily since it's shared across sign-up confirmation, password reset, and invite emails at ~2/hour/project) — see "Firm accounts → Invites/Frontend" above for the invite-side half of this same fix.
 5. Sign-out is available both in `pages/Settings.tsx` (Account section) and as a link in `components/Sidebar.tsx` — both call `signOut()` then navigate to `/login`.
+6. `components/AccountSetupGate.tsx` wraps the authenticated `/*` app-shell route (inside `ProtectedRoute`, outside `ProfileProvider`/`FirmProvider`/`StorageGate`) and blocks it with a full-screen "Finish setting up your account" form for any signed-in user `lib/firmInvites.ts`'s `needsAccountSetup()` still says needs one (an invited user with no password set yet) — see "Firm accounts → Invites/Frontend" above for the full story; it exists because that check used to only run on `/invite/:token` right after accepting, missing anyone who joined a firm another way.
 
 **Important:** Auth (who you are) and `StorageMode` (`'local' | 'cloud'`, where your data lives) are independent axes, chosen at `/onboarding` and persisted in the `profiles` table (see "Local-First Storage" below). Both modes are fully implemented; the mode can also be changed later from `pages/Settings.tsx`'s "Storage Mode" section (see "Switching Storage Mode" below).
 
@@ -264,20 +265,52 @@ before this feature).
   leaves the invite pending and links back to the app. After a successful accept, it re-reads
   `supabase.auth.getUser()` and checks `lib/firmInvites.ts`'s `needsAccountSetup()` (`invited_at`
   set and `user_metadata.password_set !== true`) — a first-time invitee sees **Finish setting up
-  your account** (full name + password + confirm, `supabase.auth.updateUser({ password, data: {
-  full_name, password_set: true } })`) before "Go to dashboard"; an existing user goes straight to
-  the success screen. "Go to dashboard" always does a full `window.location.assign()` rather than
-  a router navigation, so Profile/Firm contexts re-fetch against the new profile/firm instead of
-  showing `/onboarding` off a stale null profile. The same local-mode warning gates **Accept** on
-  the in-app `components/team/PendingInvitationsBanner.tsx` (shown in the app shell in both storage
-  modes — Supabase auth exists in local mode too — whenever `my_pending_invites()` returns rows;
-  Decline calls `decline_invite` and hides it; loaded once per session, failures are silent
-  console errors and never block the app) and on `CreateFirmGate`, which lists pending invitations
-  *above* "Create your firm" so an invited person doesn't create an empty firm by mistake.
-  `pages/TeamMembers.tsx` branches on storage mode: cloud renders
-  `components/team/FirmTeamMembers.tsx` (the real member list, invite/pending-invites/revoke,
-  role change and disable for owners, and a self-service availability picker for everyone); local
-  mode keeps the pre-1F simple CRUD list (now just "you" — see below).
+  your account** before "Go to dashboard"; an existing user goes straight to the success screen.
+  "Go to dashboard" always does a full `window.location.assign()` rather than a router navigation,
+  so Profile/Firm contexts re-fetch against the new profile/firm instead of showing `/onboarding`
+  off a stale null profile. The same local-mode warning gates **Accept** on the in-app
+  `components/team/PendingInvitationsBanner.tsx` (shown in the app shell in both storage modes —
+  Supabase auth exists in local mode too — whenever `my_pending_invites()` returns rows; Decline
+  calls `decline_invite` and hides it; loaded once per session, failures are silent console errors
+  and never block the app) and on `CreateFirmGate`, which lists pending invitations *above* "Create
+  your firm" so an invited person doesn't create an empty firm by mistake. `pages/TeamMembers.tsx`
+  branches on storage mode: cloud renders `components/team/FirmTeamMembers.tsx` (the real member
+  list, invite/pending-invites/revoke, role change and disable for owners, and a self-service
+  availability picker for everyone); local mode keeps the pre-1F simple CRUD list (now just "you" —
+  see below).
+  **Invite email delivery** (post-1G.4 fix): `api/_lib/firms.ts`'s `sendAuthInviteEmail()` posts to
+  `${SUPABASE_URL}/auth/v1/invite?redirect_to=<encoded url>` — GoTrue's admin invite endpoint reads
+  the redirect target from that **query parameter**, not the JSON body (confirmed against
+  `@supabase/auth-js`'s own `inviteUserByEmail()`/`_request()`, which builds the request the same
+  way); putting it in the body silently falls back to the project's Site URL and every invitee
+  lands on `/` instead of `/invite/:token`. **Account setup is enforced app-wide, not just on
+  `/invite/:token`**: `components/AccountSetupGate.tsx` wraps the whole authenticated `/*` tree in
+  `App.tsx` (inside `ProtectedRoute`, outside `ProfileProvider`/`FirmProvider`/`StorageGate` — so it
+  runs before onboarding, `CreateFirmGate`, or `PendingInvitationsBanner` can render), re-reads
+  `supabase.auth.getUser()` on mount/whenever the signed-in user id changes, and shows the same
+  full-screen "Finish setting up your account" form as `/invite/:token` whenever
+  `needsAccountSetup()` is still true — catching anyone who joined a firm another way (the in-app
+  banner, `CreateFirmGate`'s own invitation list) and was never asked. The form itself,
+  `components/AccountSetupForm.tsx` (full name + password + confirm,
+  `supabase.auth.updateUser({ password, data: { full_name, password_set: true } })`), is shared by
+  both surfaces so there's one implementation. `/reset-password` (`pages/ResetPassword.tsx`) also
+  stamps `password_set: true` on a successful reset (via `AuthContext.tsx`'s `updatePassword`,
+  which now takes an optional `extraMetadata` argument merged into `data`), so an invited user who
+  resets their password there instead of using the setup form doesn't get gated again on their next
+  load. **Friendly auth errors**: `lib/authErrors.ts`'s `mapAuthError(raw, context)` rewrites raw
+  Supabase Auth error text — most notably `over_email_send_rate_limit`/"email rate limit exceeded"
+  (Supabase's built-in sender caps at ~2 emails/hour/project, shared across sign-up confirmation,
+  password reset, and invite emails) into "We couldn't send the email right now… try again in about
+  an hour," with an extra "use your invite link instead" sentence only in the `'sign-up'` context,
+  and GoTrue's per-request cooldown ("…only request this after N seconds") into "Please wait a few
+  seconds and try again" — applied inside `AuthContext.tsx`'s `signUp`/`signIn`/`resetPassword`/
+  `updatePassword` before the error string reaches `LandingPage.tsx`/`ResetPassword.tsx`, and again
+  in `AccountSetupForm.tsx`'s own `updateUser` call. `api/invite-member.ts` separately detects a
+  rate-limited invite-email send (`sendAuthInviteEmail` throwing) and returns `emailError` alongside
+  the always-present `inviteLink`, so `FirmTeamMembers.tsx` shows "Couldn't send the invite email
+  right now (email limit reached). Copy the invite link instead." with the copy-link box, rather
+  than the (wrong, in this case) "…already has an Edamame account" copy that `sent: false` alone
+  used to imply.
 - **No more fake team**: `lib/seedData.ts`'s `seedDefaultTeam()` and `App.tsx`'s first-launch
   round-robin backfill (which used to spread real cases/tasks across fictional seeded members like
   `tm-eliza-chen`) are gone. In cloud mode, `TeamMember` is purely a read model derived from the

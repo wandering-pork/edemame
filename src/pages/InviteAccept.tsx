@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { LogoBrand } from '@/components/LogoBrand';
+import { AccountSetupForm } from '@/components/AccountSetupForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { supabase } from '@/lib/supabaseClient';
 import { needsAccountSetup } from '@/lib/firmInvites';
-import { validateNewPassword } from '@/lib/passwordValidation';
 
 type Status = 'loading' | 'warn-local' | 'accepting' | 'setup' | 'accepted' | 'error';
 
@@ -38,13 +38,6 @@ export const InviteAccept: React.FC = () => {
   const [status, setStatus] = useState<Status>('loading');
   const [error, setError] = useState<string | null>(null);
   const [firmName, setFirmName] = useState<string | null>(null);
-
-  // Setup-step fields.
-  const [fullName, setFullName] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [setupError, setSetupError] = useState<string | null>(null);
-  const [setupBusy, setSetupBusy] = useState(false);
 
   const acceptInvite = async () => {
     if (!token || !session?.access_token) return;
@@ -92,31 +85,6 @@ export const InviteAccept: React.FC = () => {
     acceptInvite();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, session?.access_token, profileLoading, profile?.storageMode, status]);
-
-  const handleSetupSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const validationError = validateNewPassword(password, confirmPassword);
-    if (validationError) {
-      setSetupError(validationError);
-      return;
-    }
-    if (!fullName.trim()) {
-      setSetupError('Enter your full name.');
-      return;
-    }
-    setSetupBusy(true);
-    setSetupError(null);
-    const { error: updateError } = await supabase.auth.updateUser({
-      password,
-      data: { full_name: fullName.trim(), password_set: true },
-    });
-    setSetupBusy(false);
-    if (updateError) {
-      setSetupError(updateError.message);
-      return;
-    }
-    setStatus('accepted');
-  };
 
   const goToDashboard = () => {
     // Full navigation, not react-router's navigate(): Profile/Firm contexts
@@ -175,65 +143,10 @@ export const InviteAccept: React.FC = () => {
         )}
 
         {status === 'setup' && (
-          <div className="text-left">
-            <CheckCircle2 className="w-12 h-12 text-edamame-500 mx-auto mb-4" />
-            <h1 className="font-ibm-sans text-xl font-semibold text-ink dark:text-plate-ink mb-2 text-center">
-              Finish setting up your account
-            </h1>
-            <p className="text-ink-soft dark:text-plate-ink-soft text-sm mb-6 text-center">
-              You're in{firmName ? ` at ${firmName}` : ''}! Set a name and password so you can sign back in later.
-            </p>
-            <form onSubmit={handleSetupSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="ia-name" className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">
-                  Full name
-                </label>
-                <input
-                  id="ia-name"
-                  type="text"
-                  autoFocus
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  placeholder="Jane Smith"
-                  className="focus-ring w-full px-4 py-3 rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink dark:text-plate-ink outline-none transition-all"
-                />
-              </div>
-              <div>
-                <label htmlFor="ia-pw" className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">
-                  Password
-                </label>
-                <input
-                  id="ia-pw"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="focus-ring w-full px-4 py-3 rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink dark:text-plate-ink outline-none transition-all"
-                />
-              </div>
-              <div>
-                <label htmlFor="ia-pw2" className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">
-                  Confirm password
-                </label>
-                <input
-                  id="ia-pw2"
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  className="focus-ring w-full px-4 py-3 rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink dark:text-plate-ink outline-none transition-all"
-                />
-              </div>
-              {setupError && <p className="text-sm text-red-500">{setupError}</p>}
-              <button
-                type="submit"
-                disabled={setupBusy}
-                className="w-full px-6 py-3 rounded-xl text-base font-medium bg-edamame-500 hover:bg-edamame-600 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-              >
-                {setupBusy ? 'Saving...' : 'Save and continue'}
-              </button>
-            </form>
-          </div>
+          <AccountSetupForm
+            description={`You're in${firmName ? ` at ${firmName}` : ''}! Set a name and password so you can sign back in later.`}
+            onSuccess={() => setStatus('accepted')}
+          />
         )}
 
         {status === 'accepted' && (

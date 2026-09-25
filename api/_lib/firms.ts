@@ -77,14 +77,23 @@ export async function sendAuthInviteEmail(email: string, redirectTo: string, dat
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured on the server');
   }
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
+  // GoTrue's admin invite endpoint (POST /auth/v1/invite) reads the redirect
+  // target from a `redirect_to` QUERY PARAMETER, not the JSON body — same as
+  // supabase-js's `auth.admin.inviteUserByEmail(email, { redirectTo })`,
+  // which appends it via `_request`'s `options.redirectTo` (see
+  // node_modules/@supabase/auth-js/dist/main/lib/fetch.js). Putting it in
+  // the body (the old bug here) is silently ignored, so GoTrue falls back to
+  // the project's Site URL and invitees never land on /invite/:token.
+  const url = new URL(`${SUPABASE_URL}/auth/v1/invite`);
+  url.searchParams.set('redirect_to', redirectTo);
+  const res = await fetch(url.toString(), {
     method: 'POST',
     headers: {
       apikey: SERVICE_ROLE_KEY,
       Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, data, options: { redirect_to: redirectTo } }),
+    body: JSON.stringify({ email, data }),
   });
   if (res.ok) return true;
   const text = await res.text().catch(() => '');

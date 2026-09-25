@@ -36,6 +36,7 @@ import { ProfileProvider, useProfile } from './contexts/ProfileContext';
 import { LocalFolderProvider, useLocalFolder } from './contexts/LocalFolderContext';
 import { FirmProvider, useFirm } from './contexts/FirmContext';
 import { CreateFirmGate } from './components/CreateFirmGate';
+import { AccountSetupGate } from './components/AccountSetupGate';
 import { InviteAccept } from './pages/InviteAccept';
 import { ResetPassword } from './pages/ResetPassword';
 import { LinkFolderGate } from './components/LinkFolderGate';
@@ -1160,13 +1161,15 @@ const AppRoutes: React.FC = () => {
           </ProfileProvider>
         } />
         <Route path="/*" element={
-          <ProfileProvider>
-            <FirmProvider>
-              <LocalFolderProvider>
-                <StorageGate />
-              </LocalFolderProvider>
-            </FirmProvider>
-          </ProfileProvider>
+          <AccountSetupGate>
+            <ProfileProvider>
+              <FirmProvider>
+                <LocalFolderProvider>
+                  <StorageGate />
+                </LocalFolderProvider>
+              </FirmProvider>
+            </ProfileProvider>
+          </AccountSetupGate>
         } />
       </Route>
     </Routes>
