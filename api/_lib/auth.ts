@@ -25,6 +25,8 @@ export interface VerifiedUser {
   userId: string;
   /** The caller's own verified access token, for making RLS-scoped REST calls on their behalf. */
   accessToken: string;
+  /** The verified account email, straight from Supabase Auth's /user response. Used by api/accept-invite.ts's email-match check. */
+  email: string | null;
 }
 
 function extractBearerToken(headers: Record<string, string | string[] | undefined>): string | null {
@@ -62,7 +64,7 @@ export async function verifySupabaseUser(headers: Record<string, string | string
     const data = await res.json();
     if (!data?.id || typeof data.id !== "string") return null;
 
-    return { userId: data.id, accessToken: token };
+    return { userId: data.id, accessToken: token, email: typeof data.email === "string" ? data.email : null };
   } catch (error) {
     console.error("Supabase auth verification failed:", error);
     return null;

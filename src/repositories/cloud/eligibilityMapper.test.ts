@@ -22,7 +22,7 @@ function makeAssessment(overrides: Partial<EligibilityAssessment> = {}): Eligibi
 describe('eligibilityAssessmentToRow / rowToEligibilityAssessment', () => {
   it('round-trips an assessment with no case/client/selection yet', () => {
     const assessment = makeAssessment();
-    const row = eligibilityAssessmentToRow('user-1', assessment);
+    const row = eligibilityAssessmentToRow('user-1', 'firm-1', assessment);
     expect(row.user_id).toBe('user-1');
     expect(row.client_id).toBeNull();
     expect(row.case_id).toBeNull();
@@ -34,7 +34,7 @@ describe('eligibilityAssessmentToRow / rowToEligibilityAssessment', () => {
 
   it('round-trips clientId, caseId and selectedSubclass when set', () => {
     const assessment = makeAssessment({ clientId: 'client-1', caseId: 'case-1', selectedSubclass: '820' });
-    const row = eligibilityAssessmentToRow('user-1', assessment);
+    const row = eligibilityAssessmentToRow('user-1', 'firm-1', assessment);
     expect(row.client_id).toBe('client-1');
     expect(row.case_id).toBe('case-1');
     expect(row.selected_subclass).toBe('820');
@@ -47,7 +47,7 @@ describe('eligibilityAssessmentToRow / rowToEligibilityAssessment', () => {
 
   it('preserves inputs and options as-is (jsonb passthrough)', () => {
     const assessment = makeAssessment();
-    const row = eligibilityAssessmentToRow('user-1', assessment);
+    const row = eligibilityAssessmentToRow('user-1', 'firm-1', assessment);
     expect(row.inputs).toEqual(assessment.inputs);
     expect(row.options).toEqual(assessment.options);
   });

@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { normalizeTask } from '@/lib/taskStatus';
 import { normalizeTemplate } from '@/lib/templateTiming';
+import { generateCaseNumber } from '@/lib/caseNumber';
 import { normalizeCase, deriveLegacyStatus } from '@/lib/caseStage';
 import type {
   Client,
@@ -38,10 +39,14 @@ import type {
   Repositories,
 } from '@/repositories/types';
 
-// Every table carries a user_id column scoped by RLS to auth.uid(); the
-// explicit .eq('user_id', userId) filters below are a second line of
-// defense, kept for parity with how the filesystem repositories are
-// written (every read/write is already scoped to "this user's data").
+// Step 1 · 1F: every table below except `notifications` is firm-scoped —
+// `.eq('firm_id', this.firmId)` replaces the old `.eq('user_id', this.userId)`
+// as the query filter (RLS enforces the same thing server-side; this is the
+// second line of defense, kept for parity with how it was written before).
+// `user_id` stays on every row as "created by", for audit — every insert
+// still sets it, it's just no longer the scoping column.
+// `notifications` stays per-user (each member gets their own alerts — see
+// the firms migration's "Deliberately NOT firm-scoped" comment).
 
 // Writes use .upsert(row, { onConflict: 'id' }) rather than insert/update.
 // The filesystem repositories implement both create() and update() as an
@@ -75,10 +80,11 @@ async function fetchAllRows(table: string, filters: (q: any) => any, columns = '
 // Clients
 // ---------------------------------------------------------------------------
 
-function clientToRow(userId: string, c: Client) {
+function clientToRow(userId: string, firmId: string, c: Client) {
   return {
     id: c.id,
     user_id: userId,
+    firm_id: firmId,
     name: c.name,
     dob: c.dob,
     phone: c.phone,
@@ -114,33 +120,33 @@ function rowToClient(row: any): Client {
 }
 
 class CloudClientRepository implements IClientRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getAll(): Promise<Client[]> {
-    const rows = await fetchAllRows('clients', q => q.eq('user_id', this.userId));
+    const rows = await fetchAllRows('clients', q => q.eq('firm_id', this.firmId));
     return rows.map(rowToClient);
   }
 
   async getById(id: string): Promise<Client | undefined> {
-    const { data, error } = await supabase.from('clients').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('clients').select('*').eq('firm_id', this.firmId).eq('id', id).maybeSingle();
     if (error) throw error;
     return data ? rowToClient(data) : undefined;
   }
 
   async create(item: Client): Promise<Client> {
-    const { error } = await supabase.from('clients').upsert(clientToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('clients').upsert(clientToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async update(item: Client): Promise<Client> {
-    const { error } = await supabase.from('clients').upsert(clientToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('clients').upsert(clientToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('clients').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('clients').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 
@@ -152,7 +158,7 @@ class CloudClientRepository implements IClientRepository {
 
   async createMany(items: Client[]): Promise<Client[]> {
     if (items.length === 0) return items;
-    const { error } = await supabase.from('clients').upsert(items.map(i => clientToRow(this.userId, i)), { onConflict: 'id' });
+    const { error } = await supabase.from('clients').upsert(items.map(i => clientToRow(this.userId, this.firmId, i)), { onConflict: 'id' });
     if (error) throw error;
     return items;
   }
@@ -162,18 +168,18 @@ class CloudClientRepository implements IClientRepository {
 // Cases
 // ---------------------------------------------------------------------------
 
-function caseToRow(userId: string, c: Case) {
+function caseToRow(userId: string, firmId: string, c: Case) {
   const normalized = normalizeCase(c);
   return {
     id: normalized.id,
     user_id: userId,
+    firm_id: firmId,
     client_id: normalized.clientId,
     title: normalized.title,
     description: normalized.description,
     template_id: normalized.templateId,
     // `stage`/`outcome`/`on_hold` columns added by
-    // `supabase/migrations/20260926000050_add_case_stage.sql` (not yet
-    // applied to production — see CLAUDE.md's manual-apply migration list).
+    // `supabase/migrations/20260926000050_add_case_stage.sql`.
     // `status` is kept for one release as a derived mirror so any remaining
     // reader of the legacy column keeps working — see `deriveLegacyStatus()`.
     stage: normalized.stage,
@@ -217,41 +223,59 @@ function rowToCase(row: any): Case {
   });
 }
 
+function isCaseNumberConflict(error: any): boolean {
+  return error?.code === '23505' && /case_number/i.test(error?.message ?? error?.details ?? '');
+}
+
 class CloudCaseRepository implements ICaseRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getAll(): Promise<Case[]> {
-    const rows = await fetchAllRows('cases', q => q.eq('user_id', this.userId));
+    const rows = await fetchAllRows('cases', q => q.eq('firm_id', this.firmId));
     return rows.map(rowToCase);
   }
 
   async getById(id: string): Promise<Case | undefined> {
-    const { data, error } = await supabase.from('cases').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('cases').select('*').eq('firm_id', this.firmId).eq('id', id).maybeSingle();
     if (error) throw error;
     return data ? rowToCase(data) : undefined;
   }
 
+  // Case numbers are minted client-side from an in-memory scan
+  // (lib/caseNumber.ts) — cheap and correct for a single writer, but two firm
+  // members creating cases in the same instant can compute the same "next"
+  // number. A partial unique index on (firm_id, case_number)
+  // (supabase/migrations/20260926000400_case_number_unique.sql) turns that
+  // collision into a rejected insert instead of two cases silently sharing a
+  // number; we catch it here and retry once with a freshly regenerated
+  // number. KNOWN GAP: not airtight against a third concurrent writer landing
+  // in the same narrow window — see the migration's comment.
   async create(item: Case): Promise<Case> {
-    const normalized = normalizeCase(item);
-    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, normalized), { onConflict: 'id' });
-    if (error) throw error;
-    return normalized;
+    let toInsert = normalizeCase(item);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, this.firmId, toInsert), { onConflict: 'id' });
+      if (!error) return toInsert;
+      if (!isCaseNumberConflict(error) || attempt === 2) throw error;
+      const existing = await this.getAll();
+      toInsert = { ...toInsert, caseNumber: generateCaseNumber(existing) };
+    }
+    return toInsert;
   }
 
   async update(item: Case): Promise<Case> {
     const normalized = normalizeCase(item);
-    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, normalized), { onConflict: 'id' });
+    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, this.firmId, normalized), { onConflict: 'id' });
     if (error) throw error;
     return normalized;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('cases').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('cases').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 
   async getByClientId(clientId: string): Promise<Case[]> {
-    const rows = await fetchAllRows('cases', q => q.eq('user_id', this.userId).eq('client_id', clientId));
+    const rows = await fetchAllRows('cases', q => q.eq('firm_id', this.firmId).eq('client_id', clientId));
     return rows.map(rowToCase);
   }
 }
@@ -260,11 +284,12 @@ class CloudCaseRepository implements ICaseRepository {
 // Tasks
 // ---------------------------------------------------------------------------
 
-function taskToRow(userId: string, t: Task) {
+function taskToRow(userId: string, firmId: string, t: Task) {
   const task = normalizeTask(t);
   return {
     id: task.id,
     user_id: userId,
+    firm_id: firmId,
     title: task.title,
     description: task.description,
     date: task.date,
@@ -305,69 +330,64 @@ function rowToTask(row: any): Task {
 }
 
 class CloudTaskRepository implements ITaskRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getAll(): Promise<Task[]> {
-    const rows = await fetchAllRows('tasks', q => q.eq('user_id', this.userId));
+    const rows = await fetchAllRows('tasks', q => q.eq('firm_id', this.firmId));
     return rows.map(rowToTask);
   }
 
   async getById(id: string): Promise<Task | undefined> {
-    const { data, error } = await supabase.from('tasks').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('tasks').select('*').eq('firm_id', this.firmId).eq('id', id).maybeSingle();
     if (error) throw error;
     return data ? rowToTask(data) : undefined;
   }
 
   async create(item: Task): Promise<Task> {
     const normalized = normalizeTask(item);
-    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, normalized), { onConflict: 'id' });
+    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, this.firmId, normalized), { onConflict: 'id' });
     if (error) throw error;
     return normalized;
   }
 
   async update(item: Task): Promise<Task> {
     const normalized = normalizeTask(item);
-    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, normalized), { onConflict: 'id' });
+    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, this.firmId, normalized), { onConflict: 'id' });
     if (error) throw error;
     return normalized;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('tasks').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('tasks').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 
   async getByCaseId(caseId: string): Promise<Task[]> {
-    const rows = await fetchAllRows('tasks', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    const rows = await fetchAllRows('tasks', q => q.eq('firm_id', this.firmId).eq('case_id', caseId));
     return rows.map(rowToTask);
   }
 
   async createMany(items: Task[]): Promise<Task[]> {
     if (items.length === 0) return items;
-    const { error } = await supabase.from('tasks').upsert(items.map(i => taskToRow(this.userId, i)), { onConflict: 'id' });
+    const { error } = await supabase.from('tasks').upsert(items.map(i => taskToRow(this.userId, this.firmId, i)), { onConflict: 'id' });
     if (error) throw error;
     return items;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Templates — custom only; the 5 system defaults stay hardcoded in seedData.ts
+// Templates — custom only; the system defaults stay hardcoded in seedData.ts
 // ---------------------------------------------------------------------------
 
-function templateToRow(userId: string, t: WorkflowTemplate) {
+function templateToRow(userId: string, firmId: string, t: WorkflowTemplate) {
   return {
     id: t.id,
     user_id: userId,
+    firm_id: firmId,
     title: t.title,
     description: t.description,
     visa_subclass: t.visaSubclass ?? null,
     steps: t.steps ?? null,
-    // `version`/`timing_verified` columns added by
-    // `supabase/migrations/20260926000200_template_version.sql` (not yet
-    // applied to production — see CLAUDE.md's manual-apply migration list).
-    // Like `case_number`/`visa_subclass` before it, this migration must be
-    // applied *before* this frontend build reaches production, or PostgREST
-    // rejects every custom-template insert/update with an unknown-column error.
     version: t.version ?? null,
     timing_verified: t.timingVerified ?? null,
   };
@@ -387,15 +407,15 @@ function rowToTemplate(row: any): WorkflowTemplate {
 }
 
 class CloudTemplateRepository implements ITemplateRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getAll(): Promise<WorkflowTemplate[]> {
-    const rows = await fetchAllRows('workflow_templates', q => q.eq('user_id', this.userId));
+    const rows = await fetchAllRows('workflow_templates', q => q.eq('firm_id', this.firmId));
     return rows.map(rowToTemplate);
   }
 
   async getById(id: string): Promise<WorkflowTemplate | undefined> {
-    const { data, error } = await supabase.from('workflow_templates').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('workflow_templates').select('*').eq('firm_id', this.firmId).eq('id', id).maybeSingle();
     if (error) throw error;
     return data ? rowToTemplate(data) : undefined;
   }
@@ -403,19 +423,19 @@ class CloudTemplateRepository implements ITemplateRepository {
   async create(item: WorkflowTemplate): Promise<WorkflowTemplate> {
     // System defaults (userId: null) are seeded in-app, not written to the DB.
     if (item.userId === null) return item;
-    const { error } = await supabase.from('workflow_templates').upsert(templateToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('workflow_templates').upsert(templateToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async update(item: WorkflowTemplate): Promise<WorkflowTemplate> {
-    const { error } = await supabase.from('workflow_templates').upsert(templateToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('workflow_templates').upsert(templateToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('workflow_templates').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('workflow_templates').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 
@@ -428,10 +448,11 @@ class CloudTemplateRepository implements ITemplateRepository {
 // Case Notes
 // ---------------------------------------------------------------------------
 
-function noteToRow(userId: string, n: CaseNote) {
+function noteToRow(userId: string, firmId: string, n: CaseNote) {
   return {
     id: n.id,
     user_id: userId,
+    firm_id: firmId,
     case_id: n.caseId,
     content: n.content,
     created_at: n.createdAt,
@@ -449,36 +470,41 @@ function rowToNote(row: any): CaseNote {
 }
 
 class CloudCaseNoteRepository implements ICaseNoteRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getByCaseId(caseId: string): Promise<CaseNote[]> {
-    const rows = await fetchAllRows('case_notes', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    const rows = await fetchAllRows('case_notes', q => q.eq('firm_id', this.firmId).eq('case_id', caseId));
     return rows.map(rowToNote);
   }
 
   async create(note: CaseNote): Promise<CaseNote> {
-    const { error } = await supabase.from('case_notes').upsert(noteToRow(this.userId, note), { onConflict: 'id' });
+    const { error } = await supabase.from('case_notes').upsert(noteToRow(this.userId, this.firmId, note), { onConflict: 'id' });
     if (error) throw error;
     return note;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('case_notes').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('case_notes').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 }
 
 // ---------------------------------------------------------------------------
 // Documents — metadata row + blob in the private 'documents' storage bucket.
-// doc.filePath is already 'documents/{caseId}/{fileName}' (set by
-// components/DocumentUpload.tsx), so the full object path is
-// {userId}/documents/{caseId}/{fileName}.
+//
+// New uploads go to {firmId}/{doc.filePath} (doc.filePath is already
+// 'documents/{caseId}/{fileName}', set by components/DocumentUpload.tsx).
+// Documents created before Step 1 · 1F live at {userId}/{doc.filePath}
+// instead — storage RLS (the firms migration) accepts both prefixes, so
+// reads/deletes try the firm path first and fall back to the legacy
+// creator-user path rather than requiring a copy of every existing object.
 // ---------------------------------------------------------------------------
 
-function docToRow(userId: string, d: Document) {
+function docToRow(userId: string, firmId: string, d: Document) {
   return {
     id: d.id,
     user_id: userId,
+    firm_id: firmId,
     case_id: d.caseId,
     file_name: d.fileName,
     file_path: d.filePath,
@@ -507,64 +533,79 @@ function rowToDoc(row: any): Document {
   };
 }
 
-class CloudDocumentRepository implements IDocumentRepository {
-  constructor(private userId: string) {}
+function isStorageNotFound(error: any): boolean {
+  const status = error?.statusCode ?? error?.status;
+  return String(status) === '404' || /not.?found|does not exist/i.test(error?.message ?? '');
+}
 
-  private storagePath(doc: Document): string {
-    return `${this.userId}/${doc.filePath}`;
+class CloudDocumentRepository implements IDocumentRepository {
+  constructor(private userId: string, private firmId: string) {}
+
+  private firmStoragePath(doc: Document): string {
+    return `${this.firmId}/${doc.filePath}`;
+  }
+
+  private legacyStoragePath(doc: Document): string | null {
+    return doc.userId ? `${doc.userId}/${doc.filePath}` : null;
   }
 
   async getByCaseId(caseId: string): Promise<Document[]> {
-    const rows = await fetchAllRows('documents', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    const rows = await fetchAllRows('documents', q => q.eq('firm_id', this.firmId).eq('case_id', caseId));
     return rows.map(rowToDoc);
   }
 
   async create(doc: Document, fileData: Blob): Promise<Document> {
-    const { error: uploadError } = await supabase.storage.from('documents').upload(this.storagePath(doc), fileData, { upsert: true });
+    const { error: uploadError } = await supabase.storage.from('documents').upload(this.firmStoragePath(doc), fileData, { upsert: true });
     if (uploadError) throw uploadError;
-    const { error } = await supabase.from('documents').upsert(docToRow(this.userId, doc), { onConflict: 'id' });
+    const { error } = await supabase.from('documents').upsert(docToRow(this.userId, this.firmId, doc), { onConflict: 'id' });
     if (error) throw error;
     return doc;
   }
 
   async update(doc: Document): Promise<Document> {
-    const { error } = await supabase.from('documents').upsert(docToRow(this.userId, doc), { onConflict: 'id' });
+    const { error } = await supabase.from('documents').upsert(docToRow(this.userId, this.firmId, doc), { onConflict: 'id' });
     if (error) throw error;
     return doc;
   }
 
   async getFileData(doc: Document): Promise<Blob | null> {
-    const { data, error } = await supabase.storage.from('documents').download(this.storagePath(doc));
-    if (error) {
-      // Only a genuine "the object isn't there" answers null; anything else
-      // (network failure, auth, bucket misconfig) throws, because callers such
-      // as copyAllData() in migrate.ts treat null as "no file to copy" and
-      // would otherwise silently drop a legal-evidence document. The SDK does
-      // not expose a stable error code here, so we sniff status/message —
-      // if the sniff is wrong we err towards throwing, which is recoverable
-      // (a caller can catch and skip) where silent data loss is not.
-      const status = (error as any)?.statusCode ?? (error as any)?.status;
-      const isNotFound = String(status) === '404' || /not.?found|does not exist/i.test(error.message ?? '');
-      if (isNotFound) return null;
-      throw error;
+    const { data, error } = await supabase.storage.from('documents').download(this.firmStoragePath(doc));
+    if (!error) return data;
+    // Only a genuine "the object isn't there" falls through to the legacy
+    // path / null; anything else (network failure, auth, bucket misconfig)
+    // throws — see the comment this replaced for why that distinction matters
+    // to callers like migrate.ts's copyAllData().
+    if (!isStorageNotFound(error)) throw error;
+
+    const legacyPath = this.legacyStoragePath(doc);
+    if (!legacyPath) return null;
+    const { data: legacyData, error: legacyError } = await supabase.storage.from('documents').download(legacyPath);
+    if (legacyError) {
+      if (isStorageNotFound(legacyError)) return null;
+      throw legacyError;
     }
-    return data;
+    return legacyData;
   }
 
   async delete(id: string): Promise<void> {
-    const { data, error } = await supabase.from('documents').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('documents').select('*').eq('firm_id', this.firmId).eq('id', id).maybeSingle();
     if (error) throw error;
     if (!data) return;
     const doc = rowToDoc(data);
-    const { error: removeError } = await supabase.storage.from('documents').remove([this.storagePath(doc)]);
+    const paths = [this.firmStoragePath(doc)];
+    const legacyPath = this.legacyStoragePath(doc);
+    if (legacyPath) paths.push(legacyPath);
+    // Removing a path that doesn't exist is not an error for Supabase Storage
+    // (it's simply absent from the result), so it's safe to always try both.
+    const { error: removeError } = await supabase.storage.from('documents').remove(paths);
     if (removeError) throw removeError;
-    const { error: deleteError } = await supabase.from('documents').delete().eq('user_id', this.userId).eq('id', id);
+    const { error: deleteError } = await supabase.from('documents').delete().eq('firm_id', this.firmId).eq('id', id);
     if (deleteError) throw deleteError;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Notifications
+// Notifications — per-user, not firm-scoped (each member gets their own alerts)
 // ---------------------------------------------------------------------------
 
 function notifToRow(userId: string, n: Notification) {
@@ -622,13 +663,18 @@ class CloudNotificationRepository implements INotificationRepository {
 }
 
 // ---------------------------------------------------------------------------
-// Team Members
+// Team Members — local-mode-only table now (Step 1 · 1F). Cloud mode reads
+// the firm's real member directory instead (see contexts/FirmContext.tsx and
+// lib/firmDirectory.ts) and never touches this table/class; it's kept here
+// only so the Repositories interface stays satisfied and nothing breaks if
+// some code path calls it directly.
 // ---------------------------------------------------------------------------
 
-function memberToRow(userId: string, m: TeamMember) {
+function memberToRow(userId: string, firmId: string, m: TeamMember) {
   return {
     id: m.id,
     user_id: userId,
+    firm_id: firmId,
     name: m.name,
     email: m.email,
     avatar: m.avatar ?? null,
@@ -655,33 +701,33 @@ function rowToMember(row: any): TeamMember {
 }
 
 class CloudTeamMemberRepository implements ITeamMemberRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getAll(): Promise<TeamMember[]> {
-    const rows = await fetchAllRows('team_members', q => q.eq('user_id', this.userId));
+    const rows = await fetchAllRows('team_members', q => q.eq('firm_id', this.firmId));
     return rows.map(rowToMember);
   }
 
   async getById(id: string): Promise<TeamMember | undefined> {
-    const { data, error } = await supabase.from('team_members').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('team_members').select('*').eq('firm_id', this.firmId).eq('id', id).maybeSingle();
     if (error) throw error;
     return data ? rowToMember(data) : undefined;
   }
 
   async create(item: TeamMember): Promise<TeamMember> {
-    const { error } = await supabase.from('team_members').upsert(memberToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('team_members').upsert(memberToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async update(item: TeamMember): Promise<TeamMember> {
-    const { error } = await supabase.from('team_members').upsert(memberToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('team_members').upsert(memberToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('team_members').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('team_members').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 }
@@ -690,10 +736,11 @@ class CloudTeamMemberRepository implements ITeamMemberRepository {
 // Activity — append-only
 // ---------------------------------------------------------------------------
 
-function eventToRow(userId: string, e: ActivityEvent) {
+function eventToRow(userId: string, firmId: string, e: ActivityEvent) {
   return {
     id: e.id,
     user_id: userId,
+    firm_id: firmId,
     type: e.type,
     actor_id: e.actorId ?? null,
     subject_id: e.subjectId ?? null,
@@ -714,33 +761,35 @@ function rowToEvent(row: any): ActivityEvent {
 }
 
 class CloudActivityRepository implements IActivityRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getAll(): Promise<ActivityEvent[]> {
-    const rows = await fetchAllRows('activity_events', q => q.eq('user_id', this.userId).order('created_at', { ascending: true }));
+    const rows = await fetchAllRows('activity_events', q => q.eq('firm_id', this.firmId).order('created_at', { ascending: true }));
     return rows.map(rowToEvent);
   }
 
   async create(event: ActivityEvent): Promise<ActivityEvent> {
-    const { error } = await supabase.from('activity_events').upsert(eventToRow(this.userId, event), { onConflict: 'id' });
+    const { error } = await supabase.from('activity_events').upsert(eventToRow(this.userId, this.firmId, event), { onConflict: 'id' });
     if (error) throw error;
     return event;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('activity_events').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('activity_events').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Usage — append-only
+// Usage — append-only. Keeps user_id for attribution but gains firm_id for
+// per-firm seat counts (Step 1 · 1F item #10).
 // ---------------------------------------------------------------------------
 
-function usageEventToRow(userId: string, e: UsageEvent) {
+function usageEventToRow(userId: string, firmId: string, e: UsageEvent) {
   return {
     id: e.id,
     user_id: userId,
+    firm_id: firmId,
     type: e.type,
     metadata: e.metadata ?? null,
     created_at: e.createdAt,
@@ -751,6 +800,7 @@ function rowToUsageEvent(row: any): UsageEvent {
   return {
     id: row.id,
     userId: row.user_id,
+    firmId: row.firm_id ?? undefined,
     type: row.type,
     metadata: row.metadata ?? undefined,
     createdAt: row.created_at,
@@ -758,21 +808,21 @@ function rowToUsageEvent(row: any): UsageEvent {
 }
 
 class CloudUsageRepository implements IUsageRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getAll(): Promise<UsageEvent[]> {
-    const rows = await fetchAllRows('usage_events', q => q.eq('user_id', this.userId).order('created_at', { ascending: true }));
+    const rows = await fetchAllRows('usage_events', q => q.eq('firm_id', this.firmId).order('created_at', { ascending: true }));
     return rows.map(rowToUsageEvent);
   }
 
   async create(event: UsageEvent): Promise<UsageEvent> {
-    const { error } = await supabase.from('usage_events').upsert(usageEventToRow(this.userId, event), { onConflict: 'id' });
+    const { error } = await supabase.from('usage_events').upsert(usageEventToRow(this.userId, this.firmId, event), { onConflict: 'id' });
     if (error) throw error;
     return event;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('usage_events').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('usage_events').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 }
@@ -781,10 +831,11 @@ class CloudUsageRepository implements IUsageRepository {
 // Checklist
 // ---------------------------------------------------------------------------
 
-function checklistToRow(userId: string, caseId: string, i: DocumentChecklistItem) {
+function checklistToRow(userId: string, firmId: string, caseId: string, i: DocumentChecklistItem) {
   return {
     id: i.id,
     user_id: userId,
+    firm_id: firmId,
     case_id: caseId,
     label: i.label,
     description: i.description ?? null,
@@ -821,7 +872,7 @@ function rowToChecklistItem(row: any): DocumentChecklistItem {
  */
 async function replaceCaseRows(
   table: string,
-  userId: string,
+  firmId: string,
   caseId: string,
   rows: { id: string }[],
 ): Promise<void> {
@@ -829,35 +880,38 @@ async function replaceCaseRows(
     const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
     if (error) throw error;
   }
-  const existing = await fetchAllRows(table, q => q.eq('user_id', userId).eq('case_id', caseId), 'id');
+  const existing = await fetchAllRows(table, q => q.eq('firm_id', firmId).eq('case_id', caseId), 'id');
   const keep = new Set(rows.map(r => r.id));
   const stale = existing.map(r => r.id).filter(id => !keep.has(id));
   if (stale.length === 0) return;
-  const { error } = await supabase.from(table).delete().eq('user_id', userId).eq('case_id', caseId).in('id', stale);
+  const { error } = await supabase.from(table).delete().eq('firm_id', firmId).eq('case_id', caseId).in('id', stale);
   if (error) throw error;
 }
 
 class CloudChecklistRepository implements IChecklistRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getByCaseId(caseId: string): Promise<DocumentChecklistItem[]> {
-    const rows = await fetchAllRows('checklist_items', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    const rows = await fetchAllRows('checklist_items', q => q.eq('firm_id', this.firmId).eq('case_id', caseId));
     return rows.map(rowToChecklistItem);
   }
 
   async setForCase(caseId: string, items: DocumentChecklistItem[]): Promise<void> {
-    await replaceCaseRows('checklist_items', this.userId, caseId, items.map(i => checklistToRow(this.userId, caseId, i)));
+    await replaceCaseRows('checklist_items', this.firmId, caseId, items.map(i => checklistToRow(this.userId, this.firmId, caseId, i)));
   }
 }
 
 // ---------------------------------------------------------------------------
-// Document Types — account-level reference list (no case_id)
+// Document Types — firm-level reference list (no case_id). Seeding
+// (lib/documentTypes.ts's ensureSystemDocumentTypes()) is unchanged code —
+// it's per-firm automatically now because this repository is.
 // ---------------------------------------------------------------------------
 
-function documentTypeToRow(userId: string, t: DocumentType) {
+function documentTypeToRow(userId: string, firmId: string, t: DocumentType) {
   return {
     id: t.id,
     user_id: userId,
+    firm_id: firmId,
     code: t.code,
     description: t.description,
     category: t.category,
@@ -879,44 +933,45 @@ function rowToDocumentType(row: any): DocumentType {
 }
 
 class CloudDocumentTypeRepository implements IDocumentTypeRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getAll(): Promise<DocumentType[]> {
-    const rows = await fetchAllRows('document_types', q => q.eq('user_id', this.userId));
+    const rows = await fetchAllRows('document_types', q => q.eq('firm_id', this.firmId));
     return rows.map(rowToDocumentType);
   }
 
   async getById(id: string): Promise<DocumentType | undefined> {
-    const { data, error } = await supabase.from('document_types').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('document_types').select('*').eq('firm_id', this.firmId).eq('id', id).maybeSingle();
     if (error) throw error;
     return data ? rowToDocumentType(data) : undefined;
   }
 
   async create(item: DocumentType): Promise<DocumentType> {
-    const { error } = await supabase.from('document_types').upsert(documentTypeToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('document_types').upsert(documentTypeToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async update(item: DocumentType): Promise<DocumentType> {
-    const { error } = await supabase.from('document_types').upsert(documentTypeToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('document_types').upsert(documentTypeToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('document_types').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('document_types').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 
   async createMany(items: DocumentType[]): Promise<DocumentType[]> {
     if (items.length === 0) return items;
-    // onConflict on (user_id, code) rather than id: seeding races (two tabs
-    // opening at once) would otherwise both mint a fresh uuid for the same
-    // code and trip the unique constraint.
+    // onConflict on (firm_id, code) rather than id: seeding races (two tabs
+    // opening at once, or two firm members loading simultaneously) would
+    // otherwise both mint a fresh uuid for the same code and trip the unique
+    // constraint (document_types_firm_id_code_key — see the firms migration).
     const { error } = await supabase
       .from('document_types')
-      .upsert(items.map(i => documentTypeToRow(this.userId, i)), { onConflict: 'user_id,code', ignoreDuplicates: true });
+      .upsert(items.map(i => documentTypeToRow(this.userId, this.firmId, i)), { onConflict: 'firm_id,code', ignoreDuplicates: true });
     if (error) throw error;
     return items;
   }
@@ -926,10 +981,11 @@ class CloudDocumentTypeRepository implements IDocumentTypeRepository {
 // Chat
 // ---------------------------------------------------------------------------
 
-function conversationToRow(userId: string, caseId: string, c: FocusConversation) {
+function conversationToRow(userId: string, firmId: string, caseId: string, c: FocusConversation) {
   return {
     id: c.id,
     user_id: userId,
+    firm_id: firmId,
     case_id: caseId,
     title: c.title,
     messages: c.messages,
@@ -948,26 +1004,27 @@ function rowToConversation(row: any): FocusConversation {
 }
 
 class CloudChatRepository implements IChatRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getByCaseId(caseId: string): Promise<FocusConversation[]> {
-    const rows = await fetchAllRows('focus_conversations', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    const rows = await fetchAllRows('focus_conversations', q => q.eq('firm_id', this.firmId).eq('case_id', caseId));
     return rows.map(rowToConversation);
   }
 
   async setForCase(caseId: string, conversations: FocusConversation[]): Promise<void> {
-    await replaceCaseRows('focus_conversations', this.userId, caseId, conversations.map(c => conversationToRow(this.userId, caseId, c)));
+    await replaceCaseRows('focus_conversations', this.firmId, caseId, conversations.map(c => conversationToRow(this.userId, this.firmId, caseId, c)));
   }
 }
 
 // ---------------------------------------------------------------------------
-// Eligibility Assessments — account-level, optionally linked to a case/client
+// Eligibility Assessments — firm-level, optionally linked to a case/client
 // ---------------------------------------------------------------------------
 
-export function eligibilityAssessmentToRow(userId: string, a: EligibilityAssessment) {
+export function eligibilityAssessmentToRow(userId: string, firmId: string, a: EligibilityAssessment) {
   return {
     id: a.id,
     user_id: userId,
+    firm_id: firmId,
     client_id: a.clientId ?? null,
     case_id: a.caseId ?? null,
     created_at: a.createdAt,
@@ -991,43 +1048,43 @@ export function rowToEligibilityAssessment(row: any): EligibilityAssessment {
 }
 
 class CloudEligibilityRepository implements IEligibilityRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getAll(): Promise<EligibilityAssessment[]> {
-    const rows = await fetchAllRows('eligibility_assessments', q => q.eq('user_id', this.userId));
+    const rows = await fetchAllRows('eligibility_assessments', q => q.eq('firm_id', this.firmId));
     return rows.map(rowToEligibilityAssessment);
   }
 
   async getById(id: string): Promise<EligibilityAssessment | undefined> {
-    const { data, error } = await supabase.from('eligibility_assessments').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('eligibility_assessments').select('*').eq('firm_id', this.firmId).eq('id', id).maybeSingle();
     if (error) throw error;
     return data ? rowToEligibilityAssessment(data) : undefined;
   }
 
   async create(item: EligibilityAssessment): Promise<EligibilityAssessment> {
-    const { error } = await supabase.from('eligibility_assessments').upsert(eligibilityAssessmentToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('eligibility_assessments').upsert(eligibilityAssessmentToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async update(item: EligibilityAssessment): Promise<EligibilityAssessment> {
-    const { error } = await supabase.from('eligibility_assessments').upsert(eligibilityAssessmentToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('eligibility_assessments').upsert(eligibilityAssessmentToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('eligibility_assessments').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('eligibility_assessments').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 
   async getByCaseId(caseId: string): Promise<EligibilityAssessment[]> {
-    const rows = await fetchAllRows('eligibility_assessments', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    const rows = await fetchAllRows('eligibility_assessments', q => q.eq('firm_id', this.firmId).eq('case_id', caseId));
     return rows.map(rowToEligibilityAssessment);
   }
 
   async getByClientId(clientId: string): Promise<EligibilityAssessment[]> {
-    const rows = await fetchAllRows('eligibility_assessments', q => q.eq('user_id', this.userId).eq('client_id', clientId));
+    const rows = await fetchAllRows('eligibility_assessments', q => q.eq('firm_id', this.firmId).eq('client_id', clientId));
     return rows.map(rowToEligibilityAssessment);
   }
 }
@@ -1036,10 +1093,11 @@ class CloudEligibilityRepository implements IEligibilityRepository {
 // Deadlines
 // ---------------------------------------------------------------------------
 
-export function deadlineToRow(userId: string, d: Deadline) {
+export function deadlineToRow(userId: string, firmId: string, d: Deadline) {
   return {
     id: d.id,
     user_id: userId,
+    firm_id: firmId,
     kind: d.kind,
     title: d.title,
     due_date: d.dueDate,
@@ -1071,43 +1129,43 @@ export function rowToDeadline(row: any): Deadline {
 }
 
 class CloudDeadlineRepository implements IDeadlineRepository {
-  constructor(private userId: string) {}
+  constructor(private userId: string, private firmId: string) {}
 
   async getAll(): Promise<Deadline[]> {
-    const rows = await fetchAllRows('deadlines', q => q.eq('user_id', this.userId));
+    const rows = await fetchAllRows('deadlines', q => q.eq('firm_id', this.firmId));
     return rows.map(rowToDeadline);
   }
 
   async getById(id: string): Promise<Deadline | undefined> {
-    const { data, error } = await supabase.from('deadlines').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    const { data, error } = await supabase.from('deadlines').select('*').eq('firm_id', this.firmId).eq('id', id).maybeSingle();
     if (error) throw error;
     return data ? rowToDeadline(data) : undefined;
   }
 
   async create(item: Deadline): Promise<Deadline> {
-    const { error } = await supabase.from('deadlines').upsert(deadlineToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('deadlines').upsert(deadlineToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async update(item: Deadline): Promise<Deadline> {
-    const { error } = await supabase.from('deadlines').upsert(deadlineToRow(this.userId, item), { onConflict: 'id' });
+    const { error } = await supabase.from('deadlines').upsert(deadlineToRow(this.userId, this.firmId, item), { onConflict: 'id' });
     if (error) throw error;
     return item;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('deadlines').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await supabase.from('deadlines').delete().eq('firm_id', this.firmId).eq('id', id);
     if (error) throw error;
   }
 
   async getByCaseId(caseId: string): Promise<Deadline[]> {
-    const rows = await fetchAllRows('deadlines', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    const rows = await fetchAllRows('deadlines', q => q.eq('firm_id', this.firmId).eq('case_id', caseId));
     return rows.map(rowToDeadline);
   }
 
   async getByClientId(clientId: string): Promise<Deadline[]> {
-    const rows = await fetchAllRows('deadlines', q => q.eq('user_id', this.userId).eq('client_id', clientId));
+    const rows = await fetchAllRows('deadlines', q => q.eq('firm_id', this.firmId).eq('client_id', clientId));
     return rows.map(rowToDeadline);
   }
 }
@@ -1116,22 +1174,22 @@ class CloudDeadlineRepository implements IDeadlineRepository {
 // Factory
 // ---------------------------------------------------------------------------
 
-export function createCloudRepositories(userId: string): Repositories {
+export function createCloudRepositories(userId: string, firmId: string): Repositories {
   return {
-    clients: new CloudClientRepository(userId),
-    cases: new CloudCaseRepository(userId),
-    tasks: new CloudTaskRepository(userId),
-    templates: new CloudTemplateRepository(userId),
-    caseNotes: new CloudCaseNoteRepository(userId),
-    documents: new CloudDocumentRepository(userId),
+    clients: new CloudClientRepository(userId, firmId),
+    cases: new CloudCaseRepository(userId, firmId),
+    tasks: new CloudTaskRepository(userId, firmId),
+    templates: new CloudTemplateRepository(userId, firmId),
+    caseNotes: new CloudCaseNoteRepository(userId, firmId),
+    documents: new CloudDocumentRepository(userId, firmId),
     notifications: new CloudNotificationRepository(userId),
-    teamMembers: new CloudTeamMemberRepository(userId),
-    activity: new CloudActivityRepository(userId),
-    usage: new CloudUsageRepository(userId),
-    checklist: new CloudChecklistRepository(userId),
-    documentTypes: new CloudDocumentTypeRepository(userId),
-    chat: new CloudChatRepository(userId),
-    eligibility: new CloudEligibilityRepository(userId),
-    deadlines: new CloudDeadlineRepository(userId),
+    teamMembers: new CloudTeamMemberRepository(userId, firmId),
+    activity: new CloudActivityRepository(userId, firmId),
+    usage: new CloudUsageRepository(userId, firmId),
+    checklist: new CloudChecklistRepository(userId, firmId),
+    documentTypes: new CloudDocumentTypeRepository(userId, firmId),
+    chat: new CloudChatRepository(userId, firmId),
+    eligibility: new CloudEligibilityRepository(userId, firmId),
+    deadlines: new CloudDeadlineRepository(userId, firmId),
   };
 }

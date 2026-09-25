@@ -101,6 +101,8 @@ export type UsageEventType = 'eligibility_check' | 'case_created' | 'client_crea
 export interface UsageEvent {
   id: string;
   userId: string;
+  /** Firm the acting user belonged to when the event fired (Step 1 · 1F) — gives seat counts for pricing. Undefined in local mode (no firm concept) and for cloud rows logged before this field existed. */
+  firmId?: string;
   type: UsageEventType;
   metadata?: {
     visaSubclass?: string;       // case_created
@@ -111,6 +113,44 @@ export interface UsageEvent {
     estimatedCostUsd?: number;   // eligibility_check (placeholder pricing, see api/_lib/aiPricing.ts)
   };
   createdAt: string; // ISO
+}
+
+// ---------------------------------------------------------------------------
+// Firm accounts (Step 1 · 1F) — cloud-only. See supabase/migrations/
+// 20260926000300_create_firms.sql and CLAUDE.md's "Firm accounts" section.
+// ---------------------------------------------------------------------------
+
+/** No `admin` role for MVP — see docs/plans/step-1-foundations.md, Decisions #4. */
+export type FirmRole = 'owner' | 'agent' | 'paralegal';
+export type FirmMemberAccountStatus = 'active' | 'disabled';
+/** Replaces the old free-standing `TeamMemberStatus` concept for firm members. */
+export type FirmAvailability = 'available' | 'busy' | 'offline';
+
+export interface Firm {
+  id: string;
+  name: string;
+}
+
+/** One row of `firm_member_directory(firmId)` — name/email come from `auth.users`, which the client can't read directly. */
+export interface FirmMemberRow {
+  userId: string;
+  email: string;
+  fullName: string;
+  role: FirmRole;
+  status: FirmMemberAccountStatus;
+  availability: FirmAvailability;
+  joinedAt: string; // ISO
+}
+
+export interface FirmInvite {
+  id: string;
+  firmId: string;
+  email: string;
+  role: FirmRole;
+  createdAt: string; // ISO
+  expiresAt: string; // ISO
+  acceptedAt?: string;
+  revokedAt?: string;
 }
 
 // ---------------------------------------------------------------------------

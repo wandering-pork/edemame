@@ -13,18 +13,18 @@ interface RepositoryContextValue {
 const RepositoryContext = createContext<RepositoryContextValue | null>(null);
 
 /**
- * Only ever rendered once LocalFolderContext reports status 'ready' (local mode) —
- * see AppRoutes in App.tsx, which shows the link/reconnect prompt otherwise.
+ * Only ever rendered once LocalFolderContext reports status 'ready' (local mode)
+ * or a firm is known (cloud mode) — see AppRoutes/CloudAppGate in App.tsx.
  */
-export function RepositoryProvider({ children, storageMode }: { children: React.ReactNode; storageMode: StorageMode }) {
+export function RepositoryProvider({ children, storageMode, firmId }: { children: React.ReactNode; storageMode: StorageMode; firmId?: string | null }) {
   const { rootHandle } = useLocalFolder();
   // Safe: RepositoryProvider is only ever rendered inside ProtectedRoute, which guarantees a session.
   const { user } = useAuth();
   const userId = user!.id;
   const value = useMemo(() => ({
-    repositories: createRepositories(storageMode, rootHandle, userId),
+    repositories: createRepositories(storageMode, rootHandle, userId, firmId),
     storageMode,
-  }), [storageMode, rootHandle, userId]);
+  }), [storageMode, rootHandle, userId, firmId]);
 
   return (
     <RepositoryContext.Provider value={value}>

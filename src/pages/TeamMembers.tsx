@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import type { Case, Client, Task, TeamMember, TeamMemberRole, TeamMemberStatus } from '../types';
 import { isTaskClosed } from '../lib/taskStatus';
+import { useStorageMode } from '@/contexts/RepositoryContext';
+import { FirmTeamMembers } from '@/components/team/FirmTeamMembers';
 
 interface TeamMembersProps {
   teamMembers: TeamMember[];
@@ -62,6 +64,33 @@ export const TeamMembers: React.FC<TeamMembersProps> = ({
   teamMembers,
   cases: _cases,
   clients: _clients,
+  tasks,
+  onAddMember,
+  onUpdateMember,
+  onDeleteMember,
+}) => {
+  const storageMode = useStorageMode();
+  // Cloud mode: real firm members, invites, and roles (Step 1 · 1F) — see
+  // components/team/FirmTeamMembers.tsx. Local mode falls through to the
+  // simple single-user list below (unchanged from before 1F, minus the fake
+  // seeded collaborators — App.tsx no longer seeds them).
+  if (storageMode === 'cloud') {
+    return <FirmTeamMembers tasks={tasks} />;
+  }
+
+  return <LocalTeamMembers teamMembers={teamMembers} tasks={tasks} onAddMember={onAddMember} onUpdateMember={onUpdateMember} onDeleteMember={onDeleteMember} />;
+};
+
+interface LocalTeamMembersProps {
+  teamMembers: TeamMember[];
+  tasks: Task[];
+  onAddMember: (member: TeamMember) => void;
+  onUpdateMember: (member: TeamMember) => void;
+  onDeleteMember: (id: string) => void;
+}
+
+const LocalTeamMembers: React.FC<LocalTeamMembersProps> = ({
+  teamMembers,
   tasks,
   onAddMember,
   onUpdateMember,
