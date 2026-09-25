@@ -167,7 +167,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
       setSwitchError("Cloud storage isn't configured for this deployment. Contact your administrator.");
       return;
     }
-    if (!window.confirm('This replaces any data currently in your cloud account with a fresh copy of your local folder. Your local folder is left untouched as a backup. Continue?')) return;
+    if (!window.confirm("This copies your local folder into a firm you own by yourself — reusing your current firm if you're its only member, or creating a new personal firm otherwise. It never touches a firm you share with colleagues. Anything already in that personal firm is replaced. Your local folder is left untouched as a backup. Continue?")) return;
     setSwitchError(null);
     setSwitchingMode(true);
     setSwitchProgress('Preparing...');
@@ -528,7 +528,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
           <div className="p-6 flex items-center justify-between gap-4">
             <p className="text-xs text-ink-soft dark:text-plate-ink-soft max-w-sm">
               {profile?.storageMode === 'local'
-                ? 'Switch to cloud storage to access your data from any device without a linked folder. This overwrites any existing data in your cloud account with your local copy.'
+                ? "Switch to cloud storage to access your data from any device without a linked folder. Your local data is copied into a firm you own by yourself — reusing your current firm if you're its only member, or creating a new personal firm otherwise. It never touches a firm you share with colleagues."
                 : 'Switch to local storage to keep your data as files in a folder you control (e.g. inside Dropbox or OneDrive). This overwrites any existing Edamame data in the folder you pick with your cloud copy.'}
             </p>
             {profile?.storageMode === 'local' ? (
@@ -733,7 +733,11 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
               </div>
             ))}
           </div>
-          <div className="px-6 pb-5 -mt-2 flex items-start gap-1.5 text-xs text-ink-faint dark:text-plate-ink-faint">
+          <div className="px-6 pb-1 -mt-2 flex items-start gap-1.5 text-xs text-ink-faint dark:text-plate-ink-faint">
+            <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+            <span>Counts activity since usage tracking was added — earlier cases and clients aren't included.</span>
+          </div>
+          <div className="px-6 pb-5 flex items-start gap-1.5 text-xs text-ink-faint dark:text-plate-ink-faint">
             <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
             <span>Estimated AI cost is a placeholder ($0.00) until real Gemini pricing is configured — token counts above are accurate.</span>
           </div>

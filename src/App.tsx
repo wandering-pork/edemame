@@ -20,12 +20,12 @@ import { TeamDashboard } from './pages/TeamDashboard';
 import { TeamMembers } from './pages/TeamMembers';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
-import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote, UsageEvent, Deadline } from './types';
+import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote, UsageEvent, Deadline, DocumentChecklistItem } from './types';
 import { seedDefaultTemplates } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { toLocalISODate } from './lib/dates';
 import { isTaskClosed, TASK_STATUS_LABELS } from './lib/taskStatus';
-import { CASE_STAGE_LABELS } from './lib/caseStage';
+import { CASE_STAGE_LABELS, isCaseClosed } from './lib/caseStage';
 import { allDeadlines } from './lib/deadlines';
 import { knownAnchorsFromDeadlines, rescheduleCaseTasks } from './lib/tasksFromTemplate';
 import { buildDeadlineAlerts } from './lib/deadlineAlerts';
@@ -61,12 +61,30 @@ const AppShell: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
   const theme: Theme = profile?.theme ?? 'classic';
+
+  // Keep <html>/<body> in sync with the app's `dark` class, not just the
+  // inner wrapper div below. Without this, anything rendered via
+  // `createPortal(..., document.body)` (TaskDetailModal, EligibilityAssessmentModal,
+  // OpenCasePanel) sits outside the wrapper's `.dark` scope and never picks up
+  // `dark:` styles, and index.html's `body.dark { ... }` background rule never
+  // matches — so any area taller than the wrapper's own background falls back
+  // to body's default (light-mode) gradient instead of the dark one.
+  useEffect(() => {
+    const isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    document.body.classList.toggle('dark', isDark);
+  }, [theme]);
+
   const [loading, setLoading] = useState(true);
   const [loadWarning, setLoadWarning] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [localTeamMembers, setLocalTeamMembers] = useState<TeamMember[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+  // Dashboard's "Docs outstanding" stat — see the effect below. Undefined
+  // while unloaded/loading so Dashboard shows its neutral placeholder rather
+  // than "0" before the fetch has actually run.
+  const [dashboardChecklistItems, setDashboardChecklistItems] = useState<DocumentChecklistItem[] | undefined>(undefined);
 
   // Cloud mode: team = the firm's real member directory (FirmContext), never
   // the team_members table. Local mode: team is just "you" — see
@@ -203,6 +221,24 @@ const AppShell: React.FC = () => {
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [storageMode, repos]);
+
+  // Dashboard's "Docs outstanding" stat needs real checklist data, but
+  // there's no `repos.checklist.getAll()` (checklists are stored per case) —
+  // so once cases are loaded, fetch each non-closed case's checklist in
+  // parallel here, in a separate effect that never blocks the main load or
+  // Dashboard's render. Failures are logged and leave the stat at its
+  // neutral placeholder rather than showing a wrong number.
+  useEffect(() => {
+    if (cases.length === 0) return;
+    let cancelled = false;
+    const openCaseIds = cases.filter(c => !isCaseClosed(c)).map(c => c.id);
+    Promise.all(openCaseIds.map(id => repos.checklist.getByCaseId(id)))
+      .then(results => {
+        if (!cancelled) setDashboardChecklistItems(results.flat());
+      })
+      .catch(err => console.error('Failed to load checklist items for the Dashboard docs-outstanding stat:', err));
+    return () => { cancelled = true; };
+  }, [cases, repos]);
 
   const handleThemeChange = (newTheme: Theme) => {
     updateProfile({ theme: newTheme });
@@ -731,6 +767,7 @@ const AppShell: React.FC = () => {
                 onMoveTaskOrder={handleMoveTaskOrder}
                 onMoveTaskDate={handleMoveTaskDate}
                 onAddTask={handleAddTask}
+                checklistItems={dashboardChecklistItems}
               />
             } />
             <Route path="/team" element={

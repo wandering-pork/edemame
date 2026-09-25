@@ -25,8 +25,9 @@ Five cards at the top summarise your workload, scoped by the Mine/All toggle abo
   named underneath. Tasks whose status is "Waiting on client" or "Waiting on third party" are
   never counted here, even if their due date has passed — they're blocked on someone outside the
   firm, not sitting in your backlog. See "Task status" below.
-- **Docs outstanding** — documents still pending or linked (not yet verified) across active
-  document checklists, when checklist data is available for the case.
+- **Docs outstanding** — checklist items not yet linked or verified (i.e. still pending, or
+  marked waived), summed across every non-closed case's document checklist — the same definition
+  a case's own sidebar uses. Shows "—" only while the underlying checklist data is still loading.
 - **Waiting on client** — open tasks currently in a waiting status, tracked separately from
   Overdue so "N overdue" always means work your team still owes, not work you're blocked on.
 

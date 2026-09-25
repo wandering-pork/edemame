@@ -26,6 +26,7 @@ import { isTaskClosed, isWaiting, withStatus, TASK_STATUS_LABELS, TASK_STATUS_OR
 import { CASE_STAGE_LABELS, CASE_STAGE_ORDER, evaluateTransition, outcomeRequired } from '../lib/caseStage';
 import { allDeadlines, daysLeft, urgency } from '../lib/deadlines';
 import { toLocalISODate, addDaysISO } from '../lib/dates';
+import { countLabel } from '../lib/pluralize';
 import { buildTemplateTaskDrafts, knownAnchorsFromDeadlines, templateHasTiming } from '../lib/tasksFromTemplate';
 import { suggestAdditions, TaskSuggestion } from '../services/geminiService';
 import { useNavigate } from 'react-router-dom';
@@ -1884,7 +1885,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               <section>
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">
-                    Pending <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {pendingTasks.length} tasks</span>
+                    Pending <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {countLabel(pendingTasks.length, 'task')}</span>
                   </span>
                   {overdueCount > 0 && (
                     <span className="text-[10.5px] font-bold px-2.5 py-1 rounded-md bg-red-500/[0.13] text-red-700 dark:text-red-400">
@@ -1908,7 +1909,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               {completedTasks.length > 0 && (
                 <section>
                   <div className="text-[12.5px] font-bold text-ink-soft dark:text-plate-ink-soft mb-2.5">
-                    Completed <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {completedTasks.length} tasks</span>
+                    Completed <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {countLabel(completedTasks.length, 'task')}</span>
                   </div>
                   <div className="bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl overflow-hidden">
                     {completedTasks.map(task => renderTaskRow(task, true))}

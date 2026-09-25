@@ -373,10 +373,14 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                   onClick={() => handleViewDetails(c.id)}
                   className="table-row-hover hover:bg-paper-2 dark:hover:bg-plate/60 relative flex items-center gap-4 px-5 pl-6 py-[15px] border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0"
                 >
-                  {/* Stage-group edge, red when at risk */}
+                  {/* Left edge — red only for At Risk rows; otherwise transparent (the
+                      stage itself is already shown by the stage chip's own dot+label
+                      further along the row, so this border stays a single, unambiguous
+                      signal rather than a second, unlabelled color code). */}
                   <div
                     className="absolute left-0 top-[10px] bottom-[10px] w-[3.5px] rounded-sm"
-                    style={{ background: r.risk.atRisk ? '#EF4444' : groupStyle.dot }}
+                    style={{ background: r.risk.atRisk ? '#EF4444' : 'transparent' }}
+                    aria-hidden="true"
                   />
 
                   {/* Avatar */}
@@ -408,7 +412,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                   </div>
 
                   {/* Next task */}
-                  <div className="hidden min-[1021px]:block flex-1 min-w-0">
+                  <div className="hidden min-[1021px]:block flex-1 min-w-[160px]">
                     {r.nextTask ? (
                       <>
                         <div className="text-[9px] font-bold tracking-[0.11em] uppercase text-ink-faint dark:text-plate-ink-faint">
@@ -433,12 +437,23 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                     )}
                   </div>
 
-                  {/* Stage stepper — compact dots along CASE_STAGE_STEPPER, task count secondary */}
-                  <div className="hidden sm:flex flex-col gap-1 w-[132px] flex-shrink-0" title={CASE_STAGE_LABELS[c.stage]}>
-                    <div className="flex items-center gap-[3px]">
+                  {/* Stage stepper — compact dots along CASE_STAGE_STEPPER. Labelled as
+                      the case's stage (not task progress) via role/aria-label on the
+                      group and a per-dot title so hover/focus both explain it; the task
+                      count below is explicitly prefixed "Tasks" so it never reads as
+                      part of the stepper. */}
+                  <div className="hidden sm:flex flex-col gap-1.5 w-[132px] flex-shrink-0">
+                    <div
+                      className="flex items-center gap-[3px]"
+                      role="img"
+                      tabIndex={0}
+                      aria-label={`Stage: ${CASE_STAGE_LABELS[c.stage]} — step ${stepperIndex + 1} of ${CASE_STAGE_STEPPER.length}`}
+                      title={`Stage: ${CASE_STAGE_LABELS[c.stage]} — step ${stepperIndex + 1} of ${CASE_STAGE_STEPPER.length}`}
+                    >
                       {CASE_STAGE_STEPPER.map((s, i) => (
                         <span
                           key={s}
+                          title={`${CASE_STAGE_LABELS[s]} — step ${i + 1} of ${CASE_STAGE_STEPPER.length}`}
                           className={`h-1.5 flex-1 rounded-full ${
                             i < stepperIndex ? 'bg-edamame-500' : i === stepperIndex ? 'bg-edamame-500' : 'bg-paper-2 dark:bg-plate'
                           } ${i === stepperIndex ? 'ring-2 ring-edamame-500/30' : ''}`}
@@ -446,39 +461,47 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                       ))}
                     </div>
                     <span className="text-[10px] text-ink-faint dark:text-plate-ink-faint font-mono">
-                      {r.completedTasks}/{r.totalTasks} tasks
+                      Tasks {r.completedTasks}/{r.totalTasks}
                     </span>
                   </div>
 
-                  {/* Stage chip */}
-                  <span
-                    className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-[3px] rounded-md flex-shrink-0 ${groupStyle.bg} ${groupStyle.text}`}
-                  >
+                  {/* Stage chip — fixed-width slot so rows align regardless of label length */}
+                  <div className="w-[130px] flex-shrink-0">
                     <span
-                      className="badge-pulse w-1.5 h-1.5 rounded-full"
-                      style={{ background: groupStyle.dot }}
-                    />
-                    {CASE_STAGE_LABELS[c.stage]}
-                  </span>
-
-                  {/* At Risk badge — reasons visible on hover/focus, not only a title attribute */}
-                  {r.risk.atRisk && (
-                    <span
-                      tabIndex={0}
-                      className="group/risk relative inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-[3px] rounded-md flex-shrink-0 bg-red-50 dark:bg-red-900/20 text-[#B91C1C] dark:text-[#F87171] focus-ring outline-none"
+                      className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-[3px] rounded-md ${groupStyle.bg} ${groupStyle.text}`}
                     >
-                      <AlertTriangle size={11} strokeWidth={2.2} />
-                      At Risk
                       <span
-                        role="tooltip"
-                        className="pointer-events-none absolute left-0 top-full mt-1.5 z-20 w-56 p-2.5 rounded-lg bg-ink dark:bg-plate-card border border-plate-ink/10 text-plate-ink dark:text-plate-ink text-[11px] font-normal leading-snug opacity-0 group-hover/risk:opacity-100 group-focus/risk:opacity-100 transition-opacity shadow-lg"
-                      >
-                        <ul className="list-disc pl-3.5 space-y-0.5">
-                          {r.risk.reasons.map((reason, i) => <li key={i}>{reason}</li>)}
-                        </ul>
-                      </span>
+                        className="badge-pulse w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        style={{ background: groupStyle.dot }}
+                      />
+                      <span className="whitespace-nowrap overflow-hidden text-ellipsis">{CASE_STAGE_LABELS[c.stage]}</span>
                     </span>
-                  )}
+                  </div>
+
+                  {/* At Risk badge — fixed-width slot (always rendered, empty when not at
+                      risk) so the owner/chevron columns after it never shift row to row.
+                      Reasons are visible on hover AND keyboard focus, not only a title
+                      attribute, and the tooltip opens leftward/right-aligned to the badge
+                      so it stays inside the card instead of being clipped by the right edge. */}
+                  <div className="w-[80px] flex-shrink-0 flex justify-start">
+                    {r.risk.atRisk && (
+                      <span
+                        tabIndex={0}
+                        className="group/risk relative inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-[3px] rounded-md bg-red-50 dark:bg-red-900/20 text-[#B91C1C] dark:text-[#F87171] focus-ring outline-none"
+                      >
+                        <AlertTriangle size={11} strokeWidth={2.2} />
+                        At Risk
+                        <span
+                          role="tooltip"
+                          className="pointer-events-none absolute right-0 left-auto top-full mt-1.5 z-20 w-56 max-w-[85vw] p-2.5 rounded-lg bg-ink dark:bg-plate-card border border-plate-ink/10 text-plate-ink dark:text-plate-ink text-[11px] font-normal leading-snug opacity-0 group-hover/risk:opacity-100 group-focus/risk:opacity-100 transition-opacity shadow-lg"
+                        >
+                          <ul className="list-disc pl-3.5 space-y-0.5">
+                            {r.risk.reasons.map((reason, i) => <li key={i}>{reason}</li>)}
+                          </ul>
+                        </span>
+                      </span>
+                    )}
+                  </div>
 
                   {/* Owner / assign */}
                   {r.owner ? (

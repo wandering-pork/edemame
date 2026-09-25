@@ -18,6 +18,7 @@ import {
 import { allDeadlines } from '../lib/deadlines';
 import { isTaskClosed } from '../lib/taskStatus';
 import { isCaseClosed } from '../lib/caseStage';
+import { countOutstandingChecklistItems } from '../lib/docsOutstanding';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 
 interface DashboardProps {
@@ -50,10 +51,13 @@ interface DashboardProps {
    */
   activity?: ActivityEvent[];
   /**
-   * Optional — no route currently passes per-case document checklist data to
-   * Dashboard (it lives behind `repos.checklist`, scoped to Case Details).
+   * Optional — App.tsx fetches this via `repos.checklist.getByCaseId()` for
+   * every non-closed case (there's no `getAll()` on the checklist repository)
+   * in a separate effect that doesn't block the rest of the Dashboard's load.
    * When supplied, the "Docs outstanding" stat and its delta are computed
-   * from real checklist items; when absent, the card shows a neutral
+   * from real checklist items (see `lib/docsOutstanding.ts` — same
+   * "outstanding" definition as `CaseDetails.tsx`'s sidebar); when absent
+   * (still loading, or the fetch failed), the card shows a neutral
    * placeholder rather than a fabricated number.
    */
   checklistItems?: DocumentChecklistItem[];
@@ -220,9 +224,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     [scopedTasksForStats]
   );
 
-  const docsOutstanding = checklistItems
-    ? checklistItems.filter(i => i.status === 'pending' || i.status === 'linked').length
-    : null;
+  // App.tsx only fetches checklist items for non-closed cases, so no further
+  // case-status filtering is needed here — see docsOutstanding.ts for the
+  // exact "outstanding" definition (matches CaseDetails.tsx's sidebar).
+  const docsOutstanding = checklistItems ? countOutstandingChecklistItems(checklistItems) : null;
 
   const topOverdue = overdueTasks[0];
   const topOverdueLabel = topOverdue
