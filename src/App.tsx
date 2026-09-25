@@ -427,7 +427,10 @@ const AppShell: React.FC = () => {
     setTasks(nextTasks);
     if (prev && prev.status !== updatedTask.status) {
       if (updatedTask.status === 'done') {
-        toast.success(`Task completed: ${updatedTask.title}`);
+        const previousTask = prev;
+        toast.success(`Task completed: ${updatedTask.title}`, {
+          action: { label: 'Undo', onClick: () => handleUpdateTask(previousTask) },
+        });
       }
       pushActivity({
         type: 'task_status_changed',

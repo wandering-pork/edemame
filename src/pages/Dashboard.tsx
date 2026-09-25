@@ -8,7 +8,7 @@ import {
   startOfDay,
   differenceInCalendarDays,
 } from 'date-fns';
-import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight, SkipBack, SkipForward } from 'lucide-react';
+import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight, SkipBack, SkipForward, Check } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { buildWindow, computeAutoWindowStart, jumpWeek, stepDay } from '../lib/calendarWindow';
 import {
@@ -16,7 +16,7 @@ import {
   scopeTasksForAttention, scopeDeadlinesForAttention, AttentionScope,
 } from '../lib/attention';
 import { allDeadlines } from '../lib/deadlines';
-import { isTaskClosed } from '../lib/taskStatus';
+import { isTaskClosed, statusChipFor, withStatus } from '../lib/taskStatus';
 import { isCaseClosed } from '../lib/caseStage';
 import { countOutstandingChecklistItems } from '../lib/docsOutstanding';
 import { TaskDetailModal } from '../components/TaskDetailModal';
@@ -307,6 +307,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setSelectedTaskId(item.id);
   };
 
+  // Quiet inline "Done" action on a Needs Attention row — the item drops off
+  // the list once its task closes (it's derived from `tasks`, re-filtered on
+  // every render). `onUpdateTask` (App.tsx's `handleUpdateTask`) already
+  // shows a "Task completed" toast with an Undo action for any status change
+  // to `done`, so there's nothing extra to do here.
+  const handleAttentionDone = (item: (typeof allAttentionItems)[number], e: React.MouseEvent) => {
+    e.stopPropagation();
+    const task = tasks.find(t => t.id === item.id);
+    if (!task) return;
+    onUpdateTask(withStatus(task, 'done'));
+  };
+
   // ── Agent activity ────────────────────────────────────────────────────
   const activityItems = useMemo(() => {
     if (activity.length > 0) {
@@ -484,6 +496,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                       <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5 truncate">{item.sub}</div>
                     </div>
+                    {item.kind !== 'deadline' && (
+                      <button
+                        onClick={e => handleAttentionDone(item, e)}
+                        title="Mark done"
+                        aria-label={`Mark "${item.title}" done`}
+                        className="btn-press inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-md border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors whitespace-nowrap"
+                      >
+                        <Check size={11} />
+                        Done
+                      </button>
+                    )}
                     <span className="text-xs font-semibold text-edamame-600 dark:text-edamame-400 whitespace-nowrap">
                       {item.kind === 'deadline' ? (item.caseId ? 'View case →' : 'View client →') : 'View task →'}
                     </span>
@@ -678,6 +701,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {dayTasks.map(task => {
                         const kind = EVENT_KIND[getEventKind(task)];
                         const { case: c, client } = getCaseAndClient(task.caseId);
+                        const chip = statusChipFor(task.status);
                         return (
                           <div
                             key={task.id}
@@ -696,8 +720,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             }`}
                             style={{ borderLeft: `3px solid ${kind.edge}` }}
                           >
-                            <div className={`text-[9px] font-bold uppercase tracking-[0.08em] ${kind.text}`}>
-                              {kind.label}
+                            <div className="flex items-center justify-between gap-1">
+                              <div className={`text-[9px] font-bold uppercase tracking-[0.08em] ${kind.text}`}>
+                                {kind.label}
+                              </div>
+                              {chip && (
+                                <span className={`text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded whitespace-nowrap ${chip.className}`}>
+                                  {chip.label}
+                                </span>
+                              )}
                             </div>
                             <div className="text-[11.5px] font-semibold leading-tight mt-0.5 text-ink dark:text-plate-ink break-words">
                               {task.title}
@@ -854,6 +885,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           task={selectedTask}
           caseItem={selectedTaskCaseAndClient.case}
           client={selectedTaskCaseAndClient.client}
+          assigneeName={teamMembers.find(m => m.id === selectedTask.assignedTo)?.name}
           onClose={() => setSelectedTaskId(null)}
           onUpdateTask={onUpdateTask}
           onDeleteTask={onDeleteTask}

@@ -114,6 +114,20 @@ already cover — each with a one-line reason. Nothing is added automatically: r
 suggestion and click **Accept** (it's added as a task, dated relative to the step it's anchored
 to, or the case start date if none) or **Reject** (it's dismissed).
 
+### Task status
+
+Each task row has a small tick to toggle **Done** (click again to reopen), and a status menu — the
+**⋮** button that appears on hover — offering **Not started**, **In progress**, **Waiting on
+client**, **Waiting on third party**, and **Not applicable**. The menu also has **Set to today**
+and **Edit** shortcuts. Choosing **Not applicable** asks for a short reason inline before it's
+applied. Any status other than Not started/Done shows as a small coloured chip next to the task's
+title (Not applicable's chip shows its reason as a tooltip on hover or keyboard focus), so you can
+scan a case's task list and see what's blocked or in progress without opening anything. Opening a
+task (via **Edit**, or from the Dashboard/global search) gives you the same statuses as a
+one-click segmented control that applies immediately, plus **Mark done**/**Waiting on client**
+one-click buttons and a **Move date** menu (+1 day, +1 week, or pick a date) — see "Task status" in
+the Dashboard manual for the full task window walkthrough.
+
 ### Rescheduling and locking a date
 
 A task generated from a template step keeps recalculating automatically until you or an event

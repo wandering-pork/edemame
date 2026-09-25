@@ -72,3 +72,36 @@ export function withStatus(task: Task, status: TaskStatus, reason?: string): Tas
   next.isCompleted = isTaskClosed(next);
   return next;
 }
+
+/** A status chip's label + Tailwind classes, readable in both themes. */
+export interface StatusChip {
+  label: string;
+  className: string;
+}
+
+/**
+ * A row-level status chip for every status that isn't the quiet default
+ * (`not_started` shows no chip — a task row's tick is enough) or `done`
+ * (which keeps its own tick + strikethrough treatment rather than a chip).
+ * Each of the four remaining statuses gets its own colour so they read apart
+ * from one another at a glance, not just "not the default".
+ */
+const STATUS_CHIP_CLASSES: Partial<Record<TaskStatus, string>> = {
+  in_progress: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
+  waiting_client: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+  waiting_third_party: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400',
+  not_applicable: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400',
+};
+
+/**
+ * Returns the chip to render for `status` on a task row, or `null` for
+ * `not_started`/`done` (no chip needed — see `STATUS_CHIP_CLASSES`'s doc
+ * comment). Shared by every surface that lists tasks (case Tasks tab,
+ * Dashboard calendar cards, Needs Attention) so they render statuses
+ * identically.
+ */
+export function statusChipFor(status: TaskStatus): StatusChip | null {
+  const className = STATUS_CHIP_CLASSES[status];
+  if (!className) return null;
+  return { label: TASK_STATUS_LABELS[status], className };
+}

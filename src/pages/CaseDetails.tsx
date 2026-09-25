@@ -22,7 +22,7 @@ import { recalcAutoLinks, recalcAutoLinkForItem } from '../lib/autoLink';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
 import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib/caseTabsStore';
 import { displayCaseNumber } from '../lib/caseNumber';
-import { isTaskClosed, isWaiting, withStatus, TASK_STATUS_LABELS, TASK_STATUS_ORDER } from '../lib/taskStatus';
+import { isTaskClosed, isWaiting, withStatus, statusChipFor, TASK_STATUS_LABELS, TASK_STATUS_ORDER } from '../lib/taskStatus';
 import { CASE_STAGE_LABELS, CASE_STAGE_ORDER, evaluateTransition, outcomeRequired } from '../lib/caseStage';
 import { allDeadlines, daysLeft, urgency } from '../lib/deadlines';
 import { toLocalISODate, addDaysISO } from '../lib/dates';
@@ -1118,6 +1118,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const renderTaskRow = (task: Task, closed: boolean) => {
     const waiting = isWaiting(task);
     const overdue = !closed && !waiting && new Date(task.date) < new Date();
+    const chip = statusChipFor(task.status);
     const editing = editingDate?.taskId === task.id;
     const editingNa = naReasonDraft?.taskId === task.id;
     return (
@@ -1144,10 +1145,25 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             <div className={`text-[13.5px] font-semibold tracking-tight leading-snug ${closed ? 'line-through text-ink-faint dark:text-plate-ink-faint' : 'text-ink dark:text-plate-ink'}`}>
               {task.title}
             </div>
-            {waiting && (
-              <span className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 whitespace-nowrap">
-                {TASK_STATUS_LABELS[task.status]}
-              </span>
+            {chip && (
+              task.status === 'not_applicable' && task.statusReason ? (
+                <span
+                  tabIndex={0}
+                  className={`group/na relative text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md whitespace-nowrap outline-none focus-ring ${chip.className}`}
+                >
+                  {chip.label}
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute left-0 top-full mt-1 z-20 w-52 max-w-[70vw] p-2 rounded-lg bg-ink dark:bg-plate-card border border-plate-ink/10 text-plate-ink dark:text-plate-ink text-[11px] font-normal normal-case leading-snug opacity-0 group-hover/na:opacity-100 group-focus/na:opacity-100 transition-opacity shadow-lg"
+                  >
+                    {task.statusReason}
+                  </span>
+                </span>
+              ) : (
+                <span className={`text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md whitespace-nowrap ${chip.className}`}>
+                  {chip.label}
+                </span>
+              )
             )}
             {task.datePending && !closed && (
               <span
