@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Theme, UsageEvent } from '../types';
-import { Moon, Sun, Save, Check, Palette, LogOut, FolderCog, AlertTriangle, Cloud, HardDrive, BarChart3 } from 'lucide-react';
+import { Theme, UsageEvent, FirmJobTitle } from '../types';
+import { Moon, Sun, Save, Check, Palette, LogOut, FolderCog, AlertTriangle, Cloud, HardDrive, BarChart3, Building2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { useLocalFolder } from '@/contexts/LocalFolderContext';
@@ -14,6 +14,8 @@ import { copyAllData, clearAll } from '@/repositories/migrate';
 import type { Repositories } from '@/repositories/types';
 import { isSupabaseConfigured, supabase } from '@/lib/supabaseClient';
 import { saveHandle } from '@/lib/folderHandleStore';
+import { FIRM_JOB_TITLES, firmJobTitleLabel, firmRoleLabel } from '@/lib/firmDirectory';
+import { friendlyInviteError } from '@/lib/firmInvites';
 
 const initialsOf = (s: string) =>
   s
@@ -36,7 +38,7 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
   const { profile, updateProfile, refetchProfile } = useProfile();
   const { changeFolder } = useLocalFolder();
   const repositories = useRepositories();
-  const { members: firmMembers } = useFirm();
+  const { firm, role: firmRole, members: firmMembers, refreshDirectory, leaveFirm } = useFirm();
   const activeFirmMemberCount = firmMembers.filter(m => m.status === 'active').length;
   const [changingFolder, setChangingFolder] = useState(false);
   const [changeResult, setChangeResult] = useState<string | null>(null);
@@ -45,6 +47,77 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [usageEvents, setUsageEvents] = useState<UsageEvent[] | null>(null);
   const navigate = useNavigate();
+
+  // Firm section (Step 1 · 1G.5) state.
+  const myMember = firmMembers.find(m => m.userId === user?.id) ?? null;
+  const [editingFirmName, setEditingFirmName] = useState(false);
+  const [firmNameDraft, setFirmNameDraft] = useState('');
+  const [savingFirmName, setSavingFirmName] = useState(false);
+  const [firmNameError, setFirmNameError] = useState<string | null>(null);
+  const [savingJobTitle, setSavingJobTitle] = useState(false);
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
+  const [leavingFirm, setLeavingFirm] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (firm && !editingFirmName) setFirmNameDraft(firm.name);
+  }, [firm, editingFirmName]);
+
+  const handleSaveFirmName = async () => {
+    if (!firm) return;
+    const trimmed = firmNameDraft.trim();
+    if (!trimmed || trimmed.length > 120) {
+      setFirmNameError('Firm name must be 1–120 characters.');
+      return;
+    }
+    setSavingFirmName(true);
+    setFirmNameError(null);
+    try {
+      const { error } = await supabase.from('firms').update({ name: trimmed }).eq('id', firm.id);
+      if (error) throw error;
+      await refreshDirectory();
+      setEditingFirmName(false);
+    } catch (err) {
+      console.error('Failed to rename firm:', err);
+      setFirmNameError('Could not rename the firm. Please try again.');
+    } finally {
+      setSavingFirmName(false);
+    }
+  };
+
+  const handleJobTitleChange = async (jobTitle: FirmJobTitle | '') => {
+    if (!firm || !user) return;
+    setSavingJobTitle(true);
+    try {
+      const { error } = await supabase
+        .from('firm_members')
+        .update({ job_title: jobTitle || null })
+        .eq('firm_id', firm.id)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      await refreshDirectory();
+    } catch (err) {
+      console.error('Failed to update job title:', err);
+    } finally {
+      setSavingJobTitle(false);
+    }
+  };
+
+  const handleLeaveFirm = async () => {
+    if (!firm) return;
+    setLeavingFirm(true);
+    setLeaveError(null);
+    try {
+      // leaveFirm() reloads the page on success, so there's nothing left to
+      // do here in the happy path — only the last-owner error (or a network
+      // failure) surfaces back to this catch.
+      await leaveFirm(firm.id);
+    } catch (err) {
+      console.error('Failed to leave firm:', err);
+      setLeaveError(friendlyInviteError(err, 'Could not leave the firm. Please try again.'));
+      setLeavingFirm(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -492,6 +565,145 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
             </div>
           )}
         </div>
+
+        {/* Firm section (cloud mode only) */}
+        {profile?.storageMode === 'cloud' && firm && (
+          <div className="mt-6 bg-paper-2 dark:bg-plate-card rounded-xl border border-ink/15 dark:border-plate-ink/20 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-ink/10 dark:border-plate-ink/15 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 text-edamame-600 dark:text-edamame-400 flex items-center justify-center">
+                <Building2 size={16} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-ink dark:text-plate-ink">Firm</h2>
+                <p className="text-xs text-ink-faint dark:text-plate-ink-faint">Your firm's details and your place in it.</p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Firm name */}
+              <div>
+                <label className="block text-xs font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5">Firm name</label>
+                {firmRole === 'owner' ? (
+                  editingFirmName ? (
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={firmNameDraft}
+                          onChange={e => { setFirmNameDraft(e.target.value); setFirmNameError(null); }}
+                          maxLength={120}
+                          className="focus-ring flex-1 px-3 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate text-sm text-ink dark:text-plate-ink outline-none"
+                        />
+                        <button
+                          onClick={handleSaveFirmName}
+                          disabled={savingFirmName || !firmNameDraft.trim()}
+                          className="btn-press px-3.5 py-2 rounded-lg text-xs font-semibold bg-edamame-500 hover:bg-edamame-600 text-white transition-all disabled:opacity-50"
+                        >
+                          {savingFirmName ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => { setEditingFirmName(false); setFirmNameDraft(firm.name); setFirmNameError(null); }}
+                          disabled={savingFirmName}
+                          className="px-3.5 py-2 rounded-lg text-xs font-medium text-ink-soft dark:text-plate-ink-soft hover:bg-black/5 dark:hover:bg-white/5 transition-all"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {firmNameError && <p className="text-xs text-red-500 mt-1.5">{firmNameError}</p>}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-ink dark:text-plate-ink">{firm.name}</span>
+                      <button
+                        onClick={() => setEditingFirmName(true)}
+                        className="text-xs font-semibold text-edamame-600 dark:text-edamame-400 hover:underline"
+                      >
+                        Rename
+                      </button>
+                    </div>
+                  )
+                ) : (
+                  <span className="text-sm font-medium text-ink dark:text-plate-ink">{firm.name}</span>
+                )}
+              </div>
+
+              {/* Your role + job title */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5">Your role</label>
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-ink/6 dark:bg-plate-ink/10 text-ink-soft dark:text-plate-ink-soft">
+                    {firmRole ? firmRoleLabel(firmRole) : '—'}
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5" htmlFor="my-job-title">
+                    Your job title
+                  </label>
+                  <select
+                    id="my-job-title"
+                    value={myMember?.jobTitle ?? ''}
+                    onChange={e => handleJobTitleChange(e.target.value as FirmJobTitle | '')}
+                    disabled={savingJobTitle}
+                    className="focus-ring w-full px-3 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate text-sm text-ink dark:text-plate-ink outline-none disabled:opacity-50"
+                  >
+                    <option value="">Not set</option>
+                    {FIRM_JOB_TITLES.map(t => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Member count */}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-ink-soft dark:text-plate-ink-soft">
+                  {activeFirmMemberCount} active {activeFirmMemberCount === 1 ? 'member' : 'members'}
+                </span>
+                <Link to="/team-members" className="text-xs font-semibold text-edamame-600 dark:text-edamame-400 hover:underline">
+                  View Team →
+                </Link>
+              </div>
+            </div>
+
+            {/* Leave firm */}
+            <div className="px-6 pb-6 pt-4 border-t border-ink/10 dark:border-plate-ink/15">
+              {confirmingLeave ? (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10 px-4 py-3">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">Leave {firm.name}?</p>
+                  <p className="text-xs text-amber-800/90 dark:text-amber-300/90 mb-3">
+                    You'll lose access to this firm's clients, cases, and documents. This can't be undone by you —
+                    someone else at the firm would need to invite you back.
+                  </p>
+                  {leaveError && <p className="text-xs text-red-600 dark:text-red-400 mb-3">{leaveError}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleLeaveFirm}
+                      disabled={leavingFirm}
+                      className="btn-press px-4 py-2 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-all disabled:opacity-50"
+                    >
+                      {leavingFirm ? 'Leaving...' : 'Leave firm'}
+                    </button>
+                    <button
+                      onClick={() => { setConfirmingLeave(false); setLeaveError(null); }}
+                      disabled={leavingFirm}
+                      className="px-4 py-2 rounded-lg text-xs font-medium text-ink-soft dark:text-plate-ink-soft hover:bg-black/5 dark:hover:bg-white/5 transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingLeave(true)}
+                  className="text-xs font-semibold text-red-600 dark:text-red-400 hover:underline"
+                >
+                  Leave firm
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Usage section */}
         <div className="mt-6 bg-paper-2 dark:bg-plate-card rounded-xl border border-ink/15 dark:border-plate-ink/20 shadow-sm overflow-hidden">

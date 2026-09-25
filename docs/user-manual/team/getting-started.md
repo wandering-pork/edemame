@@ -102,6 +102,36 @@ Every member — including you — can set their own availability (Available / B
 the dropdown at the top of Team Members. This is just a status signal for your colleagues; it
 doesn't restrict what you can do.
 
+## Belonging to more than one firm
+
+If you're a member of more than one firm — say, you have your own personal firm and also joined a
+colleague's — the sidebar shows which one you're currently working in, right below the logo. Click
+it to switch: a menu lists every firm you belong to and your role in each, with a checkmark on the
+current one. Picking another firm reloads the app into that firm's clients, cases, and tasks —
+nothing about your other firm is lost, it's just one click away whenever you need it.
+
+If you only belong to one firm, the sidebar still shows its name, but there's nothing to click.
+
+## Leaving a firm
+
+From **Settings → Firm**, you can leave any firm you belong to. This removes your access to that
+firm's clients, cases, and documents — someone else at the firm would need to invite you back if
+you change your mind. Settings → Firm also shows the firm's name (renameable by Owners), your role,
+your job title (which you can change any time), and how many active members the firm has.
+
+You can't leave a firm if you're its only active Owner — make someone else an Owner first, or the
+app will tell you to. After leaving, you're switched to another firm you belong to, or — if that
+was your only one — sent to the "Create your firm" screen, the same place a brand-new user without
+a firm lands.
+
+## Lost access to a firm
+
+If a firm you were part of removes you, disables your account there, or the firm itself is deleted
+while you're signed out, you'll see a one-time notice the next time you sign in — "You no longer
+have access to *that firm*" — near the top of the app. You're automatically moved to another firm
+you still belong to, or to "Create your firm" if that was your last one. The notice only appears
+once; dismissing it (or simply not seeing it again) doesn't change anything else.
+
 ## Switching storage modes with a team
 
 If your firm has more than one active member, you can't switch from Cloud Storage to Local

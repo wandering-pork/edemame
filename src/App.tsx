@@ -51,7 +51,7 @@ const AppShell: React.FC = () => {
   const { collapsed } = useSidebar();
   const { user } = useAuth();
   const { profile, updateProfile } = useProfile();
-  const { firm, teamMembers: firmTeamMembers } = useFirm();
+  const { firm, teamMembers: firmTeamMembers, lostAccessNotice, dismissLostAccessNotice } = useFirm();
   // Safe: AppShell is only ever rendered inside ProtectedRoute, once a profile exists.
   const currentUserId = user!.id;
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -646,6 +646,17 @@ const AppShell: React.FC = () => {
             onMoveTaskDate={handleMoveTaskDate}
           />
           <PendingInvitationsBanner />
+          {lostAccessNotice && (
+            <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-ink/15 bg-paper-2 px-4 py-3 text-sm text-ink-soft dark:border-plate-ink/20 dark:bg-plate-card dark:text-plate-ink-soft">
+              <span>{lostAccessNotice}</span>
+              <button
+                onClick={dismissLostAccessNotice}
+                className="flex-shrink-0 font-semibold underline underline-offset-2"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           {loadWarning && (
             <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
               <span>{loadWarning}</span>
