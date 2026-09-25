@@ -229,3 +229,16 @@ create policy "owners or admins revoke invites" on firm_invites
   for update to authenticated
   using (has_firm_role(firm_id, array['owner', 'admin']))
   with check (has_firm_role(firm_id, array['owner', 'admin']));
+
+-- ---------------------------------------------------------------------------
+-- 6. Signed-in users may only change an invite's revoked_at. The update
+--    policy above admits owners and admins to the whole row, so without
+--    this an admin could rewrite a pending invite's role to 'owner', send it
+--    to an address they control and accept it — escalating past the
+--    "admins only invite Members" rule. Every other invite write (create,
+--    resend, accept) goes through api/ with the service role, which isn't
+--    affected by these grants.
+-- ---------------------------------------------------------------------------
+
+revoke update on firm_invites from public, anon, authenticated;
+grant update (revoked_at) on firm_invites to authenticated;
