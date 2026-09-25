@@ -128,6 +128,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Step 1 · 1G.4 — the firm name and inviter's display name ride along in
+    // the Supabase Auth invite's `data`, for the Invite user email template
+    // ({{ .Data.inviter_name }} invited you to join {{ .Data.firm_name }} —
+    // see the PR description for the suggested template text, applied by
+    // hand in the Supabase dashboard).
+    const firmNameRes = await userRest(`firms?id=eq.${encodeURIComponent(firmId)}&select=name`, auth.accessToken);
+    const firmNameRows = firmNameRes.ok ? await firmNameRes.json().catch(() => []) : [];
+    const firmDisplayName = Array.isArray(firmNameRows) && firmNameRows[0] ? firmNameRows[0].name : "your firm";
+    const inviterName = auth.fullName || "A colleague";
+
     const token = generateInviteToken();
     const tokenHash = hashInviteToken(token);
 
@@ -163,7 +173,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let sent = false;
     try {
-      sent = await sendAuthInviteEmail(email, inviteLink, { invited_to_firm: firmId, invited_role: role });
+      sent = await sendAuthInviteEmail(email, inviteLink, {
+        invited_to_firm: firmId,
+        invited_role: role,
+        firm_name: firmDisplayName,
+        inviter_name: inviterName,
+      });
     } catch (err) {
       // The invite row exists either way — a copyable link still works even
       // if the email itself failed to send (e.g. Supabase email provider

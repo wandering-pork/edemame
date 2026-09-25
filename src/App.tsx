@@ -38,6 +38,7 @@ import { FirmProvider, useFirm } from './contexts/FirmContext';
 import { CreateFirmGate } from './components/CreateFirmGate';
 import { InviteAccept } from './pages/InviteAccept';
 import { LinkFolderGate } from './components/LinkFolderGate';
+import { PendingInvitationsBanner } from './components/team/PendingInvitationsBanner';
 import { isSupabaseConfigured } from './lib/supabaseClient';
 
 // ---------------------------------------------------------------------------
@@ -644,6 +645,7 @@ const AppShell: React.FC = () => {
             onDeleteTask={handleDeleteTask}
             onMoveTaskDate={handleMoveTaskDate}
           />
+          <PendingInvitationsBanner />
           {loadWarning && (
             <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
               <span>{loadWarning}</span>

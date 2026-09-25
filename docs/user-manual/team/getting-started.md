@@ -55,12 +55,38 @@ one and join your firm automatically — the confirmation says "Invite email sen
 If they already have an account, the invite email doesn't go through (Edamame never reveals whether
 an outside address has an account) — instead you'll see "…already has an Edamame account, so no
 email was sent" with a copyable link to share with them directly (e.g. over Slack or email). Either
-way, opening the link and signing in adds them to your firm.
+way, opening the link and signing in adds them to your firm — see "Joining a firm" below for what
+that looks like on their side, including if they don't have an account yet at all.
 
 Invites expire after 7 days. **Resend** on the Pending Invites list rotates the invite to a fresh
 link (the old one stops working) without reopening the invite form — it's disabled if you can't
 grant that invite's role (for example, an Admin can't resend an invite that was sent as Owner).
 **Revoke** cancels a pending invite for good.
+
+## Joining a firm
+
+**If you're brand new to Edamame:** open the invite link. You'll be asked to sign in or create an
+account with the same email address the invite was sent to (any other address won't be accepted —
+Edamame checks). Once you're in, the invite is accepted automatically and you'll be asked to
+**finish setting up your account** — your name and a password — so you can sign back in later
+without needing another invite link. Then click **Go to dashboard**.
+
+**If you already have an Edamame account:** open the invite link while signed in (with the same
+email the invite was sent to) and it's accepted straight away — no extra setup needed. You don't
+even need the link: next time you sign in, a banner appears at the top of the app —
+"*Someone* invited you to join *Firm* as a *Role*" — with **Accept** and **Decline** buttons right
+there. If you haven't created your own firm yet, any pending invitations show up above the
+"Create your firm" screen too, so you don't accidentally create an empty firm instead of joining
+the one you were invited to.
+
+**If you're currently using Local Storage:** accepting an invite (either from the link or the
+in-app banner) switches your account to Cloud Storage, since firms only work in Cloud Storage.
+You'll see a warning explaining this before anything changes — your local folder is never touched,
+moved, or deleted; it stays exactly where it is on this computer. Choosing **Switch to cloud and
+join** accepts the invite and makes the switch; **Cancel** leaves the invite pending so you can
+come back to it later, and your account stays in Local Storage untouched. You can bring your local
+data into a firm of your own later from Settings (see "Switching storage modes with a team" below)
+— it never gets mixed into the firm you joined.
 
 ## Changing roles and disabling members
 
