@@ -123,4 +123,12 @@ export interface Repositories {
   chat: IChatRepository;
   eligibility: IEligibilityRepository;
   deadlines: IDeadlineRepository;
+  /**
+   * Called by `repositories/migrate.ts`'s `clearAll()` before it deletes
+   * anything; throws if wiping this destination isn't safe. Cloud
+   * repositories are scoped to a firm that may be shared, so they refuse
+   * unless the signed-in user is its only active member (Step 1 · 1G.1).
+   * Local folders belong to one person by construction and don't set it.
+   */
+  assertSafeToClear?: () => Promise<void>;
 }

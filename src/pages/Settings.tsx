@@ -7,7 +7,8 @@ import { useProfile } from '@/contexts/ProfileContext';
 import { useLocalFolder } from '@/contexts/LocalFolderContext';
 import { useRepositories } from '@/contexts/RepositoryContext';
 import { useFirm } from '@/contexts/FirmContext';
-import { createCloudRepositories } from '@/repositories/cloud';
+import { createCloudRepositories, fetchActiveFirmMembers } from '@/repositories/cloud';
+import { pickCloudSwitchTarget } from '@/lib/cloudSwitchTarget';
 import { createFilesystemRepositories } from '@/repositories/filesystem';
 import { copyAllData, clearAll } from '@/repositories/migrate';
 import type { Repositories } from '@/repositories/types';
@@ -98,10 +99,16 @@ export const Settings: React.FC<SettingsProps> = ({ currentTheme, onThemeChange 
     setSwitchingMode(true);
     setSwitchProgress('Preparing...');
     try {
-      // Firms are cloud-only (Step 1 · 1F) — a local-mode user has no firm
-      // yet. Create a personal one now so the copied data has somewhere to
-      // land; they can invite colleagues into it afterwards.
-      let firmId = profile?.currentFirmId ?? null;
+      // Firms are cloud-only (Step 1 · 1F). The copy below replaces the
+      // destination firm's data, so it may only go into a firm this user owns
+      // alone — never a shared firm current_firm_id happens to point at (e.g.
+      // one they accepted an invite to while in local mode). Otherwise create
+      // a fresh personal firm; they can invite colleagues into it afterwards.
+      // See lib/cloudSwitchTarget.ts (Step 1 · 1G.1).
+      const currentFirmId = profile?.currentFirmId ?? null;
+      const currentFirmMembers = currentFirmId ? await fetchActiveFirmMembers(currentFirmId) : [];
+      const target = pickCloudSwitchTarget(currentFirmId, currentFirmMembers, user!.id);
+      let firmId = target.kind === 'reuse' ? target.firmId : null;
       if (!firmId) {
         const { data, error } = await supabase.rpc('create_firm', {
           firm_name: `${user?.user_metadata?.full_name || user?.email || 'My'}'s firm`,

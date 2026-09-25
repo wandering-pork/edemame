@@ -56,3 +56,8 @@ doesn't restrict what you can do.
 If your firm has more than one active member, you can't switch from Cloud Storage to Local
 Storage — Local Storage only supports one person. Remove the other members first if you really
 need to move to a single-device local folder.
+
+Switching from Local Storage to Cloud Storage copies your local folder into a firm that belongs to
+you alone. If you're already a member of a shared firm (for example, you accepted a colleague's
+invite), your local data goes into a new personal firm instead. It never replaces or mixes with a
+shared firm's data.

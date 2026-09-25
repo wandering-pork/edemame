@@ -3,6 +3,7 @@ import { normalizeTask } from '@/lib/taskStatus';
 import { normalizeTemplate } from '@/lib/templateTiming';
 import { generateCaseNumber } from '@/lib/caseNumber';
 import { normalizeCase, deriveLegacyStatus } from '@/lib/caseStage';
+import { isSoleActiveMember, type ActiveFirmMember } from '@/lib/cloudSwitchTarget';
 import type {
   Client,
   Case,
@@ -1174,8 +1175,30 @@ class CloudDeadlineRepository implements IDeadlineRepository {
 // Factory
 // ---------------------------------------------------------------------------
 
+/**
+ * A firm's active members as the signed-in user can see them. RLS only shows
+ * a firm's membership rows to its own active members, so an empty list means
+ * the caller isn't one.
+ */
+export async function fetchActiveFirmMembers(firmId: string): Promise<ActiveFirmMember[]> {
+  const { data, error } = await supabase
+    .from('firm_members')
+    .select('user_id, role')
+    .eq('firm_id', firmId)
+    .eq('status', 'active');
+  if (error) throw new Error(`Could not check the firm's members: ${error.message}`);
+  return (data ?? []).map((r: { user_id: string; role: string }) => ({ userId: r.user_id, role: r.role }));
+}
+
 export function createCloudRepositories(userId: string, firmId: string): Repositories {
   return {
+    // Step 1 · 1G.1: never let clearAll() wipe a firm other people share.
+    assertSafeToClear: async () => {
+      const members = await fetchActiveFirmMembers(firmId);
+      if (!isSoleActiveMember(members, userId)) {
+        throw new Error('This firm is shared with other people, so its data can\'t be replaced. Nothing was deleted.');
+      }
+    },
     clients: new CloudClientRepository(userId, firmId),
     cases: new CloudCaseRepository(userId, firmId),
     tasks: new CloudTaskRepository(userId, firmId),
