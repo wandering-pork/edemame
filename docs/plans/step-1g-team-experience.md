@@ -28,10 +28,12 @@ One of these gaps is a **data-loss bug** (1G.1), and it ships first on its own.
 
 Sizes are guesses for ordering, not estimates. Each row is one PR.
 
-**Migrations.** 1G.2 has its own migration (`20260927000000_firm_roles.sql`), because it changes
-the role values that every access rule checks. It must be applied *together with* the 1G.2
-deploy. 1G.3–1G.7 share one more migration (`20260927000100_team_experience.sql`), applied before
-1G.3 deploys. Every migration is dry-run in a rolled-back transaction first, as before.
+**Migrations.** Each PR that needs a database change carries its own migration file
+(`20260927000000_firm_roles.sql` for 1G.2, then `20260927000100_…`, `…0200_…` and so on for
+1G.3–1G.7). Each one is applied right before its PR deploys. 1G.2's is applied *together with*
+its deploy, because it changes the role values that every access rule checks. Every migration is
+dry-run in a rolled-back transaction first, as before. The "part 1–5" labels below say which PR
+each database change belongs to.
 
 ---
 
@@ -165,7 +167,7 @@ row any more (1G.6), so they come back as `'none'` and are simply invited again.
   "They already have an Edamame account — they'll see the invitation when they sign in (1G.4), or
   send them this link".
 
-**Migration (`20260927000100_team_experience.sql`, part 1)**
+**Migration (1G.3's own file, part 1)**
 - `firm_invites.declined_at timestamptz`.
 - A partial unique index: one open invite per firm per address,
   `unique (firm_id, lower(email)) where accepted_at is null and revoked_at is null and declined_at is null`.
@@ -420,8 +422,7 @@ everything the team experience needs:
 
 1. 1G.1 hotfix: merge and deploy. No migration.
 2. 1G.2: dry-run `20260927000000_firm_roles.sql`, then apply it and merge 1G.2 back to back.
-3. Dry-run and apply `20260927000100_team_experience.sql`, then merge 1G.3. Its later parts'
-   functions ship in the same migration, so there's one apply.
+3. For each of 1G.3 → 1G.7: dry-run and apply that PR's migration, then merge it.
 4. 1G.4 → 1G.7 in order, each with its manual test list. The team testers use two accounts: an
    owner, plus an invitee who is (a) brand new, and (b) an existing cloud user with their own firm.
    **Check early that invite emails reach an outside address** (see 1G.8).
