@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import type { Case, Client, Task, TeamMember, ActivityEvent } from '../types';
 import { toLocalISODate } from '../lib/dates';
+import { isTaskClosed } from '../lib/taskStatus';
+import { CASE_STAGE_LABELS } from '../lib/caseStage';
 
 interface TeamDashboardProps {
   teamMembers: TeamMember[];
@@ -68,7 +70,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
   const memberColumns = useMemo(() => {
     return teamMembers.map(m => {
       const openTasks = tasks
-        .filter(t => t.assignedTo === m.id && !t.isCompleted)
+        .filter(t => t.assignedTo === m.id && !isTaskClosed(t))
         .sort((a, b) => (a.date < b.date ? -1 : 1));
       return { member: m, openTasks };
     });
@@ -119,7 +121,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
   const caseProgress = (caseId: string) => {
     const t = tasks.filter(x => x.caseId === caseId);
     if (t.length === 0) return 0;
-    return Math.round((t.filter(x => x.isCompleted).length / t.length) * 100);
+    return Math.round((t.filter(isTaskClosed).length / t.length) * 100);
   };
 
   return (
@@ -278,7 +280,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                           {c.title}
                         </h3>
                         <p className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint truncate">
-                          {client?.name || 'Unknown client'} &middot; {c.status.replace('_', ' ')}
+                          {client?.name || 'Unknown client'} &middot; {CASE_STAGE_LABELS[c.stage]}
                         </p>
                         <div className="mt-1.5 flex items-center gap-2">
                           <div className="flex-1 h-1 rounded-full bg-paper-2 dark:bg-plate-card overflow-hidden max-w-[160px]">

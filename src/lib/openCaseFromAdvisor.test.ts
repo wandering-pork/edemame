@@ -123,7 +123,7 @@ describe('openCaseFromAdvisor', () => {
       title: 'Student (Subclass 500) - Jane Doe',
       description: 'summary',
       templateId: 'tpl-500',
-      status: 'open',
+      stage: 'draft',
       startDate: '2026-09-24',
       createdAt: '2026-09-24T01:00:00.000Z',
       visaSubclass: '500',
@@ -245,5 +245,48 @@ describe('openCaseFromAdvisor', () => {
     await expect(openCaseFromAdvisor(makeParams({ client: newClientChoice }), deps)).rejects.toThrow('disk full');
     expect(deps.createCase).not.toHaveBeenCalled();
     expect(deps.deleteClient).not.toHaveBeenCalled();
+  });
+
+  describe('timed templates (Step 1 · 1E)', () => {
+    const timedTemplate: WorkflowTemplate = {
+      id: 'tpl-190',
+      title: 'Skilled Nominated (Subclass 190)',
+      description: 'Skilled nominated visa workflow',
+      visaSubclass: '190',
+      version: 3,
+      steps: [
+        { key: 'coe', title: 'Skills assessment', description: '', timing: { anchor: { type: 'case_start' }, offsetDays: 2, fixed: false } },
+        { key: 'lodge', title: 'Lodge application', description: '', timing: { anchor: { type: 'step', stepKey: 'coe', edge: 'done' }, offsetDays: 1, fixed: false } },
+      ],
+    } as WorkflowTemplate;
+
+    it('builds tasks deterministically from the scheduler instead of calling the AI', async () => {
+      const { deps } = makeDeps({ templates: [timedTemplate] });
+      const result = await openCaseFromAdvisor(makeParams({ templateId: 'tpl-190' }), deps);
+
+      expect(deps.generateTasks).not.toHaveBeenCalled();
+      const [tasks, savedCase] = deps.createCase.mock.calls[0];
+      expect(savedCase.templateVersion).toBe(3);
+      expect(tasks.map((t: Task) => [t.title, t.stepKey, t.generatedByAi])).toEqual([
+        ['Skills assessment', 'coe', false],
+        ['Lodge application', 'lodge', false],
+      ]);
+      expect(tasks.every((t: Task) => t.caseId === result.caseId)).toBe(true);
+    });
+
+    it('skips deterministic generation entirely when generateTasks is off', async () => {
+      const { deps } = makeDeps({ templates: [timedTemplate] });
+      await openCaseFromAdvisor(makeParams({ templateId: 'tpl-190', generateTasks: false }), deps);
+
+      const [tasks, savedCase] = deps.createCase.mock.calls[0];
+      expect(tasks).toEqual([]);
+      expect(savedCase.templateVersion).toBeUndefined();
+    });
+
+    it('leaves the old AI-only flow untouched for a template with no timing data', async () => {
+      const { deps } = makeDeps(); // default `template` has steps with no `timing`
+      await openCaseFromAdvisor(makeParams(), deps);
+      expect(deps.generateTasks).toHaveBeenCalled();
+    });
   });
 });

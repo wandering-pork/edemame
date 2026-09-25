@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Client, Case, Task } from '../types';
+import { isTaskClosed } from '../lib/taskStatus';
+import { isCaseClosed } from '../lib/caseStage';
 import { Search, Plus, User, Users, Phone, Mail, MapPin, ChevronDown, ChevronUp, Briefcase, Upload, Globe, FileText, Scan, Check } from 'lucide-react';
 import { CsvImport } from '../components/CsvImport';
 import { PassportScanner } from '../components/PassportScanner';
@@ -82,7 +84,7 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
   const getActiveCase = (clientId: string) => {
     const clientCases = getClientCases(clientId);
     if (clientCases.length === 0) return null;
-    const open = clientCases.filter(c => c.status !== 'closed');
+    const open = clientCases.filter(c => !isCaseClosed(c));
     const pool = open.length > 0 ? open : clientCases;
     return [...pool].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0];
   };
@@ -91,7 +93,7 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
     const caseTasks = tasks.filter(t => t.caseId === caseId);
     if (caseTasks.length === 0) return { percent: 0, label: 'No Tasks' };
 
-    const completedCount = caseTasks.filter(t => t.isCompleted).length;
+    const completedCount = caseTasks.filter(isTaskClosed).length;
     const percent = Math.round((completedCount / caseTasks.length) * 100);
 
     return {

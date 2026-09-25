@@ -1,4 +1,7 @@
 import { supabase } from '@/lib/supabaseClient';
+import { normalizeTask } from '@/lib/taskStatus';
+import { normalizeTemplate } from '@/lib/templateTiming';
+import { normalizeCase, deriveLegacyStatus } from '@/lib/caseStage';
 import type {
   Client,
   Case,
@@ -14,6 +17,7 @@ import type {
   FocusConversation,
   UsageEvent,
   EligibilityAssessment,
+  Deadline,
 } from '@/types';
 import type {
   IClientRepository,
@@ -30,6 +34,7 @@ import type {
   IDocumentTypeRepository,
   IChatRepository,
   IEligibilityRepository,
+  IDeadlineRepository,
   Repositories,
 } from '@/repositories/types';
 
@@ -158,32 +163,48 @@ class CloudClientRepository implements IClientRepository {
 // ---------------------------------------------------------------------------
 
 function caseToRow(userId: string, c: Case) {
+  const normalized = normalizeCase(c);
   return {
-    id: c.id,
+    id: normalized.id,
     user_id: userId,
-    client_id: c.clientId,
-    title: c.title,
-    description: c.description,
-    template_id: c.templateId,
-    status: c.status,
-    start_date: c.startDate,
-    created_at: c.createdAt,
-    case_owner: c.caseOwner ?? null,
-    assignment_history: c.assignmentHistory ?? null,
-    applicant_id: c.applicantId ?? null,
-    case_number: c.caseNumber ?? null,
-    visa_subclass: c.visaSubclass ?? null,
+    client_id: normalized.clientId,
+    title: normalized.title,
+    description: normalized.description,
+    template_id: normalized.templateId,
+    // `stage`/`outcome`/`on_hold` columns added by
+    // `supabase/migrations/20260926000050_add_case_stage.sql` (not yet
+    // applied to production — see CLAUDE.md's manual-apply migration list).
+    // `status` is kept for one release as a derived mirror so any remaining
+    // reader of the legacy column keeps working — see `deriveLegacyStatus()`.
+    stage: normalized.stage,
+    outcome: normalized.outcome ?? null,
+    on_hold: normalized.onHold ?? false,
+    status: deriveLegacyStatus(normalized),
+    start_date: normalized.startDate,
+    created_at: normalized.createdAt,
+    case_owner: normalized.caseOwner ?? null,
+    assignment_history: normalized.assignmentHistory ?? null,
+    applicant_id: normalized.applicantId ?? null,
+    case_number: normalized.caseNumber ?? null,
+    visa_subclass: normalized.visaSubclass ?? null,
+    // `template_version` column added by
+    // `supabase/migrations/20260926000250_task_step_fields.sql` (not yet
+    // applied to production — see CLAUDE.md's manual-apply migration list).
+    template_version: normalized.templateVersion ?? null,
   };
 }
 
 function rowToCase(row: any): Case {
-  return {
+  return normalizeCase({
     id: row.id,
     clientId: row.client_id,
     title: row.title,
     description: row.description,
     templateId: row.template_id,
-    status: row.status,
+    stage: row.stage ?? undefined,
+    outcome: row.outcome ?? undefined,
+    onHold: row.on_hold ?? undefined,
+    status: row.status ?? undefined,
     startDate: row.start_date,
     createdAt: row.created_at,
     userId: row.user_id,
@@ -192,7 +213,8 @@ function rowToCase(row: any): Case {
     applicantId: row.applicant_id ?? undefined,
     caseNumber: row.case_number ?? undefined,
     visaSubclass: row.visa_subclass ?? undefined,
-  };
+    templateVersion: row.template_version ?? undefined,
+  });
 }
 
 class CloudCaseRepository implements ICaseRepository {
@@ -210,15 +232,17 @@ class CloudCaseRepository implements ICaseRepository {
   }
 
   async create(item: Case): Promise<Case> {
-    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, item), { onConflict: 'id' });
+    const normalized = normalizeCase(item);
+    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, normalized), { onConflict: 'id' });
     if (error) throw error;
-    return item;
+    return normalized;
   }
 
   async update(item: Case): Promise<Case> {
-    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, item), { onConflict: 'id' });
+    const normalized = normalizeCase(item);
+    const { error } = await supabase.from('cases').upsert(caseToRow(this.userId, normalized), { onConflict: 'id' });
     if (error) throw error;
-    return item;
+    return normalized;
   }
 
   async delete(id: string): Promise<void> {
@@ -237,33 +261,47 @@ class CloudCaseRepository implements ICaseRepository {
 // ---------------------------------------------------------------------------
 
 function taskToRow(userId: string, t: Task) {
+  const task = normalizeTask(t);
   return {
-    id: t.id,
+    id: task.id,
     user_id: userId,
-    title: t.title,
-    description: t.description,
-    date: t.date,
-    is_completed: t.isCompleted,
-    priority_order: t.priorityOrder,
-    case_id: t.caseId ?? null,
-    generated_by_ai: t.generatedByAi ?? null,
-    assigned_to: t.assignedTo ?? null,
+    title: task.title,
+    description: task.description,
+    date: task.date,
+    is_completed: task.isCompleted,
+    status: task.status,
+    status_reason: task.statusReason ?? null,
+    priority_order: task.priorityOrder,
+    case_id: task.caseId ?? null,
+    generated_by_ai: task.generatedByAi ?? null,
+    assigned_to: task.assignedTo ?? null,
+    // `step_key`/`date_locked`/`date_pending` columns added by
+    // `supabase/migrations/20260926000250_task_step_fields.sql` (not yet
+    // applied to production — see CLAUDE.md's manual-apply migration list).
+    step_key: task.stepKey ?? null,
+    date_locked: task.dateLocked ?? null,
+    date_pending: task.datePending ?? null,
   };
 }
 
 function rowToTask(row: any): Task {
-  return {
+  return normalizeTask({
     id: row.id,
     title: row.title,
     description: row.description,
     date: row.date,
     isCompleted: row.is_completed,
+    status: row.status ?? undefined,
+    statusReason: row.status_reason ?? undefined,
     priorityOrder: row.priority_order,
     caseId: row.case_id ?? undefined,
     generatedByAi: row.generated_by_ai ?? undefined,
     userId: row.user_id,
     assignedTo: row.assigned_to ?? undefined,
-  };
+    stepKey: row.step_key ?? undefined,
+    dateLocked: row.date_locked ?? undefined,
+    datePending: row.date_pending ?? undefined,
+  });
 }
 
 class CloudTaskRepository implements ITaskRepository {
@@ -281,15 +319,17 @@ class CloudTaskRepository implements ITaskRepository {
   }
 
   async create(item: Task): Promise<Task> {
-    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, item), { onConflict: 'id' });
+    const normalized = normalizeTask(item);
+    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, normalized), { onConflict: 'id' });
     if (error) throw error;
-    return item;
+    return normalized;
   }
 
   async update(item: Task): Promise<Task> {
-    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, item), { onConflict: 'id' });
+    const normalized = normalizeTask(item);
+    const { error } = await supabase.from('tasks').upsert(taskToRow(this.userId, normalized), { onConflict: 'id' });
     if (error) throw error;
-    return item;
+    return normalized;
   }
 
   async delete(id: string): Promise<void> {
@@ -322,18 +362,28 @@ function templateToRow(userId: string, t: WorkflowTemplate) {
     description: t.description,
     visa_subclass: t.visaSubclass ?? null,
     steps: t.steps ?? null,
+    // `version`/`timing_verified` columns added by
+    // `supabase/migrations/20260926000200_template_version.sql` (not yet
+    // applied to production — see CLAUDE.md's manual-apply migration list).
+    // Like `case_number`/`visa_subclass` before it, this migration must be
+    // applied *before* this frontend build reaches production, or PostgREST
+    // rejects every custom-template insert/update with an unknown-column error.
+    version: t.version ?? null,
+    timing_verified: t.timingVerified ?? null,
   };
 }
 
 function rowToTemplate(row: any): WorkflowTemplate {
-  return {
+  return normalizeTemplate({
     id: row.id,
     title: row.title,
     description: row.description,
     visaSubclass: row.visa_subclass ?? undefined,
     steps: row.steps ?? undefined,
     userId: row.user_id,
-  };
+    version: row.version ?? undefined,
+    timingVerified: row.timing_verified ?? undefined,
+  });
 }
 
 class CloudTemplateRepository implements ITemplateRepository {
@@ -983,6 +1033,86 @@ class CloudEligibilityRepository implements IEligibilityRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Deadlines
+// ---------------------------------------------------------------------------
+
+export function deadlineToRow(userId: string, d: Deadline) {
+  return {
+    id: d.id,
+    user_id: userId,
+    kind: d.kind,
+    title: d.title,
+    due_date: d.dueDate,
+    case_id: d.caseId ?? null,
+    client_id: d.clientId ?? null,
+    triggered_on: d.triggeredOn ?? null,
+    status: d.status,
+    resolved_at: d.resolvedAt ?? null,
+    notes: d.notes ?? null,
+    created_at: d.createdAt,
+  };
+}
+
+export function rowToDeadline(row: any): Deadline {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    kind: row.kind,
+    title: row.title,
+    dueDate: row.due_date,
+    caseId: row.case_id ?? undefined,
+    clientId: row.client_id ?? undefined,
+    triggeredOn: row.triggered_on ?? undefined,
+    status: row.status,
+    resolvedAt: row.resolved_at ?? undefined,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+class CloudDeadlineRepository implements IDeadlineRepository {
+  constructor(private userId: string) {}
+
+  async getAll(): Promise<Deadline[]> {
+    const rows = await fetchAllRows('deadlines', q => q.eq('user_id', this.userId));
+    return rows.map(rowToDeadline);
+  }
+
+  async getById(id: string): Promise<Deadline | undefined> {
+    const { data, error } = await supabase.from('deadlines').select('*').eq('user_id', this.userId).eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data ? rowToDeadline(data) : undefined;
+  }
+
+  async create(item: Deadline): Promise<Deadline> {
+    const { error } = await supabase.from('deadlines').upsert(deadlineToRow(this.userId, item), { onConflict: 'id' });
+    if (error) throw error;
+    return item;
+  }
+
+  async update(item: Deadline): Promise<Deadline> {
+    const { error } = await supabase.from('deadlines').upsert(deadlineToRow(this.userId, item), { onConflict: 'id' });
+    if (error) throw error;
+    return item;
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('deadlines').delete().eq('user_id', this.userId).eq('id', id);
+    if (error) throw error;
+  }
+
+  async getByCaseId(caseId: string): Promise<Deadline[]> {
+    const rows = await fetchAllRows('deadlines', q => q.eq('user_id', this.userId).eq('case_id', caseId));
+    return rows.map(rowToDeadline);
+  }
+
+  async getByClientId(clientId: string): Promise<Deadline[]> {
+    const rows = await fetchAllRows('deadlines', q => q.eq('user_id', this.userId).eq('client_id', clientId));
+    return rows.map(rowToDeadline);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -1002,5 +1132,6 @@ export function createCloudRepositories(userId: string): Repositories {
     documentTypes: new CloudDocumentTypeRepository(userId),
     chat: new CloudChatRepository(userId),
     eligibility: new CloudEligibilityRepository(userId),
+    deadlines: new CloudDeadlineRepository(userId),
   };
 }

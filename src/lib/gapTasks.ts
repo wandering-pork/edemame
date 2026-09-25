@@ -34,6 +34,7 @@ export function buildGapTasks(
     title: gapTaskTitle(gap),
     description: gap,
     date: dueDate,
+    status: 'not_started',
     isCompleted: false,
     priorityOrder: index,
     caseId,

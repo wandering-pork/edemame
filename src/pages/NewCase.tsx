@@ -5,6 +5,7 @@ import { WorkflowTemplate, Task, Client, Case } from '../types';
 import { Sparkles, Calendar, Loader2, Save, User, ChevronDown, ChevronUp, List, X } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { toLocalISODate } from '../lib/dates';
+import { buildTemplateTaskDrafts, templateHasTiming } from '../lib/tasksFromTemplate';
 
 interface NewCaseProps {
   templates: WorkflowTemplate[];
@@ -193,10 +194,22 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
     if (!description || !templateId || !clientId) return;
 
     setErrorMessage(null);
-    setIsLoading(true);
     setGeneratedTasks([]);
     setRevealedTasks([]);
     setStep('generating');
+
+    // Step 1 · 1E: a template with real step timing gets its plan built
+    // deterministically from the scheduler, with no AI call at all — see
+    // "Generation flow" in docs/plans/step-1-foundations.md. Extra
+    // case-specific tasks can be suggested afterwards from the case page.
+    if (templateHasTiming(selectedTemplate)) {
+      const { drafts } = buildTemplateTaskDrafts(selectedTemplate!.steps!, startDate);
+      setGeneratedTasks(drafts);
+      streamInTasks(drafts);
+      return;
+    }
+
+    setIsLoading(true);
 
     // Build rich client context — the more the LLM knows, the more specific the tasks
     const applicant = splitRoles && selectedApplicant ? selectedApplicant : selectedClient;
@@ -245,6 +258,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
     setIsSubmitting(true);
 
     const newCaseId = uuidv4();
+    const usesTimedTemplate = templateHasTiming(selectedTemplate);
 
     const newCase: Case = {
       id: newCaseId,
@@ -253,10 +267,11 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       title: `${selectedTemplate?.title} - ${selectedClient.name}`,
       description: description,
       templateId: templateId,
-      status: 'open',
+      stage: 'draft',
       startDate: startDate,
       createdAt: new Date().toISOString(),
       visaSubclass: selectedTemplate?.visaSubclass,
+      templateVersion: usesTimedTemplate ? selectedTemplate?.version : undefined,
     };
 
     const finalTasks: Task[] = generatedTasks.map((t, index) => ({
@@ -264,10 +279,13 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       title: t.title || 'Untitled Task',
       description: t.description || '',
       date: t.date || startDate,
+      status: 'not_started',
       isCompleted: false,
       priorityOrder: index,
-      generatedByAi: true,
+      generatedByAi: t.generatedByAi ?? true,
       caseId: newCaseId,
+      stepKey: t.stepKey,
+      datePending: t.datePending,
     }));
 
     onTasksConfirmed(finalTasks, newCase);
@@ -564,7 +582,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                 ) : (
                   <>
                     <Sparkles size={18} />
-                    Generate Plan with AI
+                    {templateHasTiming(selectedTemplate) ? 'Generate plan from template' : 'Generate Plan with AI'}
                   </>
                 )}
               </button>
@@ -629,6 +647,12 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                 {generatedTasks.length} tasks
               </span>
             </div>
+
+            {templateHasTiming(selectedTemplate) && (
+              <p className="mt-3 text-[11.5px] text-ink-faint dark:text-plate-ink-faint">
+                This plan was built from the template's own timing — dates marked "Estimated" will firm up as deadlines are recorded. Once the case is created, you can ask for AI-suggested extra tasks tailored to this case from the case page.
+              </p>
+            )}
 
             <div className="flex flex-col gap-2 mt-4">
               {generatedTasks.map((task, idx) => (

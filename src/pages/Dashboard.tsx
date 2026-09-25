@@ -1,23 +1,28 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Task, Case, Client, TeamMember, ActivityEvent, DocumentChecklistItem } from '../types';
+import { Task, Case, Client, TeamMember, ActivityEvent, DocumentChecklistItem, Deadline } from '../types';
 import {
   format,
   isSameDay,
   isSameMonth,
-  isBefore,
   startOfDay,
   differenceInCalendarDays,
 } from 'date-fns';
 import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight, SkipBack, SkipForward } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { buildWindow, computeAutoWindowStart, jumpWeek, stepDay } from '../lib/calendarWindow';
+import { overdueTasksFor, dueTodayTasksFor, waitingTasksFor, buildAttentionItems, deadlineAttentionItemsFor, mergeAttentionItems } from '../lib/attention';
+import { allDeadlines } from '../lib/deadlines';
+import { isTaskClosed } from '../lib/taskStatus';
+import { isCaseClosed } from '../lib/caseStage';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 
 interface DashboardProps {
   tasks: Task[];
   cases: Case[];
   clients: Client[];
+  /** Optional — App.tsx loads `deadlines` from `repos.deadlines`; when absent, "Needs attention" shows tasks only. */
+  deadlines?: Deadline[];
   teamMembers?: TeamMember[];
   currentUserId?: string;
   onUpdateTask: (task: Task) => void;
@@ -27,7 +32,7 @@ interface DashboardProps {
     taskId: string,
     newDate: string,
     offsetFuture: boolean,
-    taskPatch?: { title?: string; description?: string },
+    taskPatch?: { title?: string; description?: string; dateLocked?: boolean },
   ) => void;
   onAddTask: (task: Task) => void;
   /**
@@ -78,7 +83,7 @@ const EVENT_KIND: Record<'task' | 'filing' | 'deadline', { label: string; edge: 
  * title suggests a lodgement read as Filing, everything else is a plain Task.
  */
 const getEventKind = (task: Task): keyof typeof EVENT_KIND => {
-  if (!task.isCompleted) {
+  if (!isTaskClosed(task)) {
     const daysUntil = differenceInCalendarDays(startOfDay(new Date(task.date)), startOfDay(new Date()));
     if (daysUntil <= 0) return 'deadline';
   }
@@ -91,6 +96,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   tasks,
   cases,
   clients,
+  deadlines = [],
   teamMembers = [],
   currentUserId,
   activity = [],
@@ -162,6 +168,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       description: newTask.description,
       date: newTask.date,
       caseId: newTask.caseId || undefined,
+      status: 'not_started',
       isCompleted: false,
       priorityOrder: 99999,
       generatedByAi: false,
@@ -177,27 +184,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   // ── Stat cards ─────────────────────────────────────────────────────────
-  const activeCases = useMemo(() => cases.filter(c => c.status === 'open' || c.status === 'in_progress'), [cases]);
+  const activeCases = useMemo(() => cases.filter(c => !isCaseClosed(c) && !c.onHold), [cases]);
   const newCasesThisMonth = useMemo(
     () => cases.filter(c => c.createdAt && isSameMonth(new Date(c.createdAt), now)).length,
     [cases]
   );
 
-  const overdueTasks = useMemo(
-    () =>
-      tasks
-        .filter(t => !t.isCompleted && isBefore(startOfDay(new Date(t.date)), today))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    [tasks]
-  );
-  const dueTodayTasks = useMemo(
-    () => tasks.filter(t => !t.isCompleted && isSameDay(new Date(t.date), today)),
-    [tasks]
-  );
+  const overdueTasks = useMemo(() => overdueTasksFor(tasks, today), [tasks]);
+  const dueTodayTasks = useMemo(() => dueTodayTasksFor(tasks, today), [tasks]);
+  const waitingTasks = useMemo(() => waitingTasksFor(tasks), [tasks]);
   const dueThisWeekTasks = useMemo(
     () =>
       tasks.filter(t => {
-        if (t.isCompleted) return false;
+        if (isTaskClosed(t)) return false;
         const d = differenceInCalendarDays(startOfDay(new Date(t.date)), today);
         return d >= 0 && d <= 6;
       }),
@@ -238,6 +237,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       delta: docsOutstanding !== null ? 'Across active checklists' : 'Not tracked on this screen',
       color: docsOutstanding !== null ? 'text-[#B45309] dark:text-[#FBBF24]' : 'text-slate-400 dark:text-slate-500',
     },
+    {
+      label: 'Waiting on client',
+      value: String(waitingTasks.length),
+      delta: waitingTasks.length > 0 ? 'Not counted as overdue' : 'Nothing blocked',
+      color: 'text-slate-400 dark:text-slate-500',
+    },
   ];
 
   const summaryLine = `${dueTodayTasks.length} task${dueTodayTasks.length === 1 ? '' : 's'} due today · ${overdueTasks.length} overdue${
@@ -245,35 +250,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }`;
 
   // ── Needs attention ───────────────────────────────────────────────────
-  const attentionItems = useMemo(() => {
-    const items: { id: string; dot: string; title: string; sub: string; caseId?: string }[] = [];
+  const [showAllAttention, setShowAllAttention] = useState(false);
+  const ATTENTION_VISIBLE_DEFAULT = 5;
+  const getClientById = (clientId?: string) => (clientId ? clients.find(c => c.id === clientId) : undefined);
+  const taskAttentionItems = useMemo(
+    () => buildAttentionItems(overdueTasks, dueTodayTasks, getCaseAndClient, iso => format(new Date(iso), 'd MMM')),
+    [overdueTasks, dueTodayTasks, cases, clients]
+  );
+  const deadlineAttentionItems = useMemo(
+    () => deadlineAttentionItemsFor(allDeadlines(deadlines, clients), today, getCaseAndClient, getClientById),
+    [deadlines, clients, cases, today.getTime()]
+  );
+  // Deadlines at urgency ≥ soon rank above tasks, ranked by consequence — see plan 1D.
+  const allAttentionItems = useMemo(
+    () => mergeAttentionItems(deadlineAttentionItems, taskAttentionItems),
+    [deadlineAttentionItems, taskAttentionItems]
+  );
+  const attentionItems = showAllAttention ? allAttentionItems : allAttentionItems.slice(0, ATTENTION_VISIBLE_DEFAULT);
+  const hiddenAttentionCount = allAttentionItems.length - attentionItems.length;
 
-    overdueTasks.forEach(t => {
-      const { case: c, client } = getCaseAndClient(t.caseId);
-      items.push({
-        id: t.id,
-        dot: '#EF4444',
-        title: `${t.title} overdue`,
-        sub: c
-          ? `${client?.name || 'Unknown client'} · ${c.title} · was due ${format(new Date(t.date), 'd MMM')}`
-          : `No linked case · was due ${format(new Date(t.date), 'd MMM')}`,
-        caseId: c?.id,
-      });
-    });
-
-    dueTodayTasks.forEach(t => {
-      const { case: c, client } = getCaseAndClient(t.caseId);
-      items.push({
-        id: t.id,
-        dot: '#F59E0B',
-        title: `${t.title} due today`,
-        sub: c ? `${client?.name || 'Unknown client'} · ${c.title}` : 'No linked case',
-        caseId: c?.id,
-      });
-    });
-
-    return items.slice(0, 5);
-  }, [overdueTasks, dueTodayTasks, cases, clients]);
+  const handleAttentionItemClick = (item: (typeof allAttentionItems)[number]) => {
+    if (item.kind === 'deadline') {
+      if (item.caseId) {
+        navigate(`/cases/${item.caseId}`);
+      } else if (item.clientId) {
+        navigate('/clients', { state: { focusClientId: item.clientId } });
+      }
+      return;
+    }
+    setSelectedTaskId(item.id);
+  };
 
   // ── Agent activity ────────────────────────────────────────────────────
   const activityItems = useMemo(() => {
@@ -329,7 +335,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       return;
     }
     const newDate = format(day, 'yyyy-MM-dd');
-    onMoveTaskDate(draggingTaskId, newDate, false);
+    // A calendar drag is a manual date edit — see `Task.dateLocked`.
+    onMoveTaskDate(draggingTaskId, newDate, false, { dateLocked: true });
     setDraggingTaskId(null);
   };
 
@@ -363,7 +370,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* ── Stat cards ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mt-[22px]">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 mt-[22px]">
           {stats.map(st => (
             <div
               key={st.label}
@@ -386,46 +393,67 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-3.5 mt-3.5 items-start">
           {/* Needs attention */}
           <div className="bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 pt-4 pb-2.5">
+            <div className="flex items-center justify-between px-5 pt-4 pb-1">
               <span className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-ink-soft dark:text-plate-ink-soft">
                 Needs attention
               </span>
               <span
                 className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-md ${
-                  attentionItems.length > 0
+                  allAttentionItems.length > 0
                     ? 'bg-red-500/[.13] text-[#B91C1C] dark:text-[#F87171]'
                     : 'bg-edamame/10 text-[#047857] dark:text-[#4ADE80]'
                 }`}
               >
-                {attentionItems.length > 0 ? `${attentionItems.length} item${attentionItems.length === 1 ? '' : 's'}` : 'All clear'}
+                {allAttentionItems.length > 0 ? `${allAttentionItems.length} item${allAttentionItems.length === 1 ? '' : 's'}` : 'All clear'}
               </span>
+            </div>
+            <div className="px-5 pb-2.5 text-[10.5px] text-ink-soft/70 dark:text-plate-ink-soft/70">
+              Overdue first, then due today.
             </div>
             {attentionItems.length === 0 ? (
               <div className="px-5 py-8 text-center text-[12.5px] text-ink-soft dark:text-plate-ink-soft border-t border-ink/10 dark:border-plate-ink/15">
                 Nothing needs attention right now.
               </div>
             ) : (
-              attentionItems.map(item => (
-                <div
-                  key={item.id}
-                  onClick={() => (item.caseId ? navigate(`/cases/${item.caseId}`) : setSelectedTaskId(item.id))}
-                  className="flex items-center gap-3 px-5 py-3 border-t border-ink/10 dark:border-plate-ink/15 cursor-pointer transition-colors hover:bg-paper-2 dark:hover:bg-plate/60"
-                >
-                  <span
-                    className="badge-pulse w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: item.dot }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-semibold tracking-[-0.01em] text-ink dark:text-plate-ink truncate">
-                      {item.title}
+              <>
+                {attentionItems.map(item => (
+                  <div
+                    key={item.id}
+                    onClick={() => handleAttentionItemClick(item)}
+                    className="flex items-center gap-3 px-5 py-3 border-t border-ink/10 dark:border-plate-ink/15 cursor-pointer transition-colors hover:bg-paper-2 dark:hover:bg-plate/60"
+                  >
+                    <span
+                      className="badge-pulse w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: item.dot }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-semibold tracking-[-0.01em] text-ink dark:text-plate-ink truncate">
+                        {item.title}
+                      </div>
+                      <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5 truncate">{item.sub}</div>
                     </div>
-                    <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5 truncate">{item.sub}</div>
+                    <span className="text-xs font-semibold text-edamame-600 dark:text-edamame-400 whitespace-nowrap">
+                      {item.kind === 'deadline' ? (item.caseId ? 'View case →' : 'View client →') : 'View task →'}
+                    </span>
                   </div>
-                  <span className="text-xs font-semibold text-edamame-600 dark:text-edamame-400 whitespace-nowrap">
-                    {item.caseId ? 'Open case →' : 'View task →'}
-                  </span>
-                </div>
-              ))
+                ))}
+                {hiddenAttentionCount > 0 && (
+                  <button
+                    onClick={() => setShowAllAttention(true)}
+                    className="w-full px-5 py-2.5 border-t border-ink/10 dark:border-plate-ink/15 text-[12px] font-semibold text-edamame-600 dark:text-edamame-400 hover:bg-paper-2 dark:hover:bg-plate/60 transition-colors text-left"
+                  >
+                    View all {allAttentionItems.length}
+                  </button>
+                )}
+                {showAllAttention && allAttentionItems.length > ATTENTION_VISIBLE_DEFAULT && (
+                  <button
+                    onClick={() => setShowAllAttention(false)}
+                    className="w-full px-5 py-2.5 border-t border-ink/10 dark:border-plate-ink/15 text-[12px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate/60 transition-colors text-left"
+                  >
+                    Show fewer
+                  </button>
+                )}
+              </>
             )}
           </div>
 

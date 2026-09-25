@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Case, Client, Task, CaseStatus, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate } from '../types';
+import { Case, Client, Task, CaseStage, CaseOutcome, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useAuth } from '../contexts/AuthContext';
 import { CaseNotes } from '../components/CaseNotes';
@@ -20,17 +20,23 @@ import { recalcAutoLinks, recalcAutoLinkForItem } from '../lib/autoLink';
 import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplates';
 import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib/caseTabsStore';
 import { displayCaseNumber } from '../lib/caseNumber';
+import { isTaskClosed, isWaiting, withStatus, TASK_STATUS_LABELS, TASK_STATUS_ORDER } from '../lib/taskStatus';
+import { CASE_STAGE_LABELS, CASE_STAGE_ORDER, evaluateTransition, outcomeRequired } from '../lib/caseStage';
+import { allDeadlines, daysLeft, urgency } from '../lib/deadlines';
+import { toLocalISODate, addDaysISO } from '../lib/dates';
+import { buildTemplateTaskDrafts, knownAnchorsFromDeadlines, templateHasTiming } from '../lib/tasksFromTemplate';
+import { suggestAdditions, TaskSuggestion } from '../services/geminiService';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Calendar,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Plus,
   Trash2,
   Edit2,
   Check,
-  RotateCcw,
   X,
   Save,
   ChevronDown,
@@ -48,6 +54,7 @@ import {
   Columns2,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 import type { Document, EligibilityAssessment } from '../types';
 
 interface CaseDetailsProps {
@@ -59,14 +66,35 @@ interface CaseDetailsProps {
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
   onAddTask: (task: Task) => void;
+  /** Bulk add — used by "Generate plan from template" (Step 1 · 1E). */
+  onAddTasks: (tasks: Task[]) => void;
   onMoveTaskDate: (
     taskId: string,
     newDate: string,
     offsetFuture: boolean,
-    taskPatch?: { title?: string; description?: string },
+    taskPatch?: { title?: string; description?: string; dateLocked?: boolean },
   ) => void;
+  /** Every deadline currently loaded — filtered to this case (+ the client's passport-expiry deadline) below. */
+  deadlines: Deadline[];
+  onAddDeadline: (deadline: Deadline) => void;
+  onUpdateDeadline: (deadline: Deadline) => void;
+  onUpdateCase: (caseItem: Case) => void;
   onBack: () => void;
 }
+
+const DEADLINE_KIND_LABELS: Record<DeadlineKind, string> = {
+  visa_expiry: 'Visa expiry',
+  passport_expiry: 'Passport expiry',
+  s56_response: 's56 response',
+  s57_response: 's57 response',
+  nomination_validity: 'Nomination validity',
+  invitation_window: 'Invitation window',
+  other: 'Other',
+};
+
+const DEADLINE_KIND_ORDER: DeadlineKind[] = [
+  's56_response', 's57_response', 'invitation_window', 'nomination_validity', 'visa_expiry', 'passport_expiry', 'other',
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -115,7 +143,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   onUpdateTask,
   onDeleteTask,
   onAddTask,
+  onAddTasks,
   onMoveTaskDate,
+  deadlines,
+  onAddDeadline,
+  onUpdateDeadline,
+  onUpdateCase,
   onBack
 }) => {
   const repos = useRepositories();
@@ -130,6 +163,31 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [taskForm, setTaskForm] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd') });
+  // When a task row's status menu picks "Not applicable", a reason must be
+  // entered and confirmed inline before the status change is applied.
+  const [naReasonDraft, setNaReasonDraft] = useState<{ taskId: string; reason: string } | null>(null);
+
+  // ---- Generate-from-template / AI suggestions state (Step 1 · 1E) ----
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<TaskSuggestion[]>([]);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+
+  // ---- Deadline panel state ----
+  const [showAddDeadline, setShowAddDeadline] = useState(false);
+  const [deadlineForm, setDeadlineForm] = useState<{ kind: DeadlineKind; title: string; dueDate: string; notes: string }>({
+    kind: 'other',
+    title: '',
+    dueDate: toLocalISODate(),
+    notes: '',
+  });
+  // s56/s57 quick-add: the agent enters the received date, the due date defaults to
+  // received + 28 days (editable — response periods vary by request) and must be confirmed.
+  const [quickAddKind, setQuickAddKind] = useState<'s56_response' | 's57_response' | null>(null);
+  const [quickAddForm, setQuickAddForm] = useState<{ receivedDate: string; dueDate: string }>({
+    receivedDate: toLocalISODate(),
+    dueDate: addDaysISO(toLocalISODate(), 28),
+  });
 
   // ---- Case edit/delete state ----
   const [currentCase, setCurrentCase] = useState<Case>(caseItem);
@@ -162,6 +220,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // ---- Top-bar menu state ----
   const [statusOpen, setStatusOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+
+  // ---- Stage control state ----
+  // A backward move (e.g. lodged -> preparing) needs an inline confirm before
+  // it's applied; moving to `closed` needs an outcome picked first. Both are
+  // staged here rather than applied immediately from the stage menu.
+  const [backwardConfirmStage, setBackwardConfirmStage] = useState<CaseStage | null>(null);
+  const [outcomePickerOpen, setOutcomePickerOpen] = useState(false);
+  const [outcomeDraft, setOutcomeDraft] = useState<CaseOutcome | ''>('');
 
   // ---- Agent panel state (closed by default per design) ----
   const [agentOpen, setAgentOpen] = useState(false);
@@ -204,22 +270,46 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.priorityOrder - b.priorityOrder);
   }, [tasks, caseItem.id]);
 
-  const completedTasks = caseTasks.filter(t => t.isCompleted);
-  const pendingTasks = caseTasks.filter(t => !t.isCompleted);
+  // Case-linked stored deadlines, plus the client's passport-expiry deadline
+  // (stored if the agent has one on record, derived/virtual otherwise) — see
+  // lib/deadlines.ts's allDeadlines(). Client-level deadlines of any other
+  // kind aren't included here; passport expiry is the only kind derived in
+  // this slice (visa expiry becomes derived once Step 2 records grants).
+  const caseDeadlines = useMemo(() => {
+    const relevant = deadlines.filter(
+      d => d.caseId === caseItem.id || (d.clientId === client.id && d.kind === 'passport_expiry'),
+    );
+    return allDeadlines(relevant, [client]).sort((a, b) => daysLeft(a, new Date()) - daysLeft(b, new Date()));
+  }, [deadlines, caseItem.id, client]);
+
+  const completedTasks = caseTasks.filter(isTaskClosed);
+  const pendingTasks = caseTasks.filter(t => !isTaskClosed(t));
   const progress = caseTasks.length > 0 ? Math.round((completedTasks.length / caseTasks.length) * 100) : 0;
 
-  const hasOverdue = pendingTasks.some(t => new Date(t.date) < new Date());
+  const hasOverdue = pendingTasks.some(t => !isWaiting(t) && new Date(t.date) < new Date());
   const passportExpiry = client.passportExpiry ? new Date(client.passportExpiry) : null;
   const daysToPassportExpiry = passportExpiry ? Math.floor((passportExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
   const uploadedCount = checklist.filter(c => c.status === 'linked' || c.status === 'verified').length;
   const overdueCount = pendingTasks.filter(t => new Date(t.date) < new Date()).length;
   const outstandingDocs = checklist.length > 0 ? checklist.length - uploadedCount : 0;
 
-  const STATUS_META: Record<CaseStatus, { label: string; chip: string; dot: string }> = {
-    open: { label: 'Open', chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
-    in_progress: { label: 'In Progress', chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
-    on_hold: { label: 'On Hold', chip: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
-    closed: { label: 'Closed', chip: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300', dot: 'bg-green-500' },
+  const STAGE_META: Record<CaseStage, { chip: string; dot: string }> = {
+    draft: { chip: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300', dot: 'bg-slate-400' },
+    assessment: { chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+    engaged: { chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+    preparing: { chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+    ready_to_lodge: { chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+    lodged: { chip: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+    info_requested: { chip: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
+    decision: { chip: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+    closed: { chip: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300', dot: 'bg-green-500' },
+  };
+
+  const OUTCOME_LABELS: Record<CaseOutcome, string> = {
+    granted: 'Granted',
+    refused: 'Refused',
+    withdrawn: 'Withdrawn',
+    lapsed: 'Lapsed',
   };
 
   // Rail alerts (overdue red, docs outstanding amber, passport expiry red)
@@ -444,10 +534,52 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   // ---- Case handlers ----
-  const handleStatusChange = async (newStatus: CaseStatus) => {
-    const updated = { ...currentCase, status: newStatus };
-    await repos.cases.update(updated);
+  const applyStageChange = (newStage: CaseStage, outcome?: CaseOutcome) => {
+    const updated: Case = { ...currentCase, stage: newStage, outcome: newStage === 'closed' ? outcome : undefined };
     setCurrentCase(updated);
+    onUpdateCase(updated);
+  };
+
+  /**
+   * Every stage move is allowed — see `lib/caseStage.ts`'s `evaluateTransition()`
+   * — but a backward move or a move to `closed` needs an inline confirm/pick
+   * before it's applied, rather than `window.confirm`/`window.prompt`.
+   */
+  const handleStageSelect = (newStage: CaseStage) => {
+    setStatusOpen(false);
+    if (newStage === currentCase.stage) return;
+    const transition = evaluateTransition(currentCase.stage, newStage);
+    if (transition.requiresOutcome) {
+      setBackwardConfirmStage(null);
+      setOutcomeDraft('');
+      setOutcomePickerOpen(true);
+      return;
+    }
+    if (transition.isBackward) {
+      setOutcomePickerOpen(false);
+      setBackwardConfirmStage(newStage);
+      return;
+    }
+    applyStageChange(newStage);
+  };
+
+  const confirmBackwardMove = () => {
+    if (!backwardConfirmStage) return;
+    applyStageChange(backwardConfirmStage);
+    setBackwardConfirmStage(null);
+  };
+
+  const confirmOutcome = () => {
+    if (!outcomeDraft) return;
+    applyStageChange('closed', outcomeDraft);
+    setOutcomePickerOpen(false);
+    setOutcomeDraft('');
+  };
+
+  const handleToggleOnHold = () => {
+    const updated: Case = { ...currentCase, onHold: !currentCase.onHold };
+    setCurrentCase(updated);
+    onUpdateCase(updated);
   };
 
   const handleSaveCase = async () => {
@@ -461,6 +593,53 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const handleDeleteCase = async () => {
     await repos.cases.delete(currentCase.id);
     onBack();
+  };
+
+  // ---- Deadline handlers ----
+  const handleAddDeadlineSubmit = () => {
+    if (!deadlineForm.title.trim() || !deadlineForm.dueDate) return;
+    onAddDeadline({
+      id: uuidv4(),
+      kind: deadlineForm.kind,
+      title: deadlineForm.title.trim(),
+      dueDate: deadlineForm.dueDate,
+      caseId: caseItem.id,
+      clientId: client.id,
+      status: 'open',
+      notes: deadlineForm.notes.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    });
+    setDeadlineForm({ kind: 'other', title: '', dueDate: toLocalISODate(), notes: '' });
+    setShowAddDeadline(false);
+  };
+
+  const openQuickAdd = (kind: 's56_response' | 's57_response') => {
+    setQuickAddKind(kind);
+    setQuickAddForm({ receivedDate: toLocalISODate(), dueDate: addDaysISO(toLocalISODate(), 28) });
+  };
+
+  const handleQuickAddReceivedDateChange = (receivedDate: string) => {
+    setQuickAddForm({ receivedDate, dueDate: addDaysISO(receivedDate, 28) });
+  };
+
+  const handleQuickAddSubmit = () => {
+    if (!quickAddKind || !quickAddForm.dueDate) return;
+    onAddDeadline({
+      id: uuidv4(),
+      kind: quickAddKind,
+      title: DEADLINE_KIND_LABELS[quickAddKind],
+      dueDate: quickAddForm.dueDate,
+      triggeredOn: quickAddForm.receivedDate,
+      caseId: caseItem.id,
+      clientId: client.id,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+    });
+    setQuickAddKind(null);
+  };
+
+  const resolveDeadline = (deadline: Deadline, status: 'met' | 'missed' | 'dismissed') => {
+    onUpdateDeadline({ ...deadline, status, resolvedAt: new Date().toISOString() });
   };
 
   // ---- Task handlers ----
@@ -487,7 +666,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     if (futureTasks.length > 0) {
       setOffsetModal({ taskId, newDate: editingDate.date });
     } else {
-      onMoveTaskDate(taskId, editingDate.date, false);
+      onMoveTaskDate(taskId, editingDate.date, false, { dateLocked: true });
     }
     setEditingDate(null);
   };
@@ -495,13 +674,13 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const handleSetToday = (taskId: string) => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const task = tasks.find(t => t.id === taskId);
-    if (!task || task.date === today || task.isCompleted) return;
+    if (!task || task.date === today || isTaskClosed(task)) return;
 
     const futureTasks = pendingTasks.filter(t => t.id !== taskId && new Date(t.date) > new Date(task.date));
     if (futureTasks.length > 0) {
       setOffsetModal({ taskId, newDate: today });
     } else {
-      onMoveTaskDate(taskId, today, false);
+      onMoveTaskDate(taskId, today, false, { dateLocked: true });
     }
   };
 
@@ -534,6 +713,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         title: taskForm.title,
         description: taskForm.description,
         date: taskForm.date,
+        status: 'not_started',
         isCompleted: false,
         priorityOrder: 999,
         generatedByAi: false
@@ -542,9 +722,85 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setIsTaskModalOpen(false);
   };
 
+  // ---- Generate plan from template (Step 1 · 1E) ----
+  // Deterministic — one task per timed step, dated by `scheduleFromTemplate`.
+  // Only offered while the case has none of that template's step tasks yet.
+  const handleGeneratePlanFromTemplate = () => {
+    if (!workflowTemplate?.steps?.length || generatingPlan) return;
+    setGeneratingPlan(true);
+    try {
+      const knownAnchors = knownAnchorsFromDeadlines(caseDeadlines);
+      const { drafts } = buildTemplateTaskDrafts(workflowTemplate.steps, caseItem.startDate, knownAnchors);
+      const newTasks: Task[] = drafts.map((d, index) => ({
+        id: uuidv4(),
+        caseId: caseItem.id,
+        priorityOrder: index,
+        assignedTo: caseItem.caseOwner,
+        ...d,
+      }));
+      onAddTasks(newTasks);
+      if (workflowTemplate.version !== undefined) {
+        onUpdateCase({ ...currentCase, templateVersion: workflowTemplate.version });
+      }
+      toast.success(`${newTasks.length} task${newTasks.length === 1 ? '' : 's'} generated from the template`);
+    } finally {
+      setGeneratingPlan(false);
+    }
+  };
+
+  // ---- Suggest extra tasks with AI (Step 1 · 1E) ----
+  const handleSuggestAdditions = async () => {
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const scheduledSteps = caseTasks
+        .filter(t => t.stepKey)
+        .map(t => ({ title: t.title, date: t.date, stepKey: t.stepKey }));
+      const results = await suggestAdditions(
+        caseItem.description,
+        caseItem.startDate,
+        visaSubclass,
+        workflowTemplate?.title,
+        scheduledSteps,
+      );
+      setSuggestions(results);
+      if (results.length === 0) {
+        toast.info('No additional tasks suggested for this case');
+      }
+    } catch {
+      setSuggestError('Failed to fetch task suggestions. Please try again.');
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  const acceptSuggestion = (index: number) => {
+    const s = suggestions[index];
+    if (!s) return;
+    const anchorTask = s.anchorStepKey ? caseTasks.find(t => t.stepKey === s.anchorStepKey) : undefined;
+    const baseDate = anchorTask?.date ?? caseItem.startDate;
+    onAddTask({
+      id: uuidv4(),
+      caseId: caseItem.id,
+      title: s.title,
+      description: s.description,
+      date: addDaysISO(baseDate, s.offsetDays || 0),
+      status: 'not_started',
+      isCompleted: false,
+      priorityOrder: 999,
+      generatedByAi: true,
+      assignedTo: caseItem.caseOwner,
+    });
+    setSuggestions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const rejectSuggestion = (index: number) => {
+    setSuggestions(prev => prev.filter((_, i) => i !== index));
+  };
+
   const confirmOffset = (offset: boolean) => {
     if (offsetModal) {
-      onMoveTaskDate(offsetModal.taskId, offsetModal.newDate, offset);
+      onMoveTaskDate(offsetModal.taskId, offsetModal.newDate, offset, { dateLocked: true });
       setOffsetModal(null);
     }
   };
@@ -624,7 +880,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         `Client: ${client.name}`,
         applicant && applicant.id !== client.id ? `Applicant: ${applicant.name}` : null,
         visaSubclass ? `Visa Type: Subclass ${visaSubclass}` : null,
-        `Status: ${caseItem.status}`,
+        `Stage: ${CASE_STAGE_LABELS[caseItem.stage]}${caseItem.onHold ? ' (on hold)' : ''}`,
         `Progress: ${completedTasks.length}/${caseTasks.length} tasks completed (${progress}%)`,
         pendingTasks.length > 0 ? `Next task: ${pendingTasks[0]?.title}` : null,
         checklist.length > 0 ? `Documents: ${uploadedCount}/${checklist.length} collected` : null,
@@ -829,40 +1085,100 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- Task row completion toggle ----
   const toggleTaskComplete = (task: Task) => {
-    onUpdateTask({ ...task, isCompleted: !task.isCompleted });
+    onUpdateTask(withStatus(task, isTaskClosed(task) ? 'not_started' : 'done'));
+  };
+
+  const setTaskStatus = (task: Task, status: Task['status']) => {
+    if (status === 'not_applicable') {
+      setNaReasonDraft({ taskId: task.id, reason: task.statusReason ?? '' });
+      return;
+    }
+    setNaReasonDraft(null);
+    onUpdateTask(withStatus(task, status));
+  };
+
+  const confirmNaReason = (task: Task) => {
+    if (!naReasonDraft || naReasonDraft.taskId !== task.id || !naReasonDraft.reason.trim()) return;
+    onUpdateTask(withStatus(task, 'not_applicable', naReasonDraft.reason));
+    setNaReasonDraft(null);
   };
 
   // ---- Task row renderer (shared by pending + completed lists) ----
   const rowMenuCls = 'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
-  const renderTaskRow = (task: Task, isCompleted: boolean) => {
-    const overdue = !isCompleted && new Date(task.date) < new Date();
+  const renderTaskRow = (task: Task, closed: boolean) => {
+    const waiting = isWaiting(task);
+    const overdue = !closed && !waiting && new Date(task.date) < new Date();
     const editing = editingDate?.taskId === task.id;
+    const editingNa = naReasonDraft?.taskId === task.id;
     return (
       <div key={task.id} className="task-card group relative flex items-center gap-3 px-[18px] py-3 border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0">
         {/* Left edge — red when overdue */}
         <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${overdue ? 'bg-red-500' : 'bg-transparent'}`} />
 
-        {/* Circular checkbox — direct toggle */}
+        {/* Circular checkbox — one-click "Mark done" / reopen */}
         <button
           onClick={() => toggleTaskComplete(task)}
-          title={isCompleted ? 'Mark as pending' : 'Mark as complete'}
+          title={closed ? 'Reopen task' : 'Mark done'}
           className={`check-btn w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-            isCompleted
+            closed
               ? 'bg-edamame border-[1.5px] border-edamame'
               : 'border-[1.5px] border-ink/20 dark:border-plate-ink/25 hover:border-edamame'
           }`}
         >
-          {isCompleted && <Check size={11} className="text-white" strokeWidth={3} />}
+          {closed && <Check size={11} className="text-white" strokeWidth={3} />}
         </button>
 
         {/* Title + description */}
         <div className="flex-1 min-w-0">
-          <div className={`text-[13.5px] font-semibold tracking-tight leading-snug ${isCompleted ? 'line-through text-ink-faint dark:text-plate-ink-faint' : 'text-ink dark:text-plate-ink'}`}>
-            {task.title}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className={`text-[13.5px] font-semibold tracking-tight leading-snug ${closed ? 'line-through text-ink-faint dark:text-plate-ink-faint' : 'text-ink dark:text-plate-ink'}`}>
+              {task.title}
+            </div>
+            {waiting && (
+              <span className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 whitespace-nowrap">
+                {TASK_STATUS_LABELS[task.status]}
+              </span>
+            )}
+            {task.datePending && !closed && (
+              <span
+                className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 whitespace-nowrap"
+                title="Computed from a duration estimate — will firm up once the real anchor is known."
+              >
+                Estimated
+              </span>
+            )}
           </div>
-          {task.description && !isCompleted && (
+          {task.description && !closed && (
             <div className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint mt-0.5 truncate">{task.description}</div>
+          )}
+          {task.status === 'not_applicable' && task.statusReason && (
+            <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-0.5 italic truncate">N/A: {task.statusReason}</div>
+          )}
+          {editingNa && (
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <input
+                type="text"
+                autoFocus
+                value={naReasonDraft!.reason}
+                onChange={e => setNaReasonDraft({ taskId: task.id, reason: e.target.value })}
+                placeholder="Why is this task not applicable?"
+                className="flex-1 min-w-0 px-2 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+              />
+              <button
+                onClick={() => confirmNaReason(task)}
+                disabled={!naReasonDraft!.reason.trim()}
+                className="px-2 py-1 text-[11px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setNaReasonDraft(null)}
+                className="px-1.5 py-1 text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft"
+              >
+                Cancel
+              </button>
+            </div>
           )}
         </div>
 
@@ -878,10 +1194,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           />
         ) : (
           <button
-            onClick={() => { if (!isCompleted) setEditingDate({ taskId: task.id, date: task.date }); }}
-            disabled={isCompleted}
+            onClick={() => { if (!closed) setEditingDate({ taskId: task.id, date: task.date }); }}
+            disabled={closed}
             className={`text-[11.5px] font-bold whitespace-nowrap flex-shrink-0 ${
-              overdue ? 'text-red-600 dark:text-red-400' : isCompleted ? 'text-ink-soft/40 dark:text-plate-ink-soft/40' : 'text-ink-soft dark:text-plate-ink-soft hover:text-edamame'
+              overdue ? 'text-red-600 dark:text-red-400' : closed ? 'text-ink-soft/40 dark:text-plate-ink-soft/40' : 'text-ink-soft dark:text-plate-ink-soft hover:text-edamame'
             }`}
           >
             {format(new Date(task.date), 'MMM d')}
@@ -899,12 +1215,21 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           {activeDropdown === task.id && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setActiveDropdown(null)} />
-              <div className="absolute right-0 top-full mt-1 z-40 w-44 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
-                {isCompleted ? (
-                  <button onClick={() => { onUpdateTask({ ...task, isCompleted: false }); setActiveDropdown(null); }} className={rowMenuCls}>
-                    <RotateCcw size={14} className="text-orange-400" />Revert to pending
+              <div className="absolute right-0 top-full mt-1 z-40 w-52 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
+                <div className="px-3 pt-1.5 pb-1 text-[9.5px] font-bold uppercase tracking-wide text-ink-soft/60 dark:text-plate-ink-soft/60">
+                  Set status
+                </div>
+                {TASK_STATUS_ORDER.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => { setTaskStatus(task, s); if (s !== 'not_applicable') setActiveDropdown(null); }}
+                    className={`${rowMenuCls} ${task.status === s ? 'text-edamame font-semibold' : ''}`}
+                  >
+                    {task.status === s && <Check size={12} className="text-edamame" />}
+                    <span className={task.status === s ? '' : 'ml-[18px]'}>{TASK_STATUS_LABELS[s]}</span>
                   </button>
-                ) : (
+                ))}
+                {!closed && (
                   <button onClick={() => { handleSetToday(task.id); setActiveDropdown(null); }} className={rowMenuCls}>
                     <Calendar size={14} className="text-edamame" />Set to today
                   </button>
@@ -924,7 +1249,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   // ---- Render ----
-  const status = STATUS_META[currentCase.status];
+  const stageMeta = STAGE_META[currentCase.stage];
+  const needsOutcomePrompt = currentCase.stage === 'closed' && !currentCase.outcome;
 
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
@@ -952,30 +1278,104 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          {/* Status chip dropdown */}
+          {/* On hold toggle */}
+          <button
+            onClick={handleToggleOnHold}
+            title={currentCase.onHold ? 'Take this case off hold' : 'Put this case on hold'}
+            className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
+              currentCase.onHold
+                ? 'border-orange-400 bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300'
+                : 'border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame'
+            }`}
+          >
+            {currentCase.onHold ? 'On hold' : 'Not on hold'}
+          </button>
+
+          {/* Stage chip dropdown */}
           <div className="relative">
             <button
               onClick={() => setStatusOpen(o => !o)}
-              className={`inline-flex items-center gap-1.5 text-[11px] font-bold pl-2.5 pr-2 py-1.5 rounded-lg transition-colors ${status.chip}`}
+              className={`inline-flex items-center gap-1.5 text-[11px] font-bold pl-2.5 pr-2 py-1.5 rounded-lg transition-colors ${stageMeta.chip}`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full badge-pulse ${status.dot}`} />
-              {status.label}
+              <span className={`w-1.5 h-1.5 rounded-full badge-pulse ${stageMeta.dot}`} />
+              {CASE_STAGE_LABELS[currentCase.stage]}
+              {currentCase.stage === 'closed' && currentCase.outcome && (
+                <span className="opacity-70">· {OUTCOME_LABELS[currentCase.outcome]}</span>
+              )}
               <ChevronDown size={12} />
             </button>
             {statusOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setStatusOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-40 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
-                  {(['open', 'in_progress', 'on_hold', 'closed'] as CaseStatus[]).map(s => (
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-48 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content max-h-80 overflow-y-auto">
+                  {CASE_STAGE_ORDER.map(s => (
                     <button
                       key={s}
-                      onClick={() => { handleStatusChange(s); setStatusOpen(false); }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold hover:bg-paper-2 dark:hover:bg-plate transition-colors ${currentCase.status === s ? 'text-ink dark:text-plate-ink' : 'text-ink-soft dark:text-plate-ink-soft'}`}
+                      onClick={() => handleStageSelect(s)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold hover:bg-paper-2 dark:hover:bg-plate transition-colors ${currentCase.stage === s ? 'text-ink dark:text-plate-ink' : 'text-ink-soft dark:text-plate-ink-soft'}`}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${STATUS_META[s].dot}`} />
-                      {STATUS_META[s].label}
+                      <span className={`w-1.5 h-1.5 rounded-full ${STAGE_META[s].dot}`} />
+                      {CASE_STAGE_LABELS[s]}
                     </button>
                   ))}
+                </div>
+              </>
+            )}
+
+            {/* Backward-move confirm — inline, never window.confirm */}
+            {backwardConfirmStage && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setBackwardConfirmStage(null)} />
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-64 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-3 modal-content">
+                  <p className="text-[12px] text-ink dark:text-plate-ink font-semibold mb-1">Move stage backward?</p>
+                  <p className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mb-3">
+                    This moves the case from {CASE_STAGE_LABELS[currentCase.stage]} back to {CASE_STAGE_LABELS[backwardConfirmStage]}.
+                  </p>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button onClick={() => setBackwardConfirmStage(null)} className="px-3 py-1.5 text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={confirmBackwardMove} className="px-3 py-1.5 text-[11.5px] font-semibold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg transition-colors">
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Outcome picker — required before a move to Closed applies */}
+            {outcomePickerOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setOutcomePickerOpen(false)} />
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-64 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-3 modal-content">
+                  <p className="text-[12px] text-ink dark:text-plate-ink font-semibold mb-2">Outcome</p>
+                  <div className="space-y-1 mb-3">
+                    {(['granted', 'refused', 'withdrawn', 'lapsed'] as CaseOutcome[]).map(o => (
+                      <button
+                        key={o}
+                        onClick={() => setOutcomeDraft(o)}
+                        className={`w-full text-left px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+                          outcomeDraft === o
+                            ? 'bg-edamame-50 dark:bg-edamame-900/20 text-edamame-700 dark:text-edamame-400'
+                            : 'text-ink-soft dark:text-plate-ink-soft hover:bg-paper dark:hover:bg-plate'
+                        }`}
+                      >
+                        {OUTCOME_LABELS[o]}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button onClick={() => setOutcomePickerOpen(false)} className="px-3 py-1.5 text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg transition-colors">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmOutcome}
+                      disabled={!outcomeDraft}
+                      className="px-3 py-1.5 text-[11.5px] font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed rounded-lg transition-colors"
+                    >
+                      Close case
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -1074,6 +1474,22 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Closed with no recorded outcome — prompt for one inline whenever the case is opened. */}
+      {needsOutcomePrompt && (
+        <div className="mt-3 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-300/60 dark:border-amber-700/40">
+          <AlertTriangle size={15} className="text-amber-600 dark:text-amber-400 flex-shrink-0" strokeWidth={1.8} />
+          <span className="text-[12.5px] text-amber-800 dark:text-amber-300 font-semibold flex-1">
+            This case is closed with no recorded outcome.
+          </span>
+          <button
+            onClick={() => { setOutcomeDraft(''); setOutcomePickerOpen(true); }}
+            className="text-[12px] font-bold text-amber-800 dark:text-amber-300 underline hover:no-underline"
+          >
+            Set outcome
+          </button>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════
           3-COLUMN GRID
@@ -1192,6 +1608,267 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           {/* ── TASKS ── */}
           {activeTabId === 'tab:tasks' && (
             <div className="mt-4 space-y-6">
+              {/* ── Deadlines ── */}
+              <section>
+                <div className="flex items-center justify-between mb-2.5 gap-2 flex-wrap">
+                  <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">
+                    Deadlines <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {caseDeadlines.length}</span>
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => openQuickAdd('s56_response')}
+                      className="btn-press px-2.5 py-1 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
+                    >
+                      + s56
+                    </button>
+                    <button
+                      onClick={() => openQuickAdd('s57_response')}
+                      className="btn-press px-2.5 py-1 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
+                    >
+                      + s57
+                    </button>
+                    <button
+                      onClick={() => setShowAddDeadline(o => !o)}
+                      className="btn-press inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-edamame hover:bg-edamame-600 text-white text-[11px] font-bold transition-colors"
+                    >
+                      <Plus size={12} strokeWidth={2.2} />
+                      Add deadline
+                    </button>
+                  </div>
+                </div>
+
+                {/* s56/s57 quick-add form */}
+                {quickAddKind && (
+                  <div className="mb-2.5 p-3 rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card space-y-2">
+                    <div className="text-[11.5px] font-bold text-ink dark:text-plate-ink">{DEADLINE_KIND_LABELS[quickAddKind]}</div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <label className="text-[11px] text-ink-soft dark:text-plate-ink-soft flex items-center gap-1.5">
+                        Received
+                        <input
+                          type="date"
+                          value={quickAddForm.receivedDate}
+                          onChange={e => handleQuickAddReceivedDateChange(e.target.value)}
+                          className="px-1.5 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                        />
+                      </label>
+                      <label className="text-[11px] text-ink-soft dark:text-plate-ink-soft flex items-center gap-1.5">
+                        Due
+                        <input
+                          type="date"
+                          value={quickAddForm.dueDate}
+                          onChange={e => setQuickAddForm(f => ({ ...f, dueDate: e.target.value }))}
+                          className="px-1.5 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                        />
+                      </label>
+                    </div>
+                    <p className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint">
+                      Defaults to 28 days after the received date — response periods vary by request, so confirm the actual date on the letter.
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={handleQuickAddSubmit}
+                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-md"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setQuickAddKind(null)}
+                        className="px-2 py-1 text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add deadline form */}
+                {showAddDeadline && (
+                  <div className="mb-2.5 p-3 rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <select
+                        value={deadlineForm.kind}
+                        onChange={e => setDeadlineForm(f => ({ ...f, kind: e.target.value as DeadlineKind }))}
+                        className="px-2 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                      >
+                        {DEADLINE_KIND_ORDER.map(k => (
+                          <option key={k} value={k}>{DEADLINE_KIND_LABELS[k]}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={deadlineForm.title}
+                        onChange={e => setDeadlineForm(f => ({ ...f, title: e.target.value }))}
+                        placeholder="Title"
+                        className="flex-1 min-w-[140px] px-2 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                      />
+                      <input
+                        type="date"
+                        value={deadlineForm.dueDate}
+                        onChange={e => setDeadlineForm(f => ({ ...f, dueDate: e.target.value }))}
+                        className="px-1.5 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      value={deadlineForm.notes}
+                      onChange={e => setDeadlineForm(f => ({ ...f, notes: e.target.value }))}
+                      placeholder="Notes (optional)"
+                      className="w-full px-2 py-1 text-[11.5px] bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-md outline-none focus:border-edamame text-ink dark:text-plate-ink"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={handleAddDeadlineSubmit}
+                        disabled={!deadlineForm.title.trim()}
+                        className="px-2.5 py-1 text-[11px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setShowAddDeadline(false)}
+                        className="px-2 py-1 text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {caseDeadlines.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-ink/15 dark:border-plate-ink/20 p-6 text-center">
+                    <p className="text-[12.5px] text-ink-faint dark:text-plate-ink-faint">No deadlines tracked for this case</p>
+                  </div>
+                ) : (
+                  <div className="bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl overflow-hidden">
+                    {caseDeadlines.map(d => {
+                      const isVirtual = d.id.startsWith('passport:');
+                      const days = daysLeft(d, new Date());
+                      const u = urgency(d, new Date());
+                      const urgencyMeta: Record<typeof u, { chip: string; label: string }> = {
+                        none: { chip: 'bg-slate-500/[0.1] text-ink-soft dark:text-plate-ink-soft', label: days < 0 ? `overdue ${Math.abs(days)}d` : `${days}d left` },
+                        soon: { chip: 'bg-amber-500/[0.13] text-amber-700 dark:text-amber-400', label: `${days}d left` },
+                        urgent: { chip: 'bg-orange-500/[0.15] text-orange-700 dark:text-orange-400', label: `${days}d left` },
+                        critical: { chip: 'bg-red-500/[0.15] text-red-700 dark:text-red-400', label: days < 0 ? `overdue ${Math.abs(days)}d` : `${days}d left` },
+                      };
+                      const meta = urgencyMeta[u];
+                      const missedCandidate = !isVirtual && d.status === 'open' && days < 0;
+                      return (
+                        <div key={d.id} className="px-[18px] py-3 border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0">
+                          <div className="flex items-center gap-3">
+                            <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${meta.chip}`}>
+                              {meta.label}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13px] font-semibold text-ink dark:text-plate-ink truncate">
+                                {d.title}
+                                <span className="ml-1.5 text-[10px] font-semibold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wide">
+                                  {DEADLINE_KIND_LABELS[d.kind]}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-0.5">
+                                Due {format(new Date(`${d.dueDate}T00:00:00`), 'MMM d, yyyy')}
+                                {isVirtual && ' · auto-tracked from client passport'}
+                                {d.status !== 'open' && ` · ${d.status}`}
+                              </div>
+                            </div>
+                            {!isVirtual && d.status === 'open' && (
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  onClick={() => resolveDeadline(d, 'met')}
+                                  className="px-2 py-1 text-[10.5px] font-bold rounded-md bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/[0.22] transition-colors"
+                                >
+                                  Mark met
+                                </button>
+                                <button
+                                  onClick={() => resolveDeadline(d, 'missed')}
+                                  className="px-2 py-1 text-[10.5px] font-bold rounded-md bg-red-500/[0.13] text-red-700 dark:text-red-400 hover:bg-red-500/[0.22] transition-colors"
+                                >
+                                  Mark missed
+                                </button>
+                                <button
+                                  onClick={() => resolveDeadline(d, 'dismissed')}
+                                  className="px-2 py-1 text-[10.5px] font-semibold rounded-md text-ink-soft dark:text-plate-ink-soft hover:bg-paper dark:hover:bg-plate transition-colors"
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {missedCandidate && (
+                            <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                              <AlertTriangle size={12} strokeWidth={2} />
+                              Missed? This deadline is overdue and still open — mark it met or missed above.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              {templateHasTiming(workflowTemplate) && !caseTasks.some(t => t.stepKey) && (
+                <section className="rounded-xl border border-dashed border-edamame-300 dark:border-edamame-700 p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[12.5px] font-bold text-ink dark:text-plate-ink">No tasks yet</div>
+                    <p className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint mt-0.5">
+                      "{workflowTemplate?.title}" has step timing — generate this case's plan from it.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleGeneratePlanFromTemplate}
+                    disabled={generatingPlan}
+                    className="btn-press flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-edamame hover:bg-edamame-600 text-white text-[12px] font-bold transition-colors disabled:opacity-50"
+                  >
+                    <Sparkles size={14} />
+                    Generate plan from template
+                  </button>
+                </section>
+              )}
+
+              {caseTasks.some(t => t.stepKey) && (
+                <section>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">AI suggestions</span>
+                    <button
+                      onClick={handleSuggestAdditions}
+                      disabled={suggesting}
+                      className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors disabled:opacity-50"
+                    >
+                      <Sparkles size={12} />
+                      {suggesting ? 'Thinking…' : 'Suggest extra tasks with AI'}
+                    </button>
+                  </div>
+                  {suggestError && (
+                    <p className="mt-2 text-[11.5px] text-red-600 dark:text-red-400">{suggestError}</p>
+                  )}
+                  {suggestions.length > 0 && (
+                    <div className="mt-2.5 space-y-2">
+                      {suggestions.map((s, i) => (
+                        <div key={i} className="p-3 rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card">
+                          <div className="text-[13px] font-semibold text-ink dark:text-plate-ink">{s.title}</div>
+                          <p className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mt-0.5">{s.description}</p>
+                          <p className="text-[11px] italic text-ink-faint dark:text-plate-ink-faint mt-1">Why: {s.reason}</p>
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <button
+                              onClick={() => acceptSuggestion(i)}
+                              className="px-2.5 py-1 text-[11px] font-bold text-white bg-edamame-500 hover:bg-edamame-600 rounded-md transition-colors"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => rejectSuggestion(i)}
+                              className="px-2.5 py-1 text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper dark:hover:bg-plate rounded-md transition-colors"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
               <section>
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">
@@ -1590,7 +2267,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   placeholder="Add more details..."
                 />
               </div>
-              {!editingTask?.isCompleted && (
+              {!(editingTask && isTaskClosed(editingTask)) && (
                 <div>
                   <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Planned Date</label>
                   <div className="flex gap-2">

@@ -1,4 +1,7 @@
 import { readJson, writeJson, deleteEntry, listFiles, listDirNames, writeBlob, readBlob } from '@/lib/fsStorage';
+import { normalizeTask } from '@/lib/taskStatus';
+import { normalizeTemplate } from '@/lib/templateTiming';
+import { normalizeCase } from '@/lib/caseStage';
 import type {
   Client,
   Case,
@@ -14,6 +17,7 @@ import type {
   FocusConversation,
   UsageEvent,
   EligibilityAssessment,
+  Deadline,
 } from '@/types';
 import type {
   IClientRepository,
@@ -30,6 +34,7 @@ import type {
   IDocumentTypeRepository,
   IChatRepository,
   IEligibilityRepository,
+  IDeadlineRepository,
   Repositories,
 } from '@/repositories/types';
 
@@ -92,21 +97,25 @@ class FsCaseRepository implements ICaseRepository {
   constructor(private root: FileSystemDirectoryHandle) {}
 
   async getAll(): Promise<Case[]> {
-    return readAllInDir<Case>(this.root, 'cases');
+    const cases = await readAllInDir<Case>(this.root, 'cases');
+    return cases.map(normalizeCase);
   }
 
   async getById(id: string): Promise<Case | undefined> {
-    return (await readJson<Case>(this.root, `cases/${id}.json`)) ?? undefined;
+    const c = await readJson<Case>(this.root, `cases/${id}.json`);
+    return c ? normalizeCase(c) : undefined;
   }
 
   async create(item: Case): Promise<Case> {
-    await writeJson(this.root, `cases/${item.id}.json`, item);
-    return item;
+    const normalized = normalizeCase(item);
+    await writeJson(this.root, `cases/${item.id}.json`, normalized);
+    return normalized;
   }
 
   async update(item: Case): Promise<Case> {
-    await writeJson(this.root, `cases/${item.id}.json`, item);
-    return item;
+    const normalized = normalizeCase(item);
+    await writeJson(this.root, `cases/${item.id}.json`, normalized);
+    return normalized;
   }
 
   async delete(id: string): Promise<void> {
@@ -127,21 +136,25 @@ class FsTaskRepository implements ITaskRepository {
   constructor(private root: FileSystemDirectoryHandle) {}
 
   async getAll(): Promise<Task[]> {
-    return readAllInDir<Task>(this.root, 'tasks');
+    const tasks = await readAllInDir<Task>(this.root, 'tasks');
+    return tasks.map(normalizeTask);
   }
 
   async getById(id: string): Promise<Task | undefined> {
-    return (await readJson<Task>(this.root, `tasks/${id}.json`)) ?? undefined;
+    const task = await readJson<Task>(this.root, `tasks/${id}.json`);
+    return task ? normalizeTask(task) : undefined;
   }
 
   async create(item: Task): Promise<Task> {
-    await writeJson(this.root, `tasks/${item.id}.json`, item);
-    return item;
+    const normalized = normalizeTask(item);
+    await writeJson(this.root, `tasks/${item.id}.json`, normalized);
+    return normalized;
   }
 
   async update(item: Task): Promise<Task> {
-    await writeJson(this.root, `tasks/${item.id}.json`, item);
-    return item;
+    const normalized = normalizeTask(item);
+    await writeJson(this.root, `tasks/${item.id}.json`, normalized);
+    return normalized;
   }
 
   async delete(id: string): Promise<void> {
@@ -167,11 +180,13 @@ class FsTemplateRepository implements ITemplateRepository {
   constructor(private root: FileSystemDirectoryHandle) {}
 
   async getAll(): Promise<WorkflowTemplate[]> {
-    return readAllInDir<WorkflowTemplate>(this.root, 'templates');
+    const templates = await readAllInDir<WorkflowTemplate>(this.root, 'templates');
+    return templates.map(normalizeTemplate);
   }
 
   async getById(id: string): Promise<WorkflowTemplate | undefined> {
-    return (await readJson<WorkflowTemplate>(this.root, `templates/${id}.json`)) ?? undefined;
+    const template = await readJson<WorkflowTemplate>(this.root, `templates/${id}.json`);
+    return template ? normalizeTemplate(template) : undefined;
   }
 
   async create(item: WorkflowTemplate): Promise<WorkflowTemplate> {
@@ -488,6 +503,46 @@ class FsEligibilityRepository implements IEligibilityRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Deadlines — one file per record
+// ---------------------------------------------------------------------------
+
+class FsDeadlineRepository implements IDeadlineRepository {
+  constructor(private root: FileSystemDirectoryHandle) {}
+
+  async getAll(): Promise<Deadline[]> {
+    return readAllInDir<Deadline>(this.root, 'deadlines');
+  }
+
+  async getById(id: string): Promise<Deadline | undefined> {
+    return (await readJson<Deadline>(this.root, `deadlines/${id}.json`)) ?? undefined;
+  }
+
+  async create(item: Deadline): Promise<Deadline> {
+    await writeJson(this.root, `deadlines/${item.id}.json`, item);
+    return item;
+  }
+
+  async update(item: Deadline): Promise<Deadline> {
+    await writeJson(this.root, `deadlines/${item.id}.json`, item);
+    return item;
+  }
+
+  async delete(id: string): Promise<void> {
+    await deleteEntry(this.root, `deadlines/${id}.json`);
+  }
+
+  async getByCaseId(caseId: string): Promise<Deadline[]> {
+    const all = await this.getAll();
+    return all.filter(d => d.caseId === caseId);
+  }
+
+  async getByClientId(clientId: string): Promise<Deadline[]> {
+    const all = await this.getAll();
+    return all.filter(d => d.clientId === clientId);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -507,5 +562,6 @@ export function createFilesystemRepositories(root: FileSystemDirectoryHandle): R
     documentTypes: new FsDocumentTypeRepository(root),
     chat: new FsChatRepository(root),
     eligibility: new FsEligibilityRepository(root),
+    deadlines: new FsDeadlineRepository(root),
   };
 }

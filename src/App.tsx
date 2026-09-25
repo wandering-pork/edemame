@@ -20,10 +20,15 @@ import { TeamDashboard } from './pages/TeamDashboard';
 import { TeamMembers } from './pages/TeamMembers';
 import Onboarding from './pages/Onboarding';
 import LandingPage from './pages/LandingPage';
-import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote, UsageEvent } from './types';
+import { Task, WorkflowTemplate, Theme, Client, Case, StorageMode, Notification, TeamMember, ActivityEvent, CaseAssignmentEvent, CaseNote, UsageEvent, Deadline } from './types';
 import { seedDefaultTemplates, seedDefaultTeam } from './lib/seedData';
 import { generateCaseNumber } from './lib/caseNumber';
 import { toLocalISODate } from './lib/dates';
+import { isTaskClosed, TASK_STATUS_LABELS } from './lib/taskStatus';
+import { CASE_STAGE_LABELS } from './lib/caseStage';
+import { allDeadlines } from './lib/deadlines';
+import { knownAnchorsFromDeadlines, rescheduleCaseTasks } from './lib/tasksFromTemplate';
+import { buildDeadlineAlerts } from './lib/deadlineAlerts';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
@@ -52,6 +57,7 @@ const AppShell: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [deadlines, setDeadlines] = useState<Deadline[]>([]);
 
   const pushActivity = useCallback(async (ev: Omit<ActivityEvent, 'id' | 'createdAt'> & { createdAt?: string }) => {
     const created = await repos.activity.create({
@@ -93,7 +99,7 @@ const AppShell: React.FC = () => {
     let cancelled = false;
     async function loadData() {
       try {
-        const [t, customTemplates, cl, cs, notifs, team, activityEvents] = await Promise.all([
+        const [t, customTemplates, cl, cs, notifs, team, activityEvents, deadlineRecords] = await Promise.all([
           repos.tasks.getAll(),
           repos.templates.getAll(),
           repos.clients.getAll(),
@@ -101,6 +107,7 @@ const AppShell: React.FC = () => {
           repos.notifications.getAll(),
           repos.teamMembers.getAll(),
           repos.activity.getAll(),
+          repos.deadlines.getAll(),
         ]);
         if (cancelled) return;
 
@@ -138,6 +145,7 @@ const AppShell: React.FC = () => {
         setNotifications(notifs);
         setTeamMembers(resolvedTeam);
         setActivity(activityEvents);
+        setDeadlines(deadlineRecords);
       } catch (err) {
         console.error('Failed to load data from repositories:', err);
         if (!cancelled) {
@@ -177,7 +185,7 @@ const AppShell: React.FC = () => {
 
     const today = toLocalISODate();
 
-    const overdueTasks = tasks.filter(t => !t.isCompleted && t.date < today);
+    const overdueTasks = tasks.filter(t => !isTaskClosed(t) && t.date < today);
     if (overdueTasks.length === 0) return;
 
     const createMissing = async () => {
@@ -215,6 +223,101 @@ const AppShell: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, loading]);
 
+  // Auto-generate deadline-approaching notifications (14/7/2-day thresholds), including
+  // the derived passport-expiry deadline — see lib/deadlineAlerts.ts. Checked on app load;
+  // there's no background job (Step 1 · 1D). Deduplicated by buildDeadlineAlerts against
+  // notifications already created, so a reload never creates the same alert twice.
+  useEffect(() => {
+    if (loading) return;
+    const today = new Date();
+    const toCreate = buildDeadlineAlerts(allDeadlines(deadlines, clients), notifications, today);
+    if (toCreate.length === 0) return;
+
+    (async () => {
+      const created = await Promise.all(toCreate.map(n => repos.notifications.create(n)));
+      setNotifications(prev => [...prev, ...created]);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deadlines, clients, loading]);
+
+  // --- Rescheduling (Step 1 · 1E) ---
+  // Recomputes a case's own template-generated tasks (those carrying a
+  // `stepKey`) whenever a new anchor becomes known — a step is marked done,
+  // or a deadline for the case is added/updated (see
+  // `lib/tasksFromTemplate.ts`'s `rescheduleCaseTasks`). Locked or closed
+  // tasks are never touched. Takes explicit `tasksSnapshot`/`deadlinesSnapshot`
+  // rather than reading the `tasks`/`deadlines` state directly, since callers
+  // invoke this right after applying an update those states haven't
+  // necessarily re-rendered with yet.
+  const rescheduleCaseFromSnapshot = useCallback(async (caseId: string, tasksSnapshot: Task[], deadlinesSnapshot: Deadline[]) => {
+    const caseItem = cases.find(c => c.id === caseId);
+    const template = caseItem ? templates.find(t => t.id === caseItem.templateId) : undefined;
+    if (!caseItem || !template?.steps?.length) return;
+
+    const caseDeadlines = deadlinesSnapshot.filter(d => d.caseId === caseId);
+    const caseTasksAll = tasksSnapshot.filter(t => t.caseId === caseId);
+    const knownAnchors = knownAnchorsFromDeadlines(caseDeadlines);
+    const changed = rescheduleCaseTasks(template.steps, caseItem.startDate, knownAnchors, caseTasksAll);
+    if (changed.length === 0) return;
+
+    await Promise.all(changed.map(t => repos.tasks.update(t)));
+    setTasks(prev => prev.map(t => changed.find(c => c.id === t.id) ?? t));
+  }, [cases, templates, repos]);
+
+  // --- Deadline Actions ---
+  const handleAddDeadline = useCallback(async (deadline: Deadline) => {
+    await repos.deadlines.create(deadline);
+    const nextDeadlines = [...deadlines, deadline];
+    setDeadlines(nextDeadlines);
+    pushActivity({
+      type: 'deadline_added',
+      actorId: currentUserId,
+      subjectId: deadline.id,
+      summary: `Deadline "${deadline.title}" added, due ${deadline.dueDate}.`,
+    });
+    if (deadline.caseId) {
+      rescheduleCaseFromSnapshot(deadline.caseId, tasks, nextDeadlines);
+    }
+  }, [repos, deadlines, tasks, pushActivity, currentUserId, rescheduleCaseFromSnapshot]);
+
+  const handleUpdateDeadline = useCallback(async (updated: Deadline) => {
+    const prev = deadlines.find(d => d.id === updated.id);
+    await repos.deadlines.update(updated);
+    const nextDeadlines = deadlines.map(d => d.id === updated.id ? updated : d);
+    setDeadlines(nextDeadlines);
+    if (prev && prev.status === 'open' && updated.status !== 'open') {
+      pushActivity({
+        type: 'deadline_resolved',
+        actorId: currentUserId,
+        subjectId: updated.id,
+        summary: `Deadline "${updated.title}" marked ${updated.status}.`,
+      });
+    }
+    if (updated.caseId) {
+      rescheduleCaseFromSnapshot(updated.caseId, tasks, nextDeadlines);
+    }
+  }, [repos, deadlines, tasks, pushActivity, currentUserId, rescheduleCaseFromSnapshot]);
+
+  // --- Case Actions ---
+  // Applies a case update (stage/outcome/onHold, or any other case edit) and,
+  // when the stage changed, writes a `case_stage_changed` ActivityEvent — the
+  // one place besides CaseDetails.tsx's own title/description edit that
+  // writes to a case, so the activity log stays consistent regardless of
+  // which control made the change.
+  const handleUpdateCase = useCallback(async (updated: Case) => {
+    const prev = cases.find(c => c.id === updated.id);
+    await repos.cases.update(updated);
+    setCases(prevList => prevList.map(c => c.id === updated.id ? updated : c));
+    if (prev && prev.stage !== updated.stage) {
+      pushActivity({
+        type: 'case_stage_changed',
+        actorId: currentUserId,
+        subjectId: updated.id,
+        summary: `Case "${updated.title}" moved from ${CASE_STAGE_LABELS[prev.stage]} to ${CASE_STAGE_LABELS[updated.stage]}.`,
+      });
+    }
+  }, [repos, cases, pushActivity, currentUserId]);
+
   // --- Task Actions ---
   const handleAddTask = useCallback(async (task: Task) => {
     await repos.tasks.create(task);
@@ -225,20 +328,36 @@ const AppShell: React.FC = () => {
     });
   }, [repos]);
 
+  // Bulk add — used by CaseDetails' "Generate plan from template" (Step 1 ·
+  // 1E), which creates every step's task in one go rather than one at a time.
+  const handleAddTasks = useCallback(async (newTasks: Task[]) => {
+    if (newTasks.length === 0) return;
+    await repos.tasks.createMany(newTasks);
+    setTasks(prev => [...prev, ...newTasks]);
+  }, [repos]);
+
   const handleUpdateTask = useCallback(async (updatedTask: Task) => {
     const prev = tasks.find(t => t.id === updatedTask.id);
     await repos.tasks.update(updatedTask);
-    setTasks(prevTasks => prevTasks.map(t => t.id === updatedTask.id ? updatedTask : t));
-    if (updatedTask.isCompleted && prev && !prev.isCompleted) {
-      toast.success(`Task completed: ${updatedTask.title}`);
+    const nextTasks = tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
+    setTasks(nextTasks);
+    if (prev && prev.status !== updatedTask.status) {
+      if (updatedTask.status === 'done') {
+        toast.success(`Task completed: ${updatedTask.title}`);
+      }
       pushActivity({
-        type: 'task_completed',
+        type: 'task_status_changed',
         actorId: updatedTask.assignedTo || currentUserId,
         subjectId: updatedTask.id,
-        summary: `Task completed: "${updatedTask.title}".`,
+        summary: `"${updatedTask.title}" moved from ${TASK_STATUS_LABELS[prev.status]} to ${TASK_STATUS_LABELS[updatedTask.status]}.`,
       });
+      // A step's task closing is a new "step done" anchor for the rest of the
+      // case's template plan — see `rescheduleCaseFromSnapshot`.
+      if (updatedTask.caseId && updatedTask.stepKey && isTaskClosed(updatedTask) && !isTaskClosed(prev)) {
+        rescheduleCaseFromSnapshot(updatedTask.caseId, nextTasks, deadlines);
+      }
     }
-  }, [repos, tasks, pushActivity, currentUserId]);
+  }, [repos, tasks, deadlines, pushActivity, currentUserId, rescheduleCaseFromSnapshot]);
 
   const handleDeleteTask = useCallback(async (id: string) => {
     await repos.tasks.delete(id);
@@ -273,7 +392,7 @@ const AppShell: React.FC = () => {
     taskId: string,
     newDate: string,
     offsetFuture: boolean = false,
-    taskPatch?: { title?: string; description?: string },
+    taskPatch?: { title?: string; description?: string; dateLocked?: boolean },
   ) => {
     setTasks(prev => {
       const task = prev.find(t => t.id === taskId);
@@ -285,7 +404,7 @@ const AppShell: React.FC = () => {
 
       const updated = prev.map(t => {
         if (t.id === taskId) return { ...t, ...taskPatch, date: newDate, priorityOrder: 999 };
-        if (offsetFuture && t.caseId === task.caseId && !t.isCompleted) {
+        if (offsetFuture && t.caseId === task.caseId && !isTaskClosed(t)) {
           const tDate = new Date(t.date);
           if (tDate > oldDate) {
             const updatedDate = new Date(tDate.getTime() + (diffDays * 24 * 60 * 60 * 1000));
@@ -361,6 +480,11 @@ const AppShell: React.FC = () => {
   const handleAddTemplate = useCallback(async (template: WorkflowTemplate) => {
     await repos.templates.create(template);
     setTemplates(prev => [...prev, template]);
+  }, [repos]);
+
+  const handleUpdateTemplate = useCallback(async (template: WorkflowTemplate) => {
+    await repos.templates.update(template);
+    setTemplates(prev => prev.map(t => (t.id === template.id ? template : t)));
   }, [repos]);
 
   const handleDeleteTemplate = useCallback(async (id: string) => {
@@ -516,6 +640,7 @@ const AppShell: React.FC = () => {
                 tasks={tasks}
                 cases={cases}
                 clients={clients}
+                deadlines={deadlines}
                 teamMembers={teamMembers}
                 currentUserId={currentUserId}
                 onUpdateTask={handleUpdateTask}
@@ -573,6 +698,7 @@ const AppShell: React.FC = () => {
                 tasks={tasks}
                 templates={templates}
                 teamMembers={teamMembers}
+                deadlines={deadlines}
                 onTasksConfirmed={handleTasksConfirmed}
                 onAssignCase={handleAssignCase}
               />
@@ -586,13 +712,20 @@ const AppShell: React.FC = () => {
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
                 onAddTask={handleAddTask}
+                onAddTasks={handleAddTasks}
                 onMoveTaskDate={handleMoveTaskDate}
+                deadlines={deadlines}
+                onAddDeadline={handleAddDeadline}
+                onUpdateDeadline={handleUpdateDeadline}
+                onUpdateCase={handleUpdateCase}
               />
             } />
             <Route path="/templates" element={
               <Templates
                 templates={templates}
+                currentUserId={currentUserId}
                 onAddTemplate={handleAddTemplate}
+                onUpdateTemplate={handleUpdateTemplate}
                 onDeleteTemplate={handleDeleteTemplate}
               />
             } />
@@ -623,12 +756,17 @@ interface CaseDetailsRouteProps {
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onAddTask: (task: Task) => void;
+  onAddTasks: (tasks: Task[]) => void;
   onMoveTaskDate: (
     taskId: string,
     newDate: string,
     offsetFuture: boolean,
-    taskPatch?: { title?: string; description?: string },
+    taskPatch?: { title?: string; description?: string; dateLocked?: boolean },
   ) => void;
+  deadlines: Deadline[];
+  onAddDeadline: (deadline: Deadline) => void;
+  onUpdateDeadline: (deadline: Deadline) => void;
+  onUpdateCase: (caseItem: Case) => void;
 }
 
 const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
@@ -654,7 +792,12 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       onUpdateTask={props.onUpdateTask}
       onDeleteTask={props.onDeleteTask}
       onAddTask={props.onAddTask}
+      onAddTasks={props.onAddTasks}
       onMoveTaskDate={props.onMoveTaskDate}
+      deadlines={props.deadlines}
+      onAddDeadline={props.onAddDeadline}
+      onUpdateDeadline={props.onUpdateDeadline}
+      onUpdateCase={props.onUpdateCase}
       onBack={() => navigate('/cases')}
     />
   );

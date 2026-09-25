@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import type { Case, Client, Task, TeamMember, TeamMemberRole, TeamMemberStatus } from '../types';
+import { isTaskClosed } from '../lib/taskStatus';
 
 interface TeamMembersProps {
   teamMembers: TeamMember[];
@@ -81,7 +82,7 @@ export const TeamMembers: React.FC<TeamMembersProps> = ({
     );
   }, [teamMembers, searchTerm]);
 
-  const openTaskCount = (memberId: string) => tasks.filter(t => t.assignedTo === memberId && !t.isCompleted).length;
+  const openTaskCount = (memberId: string) => tasks.filter(t => t.assignedTo === memberId && !isTaskClosed(t)).length;
 
   const openCreate = () => {
     setIsCreating(true);

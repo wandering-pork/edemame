@@ -1,9 +1,29 @@
 
+/**
+ * Where a task currently stands in its lifecycle. Replaces the old boolean
+ * `isCompleted` (see `Task.isCompleted` and `lib/taskStatus.ts`).
+ */
+export type TaskStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'waiting_client'
+  | 'waiting_third_party'
+  | 'not_applicable'
+  | 'done';
+
 export interface Task {
   id: string;
   title: string;
   description: string;
   date: string; // YYYY-MM-DD
+  status: TaskStatus;
+  /** Required when status is 'not_applicable' — see `lib/taskStatus.ts`'s `withStatus()`. */
+  statusReason?: string;
+  /**
+   * @deprecated Derived from `status` (`status === 'done' || status === 'not_applicable'`).
+   * Kept in sync by `lib/taskStatus.ts` for one release so old call sites/tabs
+   * that still read it keep working — prefer `isTaskClosed(task)`.
+   */
   isCompleted: boolean;
   priorityOrder: number;
   caseId?: string;
@@ -11,6 +31,28 @@ export interface Task {
   userId?: string;
   /** ID of the team member this task is assigned to. */
   assignedTo?: string;
+  /**
+   * The `WorkflowStep.key` this task was generated from (Step 1 · 1E). Unset
+   * for manually-added tasks and AI suggestions accepted without an anchor
+   * step. Feeds `lib/risk.ts` rule 2 (gate-task-overdue) and
+   * `lib/scheduleFromTemplate.ts`'s `reschedule()`, which only recalculates
+   * tasks carrying a `stepKey`.
+   */
+  stepKey?: string;
+  /**
+   * Set once a task's date has been edited by hand (any manual date change —
+   * `TaskDetailModal`, `CaseDetails`' inline date edit/"set today", or a
+   * Dashboard calendar drag). `reschedule()` never recalculates a locked
+   * task's date.
+   */
+  dateLocked?: boolean;
+  /**
+   * True when `date` is provisional — computed from a duration estimate
+   * because the step's real anchor (a deadline, or another step's completion)
+   * isn't known yet. See `lib/scheduleFromTemplate.ts`. The UI shows
+   * "Estimated" on these tasks.
+   */
+  datePending?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -47,7 +89,7 @@ export interface CaseAssignmentEvent {
 
 export interface ActivityEvent {
   id: string;
-  type: 'case_created' | 'case_assigned' | 'case_updated' | 'task_completed' | 'task_assigned' | 'member_added';
+  type: 'case_created' | 'case_assigned' | 'case_updated' | 'case_stage_changed' | 'task_completed' | 'task_assigned' | 'task_status_changed' | 'member_added' | 'deadline_added' | 'deadline_resolved';
   actorId?: string; // TeamMember id responsible
   subjectId?: string; // caseId / taskId / memberId
   summary: string;
@@ -71,9 +113,41 @@ export interface UsageEvent {
   createdAt: string; // ISO
 }
 
+// ---------------------------------------------------------------------------
+// Template task timing (Step 1 · 1E, and the DeadlineKind used by 1D's
+// Deadline entity — defined here since 1E's `StepAnchor` references it and
+// this file has no dependency on the (not-yet-built) Deadline entity itself).
+// ---------------------------------------------------------------------------
+
+export type DeadlineKind =
+  | 'visa_expiry' | 'passport_expiry'
+  | 's56_response' | 's57_response'
+  | 'nomination_validity' | 'invitation_window'
+  | 'other';
+
+export type StepAnchor =
+  | { type: 'case_start' }
+  | { type: 'previous_step' }
+  | { type: 'step'; stepKey: string; edge: 'start' | 'done' }
+  | { type: 'deadline'; kind: DeadlineKind };      // e.g. invitation received
+
+export interface StepTiming {
+  anchor: StepAnchor;
+  offsetDays: number;                       // from the anchor
+  durationDays?: { min: number; max: number }; // how long the step itself takes
+  /** Set by law: agent can't move it (e.g. lodge ≤60 days after invitation). */
+  fixed: boolean;
+}
+
 export interface WorkflowStep {
+  /** Stable id, so anchors survive reordering. Steps missing one (custom/legacy templates) get one assigned by `lib/templateTiming.ts`'s `normalizeTemplate()`. */
+  key: string;
   title: string;
   description: string;
+  /** Absent = old/custom template with no timing data yet; scheduler falls back to today's AI-only behaviour. */
+  timing?: StepTiming;
+  /** Must be done before the case can advance (feeds the 1C At Risk rule "a gate task is overdue"). */
+  isGate?: boolean;
 }
 
 export interface WorkflowTemplate {
@@ -87,6 +161,23 @@ export interface WorkflowTemplate {
   sourceUrl?: string;
   /** Provenance for system-default templates: ISO date (YYYY-MM-DD) content was last verified. */
   lastVerified?: string;
+  /**
+   * Template schema/content revision. Optional (rather than the plan's
+   * required `version: number`) because custom templates created via
+   * `pages/Templates.tsx` today are built with just `{ title, description }`
+   * and no `steps`/`version` at all — making it required would break that
+   * call site and every persisted custom template with no migration in this
+   * slice. Absent = version 1 semantics (pre-1E behaviour, `templateVersion`
+   * on `Case` unset). System templates in `lib/seedData.ts` set this to `1`.
+   */
+  version?: number;
+  /**
+   * Whether a registered agent has reviewed this template's step `timing`
+   * data. Ships `false` on every system template (see `seedData.ts`) — the
+   * Templates page shows "Timing not yet reviewed by a registered agent"
+   * until someone signs it off.
+   */
+  timingVerified?: boolean;
 }
 
 export interface Client {
@@ -106,7 +197,50 @@ export interface Client {
   notes?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Deadlines (Step 1 · 1D)
+// ---------------------------------------------------------------------------
+
+/**
+ * An external, consequential date the agent doesn't control — as opposed to
+ * a Task, whose date the agent sets. See `lib/deadlines.ts` for urgency and
+ * ranking, and `repos.deadlines` / CLAUDE.md's "Local-First Storage" section
+ * for storage.
+ */
+export type DeadlineStatus = 'open' | 'met' | 'missed' | 'dismissed';
+
+export interface Deadline {
+  id: string;
+  kind: DeadlineKind;
+  title: string;
+  dueDate: string; // YYYY-MM-DD
+  caseId?: string;
+  clientId?: string;
+  /** When the triggering event happened (e.g. s56 letter received, invitation date). */
+  triggeredOn?: string;
+  status: DeadlineStatus;
+  /** ISO timestamp — set when status moves from 'open' to 'met'/'missed'/'dismissed'. */
+  resolvedAt?: string;
+  notes?: string;
+  createdAt: string; // ISO
+  userId?: string;
+}
+
+/** @deprecated legacy case status — replaced by `CaseStage`. Kept as a read-only fallback for `normalizeCase()` and one release of derived writes on the cloud row. See `lib/caseStage.ts`. */
 export type CaseStatus = 'open' | 'in_progress' | 'on_hold' | 'closed';
+
+/**
+ * Case lifecycle stage (Step 1 · Foundations 1C), replacing `CaseStatus`.
+ * `pre_lodgement`: draft → ready_to_lodge. `with_department`: lodged,
+ * info_requested, decision. `closed` is its own group. See
+ * `lib/caseStage.ts` for the transition rules, labels and stage groups.
+ */
+export type CaseStage =
+  | 'draft' | 'assessment' | 'engaged' | 'preparing' | 'ready_to_lodge'
+  | 'lodged' | 'info_requested' | 'decision' | 'closed';
+
+/** Required when a case's `stage` is `closed` — see `lib/caseStage.ts`'s `outcomeRequired()`. */
+export type CaseOutcome = 'granted' | 'refused' | 'withdrawn' | 'lapsed';
 
 export interface Case {
   id: string;
@@ -114,7 +248,19 @@ export interface Case {
   title: string;
   description: string;
   templateId: string;
-  status: CaseStatus;
+  /**
+   * Lifecycle stage. Always present on a case read through a repository —
+   * both repositories normalize legacy rows/files (which only have `status`)
+   * via `lib/caseStage.ts`'s `normalizeCase()` on every read. New cases start
+   * at `draft` (see `pages/NewCase.tsx`, `lib/openCaseFromAdvisor.ts`).
+   */
+  stage: CaseStage;
+  /** Set when `stage` is `closed`; a closed case with none prompts the agent for one when next opened. */
+  outcome?: CaseOutcome;
+  /** Pause flag, orthogonal to `stage` — a case can be on hold at any pre-lodgement/with-department stage. */
+  onHold?: boolean;
+  /** @deprecated legacy; read-only fallback for `normalizeCase()`. New code should read/write `stage`/`outcome`/`onHold` instead. */
+  status?: CaseStatus;
   startDate: string;
   createdAt: string;
   userId?: string;
@@ -138,6 +284,14 @@ export interface Case {
    * up the case's template's `visaSubclass` where both are available.
    */
   visaSubclass?: string;
+  /**
+   * The `WorkflowTemplate.version` used the last time this case's tasks were
+   * generated/rescheduled from a template (Step 1 · 1E). Unset for cases with
+   * no timed-template plan (AI-only flow, or no template). Records "which
+   * template, which version" per the plan — not yet surfaced in the UI beyond
+   * that provenance.
+   */
+  templateVersion?: number;
 }
 
 // ---------------------------------------------------------------------------
