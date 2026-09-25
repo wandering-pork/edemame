@@ -23,8 +23,11 @@ import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplat
 import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib/caseTabsStore';
 import { displayCaseNumber } from '../lib/caseNumber';
 import { isTaskClosed, isWaiting, withStatus, statusChipFor, TASK_STATUS_LABELS, TASK_STATUS_ORDER } from '../lib/taskStatus';
-import { CASE_STAGE_LABELS, CASE_STAGE_ORDER, evaluateTransition, outcomeRequired } from '../lib/caseStage';
-import { allDeadlines, daysLeft, urgency } from '../lib/deadlines';
+import { CASE_STAGE_LABELS, evaluateTransition, outcomeRequired } from '../lib/caseStage';
+import { allDeadlines, daysLeft, urgency, DEADLINE_KIND_LABELS, DEADLINE_KIND_ORDER } from '../lib/deadlines';
+import { computeCaseRisk } from '../lib/risk';
+import { nextDeadlineFor, stagePositionLabel } from '../lib/caseSummary';
+import { CaseSummaryStrip } from '../components/case-details/CaseSummaryStrip';
 import { toLocalISODate, addDaysISO } from '../lib/dates';
 import { countLabel } from '../lib/pluralize';
 import { buildTemplateTaskDrafts, knownAnchorsFromDeadlines, templateHasTiming } from '../lib/tasksFromTemplate';
@@ -45,8 +48,6 @@ import {
   ChevronDown,
   ChevronRight,
   Sparkles,
-  PenLine,
-  ShieldCheck,
   MoreHorizontal,
   MoreVertical,
   ArrowLeft,
@@ -84,20 +85,6 @@ interface CaseDetailsProps {
   onUpdateCase: (caseItem: Case) => void;
   onBack: () => void;
 }
-
-const DEADLINE_KIND_LABELS: Record<DeadlineKind, string> = {
-  visa_expiry: 'Visa expiry',
-  passport_expiry: 'Passport expiry',
-  s56_response: 's56 response',
-  s57_response: 's57 response',
-  nomination_validity: 'Nomination validity',
-  invitation_window: 'Invitation window',
-  other: 'Other',
-};
-
-const DEADLINE_KIND_ORDER: DeadlineKind[] = [
-  's56_response', 's57_response', 'invitation_window', 'nomination_validity', 'visa_expiry', 'passport_expiry', 'other',
-];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -296,36 +283,23 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const progress = caseTasks.length > 0 ? Math.round((completedTasks.length / caseTasks.length) * 100) : 0;
 
   const hasOverdue = pendingTasks.some(t => !isWaiting(t) && new Date(t.date) < new Date());
-  const passportExpiry = client.passportExpiry ? new Date(client.passportExpiry) : null;
-  const daysToPassportExpiry = passportExpiry ? Math.floor((passportExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
   const uploadedCount = checklist.filter(c => c.status === 'linked' || c.status === 'verified').length;
   const overdueCount = pendingTasks.filter(t => new Date(t.date) < new Date()).length;
   const outstandingDocs = checklist.length > 0 ? checklist.length - uploadedCount : 0;
 
-  const STAGE_META: Record<CaseStage, { chip: string; dot: string }> = {
-    draft: { chip: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300', dot: 'bg-slate-400' },
-    assessment: { chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
-    engaged: { chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
-    preparing: { chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
-    ready_to_lodge: { chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
-    lodged: { chip: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
-    info_requested: { chip: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
-    decision: { chip: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
-    closed: { chip: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300', dot: 'bg-green-500' },
-  };
-
-  const OUTCOME_LABELS: Record<CaseOutcome, string> = {
-    granted: 'Granted',
-    refused: 'Refused',
-    withdrawn: 'Withdrawn',
-    lapsed: 'Lapsed',
-  };
-
-  // Rail alerts (overdue red, docs outstanding amber, passport expiry red)
+  // Rail alerts — just docs outstanding now; overdue tasks and passport expiry
+  // are covered by the case summary strip's At Risk chip and Next Deadline
+  // chip (which shows any open deadline's countdown, not just an urgent one),
+  // so showing them again here would just duplicate the strip.
   const railAlerts: RailAlert[] = [];
-  if (overdueCount > 0) railAlerts.push({ color: 'red', text: `${overdueCount} overdue task${overdueCount !== 1 ? 's' : ''}` });
   if (outstandingDocs > 0) railAlerts.push({ color: 'amber', text: `${outstandingDocs} doc${outstandingDocs !== 1 ? 's' : ''} outstanding` });
-  if (daysToPassportExpiry !== null && daysToPassportExpiry < 90) railAlerts.push({ color: 'red', text: `Passport expires in ${daysToPassportExpiry}d` });
+
+  // ── Case summary strip: At Risk + next deadline (Step 1's case info at a glance) ──
+  const caseRisk = useMemo(
+    () => computeCaseRisk(currentCase, caseTasks, deadlines, currentCase.stage === 'ready_to_lodge' ? checklist : undefined, new Date(), workflowTemplate?.steps),
+    [currentCase, caseTasks, deadlines, checklist, workflowTemplate],
+  );
+  const nextDeadline = useMemo(() => nextDeadlineFor(caseDeadlines, new Date()), [caseDeadlines]);
 
   // ---- Effects ----
 
@@ -1274,7 +1248,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   // ---- Render ----
-  const stageMeta = STAGE_META[currentCase.stage];
   const needsOutcomePrompt = currentCase.stage === 'closed' && !currentCase.outcome;
 
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
@@ -1303,140 +1276,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          {/* On hold toggle */}
-          <button
-            onClick={handleToggleOnHold}
-            title={currentCase.onHold ? 'Take this case off hold' : 'Put this case on hold'}
-            className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
-              currentCase.onHold
-                ? 'border-orange-400 bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300'
-                : 'border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame'
-            }`}
-          >
-            {currentCase.onHold ? 'On hold' : 'Not on hold'}
-          </button>
-
-          {/* Stage chip dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setStatusOpen(o => !o)}
-              className={`inline-flex items-center gap-1.5 text-[11px] font-bold pl-2.5 pr-2 py-1.5 rounded-lg transition-colors ${stageMeta.chip}`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full badge-pulse ${stageMeta.dot}`} />
-              {CASE_STAGE_LABELS[currentCase.stage]}
-              {currentCase.stage === 'closed' && currentCase.outcome && (
-                <span className="opacity-70">· {OUTCOME_LABELS[currentCase.outcome]}</span>
-              )}
-              <ChevronDown size={12} />
-            </button>
-            {statusOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setStatusOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-48 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content max-h-80 overflow-y-auto">
-                  {CASE_STAGE_ORDER.map(s => (
-                    <button
-                      key={s}
-                      onClick={() => handleStageSelect(s)}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold hover:bg-paper-2 dark:hover:bg-plate transition-colors ${currentCase.stage === s ? 'text-ink dark:text-plate-ink' : 'text-ink-soft dark:text-plate-ink-soft'}`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${STAGE_META[s].dot}`} />
-                      {CASE_STAGE_LABELS[s]}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* Backward-move confirm — inline, never window.confirm */}
-            {backwardConfirmStage && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setBackwardConfirmStage(null)} />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-64 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-3 modal-content">
-                  <p className="text-[12px] text-ink dark:text-plate-ink font-semibold mb-1">Move stage backward?</p>
-                  <p className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mb-3">
-                    This moves the case from {CASE_STAGE_LABELS[currentCase.stage]} back to {CASE_STAGE_LABELS[backwardConfirmStage]}.
-                  </p>
-                  <div className="flex items-center gap-2 justify-end">
-                    <button onClick={() => setBackwardConfirmStage(null)} className="px-3 py-1.5 text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg transition-colors">
-                      Cancel
-                    </button>
-                    <button onClick={confirmBackwardMove} className="px-3 py-1.5 text-[11.5px] font-semibold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg transition-colors">
-                      Confirm
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Outcome picker — required before a move to Closed applies */}
-            {outcomePickerOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setOutcomePickerOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-64 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-3 modal-content">
-                  <p className="text-[12px] text-ink dark:text-plate-ink font-semibold mb-2">Outcome</p>
-                  <div className="space-y-1 mb-3">
-                    {(['granted', 'refused', 'withdrawn', 'lapsed'] as CaseOutcome[]).map(o => (
-                      <button
-                        key={o}
-                        onClick={() => setOutcomeDraft(o)}
-                        className={`w-full text-left px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
-                          outcomeDraft === o
-                            ? 'bg-edamame-50 dark:bg-edamame-900/20 text-edamame-700 dark:text-edamame-400'
-                            : 'text-ink-soft dark:text-plate-ink-soft hover:bg-paper dark:hover:bg-plate'
-                        }`}
-                      >
-                        {OUTCOME_LABELS[o]}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 justify-end">
-                    <button onClick={() => setOutcomePickerOpen(false)} className="px-3 py-1.5 text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg transition-colors">
-                      Cancel
-                    </button>
-                    <button
-                      onClick={confirmOutcome}
-                      disabled={!outcomeDraft}
-                      className="px-3 py-1.5 text-[11.5px] font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed rounded-lg transition-colors"
-                    >
-                      Close case
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Draft + Eligibility action chips */}
-          <div className="flex items-center gap-1.5 pr-2 border-r border-ink/15 dark:border-plate-ink/20">
-            <button
-              onClick={() => handleSkillAction('Please help me draft a cover letter for this immigration case.')}
-              title="Draft a document with the Agent"
-              className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
-            >
-              <PenLine size={13} strokeWidth={1.8} />
-              <span className="hidden md:inline">Draft</span>
-            </button>
-            <button
-              onClick={handleEligibility}
-              title="Open the Visa Advisor pre-filled with this client"
-              className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
-            >
-              <ShieldCheck size={13} strokeWidth={1.8} />
-              <span className="hidden md:inline">Eligibility</span>
-            </button>
-            {eligibilityAssessment && (
-              <button
-                onClick={() => setShowEligibilityAssessment(true)}
-                title="View the eligibility assessment this case was opened from"
-                className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
-              >
-                <ShieldCheck size={13} strokeWidth={1.8} />
-                <span className="hidden md:inline">Eligibility assessment</span>
-              </button>
-            )}
-          </div>
-
-          {/* Add Task */}
+          {/* Add Task — the one primary action kept in the header. Everything
+              else that used to live here (Draft, Eligibility, Eligibility
+              assessment, Agent toggle, and the old ⋯ menu) moved into the
+              single Case actions menu below, named for what each does. */}
           <button
             onClick={() => handleOpenTaskModal()}
             className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-xs transition-colors"
@@ -1445,32 +1288,52 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             Add Task
           </button>
 
-          {/* Agent toggle */}
-          <button
-            onClick={() => setAgentOpen(o => !o)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
-              agentOpen
-                ? 'border-edamame bg-edamame/10 text-edamame-700 dark:text-edamame-400'
-                : 'border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame'
-            }`}
-          >
-            <Sparkles size={13} strokeWidth={1.8} />
-            <span className="hidden md:inline">Agent</span>
-          </button>
-
-          {/* ⋯ menu */}
+          {/* Case actions menu */}
           <div className="relative">
             <button
               onClick={() => setMoreOpen(o => !o)}
-              title="More actions"
-              className="w-8 h-8 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card flex items-center justify-center text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors"
+              title="Case actions"
+              aria-haspopup="true"
+              aria-expanded={moreOpen}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors text-xs font-bold"
             >
               <MoreHorizontal size={16} />
+              <span className="hidden md:inline">Case actions</span>
             </button>
             {moreOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMoreOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-52 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content">
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-60 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content max-h-[80vh] overflow-y-auto">
+                  <button
+                    onClick={() => { handleSkillAction('Please help me draft a cover letter for this immigration case.'); setMoreOpen(false); }}
+                    title="Opens the Agent chat pre-filled with a cover-letter drafting prompt"
+                    className={menuItemCls}
+                  >
+                    Draft cover letter with Agent
+                  </button>
+                  <button
+                    onClick={() => { handleEligibility(); setMoreOpen(false); }}
+                    title="Open the Visa Advisor pre-filled with this client"
+                    className={menuItemCls}
+                  >
+                    Re-check eligibility
+                  </button>
+                  {eligibilityAssessment && (
+                    <button
+                      onClick={() => { setShowEligibilityAssessment(true); setMoreOpen(false); }}
+                      title="View the eligibility assessment this case was opened from"
+                      className={menuItemCls}
+                    >
+                      View eligibility assessment
+                    </button>
+                  )}
+
+                  <div className="h-px bg-paper dark:bg-plate my-1" />
+                  <button onClick={() => { setAgentOpen(o => !o); setMoreOpen(false); }} className={menuItemCls}>
+                    {agentOpen ? 'Close Agent panel' : 'Open Agent panel'}
+                  </button>
+
+                  <div className="h-px bg-paper dark:bg-plate my-1" />
                   <button onClick={() => { openOrFocusTab('checklist'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
                   <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Workspace</button>
                   <button onClick={() => { setShowAutoPackager(true); setMoreOpen(false); }} className={menuItemCls}>Auto-Packager</button>
@@ -1488,7 +1351,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   </button>
                   {canDeleteCase && (
                     <>
-                      <div className="h-px bg-paper-2 dark:bg-plate-card my-1" />
+                      <div className="h-px bg-paper dark:bg-plate my-1" />
                       <button
                         onClick={() => { setShowDeleteConfirm(true); setMoreOpen(false); }}
                         className="w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
@@ -1503,6 +1366,29 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ── Case summary strip: stage, at-risk, next deadline, on hold ── */}
+      <CaseSummaryStrip
+        stage={currentCase.stage}
+        outcome={currentCase.outcome}
+        onHold={!!currentCase.onHold}
+        onToggleOnHold={handleToggleOnHold}
+        risk={caseRisk}
+        nextDeadline={nextDeadline}
+        onOpenDeadlines={() => openOrFocusTab('tasks')}
+        statusOpen={statusOpen}
+        onToggleStatusOpen={() => setStatusOpen(o => !o)}
+        onCloseStatusOpen={() => setStatusOpen(false)}
+        onStageSelect={handleStageSelect}
+        backwardConfirmStage={backwardConfirmStage}
+        onCancelBackward={() => setBackwardConfirmStage(null)}
+        onConfirmBackward={confirmBackwardMove}
+        outcomePickerOpen={outcomePickerOpen}
+        outcomeDraft={outcomeDraft}
+        onSetOutcomeDraft={setOutcomeDraft}
+        onCancelOutcomePicker={() => setOutcomePickerOpen(false)}
+        onConfirmOutcome={confirmOutcome}
+      />
 
       {/* Closed with no recorded outcome — prompt for one inline whenever the case is opened. */}
       {needsOutcomePrompt && (
