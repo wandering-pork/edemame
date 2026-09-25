@@ -21,6 +21,9 @@ interface TeamMembersProps {
   onAddMember: (member: TeamMember) => void;
   onUpdateMember: (member: TeamMember) => void;
   onDeleteMember: (id: string) => void;
+  /** Cloud mode only — used by FirmTeamMembers' "hand over their work" panel (Step 1 · 1G.6). */
+  onUpdateTask: (task: Task) => void;
+  onUpdateCase: (caseItem: Case) => void;
 }
 
 const roleOptions: { value: TeamMemberRole; label: string }[] = [
@@ -62,12 +65,14 @@ function initialsOf(name: string) {
 
 export const TeamMembers: React.FC<TeamMembersProps> = ({
   teamMembers,
-  cases: _cases,
+  cases,
   clients: _clients,
   tasks,
   onAddMember,
   onUpdateMember,
   onDeleteMember,
+  onUpdateTask,
+  onUpdateCase,
 }) => {
   const storageMode = useStorageMode();
   // Cloud mode: real firm members, invites, and roles (Step 1 · 1F) — see
@@ -75,7 +80,7 @@ export const TeamMembers: React.FC<TeamMembersProps> = ({
   // simple single-user list below (unchanged from before 1F, minus the fake
   // seeded collaborators — App.tsx no longer seeds them).
   if (storageMode === 'cloud') {
-    return <FirmTeamMembers tasks={tasks} />;
+    return <FirmTeamMembers tasks={tasks} cases={cases} onUpdateTask={onUpdateTask} onUpdateCase={onUpdateCase} />;
   }
 
   return <LocalTeamMembers teamMembers={teamMembers} tasks={tasks} onAddMember={onAddMember} onUpdateMember={onUpdateMember} onDeleteMember={onDeleteMember} />;

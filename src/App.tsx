@@ -704,6 +704,8 @@ const AppShell: React.FC = () => {
                 onAddMember={handleAddTeamMember}
                 onUpdateMember={handleUpdateTeamMember}
                 onDeleteMember={handleDeleteTeamMember}
+                onUpdateTask={handleUpdateTask}
+                onUpdateCase={handleUpdateCase}
               />
             } />
             <Route path="/clients" element={

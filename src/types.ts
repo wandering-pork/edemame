@@ -160,6 +160,19 @@ export interface FirmInvite {
   revokedAt?: string;
 }
 
+/**
+ * Step 1 · 1G.6 — a row of `firm_former_members`: someone who was removed
+ * from the firm (or left it), kept only so old work (task assignee, case
+ * owner, activity-feed actor) can still show a name instead of going blank.
+ * Never used for permissions or pickers — see `lib/memberDirectory.ts`.
+ */
+export interface FirmFormerMember {
+  userId: string;
+  fullName: string;
+  email: string | null;
+  removedAt: string; // ISO
+}
+
 // ---------------------------------------------------------------------------
 // Template task timing (Step 1 · 1E, and the DeadlineKind used by 1D's
 // Deadline entity — defined here since 1E's `StepAnchor` references it and

@@ -88,13 +88,39 @@ come back to it later, and your account stays in Local Storage untouched. You ca
 data into a firm of your own later from Settings (see "Switching storage modes with a team" below)
 — it never gets mixed into the firm you joined.
 
-## Changing roles and disabling members
+## Changing roles
 
-Owners can change any member's role (including making someone an Admin or another Owner), or
-disable a member's access, from the member list. Admins can do the same, but only for Members —
-the controls simply don't show up on an Admin's or Owner's own row when you're an Admin. Disabling
-someone keeps their history (past cases, activity) intact but removes them from the active member
-list and assignee pickers — it doesn't delete their account.
+Owners can change any member's role (including making someone an Admin or another Owner). Admins
+can do the same, but only for Members — the controls simply don't show up on an Admin's or Owner's
+own row when you're an Admin.
+
+## Disabling, removing, and handing over work
+
+Owners and Admins (for Members only — same restriction as roles above) can **disable** or
+**remove** a member from the member list.
+
+- **Disable** is a pause — for someone on leave, or between contracts. They can't sign in to the
+  firm, and they disappear from assignee/owner pickers, but they stay on the Team page (greyed,
+  "Disabled") and keep all their history. One click on **Re-enable** brings them straight back.
+- **Remove** is final. They lose access to the firm entirely and disappear from the Team page. To
+  bring them back later, invite them again — since their account doesn't change, all their old
+  work reconnects to them automatically once they rejoin.
+
+Either action first checks whether the member has any open work — open tasks assigned to them, or
+cases they own that aren't closed. If they do, a panel lists it and asks who should pick it up:
+another active member, or **Leave unassigned**. Confirming hands everything over before the
+disable/remove happens, the same way reassigning a task or case anywhere else in Edamame does (so
+it shows up in the activity feed as usual). If there's nothing to hand over, you go straight to the
+disable, or to Remove's confirmation step ("*Name* will lose access to this firm and be removed
+from the team. Their past work keeps their name.").
+
+## Former members
+
+Removing someone (or someone leaving on their own — see "Leaving a firm" below) doesn't erase their
+name from anything they already touched. Old task assignments, case ownership, and activity-feed
+entries that pointed at them keep showing their name, tagged **(former member)** so it's clear
+they're no longer on the team — the same way a disabled member's old work is tagged **(disabled)**.
+Former/disabled members never appear in assignee or case-owner pickers going forward.
 
 ## Availability
 

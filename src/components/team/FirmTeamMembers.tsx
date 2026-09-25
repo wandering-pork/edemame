@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Search, Users, Mail, Ban, CheckCircle2, Copy, X, RotateCcw, Trash2 } from 'lucide-react';
+import { Plus, Search, Users, Mail, Ban, CheckCircle2, Copy, X, RotateCcw, Trash2, ArrowRightLeft } from 'lucide-react';
 import { useFirm } from '@/contexts/FirmContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { isTaskClosed } from '@/lib/taskStatus';
+import { isCaseClosed } from '@/lib/caseStage';
 import {
   firmRoleLabel, firmJobTitleLabel, initialsOfName, canManageMembers, canManageMember, grantableRoles, FIRM_JOB_TITLES,
 } from '@/lib/firmDirectory';
 import { inviteHintFor, type InviteHint } from '@/lib/inviteHints';
-import type { FirmJobTitle, FirmRole, Task } from '@/types';
+import { friendlyMemberLifecycleError } from '@/lib/memberLifecycleErrors';
+import type { Case, FirmJobTitle, FirmMemberRow, FirmRole, Task } from '@/types';
 
 interface PendingInvite {
   id: string;
@@ -35,6 +37,10 @@ const hueFromId = (id: string): number => {
 
 interface FirmTeamMembersProps {
   tasks: Task[];
+  /** Step 1 · 1G.6 — cases, so Disable/Remove's "hand over their work" panel can list cases the member owns. */
+  cases: Case[];
+  onUpdateTask: (task: Task) => void;
+  onUpdateCase: (caseItem: Case) => void;
 }
 
 /**
@@ -42,7 +48,7 @@ interface FirmTeamMembersProps {
  * directory, invites, and roles. RLS is the real enforcement everywhere
  * here; the role checks below only decide what the UI offers.
  */
-export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
+export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks, cases, onUpdateTask, onUpdateCase }) => {
   const { firm, role, members, loading, refreshDirectory } = useFirm();
   const { user, session } = useAuth();
   // Step 1 · 1G.2: owners and admins manage members; admins additionally
@@ -76,6 +82,76 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
   const [resendResult, setResendResult] = useState<
     { id: string; sent: boolean; inviteLink: string } | { id: string; error: string } | null
   >(null);
+
+  // Step 1 · 1G.6: Disable and Remove both open this panel first, so the
+  // member's open work can be handed to someone else before either action
+  // runs. `kind` is null when the panel is closed.
+  const [lifecycle, setLifecycle] = useState<{ member: FirmMemberRow; kind: 'disable' | 'remove' } | null>(null);
+  const [lifecycleReassignTo, setLifecycleReassignTo] = useState<string>('');
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+  const [lifecycleConfirming, setLifecycleConfirming] = useState(false);
+
+  const openLifecyclePanel = (member: FirmMemberRow, kind: 'disable' | 'remove') => {
+    setLifecycle({ member, kind });
+    setLifecycleReassignTo('');
+    setLifecycleError(null);
+    setLifecycleConfirming(false);
+  };
+
+  const closeLifecyclePanel = () => {
+    setLifecycle(null);
+    setLifecycleReassignTo('');
+    setLifecycleError(null);
+    setLifecycleConfirming(false);
+    setLifecycleBusy(false);
+  };
+
+  const openTasksForLifecycle = useMemo(
+    () => (lifecycle ? tasks.filter(t => t.assignedTo === lifecycle.member.userId && !isTaskClosed(t)) : []),
+    [lifecycle, tasks],
+  );
+  const openCasesForLifecycle = useMemo(
+    () => (lifecycle ? cases.filter(c => c.caseOwner === lifecycle.member.userId && !isCaseClosed(c)) : []),
+    [lifecycle, cases],
+  );
+  const hasWorkToHandOver = openTasksForLifecycle.length > 0 || openCasesForLifecycle.length > 0;
+  const reassignCandidates = useMemo(
+    () => members.filter(m => m.status === 'active' && m.userId !== lifecycle?.member.userId),
+    [members, lifecycle],
+  );
+
+  const runLifecycleAction = async () => {
+    if (!lifecycle || !firm) return;
+    setLifecycleBusy(true);
+    setLifecycleError(null);
+    try {
+      // Hand over open work first, if any — plain bulk updates through the
+      // same App.tsx callbacks used everywhere else, so activity events are
+      // written as usual.
+      const target = lifecycleReassignTo || undefined;
+      for (const t of openTasksForLifecycle) {
+        onUpdateTask({ ...t, assignedTo: target });
+      }
+      for (const c of openCasesForLifecycle) {
+        onUpdateCase({ ...c, caseOwner: target });
+      }
+
+      if (lifecycle.kind === 'disable') {
+        const { error } = await supabase.from('firm_members').update({ status: 'disabled' }).eq('firm_id', firm.id).eq('user_id', lifecycle.member.userId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.rpc('remove_member', { f: firm.id, p_user_id: lifecycle.member.userId });
+        if (error) throw error;
+      }
+      await refreshDirectory();
+      closeLifecyclePanel();
+    } catch (err) {
+      console.error(`Failed to ${lifecycle.kind} member:`, err);
+      setLifecycleError(friendlyMemberLifecycleError(err));
+      setLifecycleBusy(false);
+    }
+  };
 
   const loadPendingInvites = async () => {
     if (!firm || !canManage) { setPendingInvites([]); return; }
@@ -195,26 +271,36 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
     }
   };
 
+  const [rowError, setRowError] = useState<{ userId: string; message: string } | null>(null);
+
   const handleChangeRole = async (userId: string, newRole: FirmRole) => {
     if (!firm) return;
+    setRowError(null);
     try {
       const { error } = await supabase.from('firm_members').update({ role: newRole }).eq('firm_id', firm.id).eq('user_id', userId);
       if (error) throw error;
       await refreshDirectory();
     } catch (err) {
-      console.error('Failed to change role (the firm may need to keep at least one active owner):', err);
+      console.error('Failed to change role:', err);
+      setRowError({ userId, message: friendlyMemberLifecycleError(err) });
     }
   };
 
+  // Only used for re-enable now — disabling a member goes through the
+  // lifecycle panel above (openLifecyclePanel) so open work can be handed
+  // over first. Re-enabling never orphans anything, so it stays a direct
+  // one-click action.
   const handleToggleDisabled = async (userId: string, currentStatus: string) => {
     if (!firm) return;
+    setRowError(null);
     const nextStatus = currentStatus === 'active' ? 'disabled' : 'active';
     try {
       const { error } = await supabase.from('firm_members').update({ status: nextStatus }).eq('firm_id', firm.id).eq('user_id', userId);
       if (error) throw error;
       await refreshDirectory();
     } catch (err) {
-      console.error('Failed to change member status (the firm may need to keep at least one active owner):', err);
+      console.error('Failed to change member status:', err);
+      setRowError({ userId, message: friendlyMemberLifecycleError(err) });
     }
   };
 
@@ -391,7 +477,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
                     <div className="col-span-1 flex items-center justify-end gap-3">
                       {canManageThis && (
                         <button
-                          onClick={() => handleToggleDisabled(m.userId, m.status)}
+                          onClick={() => m.status === 'active' ? openLifecyclePanel(m, 'disable') : handleToggleDisabled(m.userId, m.status)}
                           aria-label={m.status === 'active' ? 'Disable member' : 'Re-enable member'}
                           title={m.status === 'active' ? 'Disable member' : 'Re-enable member'}
                           className="text-ink-faint dark:text-plate-ink-faint hover:text-red-500 transition-colors"
@@ -399,8 +485,21 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
                           {m.status === 'active' ? <Ban size={14} strokeWidth={1.8} /> : <CheckCircle2 size={14} strokeWidth={1.8} />}
                         </button>
                       )}
+                      {canManageThis && (
+                        <button
+                          onClick={() => openLifecyclePanel(m, 'remove')}
+                          aria-label="Remove member"
+                          title="Remove member"
+                          className="text-ink-faint dark:text-plate-ink-faint hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={14} strokeWidth={1.8} />
+                        </button>
+                      )}
                     </div>
                   </div>
+                  {rowError && rowError.userId === m.userId && (
+                    <p className="px-5 pb-2.5 text-[11px] text-red-500">{rowError.message}</p>
+                  )}
                 </div>
               );
             })
@@ -564,6 +663,98 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Step 1 · 1G.6: Disable/Remove lifecycle panel — hand over open
+          work first, then (for Remove) an inline confirm, then the action. */}
+      {lifecycle && (
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop">
+          <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl max-w-md w-full modal-content">
+            <div className="flex items-center justify-between p-6 border-b border-ink/15 dark:border-plate-ink/20">
+              <h2 className="text-lg font-bold text-ink dark:text-plate-ink">
+                {lifecycle.kind === 'disable' ? 'Disable' : 'Remove'} {lifecycle.member.fullName}
+              </h2>
+              <button onClick={closeLifecyclePanel} className="p-1 hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {hasWorkToHandOver && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <ArrowRightLeft size={14} className="text-ink-faint dark:text-plate-ink-faint" strokeWidth={1.8} />
+                    <p className="text-sm font-semibold text-ink dark:text-plate-ink">Hand over their work first</p>
+                  </div>
+                  <p className="text-xs text-ink-soft dark:text-plate-ink-soft mb-3">
+                    {lifecycle.member.fullName} has {openTasksForLifecycle.length} open task{openTasksForLifecycle.length === 1 ? '' : 's'}
+                    {openCasesForLifecycle.length > 0 && ` and owns ${openCasesForLifecycle.length} open case${openCasesForLifecycle.length === 1 ? '' : 's'}`}.
+                    Choose who picks them up.
+                  </p>
+                  <ul className="text-xs text-ink-soft dark:text-plate-ink-soft mb-3 space-y-1 max-h-24 overflow-y-auto pr-1">
+                    {openTasksForLifecycle.map(t => (
+                      <li key={t.id} className="truncate">Task: {t.title}</li>
+                    ))}
+                    {openCasesForLifecycle.map(c => (
+                      <li key={c.id} className="truncate">Case: {c.title}</li>
+                    ))}
+                  </ul>
+                  <label className="block text-xs font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5">Reassign to</label>
+                  <select
+                    value={lifecycleReassignTo}
+                    onChange={e => setLifecycleReassignTo(e.target.value)}
+                    className="focus-ring w-full px-3 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink dark:text-plate-ink text-sm outline-none"
+                  >
+                    <option value="">Leave unassigned</option>
+                    {reassignCandidates.map(m => (
+                      <option key={m.userId} value={m.userId}>{m.fullName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {lifecycle.kind === 'remove' && (
+                lifecycleConfirming ? (
+                  <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
+                    <p className="text-sm text-ink dark:text-plate-ink">
+                      <strong>{lifecycle.member.fullName}</strong> will lose access to this firm and be removed
+                      from the team. Their past work keeps their name.
+                    </p>
+                  </div>
+                ) : null
+              )}
+
+              {lifecycleError && <p className="text-sm text-red-500">{lifecycleError}</p>}
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeLifecyclePanel}
+                  className="px-4 py-2 text-sm font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                {lifecycle.kind === 'remove' && !lifecycleConfirming ? (
+                  <button
+                    type="button"
+                    onClick={() => setLifecycleConfirming(true)}
+                    className="btn-press ml-auto px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                  >
+                    Continue
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={runLifecycleAction}
+                    disabled={lifecycleBusy}
+                    className="btn-press ml-auto px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                  >
+                    {lifecycleBusy ? 'Working...' : lifecycle.kind === 'disable' ? 'Disable member' : 'Remove member'}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

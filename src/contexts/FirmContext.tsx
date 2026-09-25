@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import type { Firm, FirmMemberRow, FirmRole } from '../types';
+import type { Firm, FirmFormerMember, FirmMemberRow, FirmRole } from '../types';
 import { mapFirmDirectoryToTeamMembers } from '../lib/firmDirectory';
+import { resolveMemberDisplayName } from '../lib/memberDirectory';
 import type { TeamMember } from '../types';
 import { resolveCurrentFirm, type ActiveMembership } from '../lib/firmSwitch';
 import { useAuth } from './AuthContext';
@@ -18,8 +19,14 @@ interface FirmContextValue {
   /** null while loading, in local mode, or when the signed-in user has no firm yet (see CreateFirmGate). */
   role: FirmRole | null;
   members: FirmMemberRow[];
+  /** Alias for `members` (every directory row, active and disabled) — see Step 1 · 1G.6's plan wording. `members` is kept for existing call sites. */
+  allMembers: FirmMemberRow[];
   /** Active members mapped to the existing TeamMember shape — see lib/firmDirectory.ts. Assignee/owner pickers read this. */
   teamMembers: TeamMember[];
+  /** Step 1 · 1G.6 — people removed from (or who left) the current firm, kept only so old work can still show a name. Never used for permissions or pickers. */
+  formerMembers: FirmFormerMember[];
+  /** Resolves a userId to a display name for *past* work (task assignee, case owner, activity actor): active -> "Name (disabled)" -> "Name (former member)" -> null if truly unknown. See lib/memberDirectory.ts. */
+  memberNameFor: (userId: string | undefined | null) => string | null;
   /** Every firm the signed-in user is an active member of (Step 1 · 1G.5) — drives the Sidebar switcher and Settings -> Firm. */
   memberships: ActiveMembership[];
   loading: boolean;
@@ -75,6 +82,7 @@ export function FirmProvider({ children }: { children: React.ReactNode }) {
   const { profile, refetchProfile, updateProfile } = useProfile();
   const [firm, setFirm] = useState<Firm | null>(null);
   const [members, setMembers] = useState<FirmMemberRow[]>([]);
+  const [formerMembers, setFormerMembers] = useState<FirmFormerMember[]>([]);
   const [memberships, setMemberships] = useState<ActiveMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [lostAccessNotice, setLostAccessNotice] = useState<string | null>(null);
@@ -83,6 +91,7 @@ export function FirmProvider({ children }: { children: React.ReactNode }) {
     if (DEV_OFFLINE_AUTH || !user || profile?.storageMode !== 'cloud') {
       setFirm(null);
       setMembers([]);
+      setFormerMembers([]);
       setMemberships([]);
       setLoading(false);
       return;
@@ -139,22 +148,29 @@ export function FirmProvider({ children }: { children: React.ReactNode }) {
       if (!resolution.firmId) {
         setFirm(null);
         setMembers([]);
+        setFormerMembers([]);
         return;
       }
 
-      const [{ data: firmRow, error: firmErr }, { data: dirRows, error: dirErr }] = await Promise.all([
+      const [{ data: firmRow, error: firmErr }, { data: dirRows, error: dirErr }, { data: formerRows, error: formerErr }] = await Promise.all([
         supabase.from('firms').select('id, name').eq('id', resolution.firmId).maybeSingle(),
         supabase.rpc('firm_member_directory', { f: resolution.firmId }),
+        supabase.from('firm_former_members').select('user_id, full_name, email, removed_at').eq('firm_id', resolution.firmId),
       ]);
       if (firmErr) throw firmErr;
       if (dirErr) throw dirErr;
+      if (formerErr) throw formerErr;
 
       setFirm(firmRow ? { id: firmRow.id, name: firmRow.name } : null);
       setMembers((dirRows ?? []).map(rowFromRpc));
+      setFormerMembers((formerRows ?? []).map((r: any) => ({
+        userId: r.user_id, fullName: r.full_name, email: r.email, removedAt: r.removed_at,
+      })));
     } catch (err) {
       console.error('Failed to load firm context:', err);
       setFirm(null);
       setMembers([]);
+      setFormerMembers([]);
     } finally {
       setLoading(false);
     }
@@ -196,10 +212,15 @@ export function FirmProvider({ children }: { children: React.ReactNode }) {
 
   const teamMembers = useMemo(() => mapFirmDirectoryToTeamMembers(members), [members]);
 
+  const memberNameFor = useCallback(
+    (userId: string | undefined | null) => resolveMemberDisplayName(userId, members, formerMembers)?.name ?? null,
+    [members, formerMembers],
+  );
+
   const value = useMemo<FirmContextValue>(() => ({
-    firm, role, members, teamMembers, memberships, loading, refreshDirectory: load, createFirm,
-    switchFirm, leaveFirm, lostAccessNotice, dismissLostAccessNotice,
-  }), [firm, role, members, teamMembers, memberships, loading, load, createFirm, switchFirm, leaveFirm, lostAccessNotice, dismissLostAccessNotice]);
+    firm, role, members, allMembers: members, teamMembers, formerMembers, memberNameFor, memberships, loading,
+    refreshDirectory: load, createFirm, switchFirm, leaveFirm, lostAccessNotice, dismissLostAccessNotice,
+  }), [firm, role, members, teamMembers, formerMembers, memberNameFor, memberships, loading, load, createFirm, switchFirm, leaveFirm, lostAccessNotice, dismissLostAccessNotice]);
 
   return <FirmContext.Provider value={value}>{children}</FirmContext.Provider>;
 }
