@@ -5,7 +5,8 @@ import { LogoBrand } from '@/components/LogoBrand';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/contexts/ProfileContext';
 import { supabase } from '@/lib/supabaseClient';
-import { needsAccountSetup, validateNewPassword } from '@/lib/firmInvites';
+import { needsAccountSetup } from '@/lib/firmInvites';
+import { validateNewPassword } from '@/lib/passwordValidation';
 
 type Status = 'loading' | 'warn-local' | 'accepting' | 'setup' | 'accepted' | 'error';
 

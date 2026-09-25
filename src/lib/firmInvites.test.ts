@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   mapPendingInviteRows,
   needsAccountSetup,
-  validateNewPassword,
   friendlyInviteError,
   type PendingInviteRpcRow,
 } from './firmInvites';
@@ -60,20 +59,6 @@ describe('needsAccountSetup', () => {
     expect(
       needsAccountSetup({ invited_at: '2026-09-01T00:00:00.000Z', user_metadata: { password_set: true } })
     ).toBe(false);
-  });
-});
-
-describe('validateNewPassword', () => {
-  it('rejects a password under 6 characters', () => {
-    expect(validateNewPassword('abc', 'abc')).toMatch(/at least 6 characters/);
-  });
-
-  it('rejects mismatched passwords', () => {
-    expect(validateNewPassword('abcdef', 'abcdeg')).toMatch(/do not match/);
-  });
-
-  it('accepts a valid matching password', () => {
-    expect(validateNewPassword('abcdef', 'abcdef')).toBeNull();
   });
 });
 

@@ -64,19 +64,6 @@ export function needsAccountSetup(user: InviteSetupCandidate | null | undefined)
   return user.user_metadata?.password_set !== true;
 }
 
-const MIN_PASSWORD_LENGTH = 6;
-
-/** Mirrors pages/LandingPage.tsx's sign-up validation (length + match) — kept as a small local copy rather than importing a shared helper, since none exists on this base branch yet (see the module doc comment on PR #63 adding one later). */
-export function validateNewPassword(password: string, confirm: string): string | null {
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
-  }
-  if (password !== confirm) {
-    return 'The two passwords do not match.';
-  }
-  return null;
-}
-
 /**
  * The SQL functions in supabase/migrations/20260927000200_invitations.sql
  * raise exceptions with plain, already-user-facing messages (see the
