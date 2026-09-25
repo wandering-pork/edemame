@@ -118,7 +118,7 @@ begin
   end if;
 
   insert into notifications (id, user_id, title, message, type, read, created_at)
-  values (notif_id, recipient_uuid, notif_title, notif_message, 'info', false, now()::text)
+  values (notif_id, recipient_uuid, notif_title, notif_message, 'info', false, to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
   on conflict (id) do nothing;
 end $$;
 
