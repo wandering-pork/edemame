@@ -1,8 +1,9 @@
 # Team Members
 
 Team Members lets you invite colleagues into your firm's shared workspace, so everyone sees the
-same clients, cases, and tasks. It's only available in **Cloud Storage** mode — Local Storage keeps
-your data in a folder on one device, so it only ever has one user.
+same clients, cases, and tasks — that's how it works in **Cloud Storage** mode, covered below. In
+**Local Storage** mode the page is much simpler, since your data lives in a folder on one device
+and only ever has one real user — see "Local Storage mode" at the end of this page.
 
 ## Firms
 
@@ -188,3 +189,23 @@ Switching from Local Storage to Cloud Storage copies your local folder into a fi
 you alone. If you're already a member of a shared firm (for example, you accepted a colleague's
 invite), your local data goes into a new personal firm instead. It never replaces or mixes with a
 shared firm's data.
+
+## Local Storage mode
+
+Local Storage is single-user by construction, so the Team Members page here is a plain list you
+manage yourself rather than a firm directory — there's no invite flow, no roles, and nothing to
+sign in with.
+
+- **Add person** adds a name you can assign cases and tasks to. It doesn't send an email or create
+  a login — it's just a label for "who's doing this," the same idea as writing someone's initials
+  on a task. A banner at the top of the page reminds you of this and links to Settings, in case you
+  actually want colleagues to sign in and share your data (switch to Cloud Storage there).
+- The **Title** column (Partner / Lawyer / Assistant) is a cosmetic label too — it has no effect on
+  what anyone can do, unlike the access roles (Owner / Admin / Member) in Cloud Storage mode.
+- **Removing** a person clears them as the owner/assignee on any cases or tasks they had — those
+  stay, just unassigned.
+- If your linked folder was created by an older version of Edamame, you may see a notice about
+  **sample team members** (Eliza Chen, Marcus Okafor, Priya Singh) left over from that earlier
+  version. Click **Remove sample members** to confirm and delete them the same way as removing
+  anyone else — their old work stays, just unassigned. You can also dismiss the notice without
+  removing anything.

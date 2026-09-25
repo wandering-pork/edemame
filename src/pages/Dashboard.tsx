@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Task, Case, Client, TeamMember, ActivityEvent, DocumentChecklistItem, Deadline } from '../types';
+import { Task, Case, Client, TeamMember, ActivityEvent, DocumentChecklistItem, Deadline, WorkflowTemplate } from '../types';
 import {
   format,
   isSameDay,
@@ -17,6 +17,7 @@ import {
 } from '../lib/attention';
 import { allDeadlines } from '../lib/deadlines';
 import { isTaskClosed, statusChipFor, withStatus } from '../lib/taskStatus';
+import { describePlanSource, buildTaskPlanSummary } from '../lib/planActivity';
 import { isCaseClosed } from '../lib/caseStage';
 import { countOutstandingChecklistItems } from '../lib/docsOutstanding';
 import { TaskDetailModal } from '../components/TaskDetailModal';
@@ -25,6 +26,12 @@ interface DashboardProps {
   tasks: Task[];
   cases: Case[];
   clients: Client[];
+  /**
+   * Optional — used only to name the template in the "Recent activity"
+   * panel's fallback wording (see `activity` below) when an old case has no
+   * `tasks_planned` `ActivityEvent` to read a name from directly.
+   */
+  templates?: WorkflowTemplate[];
   /** Optional — App.tsx loads `deadlines` from `repos.deadlines`; when absent, "Needs attention" shows tasks only. */
   deadlines?: Deadline[];
   teamMembers?: TeamMember[];
@@ -42,12 +49,15 @@ interface DashboardProps {
   ) => void;
   onAddTask: (task: Task) => void;
   /**
-   * Optional — App.tsx already tracks an `activity: ActivityEvent[]` state (see
-   * the `/team` route) but does not currently pass it to Dashboard. When
-   * supplied, "Agent activity" renders real events with real relative
-   * timestamps; when absent, it falls back to a best-effort feed derived from
-   * AI-generated tasks (no timestamps available on `Task`, so no "time ago"
-   * is shown). Wiring `activity={activity}` from App.tsx is a one-line follow-up.
+   * Optional — App.tsx's `activity: ActivityEvent[]` state, wired in from the
+   * `/dashboard` route. When supplied, "Recent activity" renders real events
+   * (including the `tasks_planned` event `handleTasksConfirmed` writes, whose
+   * wording already distinguishes an AI-generated plan from one created
+   * deterministically from a template — see `lib/planActivity.ts`) with real
+   * relative timestamps; when absent (e.g. a case created before that event
+   * type existed), it falls back to a best-effort feed built from the case's
+   * tasks using the same `lib/planActivity.ts` wording (no timestamps
+   * available on `Task`, so no "time ago" is shown there).
    */
   activity?: ActivityEvent[];
   /**
@@ -65,7 +75,12 @@ interface DashboardProps {
 
 type ScopeFilter = 'mine' | 'team' | 'all';
 
-const EVENT_KIND: Record<'task' | 'filing' | 'deadline', { label: string; edge: string; bg: string; text: string }> = {
+// Note: a task's due date is never labelled "Deadline" here — since Step 1 ·
+// 1D, a `Deadline` is a separate, external, consequential date (s56/s57,
+// visa/passport expiry — see `lib/deadlines.ts`) shown in the case page's
+// Deadlines panel, not something derived from a task. "OVERDUE"/"DUE TODAY"
+// describe the task's own due date only.
+const EVENT_KIND: Record<'task' | 'filing' | 'overdue' | 'due_today', { label: string; edge: string; bg: string; text: string }> = {
   task: {
     label: 'Task',
     edge: '#3B82F6',
@@ -78,23 +93,31 @@ const EVENT_KIND: Record<'task' | 'filing' | 'deadline', { label: string; edge: 
     bg: 'bg-edamame/10 dark:bg-edamame/15',
     text: 'text-edamame-700 dark:text-edamame-400',
   },
-  deadline: {
-    label: 'Deadline',
+  overdue: {
+    label: 'Overdue',
     edge: '#EF4444',
     bg: 'bg-red-50 dark:bg-red-500/10',
     text: 'text-red-600 dark:text-red-400',
   },
+  due_today: {
+    label: 'Due today',
+    edge: '#F59E0B',
+    bg: 'bg-amber-50 dark:bg-amber-500/10',
+    text: 'text-amber-600 dark:text-amber-400',
+  },
 };
 
 /**
- * Task doesn't carry a "kind" (task/filing/deadline) in the data model, so
- * this is a heuristic: overdue/due-today tasks read as Deadline, tasks whose
- * title suggests a lodgement read as Filing, everything else is a plain Task.
+ * Task doesn't carry a "kind" (task/filing/overdue/due today) in the data
+ * model, so this is a heuristic: an open task past its due date reads as
+ * Overdue, one due today reads as Due today, a title suggesting a lodgement
+ * reads as Filing, everything else is a plain Task.
  */
 const getEventKind = (task: Task): keyof typeof EVENT_KIND => {
   if (!isTaskClosed(task)) {
     const daysUntil = differenceInCalendarDays(startOfDay(new Date(task.date)), startOfDay(new Date()));
-    if (daysUntil <= 0) return 'deadline';
+    if (daysUntil < 0) return 'overdue';
+    if (daysUntil === 0) return 'due_today';
   }
   const t = task.title.toLowerCase();
   if (/\blodge|\bfiling|\bfile\b|\bsubmit|\bsubmission/.test(t)) return 'filing';
@@ -105,6 +128,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   tasks,
   cases,
   clients,
+  templates = [],
   deadlines = [],
   teamMembers = [],
   currentUserId,
@@ -319,7 +343,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onUpdateTask(withStatus(task, 'done'));
   };
 
-  // ── Agent activity ────────────────────────────────────────────────────
+  // ── Recent activity ────────────────────────────────────────────────────
   const activityItems = useMemo(() => {
     if (activity.length > 0) {
       return [...activity]
@@ -338,19 +362,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
         });
     }
 
-    // Fallback: no ActivityEvent[] wired in — approximate from AI-generated tasks.
-    const aiCaseIds: string[] = Array.from(new Set(tasks.filter(t => t.generatedByAi && t.caseId).map(t => t.caseId as string)));
-    return aiCaseIds.slice(0, 4).map(caseId => {
+    // Fallback: no ActivityEvent[] wired in (e.g. very old cases from before
+    // `tasks_planned` events were recorded) — approximate from the tasks
+    // themselves, using the same wording `App.tsx`'s `handleTasksConfirmed`
+    // writes for a real event, so a case with a template-only plan doesn't
+    // read as AI-generated just because this panel is labelled with a
+    // sparkle icon.
+    const caseIdsWithTasks: string[] = Array.from(new Set(tasks.filter(t => t.caseId).map(t => t.caseId as string)));
+    return caseIdsWithTasks.slice(0, 4).map(caseId => {
       const { case: c, client } = getCaseAndClient(caseId);
-      const count = tasks.filter(t => t.caseId === caseId && t.generatedByAi).length;
+      const caseTasks = tasks.filter(t => t.caseId === caseId);
+      const template = templates.find(t => t.id === c?.templateId);
       return {
         id: caseId,
-        title: `Generated ${count}-task plan`,
+        title: buildTaskPlanSummary(caseTasks.length, describePlanSource(caseTasks), template?.title) || 'Task plan created',
         sub: c ? `${c.title}${client ? ` · ${client.name}` : ''}` : '',
         time: '—',
       };
     });
-  }, [activity, tasks, cases, clients]);
+  }, [activity, tasks, cases, clients, templates]);
 
   // ── This week board ───────────────────────────────────────────────────
   const autoWindowStart = useMemo(() => computeAutoWindowStart(today), [today.getTime()]);
@@ -427,7 +457,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           ))}
         </div>
 
-        {/* ── Needs attention / Agent activity ─────────────────────────── */}
+        {/* ── Needs attention / Recent activity ─────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-3.5 mt-3.5 items-start">
           {/* Needs attention */}
           <div className="bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl overflow-hidden">
@@ -532,17 +562,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-          {/* Agent activity */}
+          {/* Recent activity */}
           <div className="bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl overflow-hidden">
             <div className="flex items-center gap-2 px-5 pt-4 pb-2.5">
               <Sparkles size={14} className="text-edamame-500" />
               <span className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-ink-soft dark:text-plate-ink-soft">
-                Agent activity
+                Recent activity
               </span>
             </div>
             {activityItems.length === 0 ? (
               <div className="px-5 py-8 text-center text-[12.5px] text-ink-soft dark:text-plate-ink-soft border-t border-ink/10 dark:border-plate-ink/15">
-                No AI activity yet.
+                No activity yet.
               </div>
             ) : (
               activityItems.map(item => (

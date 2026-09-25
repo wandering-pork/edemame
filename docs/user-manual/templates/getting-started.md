@@ -20,13 +20,19 @@ Each step in the expanded timeline shows:
   or "Within 60 days of invitation received" — steps with no timing data yet show "No timing set"
   and fall back to the AI's own judgement when tasks are generated;
 - a **Set by law** chip on steps whose window is fixed by legislation (the case manager can't move
-  that task's date) or an **Estimate** chip otherwise (the agent can always change any task's date
-  after it's created, regardless of this chip);
+  that task's date). A step with no chip uses an estimate instead — that's the default for most
+  steps, so it isn't called out on every one; the agent can always change any task's date after
+  it's created either way. Hover or focus (keyboard-accessible) the chip for a reminder of what it
+  means;
 - a **Gate** marker on steps that must be completed before the case can be considered ready to
-  advance.
+  advance — an overdue gate step is one of the reasons a case shows as At Risk on the Case Manager
+  board. Hover or focus the marker for this explanation.
 
-Built-in templates whose timing hasn't been signed off yet show a note: "Timing not yet reviewed by
-a registered agent — dates can be changed on each task." This clears once someone verifies the
+If any built-in or custom template on the page hasn't had its timing signed off yet, a single note
+above the grid explains: "Timing not yet reviewed by a registered agent — dates can be changed on
+each task," and also recaps what **Set by law** and **Gate** mean. Each affected card additionally
+shows a small **Not yet reviewed** chip (hover/focus for the same explanation) rather than
+repeating the full notice on every card. The note and chip clear once someone verifies that
 template's step timing is correct for current legislation and processing times.
 
 ## Creating or editing a custom template

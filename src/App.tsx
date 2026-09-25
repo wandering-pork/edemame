@@ -42,6 +42,7 @@ import { LinkFolderGate } from './components/LinkFolderGate';
 import { PendingInvitationsBanner } from './components/team/PendingInvitationsBanner';
 import { isSupabaseConfigured, supabase } from './lib/supabaseClient';
 import { shouldNotifyAssignment } from './lib/assignmentNotify';
+import { describePlanSource, buildTaskPlanSummary } from './lib/planActivity';
 
 // ---------------------------------------------------------------------------
 // Inner app — has access to repositories and router
@@ -562,6 +563,16 @@ const AppShell: React.FC = () => {
       subjectId: caseWithOwner.id,
       summary: `New case created: "${caseWithOwner.title}".`,
     });
+    if (tasksWithAssignee.length > 0) {
+      const planSource = describePlanSource(tasksWithAssignee);
+      const templateName = templates.find(t => t.id === caseWithOwner.templateId)?.title;
+      pushActivity({
+        type: 'tasks_planned',
+        actorId: currentUserId,
+        subjectId: caseWithOwner.id,
+        summary: buildTaskPlanSummary(tasksWithAssignee.length, planSource, templateName),
+      });
+    }
     const visaSubclass = caseWithOwner.visaSubclass ?? templates.find(t => t.id === caseWithOwner.templateId)?.visaSubclass;
     pushUsageEvent({ type: 'case_created', metadata: { visaSubclass, templateId: caseWithOwner.templateId } });
 
@@ -765,6 +776,8 @@ const AppShell: React.FC = () => {
                 teamMembers={teamMembers}
                 currentUserId={currentUserId}
                 storageMode={storageMode}
+                activity={activity}
+                templates={templates}
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
                 onMoveTaskOrder={handleMoveTaskOrder}
