@@ -31,6 +31,25 @@ You'll get an email with a link that opens a "Set a new password" page — choos
 there and you'll be signed in with it right away. If the link says it has expired or was already
 used, go back to the sign-in screen and request a new one; each link works once.
 
+## I got an error about an email limit / rate limit when signing up, resetting my password, or sending an invite
+
+Edamame's own email sender can only send a small number of emails per hour across the whole
+project. If you (or your firm) triggered several sign-ups, password resets, or invite emails in a
+short window, you'll see: "We couldn't send the email right now — too many emails were sent
+recently. Please try again in about an hour." There's nothing wrong with your account — just wait
+and try again. If it happened while an owner or admin was inviting you to a firm, ask them to copy
+the invite link instead of resending the email (the invite screen shows a copyable link whenever
+the email itself couldn't go out) rather than waiting on another email.
+
+If you see a shorter message like "Please wait a few seconds and try again," that's a different,
+much shorter cooldown Supabase applies between individual requests — just retry after a moment.
+
+## I was invited to a firm but sign-up says the email limit was hit
+
+Don't create a brand-new account — use the link from your invite email (or the in-app banner, if
+you're already signed in) instead. Creating a separate account with **Create account** doesn't join
+you to the firm; it just makes an unrelated personal account.
+
 ## How do I sign out?
 
 Use **Sign Out** from the Account section in **Settings**, or the sign-out link in the sidebar.

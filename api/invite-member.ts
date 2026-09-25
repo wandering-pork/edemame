@@ -172,6 +172,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const inviteLink = `${origin}/invite/${token}`;
 
     let sent = false;
+    // Distinguishes "the email genuinely couldn't be sent" (e.g. Supabase's
+    // built-in sender hit its ~2-emails/hour-per-project rate limit) from
+    // sendAuthInviteEmail's other non-fatal false: the address already
+    // belongs to a registered user. Both leave `sent: false`, but the UI
+    // (components/team/FirmTeamMembers.tsx) shows different copy for each —
+    // "already has an account, here's the link" vs "couldn't send right
+    // now, here's the link" — so this needs to ride along in the response.
+    let emailError: string | null = null;
     try {
       sent = await sendAuthInviteEmail(email, inviteLink, {
         invited_to_firm: firmId,
@@ -184,15 +192,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // if the email itself failed to send (e.g. Supabase email provider
       // hiccup), so this isn't fatal to the request.
       console.error("Failed to send invite email (invite record was still created):", err);
+      const message = err instanceof Error ? err.message : String(err);
+      emailError = /rate limit|too many/i.test(message)
+        ? "Couldn't send the invite email right now (email limit reached). Copy the invite link instead."
+        : "Couldn't send the invite email right now. Copy the invite link instead.";
     }
 
     return res.status(200).json({
       ok: true,
       sent,
+      emailError,
       // Always returned: lets the owner copy the link regardless of whether
       // the email send succeeded (sent: true still went out through
-      // Supabase's own invite email; sent: false means the address is
-      // already registered, so this is the way to reach them).
+      // Supabase's own invite email; sent: false means either the address is
+      // already registered, or emailError explains a real send failure).
       inviteLink,
       resent: isResend,
     });

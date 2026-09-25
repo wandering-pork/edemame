@@ -66,6 +66,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks, cases, 
   const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
   const [lastInviteSent, setLastInviteSent] = useState<boolean | null>(null);
   const [lastInviteEmail, setLastInviteEmail] = useState<string | null>(null);
+  const [lastInviteEmailError, setLastInviteEmailError] = useState<string | null>(null);
 
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
@@ -80,7 +81,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks, cases, 
 
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [resendResult, setResendResult] = useState<
-    { id: string; sent: boolean; inviteLink: string } | { id: string; error: string } | null
+    { id: string; sent: boolean; inviteLink: string; emailError?: string | null } | { id: string; error: string } | null
   >(null);
 
   // Step 1 · 1G.6: Disable and Remove both open this panel first, so the
@@ -200,6 +201,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks, cases, 
     setLastInviteLink(null);
     setLastInviteSent(null);
     setLastInviteEmail(null);
+    setLastInviteEmailError(null);
     try {
       const res = await fetch('/api/invite-member', {
         method: 'POST',
@@ -223,6 +225,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks, cases, 
       setLastInviteLink(data.inviteLink);
       setLastInviteSent(!!data.sent);
       setLastInviteEmail(email);
+      setLastInviteEmailError(data.emailError ?? null);
       setInviteEmail('');
       await loadPendingInvites();
     } catch (err) {
@@ -251,7 +254,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks, cases, 
         setResendResult({ id: inv.id, error: data?.error || 'Could not resend the invite.' });
         return;
       }
-      setResendResult({ id: inv.id, sent: !!data.sent, inviteLink: data.inviteLink });
+      setResendResult({ id: inv.id, sent: !!data.sent, inviteLink: data.inviteLink, emailError: data.emailError ?? null });
       await loadPendingInvites();
     } catch (err) {
       console.error('Failed to resend invite:', err);
@@ -555,7 +558,9 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks, cases, 
                             <Mail size={12} />
                             {result.sent
                               ? 'Invite re-sent.'
-                              : `${inv.email} already has an Edamame account, so no email was sent — send them this link:`}
+                              : result.emailError
+                                ? result.emailError
+                                : `${inv.email} already has an Edamame account, so no email was sent — send them this link:`}
                           </p>
                           <div className="flex items-center gap-2">
                             <input readOnly value={result.inviteLink} className="flex-1 text-[11px] px-2 py-1 rounded border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink dark:text-plate-ink" />
@@ -631,7 +636,9 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks, cases, 
                     <Mail size={13} />
                     {lastInviteSent
                       ? `Invite email sent to ${lastInviteEmail}`
-                      : `${lastInviteEmail} already has an Edamame account, so no email was sent — send them this link:`}
+                      : lastInviteEmailError
+                        ? lastInviteEmailError
+                        : `${lastInviteEmail} already has an Edamame account, so no email was sent — send them this link:`}
                   </p>
                   <div className="flex items-center gap-2">
                     <input readOnly value={lastInviteLink} className="flex-1 text-xs px-2 py-1.5 rounded border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink dark:text-plate-ink" />

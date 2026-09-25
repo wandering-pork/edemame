@@ -80,6 +80,12 @@ there. If you haven't created your own firm yet, any pending invitations show up
 "Create your firm" screen too, so you don't accidentally create an empty firm instead of joining
 the one you were invited to.
 
+If you were invited but never actually finished setting up a password yet — for example you
+accepted from the in-app banner instead of the emailed link, or joined before you'd been through
+the "finish setting up your account" step — you'll see that same **Finish setting up your
+account** screen the next time you open Edamame, no matter which page you land on. It only asks
+once: after you set a name and password there, you won't see it again.
+
 **If you're currently using Local Storage:** accepting an invite (either from the link or the
 in-app banner) switches your account to Cloud Storage, since firms only work in Cloud Storage.
 You'll see a warning explaining this before anything changes — your local folder is never touched,

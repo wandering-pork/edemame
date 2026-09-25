@@ -47,7 +47,12 @@ export const ResetPassword: React.FC = () => {
     }
 
     setSubmitting(true);
-    const { error: updateError } = await updatePassword(password);
+    // Also stamp password_set: true, the same flag api/_lib/firms.ts's
+    // invite flow checks (see lib/firmInvites.ts's needsAccountSetup()) —
+    // otherwise an invited user who resets their password here (rather than
+    // through the account-setup form) would still get gated by
+    // AccountSetupGate on their next load.
+    const { error: updateError } = await updatePassword(password, { password_set: true });
     setSubmitting(false);
 
     if (updateError) {

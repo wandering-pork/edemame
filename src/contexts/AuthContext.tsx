@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import { readValidatedJson, writeLocalJson } from '@/lib/devLocalStorage';
+import { mapAuthError } from '@/lib/authErrors';
 
 type AuthUser = Pick<User, 'id' | 'email' | 'user_metadata'>;
 
@@ -18,7 +19,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
-  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
+  updatePassword: (newPassword: string, extraMetadata?: Record<string, unknown>) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -126,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
       options: { data: { full_name: fullName, ...extraMetadata } },
     });
-    if (error) return { error: error.message, needsEmailConfirmation: false };
+    if (error) return { error: mapAuthError(error.message, 'sign-up'), needsEmailConfirmation: false };
     // If email confirmation is required, Supabase returns a user with no session.
     const needsEmailConfirmation = !!data.user && !data.session;
     return { error: null, needsEmailConfirmation };
@@ -153,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error ? error.message : null };
+    return { error: error ? mapAuthError(error.message, 'sign-in') : null };
   };
 
   const signOut = async () => {
@@ -173,15 +174,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
-    return { error: error ? error.message : null };
+    return { error: error ? mapAuthError(error.message, 'reset') : null };
   };
 
-  const updatePassword: AuthContextValue['updatePassword'] = async (newPassword) => {
+  const updatePassword: AuthContextValue['updatePassword'] = async (newPassword, extraMetadata) => {
     if (DEV_OFFLINE_AUTH) {
       return { error: 'Password reset is unavailable in dev offline mode.' };
     }
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    return { error: error ? error.message : null };
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+      ...(extraMetadata ? { data: extraMetadata } : {}),
+    });
+    return { error: error ? mapAuthError(error.message, 'reset') : null };
   };
 
   return (
