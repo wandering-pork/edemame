@@ -25,8 +25,9 @@ Five cards at the top summarise your workload, scoped by the Mine/All toggle abo
   named underneath. Tasks whose status is "Waiting on client" or "Waiting on third party" are
   never counted here, even if their due date has passed — they're blocked on someone outside the
   firm, not sitting in your backlog. See "Task status" below.
-- **Docs outstanding** — documents still pending or linked (not yet verified) across active
-  document checklists, when checklist data is available for the case.
+- **Docs outstanding** — checklist items not yet linked or verified (i.e. still pending, or
+  marked waived), summed across every non-closed case's document checklist — the same definition
+  a case's own sidebar uses. Shows "—" only while the underlying checklist data is still loading.
 - **Waiting on client** — open tasks currently in a waiting status, tracked separately from
   Overdue so "N overdue" always means work your team still owes, not work you're blocked on.
 
@@ -39,28 +40,55 @@ nomination validity, then visa expiry, then passport expiry. Among tasks, the ru
 **overdue first, then due today**. Each item shows the client, the case, and the due date.
 Clicking a task item opens that task (use its **Go to Case** button from there if you need the
 case itself); clicking a deadline item goes straight to its case, or to the client's page for a
-deadline with no case (e.g. a bare passport expiry). When there are more than five items, a
-**View all N** link expands the full list in place.
+deadline with no case (e.g. a bare passport expiry). Every task item also has a small **Done**
+button so you can close it without opening the task window at all — the item drops off the list
+as soon as the task closes, and the confirmation toast that follows has an **Undo** if you tapped
+it by mistake. When there are more than five items, a **View all N** link expands the full list
+in place.
 
 ## Task status
 
 Every task has one of six statuses: **Not started**, **In progress**, **Waiting on client**,
-**Waiting on third party**, **Not applicable**, or **Done**. Click a task to open it, then use the
-status menu to change it — or click the circular checkbox for a one-click **Mark done** (click it
-again to reopen the task). Choosing **Not applicable** asks for a short reason before it's applied;
-the reason is shown on the task afterwards. Waiting statuses show as a distinct amber chip, never
-red, even past their due date, since the delay isn't the firm's.
+**Waiting on third party**, **Not applicable**, or **Done**. A task's status shows as a small
+coloured chip wherever tasks are listed — on the week board's cards below and in Needs Attention —
+so you can tell a task is blocked or in progress without opening it; **Not started** shows no chip
+(it's the quiet default) and **Done** keeps its own tick + strikethrough treatment instead of a
+chip. Each status gets its own colour (blue for In progress, amber for Waiting on client, orange
+for Waiting on third party, grey for Not applicable) so they read apart from one another at a
+glance.
 
-## Agent activity
+Click a task to open it. In the task window, a row of status buttons is the single control for a
+task's status — clicking one applies immediately, there's no separate Save step for status. Above
+that, one-click buttons cover the most common changes without hunting through the status row:
+**Mark done** (or **Reopen**, once done), **Waiting on client**, and **Move date** (a small menu
+with +1 day, +1 week, or pick a date — moving the date this way locks it exactly like editing the
+Due Date field by hand does, so it's never silently recalculated again). A line under the title
+shows context when it's relevant — how overdue the task is, "Due today", a note that an estimated
+date will firm up once the step it depends on is done, and who it's assigned to. Choosing **Not
+applicable**, from either the row menu on a case's task list or the task window's status row, asks
+for a short reason before it's applied; the reason is shown afterwards, and hovering or
+keyboard-focusing the chip on a task row shows it as a tooltip. Save at the bottom of the task
+window only applies edits to the title, description, or a hand-typed Due Date — everything else
+above it already took effect the moment you clicked it.
 
-The **Agent activity** panel shows a recent feed of what the AI has done on your behalf, such as
-generating a task plan for a case, so you can see at a glance where automation has already done
-work for you.
+## Recent activity
+
+The **Recent activity** panel shows a feed of what's happened lately across your cases — new cases,
+task plans, deadline and stage changes, and so on. A new case's task plan entry says exactly how the
+plan was produced: "Created a 12-task plan from the *Subclass 189* template" for a template with
+timing set (no AI involved — see "How timing affects task generation" in
+[Templates](../templates/getting-started.md)), or "Generated a 12-task plan with AI" when Gemini
+actually wrote the plan, so the wording never implies AI did something it didn't.
 
 ## This week's task board
 
 The board shows **five days at a time**, grouped by day, with each task card showing the client and
 case it belongs to. Five days rather than seven keeps the columns wide enough to read at a glance.
+Each card is tagged **Overdue** or **Due today** when its own due date has passed or is today, and
+**Task** otherwise (or **Filing** for a lodgement-sounding task title) — these describe the *task's*
+due date only. A **Deadline** (visa/passport expiry, an s56/s57 response window, and so on) is a
+separate, external date tracked on the case page's Deadlines panel and in Needs Attention above; it
+is never shown on a task card.
 
 Which five days you see depends on what day it is today:
 

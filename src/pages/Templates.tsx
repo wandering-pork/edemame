@@ -235,6 +235,10 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
 
   const systemTemplates = templates.filter(t => t.userId === null || t.userId === undefined);
   const userTemplates = templates.filter(t => t.userId !== null && t.userId !== undefined);
+  // Drives the single page-level "not yet reviewed" note below — a template
+  // only counts if it actually shows a timing-derived chip/typical-length
+  // figure (steps.length > 0); see the note's own comment.
+  const hasUnverifiedTiming = templates.some(t => (t.steps?.length ?? 0) > 0 && t.timingVerified === false);
 
   const openCreate = () => {
     setErrors([]);
@@ -398,16 +402,28 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
             {template.description}
           </p>
 
-          {length && (
-            <p className="text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft mt-2.5">
-              {formatTypicalLength(length)}
-            </p>
-          )}
-
-          {steps.length > 0 && template.timingVerified === false && (
-            <div className="flex items-start gap-1.5 mt-2.5 text-[10.5px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/15 rounded-lg px-2.5 py-1.5">
-              <Info size={12} strokeWidth={2} className="flex-shrink-0 mt-[1px]" />
-              <span>Timing not yet reviewed by a registered agent — dates can be changed on each task.</span>
+          {(length || (steps.length > 0 && template.timingVerified === false)) && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
+              {length && (
+                <span className="text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft">
+                  {formatTypicalLength(length)}
+                </span>
+              )}
+              {steps.length > 0 && template.timingVerified === false && (
+                <span
+                  tabIndex={0}
+                  className="group relative inline-flex items-center text-[9.5px] font-bold uppercase tracking-wide text-ink-faint dark:text-plate-ink-faint bg-ink/5 dark:bg-plate-ink/10 rounded px-1.5 py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-edamame-500"
+                  title="Timing not yet reviewed by a registered agent — dates can be changed on each task."
+                >
+                  Not yet reviewed
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute left-0 top-full z-10 mt-1 hidden w-56 whitespace-normal rounded-md bg-ink dark:bg-plate-ink px-2.5 py-1.5 text-[10.5px] font-normal normal-case text-paper dark:text-plate shadow-lg group-hover:block group-focus:block"
+                  >
+                    Timing not yet reviewed by a registered agent — dates can be changed on each task.
+                  </span>
+                </span>
+              )}
             </div>
           )}
 
@@ -435,23 +451,37 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                           </span>
                           {step.isGate && (
                             <span
-                              className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 rounded px-1.5 py-0.5"
-                              title="Must be done before the case can advance"
+                              tabIndex={0}
+                              className="group relative inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 rounded px-1.5 py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-edamame-500"
+                              title="Gate — a step that has to be done before the case can move on; overdue gates put a case At Risk."
                             >
                               <Flag size={9} strokeWidth={2.2} /> Gate
+                              <span
+                                role="tooltip"
+                                className="pointer-events-none absolute left-0 top-full z-10 mt-1 hidden w-56 whitespace-normal rounded-md bg-ink dark:bg-plate-ink px-2.5 py-1.5 text-[10.5px] font-normal normal-case text-paper dark:text-plate shadow-lg group-hover:block group-focus:block"
+                              >
+                                Gate — a step that has to be done before the case can move on; overdue gates put a case At Risk.
+                              </span>
                             </span>
                           )}
-                          {step.timing && (
+                          {/* Estimate is the default and shown implicitly by
+                              the absence of a chip — only the "Set by law"
+                              exception (a legally fixed window) gets one, so
+                              the timeline isn't noisy with an "ESTIMATE" chip
+                              on almost every step. */}
+                          {step.timing?.fixed && (
                             <span
-                              className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 ${
-                                step.timing.fixed
-                                  ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20'
-                                  : 'text-ink-faint dark:text-plate-ink-faint bg-ink/5 dark:bg-plate-ink/10'
-                              }`}
-                              title={step.timing.fixed ? 'A legally fixed window — the agent cannot move this date' : 'An estimate — the agent can move this date'}
+                              tabIndex={0}
+                              className="group relative inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 outline-none focus-visible:ring-2 focus-visible:ring-edamame-500"
+                              title="Set by law — a legally fixed window; the agent cannot move this date. A step with no chip uses an estimate the agent can move."
                             >
-                              {step.timing.fixed && <Scale size={9} strokeWidth={2.2} />}
-                              {step.timing.fixed ? 'Set by law' : 'Estimate'}
+                              <Scale size={9} strokeWidth={2.2} /> Set by law
+                              <span
+                                role="tooltip"
+                                className="pointer-events-none absolute left-0 top-full z-10 mt-1 hidden w-56 whitespace-normal rounded-md bg-ink dark:bg-plate-ink px-2.5 py-1.5 text-[10.5px] font-normal normal-case text-paper dark:text-plate shadow-lg group-hover:block group-focus:block"
+                              >
+                                Set by law — a legally fixed window; the agent cannot move this date. A step with no chip uses an estimate the agent can move.
+                              </span>
                             </span>
                           )}
                         </div>
@@ -498,6 +528,23 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
             </button>
           </div>
         </div>
+
+        {/* Page-level timing note — replaces a repeated per-card notice; see
+            each template card's own small "Not yet reviewed" chip below,
+            and the Gate/Set by law chip tooltips on each step. */}
+        {hasUnverifiedTiming && (
+          <div className="flex items-start gap-2 mb-6 text-[12px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/15 border border-amber-200/70 dark:border-amber-900/40 rounded-xl px-4 py-3">
+            <Info size={14} strokeWidth={2} className="flex-shrink-0 mt-[1px]" />
+            <p className="leading-relaxed">
+              <span className="font-semibold">Timing not yet reviewed by a registered agent.</span>{' '}
+              Templates marked <span className="font-semibold">Not yet reviewed</span> below use estimated
+              step timing — dates can always be changed on each task. A step's <span className="font-semibold">Set by law</span> chip
+              means that step's window is fixed by regulation rather than estimated; steps with no chip use an
+              estimate. A <span className="font-semibold">Gate</span> step has to be done before the case can move
+              on — an overdue gate puts a case At Risk.
+            </p>
+          </div>
+        )}
 
       {/* Create / edit / duplicate form */}
       {editor && (

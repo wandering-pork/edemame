@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { Task } from '../types';
-import { normalizeTask, isTaskClosed, isWaiting, withStatus } from './taskStatus';
+import type { Task, TaskStatus } from '../types';
+import { normalizeTask, isTaskClosed, isWaiting, withStatus, statusChipFor, TASK_STATUS_LABELS } from './taskStatus';
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -116,5 +116,31 @@ describe('withStatus', () => {
     withStatus(t, 'done');
     expect(t.status).toBe('not_started');
     expect(t.isCompleted).toBe(false);
+  });
+});
+
+describe('statusChipFor', () => {
+  it('returns null for not_started — the quiet default with no chip', () => {
+    expect(statusChipFor('not_started')).toBeNull();
+  });
+
+  it('returns null for done — the tick + strikethrough treatment covers it', () => {
+    expect(statusChipFor('done')).toBeNull();
+  });
+
+  it('returns a chip with the right label for every other status', () => {
+    const chipStatuses: TaskStatus[] = ['in_progress', 'waiting_client', 'waiting_third_party', 'not_applicable'];
+    for (const status of chipStatuses) {
+      const chip = statusChipFor(status);
+      expect(chip).not.toBeNull();
+      expect(chip!.label).toBe(TASK_STATUS_LABELS[status]);
+      expect(chip!.className).toEqual(expect.any(String));
+    }
+  });
+
+  it('gives each of the four chip statuses a distinct colour class', () => {
+    const chipStatuses: TaskStatus[] = ['in_progress', 'waiting_client', 'waiting_third_party', 'not_applicable'];
+    const classNames = chipStatuses.map(s => statusChipFor(s)!.className);
+    expect(new Set(classNames).size).toBe(classNames.length);
   });
 });

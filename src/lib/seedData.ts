@@ -180,7 +180,7 @@ export function seedDefaultTemplates(): WorkflowTemplate[] {
     {
       id: 'tpl-490', // kept for backward compatibility — see file-header note on 490 vs 491
       title: 'Skilled Work Regional Provisional (Subclass 491)',
-      description: 'Points-tested provisional visa for skilled workers nominated by a state/territory or sponsored by an eligible family member in regional Australia. (Note: 490 is not a current subclass — the correct code is 491.)',
+      description: 'Points-tested provisional visa for skilled workers nominated by a state/territory or sponsored by an eligible family member in regional Australia.',
       visaSubclass: '491',
       userId: null,
       sourceUrl: 'https://immi.homeaffairs.gov.au/visas/getting-a-visa/visa-listing/skilled-work-regional-provisional-491',

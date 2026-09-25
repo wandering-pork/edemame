@@ -106,9 +106,18 @@ interface Resolution {
  *   `datePending: true` in that case.
  * - `deadline` anchors use `knownAnchors.deadlineDates[kind]` when present;
  *   otherwise there is no real anchor date to offset from yet, so the
- *   provisional anchor is `caseStartDate` and the item is `datePending: true`
- *   — the plan's "unknown → provisional date from estimates, datePending
- *   true".
+ *   provisional anchor is the furthest date any step has resolved to so far
+ *   in this schedule run (falling back to `caseStartDate` if nothing has
+ *   resolved yet) — the plan's "unknown → provisional date from estimates,
+ *   datePending true". This is deliberately *not* always `caseStartDate`:
+ *   a deadline anchor (e.g. an invitation window) is typically reached only
+ *   after a chain of earlier steps (skills assessment, EOI, etc.) — resetting
+ *   to case start would silently drop that chain's elapsed time and schedule
+ *   (and, via `typicalLength`, report) the deadline-anchored step and
+ *   everything after it far too early. Bounding by the running high-water
+ *   mark keeps a template with no steps before the deadline anchor behaving
+ *   exactly as before (nothing resolved yet ⇒ `caseStartDate`, same as a
+ *   template's very first step).
  *
  * No item lands on day 0 relative to its anchor unless `offsetDays` is
  * explicitly 0 — that falls directly out of `date = anchor + offsetDays`, so
@@ -145,6 +154,9 @@ export function scheduleFromTemplate(
 
   const resolved = new Map<string, Resolution>();
   const cycleReported = new Set<string>();
+  // Running high-water mark of every date resolved so far in this run — see
+  // the 'deadline' case below.
+  let latestResolvedDate = caseStartDate;
 
   function resolve(key: string, chain: string[]): Resolution {
     const cached = resolved.get(key);
@@ -231,7 +243,11 @@ export function scheduleFromTemplate(
           anchorDate = knownDate;
           pending = false;
         } else {
-          anchorDate = caseStartDate;
+          // No known date for this deadline yet — provisionally anchor off
+          // the furthest point the plan has reached so far (see doc comment
+          // above), not `caseStartDate`, so the chain of steps that actually
+          // leads up to this deadline isn't silently discarded.
+          anchorDate = latestResolvedDate;
           pending = true;
         }
         break;
@@ -248,6 +264,7 @@ export function scheduleFromTemplate(
     const date = addDaysISO(anchorDate, timing.offsetDays);
     const result: Resolution = { date, pending };
     resolved.set(key, result);
+    if (date > latestResolvedDate) latestResolvedDate = date;
     return result;
   }
 

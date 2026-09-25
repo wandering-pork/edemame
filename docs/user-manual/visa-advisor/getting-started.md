@@ -72,8 +72,8 @@ from the case page. If you navigate away from Visa Advisor before creation finis
 **View case** action appears instead of navigating out from under you.
 
 The case's notes get a short summary of the assessed pathway (not the full report) with a pointer
-to **Eligibility assessment** on the case — see `case-manager/getting-started.md` — which opens the
-full report you saw here, read-only.
+to **View eligibility assessment** in the case's **Case actions** menu — see
+`case-manager/getting-started.md` — which opens the full report you saw here, read-only.
 
 This assessment is general information about visa pathways, not immigration advice — eligibility is
 ultimately assessed by the Department of Home Affairs at lodgement.

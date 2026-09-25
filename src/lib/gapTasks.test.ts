@@ -8,16 +8,39 @@ describe('gapTaskTitle', () => {
     );
   });
 
-  it('truncates long gaps with an ellipsis, keeping the total title within the max', () => {
-    const longGap = 'A'.repeat(200);
-    const title = gapTaskTitle(longGap);
-    expect(title.length).toBeLessThanOrEqual(90);
-    expect(title.startsWith('Address gap: ')).toBe(true);
-    expect(title.endsWith('…')).toBe(true);
-  });
-
   it('does not truncate short gaps', () => {
     expect(gapTaskTitle('Short gap')).toBe('Address gap: Short gap');
+  });
+
+  it('stops at the first clause, dropping a parenthetical detail', () => {
+    const gap = 'Estimated points score is currently too low (approx. 50 points: Age 25 + Qualifications 15 + English 10)';
+    const title = gapTaskTitle(gap);
+    expect(title).toBe('Address gap: Estimated points score is currently too low');
+    expect(title).not.toContain('(');
+    expect(title.length).toBeLessThanOrEqual(62);
+  });
+
+  it('stops at a sentence-ending period, dropping the rest of the sentence', () => {
+    const gap = 'English test not yet sat. IELTS or PTE results are required before lodgement.';
+    expect(gapTaskTitle(gap)).toBe('Address gap: English test not yet sat');
+  });
+
+  it('truncates a long single clause at a whole word, never mid-word or mid-number, and marks it with an ellipsis', () => {
+    const longGap = 'Applicant needs to gather substantially more supporting evidence of a genuine and continuing relationship spanning several years';
+    const title = gapTaskTitle(longGap);
+    expect(title.startsWith('Address gap: ')).toBe(true);
+    expect(title.endsWith('…')).toBe(true);
+    expect(title.length).toBeLessThanOrEqual(65);
+    // No partial word right before the ellipsis.
+    const clause = title.replace('Address gap: ', '').replace('…', '');
+    expect(longGap.startsWith(clause)).toBe(true);
+    expect(longGap[clause.length]).toBe(' ');
+  });
+
+  it('never cuts a title in the middle of a number', () => {
+    const longGap = 'Requires 12345678901234567890 continuous days of employment history before this gap can be closed';
+    const title = gapTaskTitle(longGap);
+    expect(title).not.toMatch(/\d…/);
   });
 });
 

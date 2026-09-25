@@ -89,7 +89,7 @@ export interface CaseAssignmentEvent {
 
 export interface ActivityEvent {
   id: string;
-  type: 'case_created' | 'case_assigned' | 'case_updated' | 'case_stage_changed' | 'task_completed' | 'task_assigned' | 'task_status_changed' | 'member_added' | 'deadline_added' | 'deadline_resolved';
+  type: 'case_created' | 'case_assigned' | 'case_updated' | 'case_stage_changed' | 'task_completed' | 'task_assigned' | 'task_status_changed' | 'member_added' | 'deadline_added' | 'deadline_resolved' | 'tasks_planned';
   actorId?: string; // TeamMember id responsible
   subjectId?: string; // caseId / taskId / memberId
   summary: string;
