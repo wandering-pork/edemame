@@ -15,16 +15,16 @@ to end shows gaps in six areas:
 
 One of these gaps is a **data-loss bug** (1G.1), and it ships first on its own.
 
-| # | Work | Size (rough) | Depends on |
-|---|------|--------------|-----------|
-| 1G.1 | Fix: switching Local → Cloud can wipe a shared firm | S · ½ day | — |
-| 1G.2 | Roles: Owner / Admin / Member + job title | M · 2 days | — |
-| 1G.3 | Invite: check the firm first, one pending invite per person | S · 1 day | 1G.2 |
-| 1G.4 | Joining a firm: new users, existing users, in-app invitations | M · 3 days | 1G.3 |
-| 1G.5 | Several firms: firm name, switcher, lost access, Settings → Firm | M · 2–3 days | 1G.4 |
-| 1G.6 | Member lifecycle: disable, remove, reassign work, former members | M · 2 days | 1G.5 |
-| 1G.7 | Working as a team: "mine" views, assignment notifications | M · 2 days | 1G.6 |
-| 1G.8 | Email provider: send our own emails (**waiting on a domain** — see below) | M · 2 days + owner setup | 1G.4, a domain |
+| # | Work | Size (rough) | Status |
+|---|------|--------------|--------|
+| 1G.1 | Fix: switching Local → Cloud can wipe a shared firm | S · ½ day | Implemented (PR #62) |
+| 1G.2 | Roles: Owner / Admin / Member + job title | M · 2 days | Implemented (PR #64) |
+| 1G.3 | Invite: check the firm first, one pending invite per person | S · 1 day | Implemented (PR #65) |
+| 1G.4 | Joining a firm: new users, existing users, in-app invitations | M · 3 days | Implemented (PR #66) |
+| 1G.5 | Several firms: firm name, switcher, lost access, Settings → Firm | M · 2–3 days | Implemented (PR #67) |
+| 1G.6 | Member lifecycle: disable, remove, reassign work, former members | M · 2 days | Implemented (PR #68) |
+| 1G.7 | Working as a team: "mine" views, assignment notifications | M · 2 days | Implemented (PR #69) |
+| 1G.8 | Email provider: send our own emails (**waiting on a domain** — see below) | M · 2 days + owner setup | Not started (blocked on domain) |
 
 Sizes are guesses for ordering, not estimates. Each row is one PR.
 
@@ -331,16 +331,17 @@ firm's tasks. Case Manager can't show only "my cases". Assigning someone a task 
   owners and admins, and to Mine for members. It's hidden in local mode.
 - **"Assigned to you" notifications (in-app).** When someone *else* assigns you a task or makes
   you a case's owner, you get a notification. `notifications` is per-user under RLS, so this goes
-  through a new security-definer RPC, `notify_member(f, user_id, payload)`. It checks that both
-  the caller and the recipient are active members of `f`, and it's deduplicated by a deterministic
-  id (`assign:{taskId|caseId}:{userId}`). It's called from `App.tsx`'s `handleUpdateTask` /
-  `handleUpdateCase` when `assignedTo` / `caseOwner` changes to someone other than the current
-  user. The email version comes with 1G.8.
+  through a new security-definer RPC, `notify_assignment(f, p_kind, p_entity_id)`. It checks that
+  both the caller and the recipient are active members of `f`, re-reads the task/case row
+  server-side to build the notification message (so a Member can't spam colleagues with arbitrary
+  text), and it's deduplicated by a deterministic id (`assign:{kind}:{entityId}:{userId}`). It's
+  called from `App.tsx`'s `handleUpdateTask` / `handleUpdateCase` when `assignedTo` / `caseOwner`
+  changes to someone other than the current user. The email version comes with 1G.8.
 - **Team Dashboard.** Check that it uses the real directory, with availability dots, job titles
   and workload per member, and that former and disabled members are left out of workload but still
   named on the cases they owned.
 
-**Migration (part 5):** `notify_member()`.
+**Migration (part 5):** `notify_assignment(f, p_kind, p_entity_id)`.
 
 ---
 
@@ -378,8 +379,8 @@ everything the team experience needs:
     *You've been added to a firm*, *Assigned to you*.
   - `api/invite-member.ts`: for an address that's already registered, send our own invitation
     email instead of only returning a link.
-  - "Assigned to you": a new `api/notify-assignment.ts` endpoint, called after `notify_member()`,
-    sends the email. Later: a per-user "Email me about…" preference in Settings.
+  - "Assigned to you": a new `api/notify-assignment.ts` endpoint, called after `notify_assignment()`
+    RPC, sends the email. Later: a per-user "Email me about…" preference in Settings.
 - **Not in 1G.8:** deadline-alert emails, client emails and SMS. Those are Step 3's messaging work,
   which builds on this same `sendEmail()`.
 
