@@ -16,6 +16,7 @@ import { isTaskClosed } from '../lib/taskStatus';
 import { CASE_STAGE_LABELS } from '../lib/caseStage';
 import { firmJobTitleLabel } from '../lib/firmDirectory';
 import { useFirm } from '../contexts/FirmContext';
+import { AssignCaseDialog } from '../components/AssignCaseDialog';
 
 // Same palette as components/team/FirmTeamMembers.tsx's availability picker
 // — small enough not to be worth sharing a module for.
@@ -31,6 +32,7 @@ interface TeamDashboardProps {
   clients: Client[];
   tasks: Task[];
   activity: ActivityEvent[];
+  currentUserId?: string;
   onAssignCase: (caseId: string, newOwnerId: string, note?: string) => void;
 }
 
@@ -65,13 +67,12 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
   clients,
   tasks,
   activity,
+  currentUserId,
   onAssignCase,
 }) => {
   const navigate = useNavigate();
   const [filterMemberId, setFilterMemberId] = useState<string>('all');
   const [assignModal, setAssignModal] = useState<{ caseId: string } | null>(null);
-  const [assignNote, setAssignNote] = useState('');
-  const [assignTarget, setAssignTarget] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
 
   const today = useMemo(() => toLocalISODate(), []);
@@ -112,17 +113,6 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
 
   const openAssignModal = (caseId: string) => {
     setAssignModal({ caseId });
-    const existing = cases.find(c => c.id === caseId)?.caseOwner;
-    setAssignTarget(existing || '');
-    setAssignNote('');
-  };
-
-  const confirmAssign = () => {
-    if (!assignModal || !assignTarget) return;
-    onAssignCase(assignModal.caseId, assignTarget, assignNote || undefined);
-    setAssignModal(null);
-    setAssignTarget('');
-    setAssignNote('');
   };
 
   const { memberNameFor, allMembers } = useFirm();
@@ -137,11 +127,6 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
     const row = allMembers.find(m => m.userId === member.id);
     return (row && firmJobTitleLabel(row.jobTitle)) || roleLabel[member.role];
   };
-  // Step 1 · 1G.6: getMember only finds *active* members (teamMembers is
-  // active-only) — for display of past work (activity actor, assignment
-  // history, case owner), fall back to a disabled/former member's name
-  // instead of showing nothing.
-  const getMemberDisplayName = (id?: string) => getMember(id)?.name ?? memberNameFor(id) ?? undefined;
   const getClient = (id: string) => clients.find(c => c.id === id);
 
   const caseProgress = (caseId: string) => {
@@ -412,110 +397,24 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
       </div>
 
       {/* Assign modal */}
-      {assignModal && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop">
-          <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl max-w-md w-full modal-content">
-            <div className="flex items-center justify-between p-6 border-b border-ink/15 dark:border-plate-ink/20">
-              <h2 className="text-lg font-bold text-ink dark:text-plate-ink">Assign Case</h2>
-              <button
-                onClick={() => setAssignModal(null)}
-                className="text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink transition-colors text-xl"
-              >
-                ×
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">Team member</label>
-                <div className="space-y-2">
-                  {teamMembers.map(m => (
-                    <button
-                      key={m.id}
-                      onClick={() => setAssignTarget(m.id)}
-                      className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                        assignTarget === m.id
-                          ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-900/20 ring-2 ring-edamame-500/20'
-                          : 'border-ink/15 dark:border-plate-ink/20 hover:border-ink/20 dark:hover:border-plate-ink/25'
-                      }`}
-                    >
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center font-bold text-sm">
-                        {m.avatar || initialsOf(m.name)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-ink dark:text-plate-ink text-sm">{m.name}</p>
-                        <p className="text-xs text-ink-soft dark:text-plate-ink-soft">{roleLabel[m.role]}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">
-                  Note <span className="font-normal text-ink-faint dark:text-plate-ink-faint">(optional)</span>
-                </label>
-                <textarea
-                  value={assignNote}
-                  onChange={e => setAssignNote(e.target.value)}
-                  placeholder="Context for the reassignment..."
-                  rows={2}
-                  className="focus-ring w-full px-4 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink dark:text-plate-ink placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50 outline-none transition-all resize-none"
-                />
-              </div>
-
-              {/* Assignment history */}
-              {(() => {
-                const currentCase = cases.find(c => c.id === assignModal.caseId);
-                const history = currentCase?.assignmentHistory || [];
-                if (history.length === 0) return null;
-                return (
-                  <div>
-                    <p className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-ink-faint dark:text-plate-ink-faint mb-2">
-                      Assignment history
-                    </p>
-                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
-                      {history.slice().reverse().map(ev => {
-                        // Step 1 · 1G.6: an assignment history entry can name
-                        // a disabled/removed member — fall back to their
-                        // name instead of "Unknown".
-                        const fromName = getMemberDisplayName(ev.fromOwnerId);
-                        const toName = getMemberDisplayName(ev.toOwnerId);
-                        return (
-                          <div key={ev.id} className="text-xs text-ink-soft dark:text-plate-ink-soft flex items-center gap-2">
-                            <Clock size={12} strokeWidth={1.8} />
-                            <span>
-                              {fromName ? `${fromName} → ` : 'Assigned to '}
-                              <span className="font-semibold text-ink-soft dark:text-plate-ink-soft">
-                                {toName || 'Unknown'}
-                              </span>
-                              <span className="ml-2 text-ink-faint dark:text-plate-ink-faint">{format(new Date(ev.changedAt), 'MMM d')}</span>
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div className="flex items-center gap-3 p-6 border-t border-ink/15 dark:border-plate-ink/20">
-              <button
-                onClick={() => setAssignModal(null)}
-                className="px-4 py-2 text-sm font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmAssign}
-                disabled={!assignTarget}
-                className="btn-press ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed rounded-lg transition-colors"
-              >
-                Confirm assignment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {assignModal && (() => {
+        const assignCaseItem = cases.find(c => c.id === assignModal.caseId);
+        if (!assignCaseItem) return null;
+        return (
+          <AssignCaseDialog
+            caseItem={assignCaseItem}
+            teamMembers={teamMembers}
+            cases={cases}
+            tasks={tasks}
+            currentUserId={currentUserId}
+            onClose={() => setAssignModal(null)}
+            onConfirm={(caseId, newOwnerId, note) => {
+              onAssignCase(caseId, newOwnerId, note);
+              setAssignModal(null);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 };

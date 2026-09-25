@@ -915,6 +915,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           task={selectedTask}
           caseItem={selectedTaskCaseAndClient.case}
           client={selectedTaskCaseAndClient.client}
+          teamMembers={teamMembers}
+          cases={cases}
+          allTasks={tasks}
+          currentUserId={currentUserId}
           assigneeName={teamMembers.find(m => m.id === selectedTask.assignedTo)?.name}
           onClose={() => setSelectedTaskId(null)}
           onUpdateTask={onUpdateTask}

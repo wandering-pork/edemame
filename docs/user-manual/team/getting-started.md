@@ -114,12 +114,14 @@ Owners and Admins (for Members only — same restriction as roles above) can **d
   work reconnects to them automatically once they rejoin.
 
 Either action first checks whether the member has any open work — open tasks assigned to them, or
-cases they own that aren't closed. If they do, a panel lists it and asks who should pick it up:
-another active member, or **Leave unassigned**. Confirming hands everything over before the
-disable/remove happens, the same way reassigning a task or case anywhere else in Edamame does (so
-it shows up in the activity feed as usual). If there's nothing to hand over, you go straight to the
-disable, or to Remove's confirmation step ("*Name* will lose access to this firm and be removed
-from the team. Their past work keeps their name.").
+cases they own that aren't closed. If they do, a panel lists it and asks who should pick it up: the
+same searchable person picker used everywhere someone is assigned in Edamame (search by name,
+email, or job title, with an availability dot and open case/task count per row), or **Leave
+unassigned**. Confirming hands everything over before the disable/remove happens, the same way
+reassigning a task or case anywhere else in Edamame does (so it shows up in the activity feed as
+usual). If there's nothing to hand over, you go straight to the disable, or to Remove's
+confirmation step ("*Name* will lose access to this firm and be removed from the team. Their past
+work keeps their name.").
 
 ## Former members
 

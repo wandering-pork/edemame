@@ -12,6 +12,16 @@ their own book, while an Owner or Admin usually needs the whole firm's view. Whi
 remembered for the rest of your browser session. This toggle is hidden in local mode, where every
 case is by definition yours.
 
+## Assigning a case owner
+
+An unowned case shows a dashed circle with a **+** next to it in the case list — click it to open
+**Assign Case**. It uses the same searchable person picker as task assignment (search by name,
+email, or job title; an availability dot and open case/task count per row), plus an optional note
+that's added to the case's assignment history (visible further down the same dialog). The
+**Confirm assignment** button stays disabled until you pick someone other than the case's current
+owner. The Team Dashboard's Shared Case Board opens the identical dialog for reassigning an
+already-owned case.
+
 ## Creating a case
 
 1. From the sidebar, open **Cases** and click **New Case**.
@@ -150,15 +160,22 @@ to, or the case start date if none) or **Reject** (it's dismissed).
 
 Each task row has a small tick to toggle **Done** (click again to reopen), and a status menu — the
 **⋮** button that appears on hover — offering **Not started**, **In progress**, **Waiting on
-client**, **Waiting on third party**, and **Not applicable**. The menu also has **Set to today**
-and **Edit** shortcuts. Choosing **Not applicable** asks for a short reason inline before it's
-applied. Any status other than Not started/Done shows as a small coloured chip next to the task's
-title (Not applicable's chip shows its reason as a tooltip on hover or keyboard focus), so you can
-scan a case's task list and see what's blocked or in progress without opening anything. Opening a
-task (via **Edit**, or from the Dashboard/global search) gives you the same statuses as a
+client**, **Waiting on third party**, and **Not applicable**. The menu also has **Set to today**,
+**Assign to…**, and **Edit** shortcuts. Choosing **Not applicable** asks for a short reason inline
+before it's applied. Any status other than Not started/Done shows as a small coloured chip next to
+the task's title (Not applicable's chip shows its reason as a tooltip on hover or keyboard focus),
+so you can scan a case's task list and see what's blocked or in progress without opening anything.
+Opening a task (via **Edit**, or from the Dashboard/global search) gives you the same statuses as a
 one-click segmented control that applies immediately, plus **Mark done**/**Waiting on client**
 one-click buttons and a **Move date** menu (+1 day, +1 week, or pick a date) — see "Task status" in
 the Dashboard manual for the full task window walkthrough.
+
+Every task row also shows the assignee's initials (a dashed circle when unassigned) — hover or
+keyboard-focus it to see the full name. **Assign to…** in the row's **⋮** menu opens a searchable
+person picker (search by name, email, or job title, with an availability dot and open case/task
+count per person, plus an **Unassigned** option) and applies the moment you pick someone — no
+separate Save. New tasks still default to the case owner. The same picker backs the task window's
+**Assignee** field (see the Dashboard manual) and the **Assign Case** action described next.
 
 ### Rescheduling and locking a date
 

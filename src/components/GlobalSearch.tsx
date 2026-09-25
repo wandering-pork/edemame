@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { format, isValid, parseISO } from 'date-fns';
-import type { Case, Client, Task, WorkflowTemplate } from '../types';
+import type { Case, Client, Task, WorkflowTemplate, TeamMember } from '../types';
 import { smartSearch, buildSearchIndex } from '../lib/search/smartSearch';
 import { TaskDetailModal } from './TaskDetailModal';
 
@@ -11,6 +11,8 @@ interface GlobalSearchProps {
   cases: Case[];
   tasks: Task[];
   templates: WorkflowTemplate[];
+  teamMembers?: TeamMember[];
+  currentUserId?: string;
   onUpdateTask?: (task: Task) => void;
   onDeleteTask?: (id: string) => void;
   onMoveTaskDate?: (
@@ -70,6 +72,8 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
   cases,
   tasks,
   templates,
+  teamMembers = [],
+  currentUserId,
   onUpdateTask,
   onDeleteTask,
   onMoveTaskDate,
@@ -227,6 +231,11 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({
           task={openTask}
           caseItem={openTaskCase}
           client={openTaskClient}
+          teamMembers={teamMembers}
+          cases={cases}
+          allTasks={tasks}
+          currentUserId={currentUserId}
+          assigneeName={teamMembers.find(m => m.id === openTask.assignedTo)?.name}
           onClose={() => setOpenTaskId(null)}
           onUpdateTask={onUpdateTask}
           onDeleteTask={onDeleteTask}
