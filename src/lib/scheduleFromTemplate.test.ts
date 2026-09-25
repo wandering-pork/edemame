@@ -114,13 +114,52 @@ describe('scheduleFromTemplate', () => {
     expect(items[0].fixed).toBe(true);
   });
 
-  it('deadline anchor with no known date is provisional off case start', () => {
+  it('deadline anchor with no known date is provisional off case start when it is the first step', () => {
     const steps: ScheduleStep[] = [
       step({ key: 'a', title: 'Lodge', timing: { anchor: { type: 'deadline', kind: 'invitation_window' }, offsetDays: 60, fixed: true } }),
     ];
     const { items } = scheduleFromTemplate(steps, START, {});
     expect(items[0].date).toBe(addDaysISO(START, 60));
     expect(items[0].datePending).toBe(true);
+  });
+
+  it('deadline anchor with no known date is provisional off the furthest point the plan has already reached, not case start', () => {
+    // Regression test for a real bug: a template's Templates-page "Typical
+    // length" (and a live case's actual task dates) for e.g. Subclass 189
+    // silently discarded the whole skills-assessment → EOI → invitation
+    // chain once it hit the "lodge within 60 days of invitation" deadline
+    // anchor, because that anchor reset all the way back to case start
+    // instead of picking up from wherever the plan had actually reached.
+    const steps: ScheduleStep[] = [
+      step({ key: 'assessment', title: 'Skills assessment', timing: { anchor: { type: 'case_start' }, offsetDays: 1, durationDays: { min: 28, max: 84 }, fixed: false } }),
+      step({ key: 'invitation', title: 'Invitation to apply', timing: { anchor: { type: 'step', stepKey: 'assessment', edge: 'done' }, offsetDays: 3, durationDays: { min: 14, max: 90 }, fixed: false } }),
+      step({ key: 'lodge', title: 'Lodge visa application', timing: { anchor: { type: 'deadline', kind: 'invitation_window' }, offsetDays: 60, fixed: true } }),
+    ];
+    const { items } = scheduleFromTemplate(steps, START, {});
+    const invitation = items.find(i => i.stepKey === 'invitation')!;
+    const lodge = items.find(i => i.stepKey === 'lodge')!;
+    // "assessment" has no known done date, so "invitation" chains off its max
+    // duration estimate (84 days) — it must land well after case start...
+    expect(invitation.date).toBe(addDaysISO(START, 1 + 84 + 3));
+    // ...and "lodge" (the unknown deadline anchor) must not reset earlier
+    // than that — it should be anchored on the furthest point reached so
+    // far ("invitation"'s date), not on caseStartDate.
+    expect(lodge.date).toBe(addDaysISO(invitation.date, 60));
+    expect(lodge.date > addDaysISO(START, 60)).toBe(true);
+    expect(lodge.datePending).toBe(true);
+  });
+
+  it('a step chained after an unknown deadline anchor still lands after it, not back near case start', () => {
+    const steps: ScheduleStep[] = [
+      step({ key: 'assessment', title: 'Skills assessment', timing: { anchor: { type: 'case_start' }, offsetDays: 1, durationDays: { min: 28, max: 84 }, fixed: false } }),
+      step({ key: 'lodge', title: 'Lodge visa application', timing: { anchor: { type: 'deadline', kind: 'invitation_window' }, offsetDays: 60, fixed: true } }),
+      step({ key: 'grant', title: 'Grant', timing: { anchor: { type: 'previous_step' }, offsetDays: 5, fixed: false } }),
+    ];
+    const { items } = scheduleFromTemplate(steps, START, {});
+    const lodge = items.find(i => i.stepKey === 'lodge')!;
+    const grant = items.find(i => i.stepKey === 'grant')!;
+    expect(grant.date).toBe(addDaysISO(lodge.date, 5));
+    expect(grant.date > addDaysISO(START, 60)).toBe(true);
   });
 
   it('detects a missing stepKey without throwing', () => {

@@ -51,16 +51,24 @@ again to reopen the task). Choosing **Not applicable** asks for a short reason b
 the reason is shown on the task afterwards. Waiting statuses show as a distinct amber chip, never
 red, even past their due date, since the delay isn't the firm's.
 
-## Agent activity
+## Recent activity
 
-The **Agent activity** panel shows a recent feed of what the AI has done on your behalf, such as
-generating a task plan for a case, so you can see at a glance where automation has already done
-work for you.
+The **Recent activity** panel shows a feed of what's happened lately across your cases — new cases,
+task plans, deadline and stage changes, and so on. A new case's task plan entry says exactly how the
+plan was produced: "Created a 12-task plan from the *Subclass 189* template" for a template with
+timing set (no AI involved — see "How timing affects task generation" in
+[Templates](../templates/getting-started.md)), or "Generated a 12-task plan with AI" when Gemini
+actually wrote the plan, so the wording never implies AI did something it didn't.
 
 ## This week's task board
 
 The board shows **five days at a time**, grouped by day, with each task card showing the client and
 case it belongs to. Five days rather than seven keeps the columns wide enough to read at a glance.
+Each card is tagged **Overdue** or **Due today** when its own due date has passed or is today, and
+**Task** otherwise (or **Filing** for a lodgement-sounding task title) — these describe the *task's*
+due date only. A **Deadline** (visa/passport expiry, an s56/s57 response window, and so on) is a
+separate, external date tracked on the case page's Deadlines panel and in Needs Attention above; it
+is never shown on a task card.
 
 Which five days you see depends on what day it is today:
 

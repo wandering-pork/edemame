@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Plus,
@@ -7,9 +8,11 @@ import {
   Search,
   Users,
   X,
+  Info,
 } from 'lucide-react';
 import type { Case, Client, Task, TeamMember, TeamMemberRole, TeamMemberStatus } from '../types';
 import { isTaskClosed } from '../lib/taskStatus';
+import { findSampleTeamMembers } from '../lib/sampleTeamMembers';
 import { useStorageMode } from '@/contexts/RepositoryContext';
 import { FirmTeamMembers } from '@/components/team/FirmTeamMembers';
 
@@ -108,6 +111,16 @@ const LocalTeamMembers: React.FC<LocalTeamMembersProps> = ({
     { name: '', email: '', role: 'lawyer', status: 'available' },
   );
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [sampleNoticeDismissed, setSampleNoticeDismissed] = useState(false);
+  const [confirmRemoveSamples, setConfirmRemoveSamples] = useState(false);
+
+  const sampleMembers = useMemo(() => findSampleTeamMembers(teamMembers), [teamMembers]);
+
+  const handleRemoveSamples = () => {
+    sampleMembers.forEach(m => onDeleteMember(m.id));
+    setConfirmRemoveSamples(false);
+    setSampleNoticeDismissed(true);
+  };
 
   const filtered = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -176,16 +189,70 @@ const LocalTeamMembers: React.FC<LocalTeamMembersProps> = ({
               Team Members
             </h1>
             <p className="text-[13px] text-ink-soft dark:text-plate-ink-soft mt-1">
-              People with access to this workspace
+              Names for assigning work in Local Storage
             </p>
           </div>
           <button
             onClick={openCreate}
             className="btn-press focus-ring inline-flex items-center gap-1.5 bg-edamame-500 hover:bg-edamame-700 text-white px-4 py-2.5 rounded-xl font-bold text-[13px] whitespace-nowrap transition-colors"
           >
-            <Plus size={16} strokeWidth={1.8} /> Invite
+            <Plus size={16} strokeWidth={1.8} /> Add person
           </button>
         </div>
+
+        {/* Local Storage is single-user — explain what "Add person" actually does. */}
+        <div className="flex items-start gap-2 mt-4 text-[12px] text-ink-soft dark:text-plate-ink-soft bg-paper-2 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl px-4 py-3">
+          <Info size={14} strokeWidth={2} className="flex-shrink-0 mt-[1px] text-ink-faint dark:text-plate-ink-faint" />
+          <p className="leading-relaxed">
+            Local Storage is just you — people you add here are names for assigning work; they can't sign in.
+            To work with colleagues, switch to Cloud Storage in{' '}
+            <Link to="/settings" className="font-semibold text-edamame-600 dark:text-edamame-400 hover:underline">
+              Settings
+            </Link>.
+          </p>
+        </div>
+
+        {/* Sample data from an earlier version of the app */}
+        {sampleMembers.length > 0 && !sampleNoticeDismissed && (
+          <div className="flex items-start gap-2 mt-3 text-[12px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/15 border border-amber-200/70 dark:border-amber-900/40 rounded-xl px-4 py-3">
+            <Info size={14} strokeWidth={2} className="flex-shrink-0 mt-[1px]" />
+            <div className="flex-1">
+              <p>These are sample team members from an earlier version of Edamame.</p>
+              {confirmRemoveSamples ? (
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="font-semibold">Remove {sampleMembers.length} sample member{sampleMembers.length === 1 ? '' : 's'}? Their cases and tasks will keep going, just unassigned.</span>
+                  <button
+                    onClick={handleRemoveSamples}
+                    className="btn-press flex-shrink-0 px-3 py-1 text-[11.5px] font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={() => setConfirmRemoveSamples(false)}
+                    className="flex-shrink-0 px-3 py-1 text-[11.5px] font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 mt-1.5">
+                  <button
+                    onClick={() => setConfirmRemoveSamples(true)}
+                    className="font-semibold underline hover:no-underline"
+                  >
+                    Remove sample members
+                  </button>
+                  <button
+                    onClick={() => setSampleNoticeDismissed(true)}
+                    className="text-amber-700/70 dark:text-amber-400/70 hover:text-amber-800 dark:hover:text-amber-300"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div className="relative max-w-xs mt-6">
@@ -203,7 +270,7 @@ const LocalTeamMembers: React.FC<LocalTeamMembersProps> = ({
           {/* Table header */}
           <div className="grid grid-cols-12 gap-3 px-5 py-[11px] bg-paper-2/80 dark:bg-plate-card/60">
             <div className="col-span-4 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Member</div>
-            <div className="col-span-3 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Role</div>
+            <div className="col-span-3 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Title</div>
             <div className="col-span-2 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Open tasks</div>
             <div className="col-span-2 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Status</div>
             <div className="col-span-1 text-right text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Actions</div>
@@ -281,7 +348,7 @@ const LocalTeamMembers: React.FC<LocalTeamMembersProps> = ({
           <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl max-w-md w-full modal-content">
             <div className="flex items-center justify-between p-6 border-b border-ink/15 dark:border-plate-ink/20">
               <h2 className="text-lg font-bold text-ink dark:text-plate-ink">
-                {editing ? 'Edit Member' : 'Invite Member'}
+                {editing ? 'Edit Member' : 'Add Person'}
               </h2>
               <button
                 onClick={() => { setEditing(null); setIsCreating(false); }}
@@ -311,7 +378,7 @@ const LocalTeamMembers: React.FC<LocalTeamMembersProps> = ({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">Role</label>
+                  <label className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">Title</label>
                   <select
                     value={form.role}
                     onChange={e => setForm({ ...form, role: e.target.value as TeamMemberRole })}
@@ -348,7 +415,7 @@ const LocalTeamMembers: React.FC<LocalTeamMembersProps> = ({
                 disabled={!form.name.trim() || !form.email.trim()}
                 className="btn-press ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
-                {editing ? 'Save changes' : 'Send invite'}
+                {editing ? 'Save changes' : 'Add person'}
               </button>
             </div>
           </div>
