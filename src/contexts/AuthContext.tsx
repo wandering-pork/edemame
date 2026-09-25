@@ -18,6 +18,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -169,13 +170,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (DEV_OFFLINE_AUTH) {
       return { error: `Password reset is unavailable in dev offline mode. Use ${DEV_TEST_EMAIL}.` };
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    return { error: error ? error.message : null };
+  };
+
+  const updatePassword: AuthContextValue['updatePassword'] = async (newPassword) => {
+    if (DEV_OFFLINE_AUTH) {
+      return { error: 'Password reset is unavailable in dev offline mode.' };
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
     return { error: error ? error.message : null };
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, signUp, signIn, signOut, resetPassword }}
+      value={{ user, session, loading, signUp, signIn, signOut, resetPassword, updatePassword }}
     >
       {children}
     </AuthContext.Provider>
