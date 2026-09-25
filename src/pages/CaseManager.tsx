@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Case, Client, Task, WorkflowTemplate, TeamMember, DocumentChecklistItem, Deadline } from '../types';
-import { Search, Plus, FileText, X, ChevronRight, Calendar, UserPlus, Settings2, AlertTriangle, Users } from 'lucide-react';
+import { Search, Plus, FileText, ChevronRight, Calendar, UserPlus, Settings2, AlertTriangle, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { NewCase } from './NewCase';
 import { ConfigurationsPanel } from '../components/case-manager/ConfigurationsPanel';
@@ -10,6 +10,7 @@ import { CASE_STAGE_LABELS, CASE_STAGE_STEPPER, CASE_STAGE_GROUP_LABELS, caseSta
 import { computeCaseRisk } from '../lib/risk';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useFirm } from '../contexts/FirmContext';
+import { AssignCaseDialog } from '../components/AssignCaseDialog';
 import {
   CaseOwnerScope, filterCasesByOwnerScope, defaultCaseOwnerScope, loadCaseOwnerScope, saveCaseOwnerScope,
 } from '../lib/caseManagerScope';
@@ -118,8 +119,6 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
   const [atRiskOnly, setAtRiskOnly] = useState(false);
   const [assignModalCaseId, setAssignModalCaseId] = useState<string | null>(null);
-  const [assignTarget, setAssignTarget] = useState<string>('');
-  const [assignNote, setAssignNote] = useState('');
   // At Risk rule 3 only applies to cases at ready_to_lodge — checklists are
   // fetched just for those (few of them), per lib/risk.ts's doc comment.
   const [checklistsByCase, setChecklistsByCase] = useState<Record<string, DocumentChecklistItem[]>>({});
@@ -524,8 +523,6 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           setAssignModalCaseId(c.id);
-                          setAssignTarget(c.caseOwner || '');
-                          setAssignNote('');
                         }}
                         title="Assign case owner"
                         className="w-6 h-6 rounded-full border border-dashed border-ink/20 dark:border-plate-ink/25 text-ink-faint dark:text-plate-ink-faint hover:border-edamame-500 hover:text-edamame-500 flex items-center justify-center flex-shrink-0 transition-colors"
@@ -543,71 +540,24 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
         )}
       </div>
 
-      {assignModalCaseId && onAssignCase && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop">
-          <div className="bg-paper dark:bg-plate-card rounded-2xl shadow-2xl max-w-md w-full modal-content">
-            <div className="flex items-center justify-between p-6 border-b border-ink/10 dark:border-plate-ink/15">
-              <h2 className="font-serif text-xl font-semibold text-ink dark:text-plate-ink">Assign Case</h2>
-              <button
-                onClick={() => setAssignModalCaseId(null)}
-                className="p-1 hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg text-ink-soft dark:text-plate-ink-soft"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-3">
-              {teamMembers.length === 0 && (
-                <p className="text-sm text-ink-soft dark:text-plate-ink-soft">No team members yet. Add some in Team Members.</p>
-              )}
-              {teamMembers.map(m => (
-                <button
-                  key={m.id}
-                  onClick={() => setAssignTarget(m.id)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                    assignTarget === m.id
-                      ? 'border-edamame-500 bg-edamame-50 dark:bg-edamame-900/20 ring-2 ring-edamame-500/20'
-                      : 'border-ink/15 dark:border-plate-ink/20 hover:border-ink/25 dark:hover:border-plate-ink/30'
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center font-bold">
-                    {m.avatar || m.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-ink dark:text-plate-ink text-sm">{m.name}</p>
-                    <p className="text-xs text-ink-soft dark:text-plate-ink-soft capitalize">{m.role}</p>
-                  </div>
-                </button>
-              ))}
-              <textarea
-                value={assignNote}
-                onChange={e => setAssignNote(e.target.value)}
-                placeholder="Reassignment note (optional)..."
-                rows={2}
-                className="w-full px-4 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate text-ink dark:text-plate-ink outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all resize-none text-sm"
-              />
-            </div>
-            <div className="flex items-center gap-3 p-6 border-t border-ink/10 dark:border-plate-ink/15">
-              <button
-                onClick={() => setAssignModalCaseId(null)}
-                className="px-4 py-2 text-sm font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (!assignTarget) return;
-                  onAssignCase(assignModalCaseId, assignTarget, assignNote || undefined);
-                  setAssignModalCaseId(null);
-                }}
-                disabled={!assignTarget}
-                className="ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed rounded-lg transition-colors"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {assignModalCaseId && onAssignCase && (() => {
+        const assignCaseItem = cases.find(c => c.id === assignModalCaseId);
+        if (!assignCaseItem) return null;
+        return (
+          <AssignCaseDialog
+            caseItem={assignCaseItem}
+            teamMembers={teamMembers}
+            cases={cases}
+            tasks={tasks}
+            currentUserId={currentUserId}
+            onClose={() => setAssignModalCaseId(null)}
+            onConfirm={(caseId, newOwnerId, note) => {
+              onAssignCase(caseId, newOwnerId, note);
+              setAssignModalCaseId(null);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 };

@@ -64,7 +64,12 @@ that, one-click buttons cover the most common changes without hunting through th
 with +1 day, +1 week, or pick a date — moving the date this way locks it exactly like editing the
 Due Date field by hand does, so it's never silently recalculated again). A line under the title
 shows context when it's relevant — how overdue the task is, "Due today", a note that an estimated
-date will firm up once the step it depends on is done, and who it's assigned to. Choosing **Not
+date will firm up once the step it depends on is done, and who it's assigned to. Below that, an
+**Assignee** field lets you change who the task is assigned to (or make it **Unassigned**) — it
+opens the same searchable person picker used everywhere someone is assigned in Edamame (search by
+name, email, or job title; an availability dot and open case/task count on each row), and applies
+the moment you pick someone, with no separate Save step. If the person you assign it to isn't you,
+they get an "assigned to you" notification (cloud/firm accounts only). Choosing **Not
 applicable**, from either the row menu on a case's task list or the task window's status row, asks
 for a short reason before it's applied; the reason is shown afterwards, and hovering or
 keyboard-focusing the chip on a task row shows it as a tooltip. Save at the bottom of the task

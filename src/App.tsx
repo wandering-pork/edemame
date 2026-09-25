@@ -739,6 +739,8 @@ const AppShell: React.FC = () => {
             cases={cases}
             tasks={tasks}
             templates={templates}
+            teamMembers={teamMembers}
+            currentUserId={currentUserId}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
             onMoveTaskDate={handleMoveTaskDate}
@@ -794,6 +796,7 @@ const AppShell: React.FC = () => {
                 clients={clients}
                 tasks={tasks}
                 activity={activity}
+                currentUserId={currentUserId}
                 onAssignCase={handleAssignCase}
               />
             } />
@@ -850,6 +853,8 @@ const AppShell: React.FC = () => {
                 clients={clients}
                 tasks={tasks}
                 templates={templates}
+                teamMembers={teamMembers}
+                currentUserId={currentUserId}
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
                 onAddTask={handleAddTask}
@@ -894,6 +899,8 @@ interface CaseDetailsRouteProps {
   clients: Client[];
   tasks: Task[];
   templates: WorkflowTemplate[];
+  teamMembers?: TeamMember[];
+  currentUserId?: string;
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onAddTask: (task: Task) => void;
@@ -930,6 +937,9 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       applicant={applicant}
       visaSubclass={caseItem.visaSubclass ?? template?.visaSubclass}
       tasks={props.tasks}
+      allCases={props.cases}
+      teamMembers={props.teamMembers}
+      currentUserId={props.currentUserId}
       onUpdateTask={props.onUpdateTask}
       onDeleteTask={props.onDeleteTask}
       onAddTask={props.onAddTask}

@@ -2,11 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X, ArrowRight, Trash2, CheckCircle2, Circle, CalendarClock, Check } from 'lucide-react';
-import type { Task, Case, Client, TaskStatus } from '../types';
+import type { Task, Case, Client, TaskStatus, TeamMember } from '../types';
 import { displayCaseNumber } from '../lib/caseNumber';
 import { isTaskClosed, withStatus, statusChipFor, TASK_STATUS_LABELS, TASK_STATUS_ORDER } from '../lib/taskStatus';
 import { overdueLabel } from '../lib/overdueLabel';
 import { quickMoveDate, QuickMoveOption } from '../lib/quickMoveDate';
+import { PersonPicker } from './PersonPicker';
+import { useFirm } from '../contexts/FirmContext';
+import { firmJobTitleLabel } from '../lib/firmDirectory';
+import type { PersonPickerPerson } from '../lib/personPicker';
 
 interface TaskDetailModalProps {
   task: Task;
@@ -33,7 +37,20 @@ interface TaskDetailModalProps {
   onNavigateAway?: () => void;
   /** Display name of `task.assignedTo`, if resolvable — shown in the context line under the title. */
   assigneeName?: string;
+  /** Active members selectable in the Assignee field's PersonPicker. Field is hidden if omitted/empty. */
+  teamMembers?: TeamMember[];
+  /** All cases — for the PersonPicker's workload counts. */
+  cases?: Case[];
+  /** All tasks — for the PersonPicker's workload counts. */
+  allTasks?: Task[];
+  currentUserId?: string;
 }
+
+const ROLE_LABEL: Record<TeamMember['role'], string> = {
+  partner: 'Partner',
+  lawyer: 'Lawyer',
+  assistant: 'Assistant',
+};
 
 /**
  * Task view/edit popup, shared by the Dashboard board and the global search
@@ -50,8 +67,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   onMoveTaskDate,
   onNavigateAway,
   assigneeName,
+  teamMembers = [],
+  cases = [],
+  allTasks = [],
+  currentUserId,
 }) => {
   const navigate = useNavigate();
+  const { allMembers } = useFirm();
+  const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
   const [date, setDate] = useState(task.date);
@@ -171,6 +194,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
     goToCase();
   };
+
+  const applyAssignee = (personId: string | undefined) => {
+    if (!onUpdateTask) return;
+    onUpdateTask({ ...task, assignedTo: personId });
+    setAssigneePickerOpen(false);
+  };
+
+  const assigneePeople: PersonPickerPerson[] = teamMembers.map(m => {
+    const row = allMembers.find(r => r.userId === m.id);
+    const jobTitle = (row && firmJobTitleLabel(row.jobTitle)) || ROLE_LABEL[m.role];
+    return { id: m.id, name: m.name, email: m.email, avatar: m.avatar, jobTitle, status: m.status };
+  });
 
   const handleSave = () => {
     if (!isDirty || !title.trim() || !date) return;
@@ -356,6 +391,47 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <div className="mt-1.5 text-[12.5px] text-ink-soft dark:text-plate-ink-soft italic">{task.statusReason}</div>
             ) : null}
           </div>
+
+          {teamMembers.length > 0 && (
+            <div>
+              <label className="block text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft mb-1">
+                Assignee
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAssigneePickerOpen(o => !o)}
+                  aria-haspopup="listbox"
+                  aria-expanded={assigneePickerOpen}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-left text-[13.5px] text-ink dark:text-plate-ink outline-none hover:border-edamame-500 focus-ring transition-colors"
+                >
+                  <span className={assigneeName ? '' : 'text-ink-faint dark:text-plate-ink-faint italic'}>
+                    {assigneeName || 'Unassigned'}
+                  </span>
+                  <span className="text-ink-faint dark:text-plate-ink-faint text-[11px]">Change</span>
+                </button>
+                {assigneePickerOpen && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setAssigneePickerOpen(false)} />
+                    <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-2">
+                      <PersonPicker
+                        people={assigneePeople}
+                        cases={cases}
+                        tasks={allTasks}
+                        value={task.assignedTo}
+                        onChange={applyAssignee}
+                        currentUserId={currentUserId}
+                        allowUnassigned
+                        autoFocus
+                        onEscape={() => setAssigneePickerOpen(false)}
+                        aria-label="Assign task to"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft mb-1">

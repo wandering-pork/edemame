@@ -10,6 +10,8 @@ import {
 } from '@/lib/firmDirectory';
 import { inviteHintFor, type InviteHint } from '@/lib/inviteHints';
 import { friendlyMemberLifecycleError } from '@/lib/memberLifecycleErrors';
+import { PersonPicker } from '@/components/PersonPicker';
+import type { PersonPickerPerson } from '@/lib/personPicker';
 import type { Case, FirmJobTitle, FirmMemberRow, FirmRole, Task } from '@/types';
 
 interface PendingInvite {
@@ -120,6 +122,16 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks, cases, 
   const reassignCandidates = useMemo(
     () => members.filter(m => m.status === 'active' && m.userId !== lifecycle?.member.userId),
     [members, lifecycle],
+  );
+  const reassignPeople = useMemo<PersonPickerPerson[]>(
+    () => reassignCandidates.map(m => ({
+      id: m.userId,
+      name: m.fullName,
+      email: m.email,
+      jobTitle: firmJobTitleLabel(m.jobTitle),
+      status: m.availability,
+    })),
+    [reassignCandidates],
   );
 
   const runLifecycleAction = async () => {
@@ -708,16 +720,16 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks, cases, 
                     ))}
                   </ul>
                   <label className="block text-xs font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5">Reassign to</label>
-                  <select
-                    value={lifecycleReassignTo}
-                    onChange={e => setLifecycleReassignTo(e.target.value)}
-                    className="focus-ring w-full px-3 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink dark:text-plate-ink text-sm outline-none"
-                  >
-                    <option value="">Leave unassigned</option>
-                    {reassignCandidates.map(m => (
-                      <option key={m.userId} value={m.userId}>{m.fullName}</option>
-                    ))}
-                  </select>
+                  <PersonPicker
+                    people={reassignPeople}
+                    cases={cases}
+                    tasks={tasks}
+                    value={lifecycleReassignTo || undefined}
+                    onChange={id => setLifecycleReassignTo(id ?? '')}
+                    currentUserId={user?.id}
+                    allowUnassigned
+                    aria-label="Reassign to"
+                  />
                 </div>
               )}
 

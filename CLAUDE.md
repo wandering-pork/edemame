@@ -445,6 +445,29 @@ before this feature).
   partner/lawyer/assistant bucket; disabled/former members already dropped out of the workload
   columns (`teamMembers` is active-only) while still being named via `memberNameFor()` on cases they
   own or old activity-feed entries — unchanged from 1G.6.
+- **Shared person picker and task assignment**: every place a person is chosen from the team —
+  case assignment, a task's assignee, and the 1G.6 hand-over panel — shares one accessible
+  combobox/listbox, `components/PersonPicker.tsx`, instead of each surface rendering its own card
+  list or `<select>`. Pure ordering/filtering/workload logic lives in `lib/personPicker.ts`
+  (unit-tested): `buildPersonPickerEntries()` orders people You first, then the picker's current
+  value (tagged "Current"), then available/busy/offline, lightest workload (open cases + open
+  tasks, via `computeWorkload()`) first within each bucket; `filterPersonPickerEntries()` matches
+  name/email/job title case-insensitively. `PersonPicker` takes a minimal `PersonPickerPerson[]`
+  (id/name/email/avatar/jobTitle/status) so cloud firm-directory rows, local `TeamMember`s, and a
+  `FirmMemberRow` (mapped via `lib/firmDirectory.ts`'s `firmJobTitleLabel()`) can all feed it
+  without an intermediate type; only active people should ever be passed in. `components/
+  AssignCaseDialog.tsx` (picker + an optional note, truthfully labelled "added to the case's
+  assignment history" since that's where `handleAssignCase`'s `note` argument actually lands —
+  `CaseAssignmentEvent.note`, rendered in the same dialog's assignment history list) replaced the
+  two near-duplicate "Assign Case" modals that used to live separately in `pages/CaseManager.tsx`
+  and `pages/TeamDashboard.tsx`. `components/TaskDetailModal.tsx` gained an **Assignee** field
+  (the picker in a small popover, with an "Unassigned" option) that applies immediately through
+  the existing `onUpdateTask` path, so activity + `notify_assignment` fire exactly as for any other
+  task edit; `pages/CaseDetails.tsx`'s Tasks tab rows show the assignee's initials (a dashed circle
+  when unassigned, full name on hover/keyboard-focus) and gained an **Assign to…** entry in the
+  row's **⋮** menu opening the same popover — new tasks still default to the case owner.
+  `components/team/FirmTeamMembers.tsx`'s 1G.6 hand-over panel uses the picker in place of its old
+  `<select>`, still offering "Leave unassigned".
 
 ### Agentic Issue Filing (Case Manager Focus Mode chat only)
 

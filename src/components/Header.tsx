@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Sun, Moon } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { GlobalSearch } from './GlobalSearch';
-import type { Notification, Theme, Client, Case, Task, WorkflowTemplate } from '../types';
+import type { Notification, Theme, Client, Case, Task, WorkflowTemplate, TeamMember } from '../types';
 
 interface HeaderProps {
   theme: Theme;
@@ -19,6 +19,8 @@ interface HeaderProps {
   cases: Case[];
   tasks: Task[];
   templates: WorkflowTemplate[];
+  teamMembers?: TeamMember[];
+  currentUserId?: string;
   onUpdateTask?: (task: Task) => void;
   onDeleteTask?: (id: string) => void;
   onMoveTaskDate?: (
@@ -50,6 +52,8 @@ export const Header: React.FC<HeaderProps> = ({
   cases,
   tasks,
   templates,
+  teamMembers,
+  currentUserId,
   onUpdateTask,
   onDeleteTask,
   onMoveTaskDate,
@@ -64,6 +68,8 @@ export const Header: React.FC<HeaderProps> = ({
         cases={cases}
         tasks={tasks}
         templates={templates}
+        teamMembers={teamMembers}
+        currentUserId={currentUserId}
         onUpdateTask={onUpdateTask}
         onDeleteTask={onDeleteTask}
         onMoveTaskDate={onMoveTaskDate}

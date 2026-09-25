@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Case, Client, Task, CaseStage, CaseOutcome, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind } from '../types';
+import { Case, Client, Task, CaseStage, CaseOutcome, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind, TeamMember } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useFirm } from '../contexts/FirmContext';
-import { canDeleteFirmData } from '../lib/firmDirectory';
+import { canDeleteFirmData, firmJobTitleLabel } from '../lib/firmDirectory';
+import { PersonPicker } from '../components/PersonPicker';
+import type { PersonPickerPerson } from '../lib/personPicker';
 import { CaseNotes } from '../components/CaseNotes';
 import { DocumentUpload } from '../components/DocumentUpload';
 import { DocumentList } from '../components/DocumentList';
@@ -56,6 +58,7 @@ import {
   PinOff,
   RefreshCw,
   Columns2,
+  UserPlus,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -67,6 +70,11 @@ interface CaseDetailsProps {
   applicant?: Client;
   visaSubclass?: string;
   tasks: Task[];
+  /** Every case — used only for the "Assign to…" PersonPicker's workload counts. */
+  allCases?: Case[];
+  /** Active team members selectable in the "Assign to…" row action. */
+  teamMembers?: TeamMember[];
+  currentUserId?: string;
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
   onAddTask: (task: Task) => void;
@@ -91,6 +99,12 @@ interface CaseDetailsProps {
 // ---------------------------------------------------------------------------
 
 const AGENT_CHIPS = ['Draft consultation checklist', 'Document request email', 'Summarise eligibility'];
+
+const TEAM_ROLE_LABEL: Record<TeamMember['role'], string> = {
+  partner: 'Partner',
+  lawyer: 'Lawyer',
+  assistant: 'Assistant',
+};
 
 const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
   tasks: 'Tasks',
@@ -130,6 +144,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   applicant,
   visaSubclass,
   tasks,
+  allCases = [],
+  teamMembers = [],
+  currentUserId,
   onUpdateTask,
   onDeleteTask,
   onAddTask,
@@ -149,13 +166,20 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // on `cases` is owner/agent only) — this only hides the control for a role
   // that would be rejected server-side anyway. `role` is null in local mode,
   // where deletes stay allowed (single user, always their own data).
-  const { role: firmRole } = useFirm();
+  const { role: firmRole, allMembers } = useFirm();
   const canDeleteCase = canDeleteFirmData(firmRole);
 
   // ---- Task state ----
   const [offsetModal, setOffsetModal] = useState<{ taskId: string, newDate: string } | null>(null);
   const [editingDate, setEditingDate] = useState<{ taskId: string, date: string } | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [assigningTaskId, setAssigningTaskId] = useState<string | null>(null);
+
+  const assigneePeople = useMemo<PersonPickerPerson[]>(() => teamMembers.map(m => {
+    const row = allMembers.find(r => r.userId === m.id);
+    const jobTitle = (row && firmJobTitleLabel(row.jobTitle)) || TEAM_ROLE_LABEL[m.role];
+    return { id: m.id, name: m.name, email: m.email, avatar: m.avatar, jobTitle, status: m.status };
+  }), [teamMembers, allMembers]);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [taskForm, setTaskForm] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd') });
@@ -1181,6 +1205,30 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           )}
         </div>
 
+        {/* Assignee initials — always shown for clarity; full name on hover/focus. */}
+        {(() => {
+          const assignee = teamMembers.find(m => m.id === task.assignedTo);
+          const initials = assignee
+            ? assignee.name.split(/\s+/).filter(Boolean).map(p => p[0]).join('').slice(0, 2).toUpperCase()
+            : null;
+          return (
+            <div
+              tabIndex={0}
+              className="w-6 h-6 rounded-full flex items-center justify-center text-[9.5px] font-bold flex-shrink-0 outline-none focus-ring"
+              title={assignee ? assignee.name : 'Unassigned'}
+              aria-label={assignee ? `Assigned to ${assignee.name}` : 'Unassigned'}
+            >
+              {initials ? (
+                <span className="w-full h-full rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center">
+                  {initials}
+                </span>
+              ) : (
+                <span className="w-full h-full rounded-full border border-dashed border-ink/20 dark:border-plate-ink/25" />
+              )}
+            </div>
+          );
+        })()}
+
         {/* Due date — click to reschedule */}
         {editing ? (
           <input
@@ -1233,12 +1281,37 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     <Calendar size={14} className="text-edamame" />Set to today
                   </button>
                 )}
+                {teamMembers.length > 0 && (
+                  <button onClick={() => { setAssigningTaskId(task.id); setActiveDropdown(null); }} className={rowMenuCls}>
+                    <UserPlus size={14} className="text-edamame" />Assign to…
+                  </button>
+                )}
                 <button onClick={() => handleOpenTaskModal(task)} className={rowMenuCls}>
                   <Edit2 size={14} className="text-blue-400" />Edit
                 </button>
                 <button onClick={() => { onDeleteTask(task.id); setActiveDropdown(null); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                   <Trash2 size={14} />Delete
                 </button>
+              </div>
+            </>
+          )}
+
+          {assigningTaskId === task.id && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setAssigningTaskId(null)} />
+              <div className="absolute right-0 top-full mt-1 z-40 w-64 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-2 modal-content">
+                <PersonPicker
+                  people={assigneePeople}
+                  cases={allCases}
+                  tasks={tasks}
+                  value={task.assignedTo}
+                  onChange={(personId) => { onUpdateTask({ ...task, assignedTo: personId }); setAssigningTaskId(null); }}
+                  currentUserId={currentUserId}
+                  allowUnassigned
+                  autoFocus
+                  onEscape={() => setAssigningTaskId(null)}
+                  aria-label="Assign task to"
+                />
               </div>
             </>
           )}
