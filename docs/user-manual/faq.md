@@ -24,6 +24,13 @@ You need an internet connection for AI features (task generation, passport scann
 checks, chat) since these call out to Gemini. Viewing and editing clients, cases, and tasks against
 your linked local folder does not require a live connection once the folder is linked.
 
+## I forgot my password. How do I reset it?
+
+On the sign-in screen, click **Send reset link** next to the password field and enter your email.
+You'll get an email with a link that opens a "Set a new password" page — choose a new password
+there and you'll be signed in with it right away. If the link says it has expired or was already
+used, go back to the sign-in screen and request a new one; each link works once.
+
 ## How do I sign out?
 
 Use **Sign Out** from the Account section in **Settings**, or the sign-out link in the sidebar.

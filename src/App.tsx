@@ -37,6 +37,7 @@ import { LocalFolderProvider, useLocalFolder } from './contexts/LocalFolderConte
 import { FirmProvider, useFirm } from './contexts/FirmContext';
 import { CreateFirmGate } from './components/CreateFirmGate';
 import { InviteAccept } from './pages/InviteAccept';
+import { ResetPassword } from './pages/ResetPassword';
 import { LinkFolderGate } from './components/LinkFolderGate';
 import { isSupabaseConfigured } from './lib/supabaseClient';
 
@@ -1028,6 +1029,12 @@ const AppRoutes: React.FC = () => {
           redirects (ProtectedRoute, sign-out) and shared links still work. */}
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
       <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+      {/* Fully public, and deliberately outside ProtectedRoute/ProfileProvider: the
+          Supabase recovery link signs the visitor in via a short-lived recovery
+          session (see pages/ResetPassword.tsx), which would otherwise get bounced
+          around by the "signed-in users get sent to /dashboard" rule above or the
+          onboarding/firm gates further down the tree before the form ever shows. */}
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<ProtectedRoute />}>
         {/* Accepting a firm invite needs a session but not a resolved profile/firm — see pages/InviteAccept.tsx. ProtectedRoute already redirects a signed-out visitor to /login and back here (location.state.from), via LandingPage's own sign-in flow. */}
         <Route path="/invite/:token" element={
