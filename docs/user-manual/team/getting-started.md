@@ -40,14 +40,27 @@ From **Team Members** (Owners and Admins — everyone else sees a read-only list
    invite at any role.
 3. Click **Send invite**.
 
-If they don't already have an Edamame account, they'll get an invite email with a link to create
-one and join your firm automatically. If they already have an account, the invite email may not
-go through — in that case, copy the invite link shown after sending and share it with them
-directly (e.g. over Slack or email). Either way, opening the link and signing in adds them to your
-firm.
+As you type the email, Edamame checks it against your firm and gives you a heads-up before you
+even click Send:
 
-Invites expire after 7 days. You can **resend** (sends a fresh link) or **revoke** a pending
-invite at any time from the Pending Invites list.
+- **Already in your firm** — they're an active member; Send is disabled, since inviting them again
+  would do nothing.
+- **Disabled** — they were disabled, not removed. A **Re-enable** button appears right there so you
+  don't have to send a new invite at all.
+- **An invite is already pending** — sending again replaces the old link with a fresh one (the old
+  one stops working). This is the same as clicking **Resend** on the Pending Invites list below.
+
+If they don't already have an Edamame account, they'll get an invite email with a link to create
+one and join your firm automatically — the confirmation says "Invite email sent to their-address".
+If they already have an account, the invite email doesn't go through (Edamame never reveals whether
+an outside address has an account) — instead you'll see "…already has an Edamame account, so no
+email was sent" with a copyable link to share with them directly (e.g. over Slack or email). Either
+way, opening the link and signing in adds them to your firm.
+
+Invites expire after 7 days. **Resend** on the Pending Invites list rotates the invite to a fresh
+link (the old one stops working) without reopening the invite form — it's disabled if you can't
+grant that invite's role (for example, an Admin can't resend an invite that was sent as Owner).
+**Revoke** cancels a pending invite for good.
 
 ## Changing roles and disabling members
 

@@ -7,6 +7,7 @@ import { isTaskClosed } from '@/lib/taskStatus';
 import {
   firmRoleLabel, firmJobTitleLabel, initialsOfName, canManageMembers, canManageMember, grantableRoles, FIRM_JOB_TITLES,
 } from '@/lib/firmDirectory';
+import { inviteHintFor, type InviteHint } from '@/lib/inviteHints';
 import type { FirmJobTitle, FirmRole, Task } from '@/types';
 
 interface PendingInvite {
@@ -57,9 +58,24 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
+  const [lastInviteSent, setLastInviteSent] = useState<boolean | null>(null);
+  const [lastInviteEmail, setLastInviteEmail] = useState<string | null>(null);
 
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
+
+  // Step 1 · 1G.3: as the user types, check the address against the
+  // already-loaded members + pending invites for an instant hint — the
+  // server's firm_email_status stays the authority (see handleInvite).
+  const inviteHint: InviteHint | null = useMemo(
+    () => inviteHintFor(inviteEmail, members, pendingInvites),
+    [inviteEmail, members, pendingInvites]
+  );
+
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [resendResult, setResendResult] = useState<
+    { id: string; sent: boolean; inviteLink: string } | { id: string; error: string } | null
+  >(null);
 
   const loadPendingInvites = async () => {
     if (!firm || !canManage) { setPendingInvites([]); return; }
@@ -101,21 +117,36 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firm || !session?.access_token || !inviteEmail.trim()) return;
+    if (inviteHint?.kind === 'already_member') return;
+    const email = inviteEmail.trim();
     setInviting(true);
     setInviteError(null);
     setLastInviteLink(null);
+    setLastInviteSent(null);
+    setLastInviteEmail(null);
     try {
       const res = await fetch('/api/invite-member', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ firmId: firm.id, email: inviteEmail.trim(), role: inviteRole }),
+        body: JSON.stringify({ firmId: firm.id, email, role: inviteRole }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setInviteError(data?.error || 'Could not send the invite.');
+        // Step 1 · 1G.3: the server is the authority — map its 409 codes to
+        // the same wording the inline hint already showed, rather than a
+        // generic error, for whichever of the two caught it first.
+        if (data?.code === 'already_member') {
+          setInviteError('Already in your firm — no invite was sent.');
+        } else if (data?.code === 'disabled_member') {
+          setInviteError('This person is disabled in your firm — re-enable them instead of inviting them again.');
+        } else {
+          setInviteError(data?.error || 'Could not send the invite.');
+        }
         return;
       }
       setLastInviteLink(data.inviteLink);
+      setLastInviteSent(!!data.sent);
+      setLastInviteEmail(email);
       setInviteEmail('');
       await loadPendingInvites();
     } catch (err) {
@@ -123,6 +154,34 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
       setInviteError('Could not send the invite — check your connection and try again.');
     } finally {
       setInviting(false);
+    }
+  };
+
+  // Step 1 · 1G.3: Resend calls the endpoint directly with the pending
+  // invite's own email + role (a server-side resend rotates the token and
+  // revokes the old one) instead of reopening the invite form.
+  const handleResendInvite = async (inv: PendingInvite) => {
+    if (!firm || !session?.access_token) return;
+    setResendingId(inv.id);
+    setResendResult(null);
+    try {
+      const res = await fetch('/api/invite-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ firmId: firm.id, email: inv.email, role: inv.role }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResendResult({ id: inv.id, error: data?.error || 'Could not resend the invite.' });
+        return;
+      }
+      setResendResult({ id: inv.id, sent: !!data.sent, inviteLink: data.inviteLink });
+      await loadPendingInvites();
+    } catch (err) {
+      console.error('Failed to resend invite:', err);
+      setResendResult({ id: inv.id, error: 'Could not resend — check your connection and try again.' });
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -219,7 +278,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
             </div>
             {canManage && (
               <button
-                onClick={() => { setInviteOpen(true); setInviteRole(myGrantableRoles[0] ?? 'member'); setInviteError(null); setLastInviteLink(null); }}
+                onClick={() => { setInviteOpen(true); setInviteRole(myGrantableRoles[0] ?? 'member'); setInviteError(null); setLastInviteLink(null); setLastInviteSent(null); setLastInviteEmail(null); }}
                 className="btn-press focus-ring inline-flex items-center gap-1.5 bg-edamame-500 hover:bg-edamame-700 text-white px-4 py-2.5 rounded-xl font-bold text-[13px] whitespace-nowrap transition-colors"
               >
                 <Plus size={16} strokeWidth={1.8} /> Invite
@@ -358,32 +417,63 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
               ) : pendingInvites.length === 0 ? (
                 <div className="py-8 text-center text-ink-faint dark:text-plate-ink-faint text-sm">No pending invites.</div>
               ) : (
-                pendingInvites.map(inv => (
-                  <div key={inv.id} className="border-t first:border-t-0 border-ink/10 dark:border-plate-ink/20 flex items-center justify-between gap-3 px-5 py-3">
-                    <div className="min-w-0">
-                      <div className="font-semibold text-ink dark:text-plate-ink text-[13px] truncate">{inv.email}</div>
-                      <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
-                        {firmRoleLabel(inv.role)} · expires {new Date(inv.expiresAt).toLocaleDateString()}
+                pendingInvites.map(inv => {
+                  const canGrantThisRole = myGrantableRoles.includes(inv.role);
+                  const result = resendResult && resendResult.id === inv.id ? resendResult : null;
+                  return (
+                    <div key={inv.id} className="border-t first:border-t-0 border-ink/10 dark:border-plate-ink/20 px-5 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-ink dark:text-plate-ink text-[13px] truncate">{inv.email}</div>
+                          <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
+                            {firmRoleLabel(inv.role)} · expires {new Date(inv.expiresAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <button
+                            onClick={() => handleResendInvite(inv)}
+                            disabled={!canGrantThisRole || resendingId === inv.id}
+                            title={canGrantThisRole ? 'Resend invite' : `You can't grant the ${firmRoleLabel(inv.role)} role`}
+                            className="text-ink-faint dark:text-plate-ink-faint hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <RotateCcw size={14} strokeWidth={1.8} className={resendingId === inv.id ? 'animate-spin' : ''} />
+                          </button>
+                          <button
+                            onClick={() => handleRevoke(inv.id)}
+                            title="Revoke invite"
+                            className="text-ink-faint dark:text-plate-ink-faint hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={14} strokeWidth={1.8} />
+                          </button>
+                        </div>
                       </div>
+                      {result && 'error' in result && (
+                        <p className="mt-2 text-[11px] text-red-500">{result.error}</p>
+                      )}
+                      {result && !('error' in result) && (
+                        <div className="mt-2 rounded-lg bg-edamame-50 dark:bg-edamame-950 border border-edamame-200 dark:border-edamame-800 p-2.5">
+                          <p className="text-[11px] text-ink-soft dark:text-plate-ink-soft mb-1.5 flex items-center gap-1.5">
+                            <Mail size={12} />
+                            {result.sent
+                              ? 'Invite re-sent.'
+                              : `${inv.email} already has an Edamame account, so no email was sent — send them this link:`}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <input readOnly value={result.inviteLink} className="flex-1 text-[11px] px-2 py-1 rounded border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink dark:text-plate-ink" />
+                            <button
+                              type="button"
+                              onClick={() => navigator.clipboard?.writeText(result.inviteLink)}
+                              className="p-1.5 rounded-md text-ink-faint hover:text-edamame-600 transition-colors"
+                              title="Copy link"
+                            >
+                              <Copy size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <button
-                        onClick={() => { setInviteOpen(true); setInviteEmail(inv.email); setInviteRole(inv.role); setInviteError(null); setLastInviteLink(null); }}
-                        title="Resend invite"
-                        className="text-ink-faint dark:text-plate-ink-faint hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors"
-                      >
-                        <RotateCcw size={14} strokeWidth={1.8} />
-                      </button>
-                      <button
-                        onClick={() => handleRevoke(inv.id)}
-                        title="Revoke invite"
-                        className="text-ink-faint dark:text-plate-ink-faint hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 size={14} strokeWidth={1.8} />
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -410,6 +500,20 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
                   onChange={e => setInviteEmail(e.target.value)}
                   className="focus-ring w-full px-4 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink dark:text-plate-ink outline-none transition-all"
                 />
+                {inviteHint && (
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-ink-soft dark:text-plate-ink-soft">
+                    <span>{inviteHint.message}</span>
+                    {inviteHint.kind === 'disabled_member' && inviteHint.userId && (
+                      <button
+                        type="button"
+                        onClick={() => { handleToggleDisabled(inviteHint.userId!, 'disabled'); setInviteOpen(false); }}
+                        className="btn-press focus-ring flex-shrink-0 px-2.5 py-1 rounded-md bg-edamame-500 hover:bg-edamame-700 text-white font-semibold text-[11px] transition-colors"
+                      >
+                        Re-enable
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">Role</label>
@@ -422,10 +526,13 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
                 </select>
               </div>
               {inviteError && <p className="text-sm text-red-500">{inviteError}</p>}
-              {lastInviteLink && (
+              {lastInviteLink && lastInviteEmail && (
                 <div className="rounded-lg bg-edamame-50 dark:bg-edamame-950 border border-edamame-200 dark:border-edamame-800 p-3">
                   <p className="text-xs text-ink-soft dark:text-plate-ink-soft mb-1.5 flex items-center gap-1.5">
-                    <Mail size={13} /> Invite email sent. You can also share this link directly:
+                    <Mail size={13} />
+                    {lastInviteSent
+                      ? `Invite email sent to ${lastInviteEmail}`
+                      : `${lastInviteEmail} already has an Edamame account, so no email was sent — send them this link:`}
                   </p>
                   <div className="flex items-center gap-2">
                     <input readOnly value={lastInviteLink} className="flex-1 text-xs px-2 py-1.5 rounded border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink dark:text-plate-ink" />
@@ -450,7 +557,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
                 </button>
                 <button
                   type="submit"
-                  disabled={inviting || !inviteEmail.trim()}
+                  disabled={inviting || !inviteEmail.trim() || inviteHint?.kind === 'already_member'}
                   className="btn-press ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed rounded-lg transition-colors"
                 >
                   {inviting ? 'Sending...' : 'Send invite'}
