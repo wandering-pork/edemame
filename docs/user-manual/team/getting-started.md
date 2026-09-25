@@ -126,7 +126,27 @@ Former/disabled members never appear in assignee or case-owner pickers going for
 
 Every member — including you — can set their own availability (Available / Busy / Offline) from
 the dropdown at the top of Team Members. This is just a status signal for your colleagues; it
-doesn't restrict what you can do.
+doesn't restrict what you can do — it also shows as a small coloured dot on your avatar in the Team
+Dashboard's per-member columns.
+
+## "Assigned to you" notifications
+
+When a colleague assigns you a task, or makes you the owner of a case, you get an in-app
+notification ("*Their name* assigned you a task: *Task title*" / "*Their name* made you the owner
+of *Case title*") — check the bell icon in the top bar. Assigning something to yourself, or
+re-saving something without changing who it's assigned to, never creates a notification. This is
+cloud/firm-only — local mode has no one else to notify.
+
+## Team Dashboard
+
+**Team Dashboard** (Team View) shows one column per active team member with their open tasks, a
+shared case board you can filter and search, and a recent activity feed. Each column's header shows
+the member's avatar with their live availability dot, their real job title (e.g. "Registered
+migration agent"), and their open task count. Disabled and former members drop out of these
+columns — their open work should already have been reassigned when they were disabled or removed
+(see "Disabling, removing, and handing over work" above) — but any case they still own, or older
+activity-feed entries naming them, keep showing their name tagged **(disabled)** or **(former
+member)** rather than going blank.
 
 ## Belonging to more than one firm
 

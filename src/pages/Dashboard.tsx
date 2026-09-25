@@ -11,7 +11,10 @@ import {
 import { Plus, Sparkles, Calendar as CalendarIcon, X, Link as LinkIcon, ChevronLeft, ChevronRight, SkipBack, SkipForward } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { buildWindow, computeAutoWindowStart, jumpWeek, stepDay } from '../lib/calendarWindow';
-import { overdueTasksFor, dueTodayTasksFor, waitingTasksFor, buildAttentionItems, deadlineAttentionItemsFor, mergeAttentionItems } from '../lib/attention';
+import {
+  overdueTasksFor, dueTodayTasksFor, waitingTasksFor, buildAttentionItems, deadlineAttentionItemsFor, mergeAttentionItems,
+  scopeTasksForAttention, scopeDeadlinesForAttention, AttentionScope,
+} from '../lib/attention';
 import { allDeadlines } from '../lib/deadlines';
 import { isTaskClosed } from '../lib/taskStatus';
 import { isCaseClosed } from '../lib/caseStage';
@@ -25,6 +28,8 @@ interface DashboardProps {
   deadlines?: Deadline[];
   teamMembers?: TeamMember[];
   currentUserId?: string;
+  /** Cloud mode only — shows the Needs Attention scope toggle. Local mode is always single-user, so "mine" and "all" are the same set and the toggle stays hidden. */
+  storageMode?: 'local' | 'cloud';
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onMoveTaskOrder: (taskId: string, direction: 'up' | 'down') => void;
@@ -99,6 +104,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   deadlines = [],
   teamMembers = [],
   currentUserId,
+  storageMode = 'local',
   activity = [],
   checklistItems,
   onAddTask,
@@ -108,6 +114,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const navigate = useNavigate();
   const [boardScope, setBoardScope] = useState<ScopeFilter>(currentUserId ? 'mine' : 'all');
+  // Step 1 · 1G.7 — Needs Attention and the stats below follow this scope,
+  // "Mine" by default in cloud mode. Local mode is single-user, so scoping
+  // would be a no-op — default straight to 'all' and hide the toggle.
+  const [attentionScope, setAttentionScope] = useState<AttentionScope>(storageMode === 'cloud' ? 'mine' : 'all');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), caseId: '' });
   const [caseSearchTerm, setCaseSearchTerm] = useState('');
@@ -190,17 +200,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
     [cases]
   );
 
-  const overdueTasks = useMemo(() => overdueTasksFor(tasks, today), [tasks]);
-  const dueTodayTasks = useMemo(() => dueTodayTasksFor(tasks, today), [tasks]);
-  const waitingTasks = useMemo(() => waitingTasksFor(tasks), [tasks]);
+  // Overdue / due-today / waiting / due-this-week all follow attentionScope
+  // (Step 1 · 1G.7) — "Mine" is assigned to me or unassigned, same rule as
+  // the board's own scope toggle.
+  const scopedTasksForStats = useMemo(
+    () => scopeTasksForAttention(tasks, attentionScope, currentUserId),
+    [tasks, attentionScope, currentUserId]
+  );
+  const overdueTasks = useMemo(() => overdueTasksFor(scopedTasksForStats, today), [scopedTasksForStats]);
+  const dueTodayTasks = useMemo(() => dueTodayTasksFor(scopedTasksForStats, today), [scopedTasksForStats]);
+  const waitingTasks = useMemo(() => waitingTasksFor(scopedTasksForStats), [scopedTasksForStats]);
   const dueThisWeekTasks = useMemo(
     () =>
-      tasks.filter(t => {
+      scopedTasksForStats.filter(t => {
         if (isTaskClosed(t)) return false;
         const d = differenceInCalendarDays(startOfDay(new Date(t.date)), today);
         return d >= 0 && d <= 6;
       }),
-    [tasks]
+    [scopedTasksForStats]
   );
 
   const docsOutstanding = checklistItems
@@ -257,9 +274,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     () => buildAttentionItems(overdueTasks, dueTodayTasks, getCaseAndClient, iso => format(new Date(iso), 'd MMM')),
     [overdueTasks, dueTodayTasks, cases, clients]
   );
+  const scopedDeadlinesForAttention = useMemo(
+    () => scopeDeadlinesForAttention(allDeadlines(deadlines, clients), cases, attentionScope, currentUserId),
+    [deadlines, clients, cases, attentionScope, currentUserId]
+  );
   const deadlineAttentionItems = useMemo(
-    () => deadlineAttentionItemsFor(allDeadlines(deadlines, clients), today, getCaseAndClient, getClientById),
-    [deadlines, clients, cases, today.getTime()]
+    () => deadlineAttentionItemsFor(scopedDeadlinesForAttention, today, getCaseAndClient, getClientById),
+    [scopedDeadlinesForAttention, cases, clients, today.getTime()]
   );
   // Deadlines at urgency ≥ soon rank above tasks, ranked by consequence — see plan 1D.
   const allAttentionItems = useMemo(
@@ -393,22 +414,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-3.5 mt-3.5 items-start">
           {/* Needs attention */}
           <div className="bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 pt-4 pb-1">
+            <div className="flex items-center justify-between px-5 pt-4 pb-1 gap-2">
               <span className="text-[9.5px] font-bold uppercase tracking-[0.11em] text-ink-soft dark:text-plate-ink-soft">
                 Needs attention
               </span>
-              <span
-                className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-md ${
-                  allAttentionItems.length > 0
-                    ? 'bg-red-500/[.13] text-[#B91C1C] dark:text-[#F87171]'
-                    : 'bg-edamame/10 text-[#047857] dark:text-[#4ADE80]'
-                }`}
-              >
-                {allAttentionItems.length > 0 ? `${allAttentionItems.length} item${allAttentionItems.length === 1 ? '' : 's'}` : 'All clear'}
-              </span>
+              <div className="flex items-center gap-2">
+                {storageMode === 'cloud' && (
+                  <div className="flex gap-0.5 p-[2px] bg-paper-2 dark:bg-plate rounded-md" role="group" aria-label="Needs attention scope">
+                    <button
+                      onClick={() => setAttentionScope('mine')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                        attentionScope === 'mine'
+                          ? 'bg-paper dark:bg-plate-card text-ink dark:text-plate-ink'
+                          : 'text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink'
+                      }`}
+                    >
+                      Mine
+                    </button>
+                    <button
+                      onClick={() => setAttentionScope('all')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                        attentionScope === 'all'
+                          ? 'bg-paper dark:bg-plate-card text-ink dark:text-plate-ink'
+                          : 'text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink'
+                      }`}
+                    >
+                      All
+                    </button>
+                  </div>
+                )}
+                <span
+                  className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-md whitespace-nowrap ${
+                    allAttentionItems.length > 0
+                      ? 'bg-red-500/[.13] text-[#B91C1C] dark:text-[#F87171]'
+                      : 'bg-edamame/10 text-[#047857] dark:text-[#4ADE80]'
+                  }`}
+                >
+                  {allAttentionItems.length > 0 ? `${allAttentionItems.length} item${allAttentionItems.length === 1 ? '' : 's'}` : 'All clear'}
+                </span>
+              </div>
             </div>
             <div className="px-5 pb-2.5 text-[10.5px] text-ink-soft/70 dark:text-plate-ink-soft/70">
-              Overdue first, then due today.
+              {attentionScope === 'mine' ? 'Your tasks' : 'All tasks'} — overdue first, then due today.
             </div>
             {attentionItems.length === 0 ? (
               <div className="px-5 py-8 text-center text-[12.5px] text-ink-soft dark:text-plate-ink-soft border-t border-ink/10 dark:border-plate-ink/15">

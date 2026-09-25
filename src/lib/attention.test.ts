@@ -1,6 +1,29 @@
 import { describe, it, expect } from 'vitest';
 import type { Task, Case, Client, Deadline } from '../types';
-import { overdueTasksFor, dueTodayTasksFor, waitingTasksFor, buildAttentionItems, deadlineAttentionItemsFor, mergeAttentionItems } from './attention';
+import {
+  overdueTasksFor,
+  dueTodayTasksFor,
+  waitingTasksFor,
+  buildAttentionItems,
+  deadlineAttentionItemsFor,
+  mergeAttentionItems,
+  scopeTasksForAttention,
+  scopeDeadlinesForAttention,
+} from './attention';
+
+function makeCase(overrides: Partial<Case> = {}): Case {
+  return {
+    id: 'case-1',
+    clientId: 'client-1',
+    title: 'Test case',
+    description: '',
+    templateId: 'tpl-1',
+    stage: 'preparing',
+    startDate: '2026-01-01',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 const today = new Date('2026-06-15T00:00:00');
 
@@ -161,5 +184,70 @@ describe('mergeAttentionItems', () => {
     const taskItems = [{ id: 't1', dot: '#EF4444', title: 'T', sub: '' }];
     const merged = mergeAttentionItems(deadlineItems, taskItems);
     expect(merged.map(i => i.id)).toEqual(['deadline:1', 't1']);
+  });
+});
+
+describe('scopeTasksForAttention', () => {
+  function makeTask(overrides: Partial<Task>): Task {
+    return {
+      id: 't1', title: 'Task', description: '', date: '2026-06-15',
+      status: 'not_started', isCompleted: false, priorityOrder: 0,
+      ...overrides,
+    };
+  }
+
+  const tasks = [
+    makeTask({ id: 'mine', assignedTo: 'user-1' }),
+    makeTask({ id: 'unassigned' }),
+    makeTask({ id: 'theirs', assignedTo: 'user-2' }),
+  ];
+
+  it('"mine" keeps tasks assigned to me or unassigned', () => {
+    const result = scopeTasksForAttention(tasks, 'mine', 'user-1');
+    expect(result.map(t => t.id).sort()).toEqual(['mine', 'unassigned']);
+  });
+
+  it('"all" keeps every task', () => {
+    expect(scopeTasksForAttention(tasks, 'all', 'user-1')).toHaveLength(3);
+  });
+
+  it('falls back to "all" with no currentUserId (local mode)', () => {
+    expect(scopeTasksForAttention(tasks, 'mine', undefined)).toHaveLength(3);
+  });
+});
+
+describe('scopeDeadlinesForAttention', () => {
+  function makeDeadline(overrides: Partial<Deadline>): Deadline {
+    return {
+      id: 'd1', kind: 'other', title: 'Deadline', dueDate: '2026-06-15',
+      status: 'open', createdAt: '2026-01-01T00:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  const cases = [
+    makeCase({ id: 'owned-by-me', caseOwner: 'user-1' }),
+    makeCase({ id: 'owned-by-other', caseOwner: 'user-2' }),
+    makeCase({ id: 'unowned' }),
+  ];
+
+  const deadlines = [
+    makeDeadline({ id: 'on-my-case', caseId: 'owned-by-me' }),
+    makeDeadline({ id: 'on-their-case', caseId: 'owned-by-other' }),
+    makeDeadline({ id: 'on-unowned-case', caseId: 'unowned' }),
+    makeDeadline({ id: 'no-case', clientId: 'client-1' }),
+  ];
+
+  it('"mine" keeps deadlines on my cases, unowned cases, and no linked case', () => {
+    const result = scopeDeadlinesForAttention(deadlines, cases, 'mine', 'user-1');
+    expect(result.map(d => d.id).sort()).toEqual(['no-case', 'on-my-case', 'on-unowned-case']);
+  });
+
+  it('"all" keeps every deadline', () => {
+    expect(scopeDeadlinesForAttention(deadlines, cases, 'all', 'user-1')).toHaveLength(4);
+  });
+
+  it('falls back to "all" with no currentUserId (local mode)', () => {
+    expect(scopeDeadlinesForAttention(deadlines, cases, 'mine', undefined)).toHaveLength(4);
   });
 });
