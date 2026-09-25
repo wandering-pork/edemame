@@ -24,36 +24,40 @@ a running number for that year). It's the reference to quote when discussing a f
 type it straight into the search bar at the top of the screen to jump to the case. Cases created
 before case numbers were introduced show a reference derived from their internal id instead.
 
-A case's header shows an **Eligibility** button (opens the Visa Advisor pre-filled with this
-client) and, only when this case has a saved assessment behind it — either opened directly from a
-Visa Advisor pathway, or matched up after the fact — an **Eligibility assessment** button. Click it
-to open a read-only view of the full report (inputs summary and every assessed pathway with its
-verdict, reasons, and gaps) without leaving the case. See
-[Visa Eligibility Advisor](../visa-advisor/getting-started.md) for how that report is produced.
+## The case summary strip
 
-## Case stage, on hold, and At Risk
+Directly under the case title sits a row of four chips that answer "where is this case at" without
+opening anything: **Stage**, **Risk**, **Next deadline**, and **On hold**. The case header itself
+now only keeps one primary button, **Add Task**, plus a single **Case actions** menu for everything
+else (see "The Case actions menu" below).
 
-Every case moves through a **stage**, shown as a chip in the case header and grouped on the Case
-Manager list into three boards: **Pre-lodgement** (Draft → Assessment → Engaged → Preparing →
-Ready to lodge), **With Department** (Lodged, Info requested, Decision), and **Closed**. A new case
-always starts at **Draft**.
+### Case stage, on hold, and At Risk
 
-Click the stage chip to move a case to any other stage — there's no fixed one-way path, since a real
-case can go backward (a decision gets reopened, a lodgement is withdrawn and re-prepared). Moving a
-case to an earlier stage asks for a quick confirm first. **Lodged** and **Info requested** are treated
-as the same step in the stage picker, since a case toggles between the two rather than progressing
-through both — no confirm is needed either way.
+Every case moves through a **stage**, shown in the summary strip as "Stage N of 8 · Label" and
+grouped on the Case Manager list into three boards: **Pre-lodgement** (Draft → Assessment → Engaged
+→ Preparing → Ready to lodge), **With Department** (Lodged, Info requested, Decision), and
+**Closed**. A new case always starts at **Draft**.
+
+Click the Stage chip to open a picker grouped the same way — Pre-lodgement / With Department /
+Closed — with the current stage marked. There's no fixed one-way path, since a real case can go
+backward (a decision gets reopened, a lodgement is withdrawn and re-prepared); moving a case to an
+earlier stage asks for a quick confirm first. **Lodged** and **Info requested** are treated as the
+same step, since a case toggles between the two rather than progressing through both — no confirm
+is needed either way, and they share one position in "Stage N of 8".
 
 Moving a case to **Closed** requires picking an **outcome** first: Granted, Refused, Withdrawn, or
 Lapsed. If a case is already closed with no outcome on file (this can happen to cases closed before
 outcomes existed), an amber banner appears at the top of the case asking you to set one.
 
-**On hold** is a separate pause flag next to the stage chip — a case can be on hold at any
-pre-lodgement or with-department stage. It doesn't change the stage itself.
+**On hold** is its own chip in the strip, labelled for the action it takes — **Put on hold** when
+the case is active, or **On hold · Resume** once it is. A case can be on hold at any pre-lodgement
+or with-department stage; it doesn't change the stage itself.
 
-**At Risk** is never set manually — it's computed live from the case's own data and shown as a red
-badge on the Case Manager list (hover or focus it to see the specific reasons) and as a red edge on
-the row. A case is flagged At Risk when any of the following is true:
+**At Risk** is never set manually — it's computed live from the case's own data and shown as the
+Risk chip in the summary strip ("At risk" with its reasons spelled out right there, not hidden in a
+tooltip, or a quiet "On track" when none apply), as well as a red badge on the Case Manager list
+(hover or focus it there to see the specific reasons) and a red edge on the row. A case is flagged
+At Risk when any of the following is true:
 - it has an open deadline due within 14 days,
 - it has an overdue task generated from a template step marked **Gate** — or, for a task with no
   such step behind it (a manually added task, or a plan from a template with no timing set), any
@@ -63,6 +67,34 @@ the row. A case is flagged At Risk when any of the following is true:
 
 Use the **At Risk** chip on the Case Manager list to filter down to just those cases, alongside (not
 instead of) the Pre-lodgement/With Department/Closed board filters.
+
+### Next deadline
+
+The **Next deadline** chip shows the soonest open deadline on the case (including a client's
+passport expiry, even if nobody has entered it as a deadline directly) with a countdown — "3d
+left", "Due today", "5d overdue" — coloured by how urgent it is. Click it to jump straight to the
+Deadlines panel at the top of the Tasks tab, where you can add, resolve, or review every deadline on
+the case. A case with no open deadlines shows a quiet "No deadlines · Add" link to the same panel
+instead.
+
+### The Case actions menu
+
+Everything that isn't **Add Task** now lives in one **Case actions** menu, named for what each item
+actually does:
+- **Draft cover letter with Agent** (previously an unlabelled "Draft" button) — opens the Agent
+  chat panel with a cover-letter drafting prompt already typed in; nothing is sent until you do.
+- **Re-check eligibility** (previously "Eligibility") — opens the Visa Advisor pre-filled with this
+  client.
+- **View eligibility assessment** (previously "Eligibility assessment", still only shown when this
+  case has a saved assessment behind it — either opened directly from a Visa Advisor pathway, or
+  matched up after the fact) — opens a read-only view of the full report (inputs summary and every
+  assessed pathway with its verdict, reasons, and gaps) without leaving the case. See
+  [Visa Eligibility Advisor](../visa-advisor/getting-started.md) for how that report is produced.
+- **Open/Close Agent panel** (previously a separate "Agent" toggle button) — shows or hides the
+  case-aware chat panel on the right.
+- **Document checklist**, **Workspace**, **Auto-Packager**, **Run Crusher** (supported subclasses
+  only), **820 bundle builder** (subclass 820 only), **Edit case**, and **Delete case** — unchanged
+  from the old **⋯** menu, just folded into the same menu as everything above.
 
 ## Landing on the Workspace tab
 

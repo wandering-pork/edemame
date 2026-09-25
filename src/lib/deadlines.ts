@@ -1,6 +1,21 @@
 import { differenceInCalendarDays, startOfDay } from 'date-fns';
 import type { Client, Deadline, DeadlineKind } from '../types';
 
+/** Human-readable labels shared by every deadline control in the UI. */
+export const DEADLINE_KIND_LABELS: Record<DeadlineKind, string> = {
+  visa_expiry: 'Visa expiry',
+  passport_expiry: 'Passport expiry',
+  s56_response: 's56 response',
+  s57_response: 's57 response',
+  nomination_validity: 'Nomination validity',
+  invitation_window: 'Invitation window',
+  other: 'Other',
+};
+
+export const DEADLINE_KIND_ORDER: DeadlineKind[] = [
+  's56_response', 's57_response', 'invitation_window', 'nomination_validity', 'visa_expiry', 'passport_expiry', 'other',
+];
+
 /**
  * Days until (negative if past) a deadline's due date, relative to `today`.
  * Computed on local calendar fields (see `lib/dates.ts`'s note on the UTC

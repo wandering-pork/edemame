@@ -1,4 +1,4 @@
-import type { Case, CaseStage } from '../types';
+import type { Case, CaseStage, CaseOutcome } from '../types';
 
 /** Human-readable labels shared by every stage control in the UI. */
 export const CASE_STAGE_LABELS: Record<CaseStage, string> = {
@@ -28,6 +28,26 @@ export const CASE_STAGE_ORDER: CaseStage[] = [
 export const CASE_STAGE_STEPPER: CaseStage[] = [
   'draft', 'assessment', 'engaged', 'preparing', 'ready_to_lodge', 'lodged', 'decision', 'closed',
 ];
+
+/** Chip/dot Tailwind classes for a stage, shared by the stage-chip control and the picker's dot markers. */
+export const STAGE_META: Record<CaseStage, { chip: string; dot: string }> = {
+  draft: { chip: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300', dot: 'bg-slate-400' },
+  assessment: { chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+  engaged: { chip: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+  preparing: { chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+  ready_to_lodge: { chip: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+  lodged: { chip: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+  info_requested: { chip: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
+  decision: { chip: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+  closed: { chip: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300', dot: 'bg-green-500' },
+};
+
+export const OUTCOME_LABELS: Record<CaseOutcome, string> = {
+  granted: 'Granted',
+  refused: 'Refused',
+  withdrawn: 'Withdrawn',
+  lapsed: 'Lapsed',
+};
 
 export type CaseStageGroup = 'pre_lodgement' | 'with_department' | 'closed';
 

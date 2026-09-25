@@ -14,7 +14,7 @@ Auto-Packager instead of re-browsing for it.
 
 ## Auto-Packager (recommended for most cases)
 
-Open a case, click the **⋯** menu in the top bar, and choose **Auto-Packager**. It starts by asking
+Open a case, click the **Case actions** menu in the top bar, and choose **Auto-Packager**. It starts by asking
 where the files are:
 
 - **Compress files in Case Files** — works from documents already uploaded to this case. Files
