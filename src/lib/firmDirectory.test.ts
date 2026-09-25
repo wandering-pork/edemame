@@ -5,7 +5,12 @@ import {
   mapFirmDirectoryToTeamMembers,
   canDeleteFirmData,
   canManageMembers,
+  canManageAdmins,
+  canManageMember,
+  grantableRoles,
   firmRoleLabel,
+  firmJobTitleLabel,
+  deriveTeamMemberRole,
   initialsOfName,
 } from './firmDirectory';
 
@@ -18,15 +23,37 @@ function makeRow(overrides: Partial<FirmMemberRow> = {}): FirmMemberRow {
     status: 'active',
     availability: 'available',
     joinedAt: '2026-01-01T00:00:00.000Z',
+    jobTitle: null,
     ...overrides,
   };
 }
 
+describe('deriveTeamMemberRole', () => {
+  it('maps owner to partner regardless of job title', () => {
+    expect(deriveTeamMemberRole('owner', 'paralegal')).toBe('partner');
+    expect(deriveTeamMemberRole('owner', null)).toBe('partner');
+  });
+
+  it('maps admin to lawyer regardless of job title', () => {
+    expect(deriveTeamMemberRole('admin', 'office_staff')).toBe('lawyer');
+  });
+
+  it('maps member by job title', () => {
+    expect(deriveTeamMemberRole('member', 'registered_migration_agent')).toBe('lawyer');
+    expect(deriveTeamMemberRole('member', 'lawyer')).toBe('lawyer');
+    expect(deriveTeamMemberRole('member', 'paralegal')).toBe('assistant');
+    expect(deriveTeamMemberRole('member', 'case_officer')).toBe('assistant');
+    expect(deriveTeamMemberRole('member', 'office_staff')).toBe('assistant');
+    expect(deriveTeamMemberRole('member', 'other')).toBe('assistant');
+    expect(deriveTeamMemberRole('member', null)).toBe('assistant');
+  });
+});
+
 describe('mapFirmMemberToTeamMember', () => {
-  it('maps owner/agent/paralegal to partner/lawyer/assistant', () => {
+  it('derives role from access role + job title', () => {
     expect(mapFirmMemberToTeamMember(makeRow({ role: 'owner' })).role).toBe('partner');
-    expect(mapFirmMemberToTeamMember(makeRow({ role: 'agent' })).role).toBe('lawyer');
-    expect(mapFirmMemberToTeamMember(makeRow({ role: 'paralegal' })).role).toBe('assistant');
+    expect(mapFirmMemberToTeamMember(makeRow({ role: 'admin' })).role).toBe('lawyer');
+    expect(mapFirmMemberToTeamMember(makeRow({ role: 'member', jobTitle: 'paralegal' })).role).toBe('assistant');
   });
 
   it('carries availability through as the TeamMember status', () => {
@@ -56,29 +83,78 @@ describe('canDeleteFirmData', () => {
   it('allows local mode (null role)', () => {
     expect(canDeleteFirmData(null)).toBe(true);
   });
-  it('allows owner and agent', () => {
+  it('allows owner and admin', () => {
     expect(canDeleteFirmData('owner')).toBe(true);
-    expect(canDeleteFirmData('agent')).toBe(true);
+    expect(canDeleteFirmData('admin')).toBe(true);
   });
-  it('blocks paralegal', () => {
-    expect(canDeleteFirmData('paralegal')).toBe(false);
+  it('blocks member', () => {
+    expect(canDeleteFirmData('member')).toBe(false);
   });
 });
 
 describe('canManageMembers', () => {
-  it('only allows owner', () => {
+  it('allows owner and admin', () => {
     expect(canManageMembers('owner')).toBe(true);
-    expect(canManageMembers('agent')).toBe(false);
-    expect(canManageMembers('paralegal')).toBe(false);
+    expect(canManageMembers('admin')).toBe(true);
+    expect(canManageMembers('member')).toBe(false);
     expect(canManageMembers(null)).toBe(false);
+  });
+});
+
+describe('canManageAdmins', () => {
+  it('only allows owner', () => {
+    expect(canManageAdmins('owner')).toBe(true);
+    expect(canManageAdmins('admin')).toBe(false);
+    expect(canManageAdmins('member')).toBe(false);
+    expect(canManageAdmins(null)).toBe(false);
+  });
+});
+
+describe('canManageMember', () => {
+  it('owner can manage anyone', () => {
+    expect(canManageMember('owner', 'owner')).toBe(true);
+    expect(canManageMember('owner', 'admin')).toBe(true);
+    expect(canManageMember('owner', 'member')).toBe(true);
+  });
+  it('admin can only manage members', () => {
+    expect(canManageMember('admin', 'member')).toBe(true);
+    expect(canManageMember('admin', 'admin')).toBe(false);
+    expect(canManageMember('admin', 'owner')).toBe(false);
+  });
+  it('member and null can manage nobody', () => {
+    expect(canManageMember('member', 'member')).toBe(false);
+    expect(canManageMember(null, 'member')).toBe(false);
+  });
+});
+
+describe('grantableRoles', () => {
+  it('owner can grant any role', () => {
+    expect(grantableRoles('owner')).toEqual(['owner', 'admin', 'member']);
+  });
+  it('admin can only grant member', () => {
+    expect(grantableRoles('admin')).toEqual(['member']);
+  });
+  it('member and null can grant nothing', () => {
+    expect(grantableRoles('member')).toEqual([]);
+    expect(grantableRoles(null)).toEqual([]);
   });
 });
 
 describe('firmRoleLabel', () => {
   it('labels every role', () => {
     expect(firmRoleLabel('owner')).toBe('Owner');
-    expect(firmRoleLabel('agent')).toBe('Agent');
-    expect(firmRoleLabel('paralegal')).toBe('Paralegal');
+    expect(firmRoleLabel('admin')).toBe('Admin');
+    expect(firmRoleLabel('member')).toBe('Member');
+  });
+});
+
+describe('firmJobTitleLabel', () => {
+  it('labels a known job title', () => {
+    expect(firmJobTitleLabel('registered_migration_agent')).toBe('Registered migration agent');
+    expect(firmJobTitleLabel('case_officer')).toBe('Case officer');
+  });
+  it('returns null for no job title', () => {
+    expect(firmJobTitleLabel(null)).toBeNull();
   });
 });
 

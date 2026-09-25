@@ -35,6 +35,7 @@ function rowFromRpc(r: any): FirmMemberRow {
     status: r.status,
     availability: r.availability,
     joinedAt: r.joined_at,
+    jobTitle: r.job_title ?? null,
   };
 }
 

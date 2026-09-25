@@ -4,8 +4,10 @@ import { useFirm } from '@/contexts/FirmContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { isTaskClosed } from '@/lib/taskStatus';
-import { firmRoleLabel, initialsOfName, canManageMembers } from '@/lib/firmDirectory';
-import type { FirmRole, Task } from '@/types';
+import {
+  firmRoleLabel, firmJobTitleLabel, initialsOfName, canManageMembers, canManageMember, grantableRoles, FIRM_JOB_TITLES,
+} from '@/lib/firmDirectory';
+import type { FirmJobTitle, FirmRole, Task } from '@/types';
 
 interface PendingInvite {
   id: string;
@@ -14,12 +16,6 @@ interface PendingInvite {
   createdAt: string;
   expiresAt: string;
 }
-
-const roleOptions: { value: FirmRole; label: string }[] = [
-  { value: 'owner', label: 'Owner' },
-  { value: 'agent', label: 'Agent' },
-  { value: 'paralegal', label: 'Paralegal' },
-];
 
 const availabilityStyle: Record<string, { dot: string; bg: string; text: string; label: string }> = {
   available: { dot: '#10B981', bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-[#047857] dark:text-[#4ADE80]', label: 'Available' },
@@ -48,12 +44,16 @@ interface FirmTeamMembersProps {
 export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
   const { firm, role, members, loading, refreshDirectory } = useFirm();
   const { user, session } = useAuth();
-  const isOwner = canManageMembers(role);
+  // Step 1 · 1G.2: owners and admins manage members; admins additionally
+  // can't touch other admins/owners (canManageMember, checked per row) and
+  // may only grant the Member role (grantableRoles).
+  const canManage = canManageMembers(role);
+  const myGrantableRoles = useMemo(() => grantableRoles(role), [role]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<FirmRole>('paralegal');
+  const [inviteRole, setInviteRole] = useState<FirmRole>('member');
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
   const [invitesLoading, setInvitesLoading] = useState(false);
 
   const loadPendingInvites = async () => {
-    if (!firm || !isOwner) { setPendingInvites([]); return; }
+    if (!firm || !canManage) { setPendingInvites([]); return; }
     setInvitesLoading(true);
     try {
       const { data, error } = await supabase
@@ -87,7 +87,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
   useEffect(() => {
     loadPendingInvites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firm?.id, isOwner]);
+  }, [firm?.id, canManage]);
 
   const filtered = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -170,6 +170,24 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
     }
   };
 
+  // Everyone can set their own job title; owners/admins can set a Member's
+  // (never another admin's/owner's — the trigger enforces this server-side,
+  // this only hides the control for a caller who couldn't do it anyway).
+  const handleJobTitle = async (userId: string, jobTitle: FirmJobTitle | '') => {
+    if (!firm) return;
+    try {
+      const { error } = await supabase
+        .from('firm_members')
+        .update({ job_title: jobTitle || null })
+        .eq('firm_id', firm.id)
+        .eq('user_id', userId);
+      if (error) throw error;
+      await refreshDirectory();
+    } catch (err) {
+      console.error('Failed to update job title:', err);
+    }
+  };
+
   const myAvailability = members.find(m => m.userId === user?.id)?.availability ?? 'available';
 
   return (
@@ -182,7 +200,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
             </h1>
             <p className="text-[13px] text-ink-soft dark:text-plate-ink-soft mt-1">
               {firm ? `${firm.name} — ${members.length} member${members.length === 1 ? '' : 's'}` : 'Loading firm...'}
-              {!isOwner && ' · read-only (owners manage members)'}
+              {!canManage && ' · read-only (owners and admins manage members)'}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -199,9 +217,9 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
                 <option value="offline">Offline</option>
               </select>
             </div>
-            {isOwner && (
+            {canManage && (
               <button
-                onClick={() => { setInviteOpen(true); setInviteError(null); setLastInviteLink(null); }}
+                onClick={() => { setInviteOpen(true); setInviteRole(myGrantableRoles[0] ?? 'member'); setInviteError(null); setLastInviteLink(null); }}
                 className="btn-press focus-ring inline-flex items-center gap-1.5 bg-edamame-500 hover:bg-edamame-700 text-white px-4 py-2.5 rounded-xl font-bold text-[13px] whitespace-nowrap transition-colors"
               >
                 <Plus size={16} strokeWidth={1.8} /> Invite
@@ -223,8 +241,9 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
         {/* Member table */}
         <div className="bg-paper-2 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl shadow-sm overflow-hidden mt-5">
           <div className="grid grid-cols-12 gap-3 px-5 py-[11px] bg-paper-2/80 dark:bg-plate-card/60">
-            <div className="col-span-4 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Member</div>
-            <div className="col-span-3 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Role</div>
+            <div className="col-span-3 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Member</div>
+            <div className="col-span-2 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Role</div>
+            <div className="col-span-2 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Job title</div>
             <div className="col-span-2 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Open tasks</div>
             <div className="col-span-2 text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Availability</div>
             <div className="col-span-1 text-right text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.11em]">Actions</div>
@@ -244,10 +263,15 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
               const hue = hueFromId(m.userId);
               const as = availabilityStyle[m.availability];
               const isMe = m.userId === user?.id;
+              // Owners can manage anyone; admins only plain Members — see
+              // lib/firmDirectory.ts's canManageMember, which mirrors the
+              // firm_members_guard() trigger (the real enforcement).
+              const canManageThis = canManageMember(role, m.role) && !isMe;
+              const myRoleOptionsForRow = role === 'owner' ? grantableRoles(role) : (m.role === 'member' ? grantableRoles(role) : []);
               return (
                 <div key={m.userId} className="border-t border-ink/10 dark:border-plate-ink/20">
                   <div className="table-row-hover grid grid-cols-12 gap-3 px-5 py-[13px] items-center hover:bg-paper-2/80 dark:hover:bg-plate-card/40">
-                    <div className="col-span-4 flex items-center gap-2.5 min-w-0">
+                    <div className="col-span-3 flex items-center gap-2.5 min-w-0">
                       <div
                         className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0"
                         style={{ background: `oklch(0.93 0.05 ${hue})`, color: `oklch(0.42 0.12 ${hue})` }}
@@ -262,20 +286,35 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
                       </div>
                     </div>
 
-                    <div className="col-span-3 text-[12.5px] text-ink-soft dark:text-plate-ink-soft">
-                      {isOwner && !isMe ? (
+                    <div className="col-span-2 text-[12.5px] text-ink-soft dark:text-plate-ink-soft">
+                      {canManageThis && myRoleOptionsForRow.length > 0 ? (
                         <select
                           value={m.role}
                           onChange={e => handleChangeRole(m.userId, e.target.value as FirmRole)}
                           className="focus-ring px-2 py-1 rounded-md border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink dark:text-plate-ink text-[12.5px] outline-none"
                         >
-                          {roleOptions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                          {myRoleOptionsForRow.map(r => <option key={r} value={r}>{firmRoleLabel(r)}</option>)}
                         </select>
                       ) : (
                         firmRoleLabel(m.role)
                       )}
                       {m.status === 'disabled' && (
                         <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-red-500">Disabled</span>
+                      )}
+                    </div>
+
+                    <div className="col-span-2 text-[12.5px] text-ink-soft dark:text-plate-ink-soft">
+                      {(isMe || (canManageThis)) ? (
+                        <select
+                          value={m.jobTitle ?? ''}
+                          onChange={e => handleJobTitle(m.userId, e.target.value as FirmJobTitle | '')}
+                          className="focus-ring px-2 py-1 rounded-md border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink dark:text-plate-ink text-[12.5px] outline-none max-w-full"
+                        >
+                          <option value="">—</option>
+                          {FIRM_JOB_TITLES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                      ) : (
+                        firmJobTitleLabel(m.jobTitle) ?? '—'
                       )}
                     </div>
 
@@ -291,7 +330,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
                     </div>
 
                     <div className="col-span-1 flex items-center justify-end gap-3">
-                      {isOwner && !isMe && (
+                      {canManageThis && (
                         <button
                           onClick={() => handleToggleDisabled(m.userId, m.status)}
                           aria-label={m.status === 'active' ? 'Disable member' : 'Re-enable member'}
@@ -310,7 +349,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
         </div>
 
         {/* Pending invites */}
-        {isOwner && (
+        {canManage && (
           <div className="mt-6">
             <h2 className="text-sm font-bold text-ink dark:text-plate-ink mb-3">Pending invites</h2>
             <div className="bg-paper-2 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl shadow-sm overflow-hidden">
@@ -379,7 +418,7 @@ export const FirmTeamMembers: React.FC<FirmTeamMembersProps> = ({ tasks }) => {
                   onChange={e => setInviteRole(e.target.value as FirmRole)}
                   className="focus-ring w-full px-4 py-2 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate-card text-ink dark:text-plate-ink outline-none transition-all"
                 >
-                  {roleOptions.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  {myGrantableRoles.map(r => <option key={r} value={r}>{firmRoleLabel(r)}</option>)}
                 </select>
               </div>
               {inviteError && <p className="text-sm text-red-500">{inviteError}</p>}

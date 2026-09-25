@@ -21,13 +21,15 @@ interface VercelResponse extends ServerResponse {
   json(data: any): VercelResponse;
 }
 
-const VALID_ROLES = ["owner", "agent", "paralegal"];
+const VALID_ROLES = ["owner", "admin", "member"];
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Step 1 · 1F — invites a person into the caller's firm. Only an active
-// owner of the target firm may call this (checked below via the caller's own
-// RLS-scoped read of their firm_members row, not the service role — no need
-// to bypass RLS just to read a row the caller is already allowed to see).
+// owner or admin of the target firm may call this (checked below via the
+// caller's own RLS-scoped read of their firm_members row, not the service
+// role — no need to bypass RLS just to read a row the caller is already
+// allowed to see). Step 1 · 1G.2: an admin caller may only invite as Member
+// — an owner can invite at any role, including owner/admin.
 //
 // Writing firm_invites and sending the Supabase Auth invite email both need
 // the service role key: firm_invites has no insert policy for `authenticated`
@@ -72,8 +74,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const membership = await membershipRes.json();
     const mine = Array.isArray(membership) ? membership[0] : null;
-    if (!mine || mine.role !== "owner" || mine.status !== "active") {
-      return res.status(403).json({ error: "Only a firm owner can invite team members" });
+    if (!mine || mine.status !== "active" || (mine.role !== "owner" && mine.role !== "admin")) {
+      return res.status(403).json({ error: "Only a firm owner or admin can invite team members" });
+    }
+    if (mine.role === "admin" && role !== "member") {
+      return res.status(403).json({ error: "Admins can only invite new members as Member" });
     }
 
     const token = generateInviteToken();

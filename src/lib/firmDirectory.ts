@@ -1,4 +1,4 @@
-import type { FirmMemberRow, FirmRole, TeamMember } from '../types';
+import type { FirmJobTitle, FirmMemberRow, FirmRole, TeamMember } from '../types';
 
 /**
  * Step 1 · 1F: in cloud mode, `TeamMember` (the existing partner/lawyer/
@@ -9,22 +9,54 @@ import type { FirmMemberRow, FirmRole, TeamMember } from '../types';
  * without a rewrite: only App.tsx's data-loading changes (directory instead
  * of `repos.teamMembers` in cloud mode — see FirmContext.tsx).
  *
- * Firm roles and TeamMember roles are different vocabularies (the former is
- * the real permission role; the latter is a cosmetic label used across the
- * UI today). The mapping below is display-only and never used for
- * authorization — see `canDeleteFirmData`/`canManageMembers` for that.
+ * Step 1 · 1G.2 split the firm role into two fields: an access role
+ * (owner | admin | member — what you can do) and a job title (display only,
+ * never used for permissions — who you are). `deriveTeamMemberRole` below
+ * replaces the old direct FirmRole -> TeamMember['role'] mapping, since
+ * TeamMember's cosmetic role vocabulary (partner/lawyer/assistant) is still
+ * read elsewhere in the UI and isn't worth widening for this.
  */
-const FIRM_ROLE_TO_TEAM_MEMBER_ROLE: Record<FirmRole, TeamMember['role']> = {
-  owner: 'partner',
-  agent: 'lawyer',
-  paralegal: 'assistant',
-};
+export const FIRM_JOB_TITLES: { value: FirmJobTitle; label: string }[] = [
+  { value: 'registered_migration_agent', label: 'Registered migration agent' },
+  { value: 'lawyer', label: 'Lawyer' },
+  { value: 'paralegal', label: 'Paralegal' },
+  { value: 'case_officer', label: 'Case officer' },
+  { value: 'office_staff', label: 'Office staff' },
+  { value: 'other', label: 'Other' },
+];
+
+export function firmJobTitleLabel(jobTitle: FirmJobTitle | null): string | null {
+  if (!jobTitle) return null;
+  return FIRM_JOB_TITLES.find(t => t.value === jobTitle)?.label ?? null;
+}
 
 export function firmRoleLabel(role: FirmRole): string {
   switch (role) {
     case 'owner': return 'Owner';
-    case 'agent': return 'Agent';
-    case 'paralegal': return 'Paralegal';
+    case 'admin': return 'Admin';
+    case 'member': return 'Member';
+  }
+}
+
+/**
+ * TeamMember.role is a cosmetic display label (partner/lawyer/assistant)
+ * used across pickers and the Team Dashboard — never authorization. Derived
+ * from access role first (an owner reads as "partner", regardless of job
+ * title), then job title for everyone else, with a sensible fallback.
+ */
+export function deriveTeamMemberRole(role: FirmRole, jobTitle: FirmJobTitle | null): TeamMember['role'] {
+  if (role === 'owner') return 'partner';
+  if (role === 'admin') return 'lawyer';
+  switch (jobTitle) {
+    case 'registered_migration_agent':
+    case 'lawyer':
+      return 'lawyer';
+    case 'paralegal':
+    case 'case_officer':
+    case 'office_staff':
+    case 'other':
+    default:
+      return 'assistant';
   }
 }
 
@@ -46,7 +78,7 @@ export function mapFirmMemberToTeamMember(row: FirmMemberRow): TeamMember {
     name: displayName,
     email: row.email,
     avatar: initialsOfName(displayName),
-    role: FIRM_ROLE_TO_TEAM_MEMBER_ROLE[row.role],
+    role: deriveTeamMemberRole(row.role, row.jobTitle),
     caseCount: 0,
     activeTaskCount: 0,
     status: row.availability,
@@ -58,13 +90,40 @@ export function mapFirmDirectoryToTeamMembers(rows: FirmMemberRow[]): TeamMember
   return rows.filter(r => r.status === 'active').map(mapFirmMemberToTeamMember);
 }
 
-/** Paralegals can't delete clients, cases or documents (RLS is the real enforcement — see the firms migration's delete policies; this only hides the UI). `role === null` means local mode (single user, always allowed) or firm context not yet loaded. */
+/** Members can't delete clients, cases or documents (RLS is the real enforcement — see the firm roles migration's delete policies; this only hides the UI). `role === null` means local mode (single user, always allowed) or firm context not yet loaded. */
 export function canDeleteFirmData(role: FirmRole | null): boolean {
   if (role === null) return true;
-  return role === 'owner' || role === 'agent';
+  return role === 'owner' || role === 'admin';
 }
 
-/** Only owners manage members (invite, change role, disable, revoke invites). */
+/** Owners and admins manage Members (invite, disable/re-enable/remove, resend/revoke invites). Admins additionally can't touch other Admins or Owners — see `canManageMember`. */
 export function canManageMembers(role: FirmRole | null): boolean {
+  return role === 'owner' || role === 'admin';
+}
+
+/** Only owners promote/demote/remove Admins or Owners, and rename the firm. */
+export function canManageAdmins(role: FirmRole | null): boolean {
   return role === 'owner';
+}
+
+/**
+ * Whether `caller` may change `target`'s role/status/removal. Mirrors the
+ * `firm_members_guard()` trigger (the real enforcement) so the UI can hide
+ * controls that would just fail server-side:
+ *   - Owners can manage anyone (including other owners).
+ *   - Admins can only manage plain Members.
+ *   - Members can't manage anyone (including themselves — see FirmTeamMembers
+ *     for the separate self-service availability/job-title path).
+ */
+export function canManageMember(callerRole: FirmRole | null, targetRole: FirmRole): boolean {
+  if (callerRole === 'owner') return true;
+  if (callerRole === 'admin') return targetRole === 'member';
+  return false;
+}
+
+/** Roles `callerRole` may grant when inviting or changing someone's role. Owners grant any role; admins may only invite/set Member; members grant nothing. */
+export function grantableRoles(callerRole: FirmRole | null): FirmRole[] {
+  if (callerRole === 'owner') return ['owner', 'admin', 'member'];
+  if (callerRole === 'admin') return ['member'];
+  return [];
 }

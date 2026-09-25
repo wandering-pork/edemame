@@ -12,22 +12,32 @@ Settings), you create a **firm** — just a name for your workspace. You're auto
 
 ## Roles
 
-Every team member has one of three roles:
+Every team member has an access role — what they can do — and a job title, which is just a label
+(who they are) and never affects what they can do.
 
-- **Owner** — full access, including inviting/removing members, changing roles, and deleting
-  clients, cases, and documents. A firm always has at least one active Owner — the app won't let
-  you remove or demote the last one.
-- **Agent** — a registered migration agent. Can do everything an Owner can except manage other
-  team members (invite, change roles, disable accounts).
-- **Paralegal** — can view and work on clients, cases, tasks, and documents, but can't delete
+**Access roles:**
+
+- **Owner** — full access, including inviting/removing members, promoting or demoting Admins and
+  other Owners, renaming the firm, and deleting clients, cases, and documents. A firm always has
+  at least one active Owner — the app won't let you remove or demote the last one.
+- **Admin** — can do everything an Owner can day-to-day: work on clients/cases/tasks/documents,
+  delete clients/cases/documents, invite people, and disable/re-enable/remove **Members**. An
+  Admin can't manage other Admins or Owners (promote, demote, disable, or remove them), can't
+  rename the firm, and can only invite new people as a Member.
+- **Member** — can view and work on clients, cases, tasks, and documents, but can't delete
   clients, cases, or documents, and can't manage team members.
+
+**Job title** (Registered migration agent, Lawyer, Paralegal, Case officer, Office staff, Other)
+is just a label shown on the Team page and in pickers — it doesn't grant or restrict anything.
+Everyone can set their own job title; Owners and Admins can also set it for a Member.
 
 ## Inviting someone
 
-From **Team Members** (Owners only — everyone else sees a read-only list):
+From **Team Members** (Owners and Admins — everyone else sees a read-only list):
 
 1. Click **Invite**.
-2. Enter their email address and choose a role.
+2. Enter their email address and choose a role. Admins can only invite as Member; Owners can
+   invite at any role.
 3. Click **Send invite**.
 
 If they don't already have an Edamame account, they'll get an invite email with a link to create
@@ -41,9 +51,11 @@ invite at any time from the Pending Invites list.
 
 ## Changing roles and disabling members
 
-Owners can change any other member's role, or disable a member's access, from the member list.
-Disabling someone keeps their history (past cases, activity) intact but removes them from the
-active member list and assignee pickers — it doesn't delete their account.
+Owners can change any member's role (including making someone an Admin or another Owner), or
+disable a member's access, from the member list. Admins can do the same, but only for Members —
+the controls simply don't show up on an Admin's or Owner's own row when you're an Admin. Disabling
+someone keeps their history (past cases, activity) intact but removes them from the active member
+list and assignee pickers — it doesn't delete their account.
 
 ## Availability
 
