@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { validateNewPassword } from '@/lib/passwordValidation';
 
 /**
  * Edamame landing page — take four, "edamame-folio".
@@ -251,12 +252,9 @@ export default function LandingPage() {
     e.preventDefault();
     setUpError(null);
 
-    if (upPassword.length < 6) {
-      setUpError('Password must be at least 6 characters.');
-      return;
-    }
-    if (upPassword !== upConfirm) {
-      setUpError('The two passwords do not match.');
+    const passwordError = validateNewPassword(upPassword, upConfirm);
+    if (passwordError) {
+      setUpError(passwordError);
       return;
     }
     const trimmedFirst = firstName.trim();

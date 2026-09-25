@@ -120,11 +120,17 @@ export interface UsageEvent {
 // 20260926000300_create_firms.sql and CLAUDE.md's "Firm accounts" section.
 // ---------------------------------------------------------------------------
 
-/** No `admin` role for MVP — see docs/plans/step-1-foundations.md, Decisions #4. */
-export type FirmRole = 'owner' | 'agent' | 'paralegal';
+/**
+ * Step 1 · 1G.2 replaced the old `owner | agent | paralegal` roles (which
+ * conflated a permission with a job title) with a plain access-role ladder.
+ * See docs/plans/step-1g-team-experience.md, 1G.2.
+ */
+export type FirmRole = 'owner' | 'admin' | 'member';
 export type FirmMemberAccountStatus = 'active' | 'disabled';
 /** Replaces the old free-standing `TeamMemberStatus` concept for firm members. */
 export type FirmAvailability = 'available' | 'busy' | 'offline';
+/** Display-only — who you are, never used for permissions. Shown on the Team page and in pickers. */
+export type FirmJobTitle = 'registered_migration_agent' | 'lawyer' | 'paralegal' | 'case_officer' | 'office_staff' | 'other';
 
 export interface Firm {
   id: string;
@@ -140,6 +146,7 @@ export interface FirmMemberRow {
   status: FirmMemberAccountStatus;
   availability: FirmAvailability;
   joinedAt: string; // ISO
+  jobTitle: FirmJobTitle | null;
 }
 
 export interface FirmInvite {
@@ -151,6 +158,19 @@ export interface FirmInvite {
   expiresAt: string; // ISO
   acceptedAt?: string;
   revokedAt?: string;
+}
+
+/**
+ * Step 1 · 1G.6 — a row of `firm_former_members`: someone who was removed
+ * from the firm (or left it), kept only so old work (task assignee, case
+ * owner, activity-feed actor) can still show a name instead of going blank.
+ * Never used for permissions or pickers — see `lib/memberDirectory.ts`.
+ */
+export interface FirmFormerMember {
+  userId: string;
+  fullName: string;
+  email: string | null;
+  removedAt: string; // ISO
 }
 
 // ---------------------------------------------------------------------------

@@ -11,11 +11,17 @@ import type { Repositories } from './types';
  * Order matters for the cloud repositories, whose tables have real foreign
  * keys: per-case children (chat, checklist, documents, notes) are cleared
  * before tasks/cases, and cases before clients.
+ *
+ * Refuses (throws before deleting anything) when `dest.assertSafeToClear`
+ * does — cloud repositories are scoped to a firm, and a firm shared with
+ * other people must never be wiped by one member's storage-mode switch.
  */
 export async function clearAll(
   dest: Repositories,
   onProgress?: (entityName: string) => void,
 ): Promise<void> {
+  await dest.assertSafeToClear?.();
+
   const report = (name: string) => onProgress?.(name);
 
   const cases = await dest.cases.getAll();

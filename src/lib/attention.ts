@@ -3,6 +3,49 @@ import type { Task, Case, Client, Deadline } from '../types';
 import { isTaskClosed, isWaiting } from './taskStatus';
 import { consequenceWeight, daysLeft, urgency } from './deadlines';
 
+/**
+ * Step 1 · 1G.7 — "mine" by default. `'mine'` matches the Dashboard board's
+ * existing rule (`scopeTasks('mine', ...)`): assigned to me, or unassigned.
+ * `'all'` is the whole firm's work. Single-user (local mode) callers should
+ * just pass `'all'` and hide the toggle — with one user, the two scopes are
+ * the same set anyway.
+ */
+export type AttentionScope = 'mine' | 'all';
+
+/**
+ * Filters tasks to a scope before they're fed into `overdueTasksFor` /
+ * `dueTodayTasksFor` / `waitingTasksFor` — "mine" is assigned to
+ * `currentUserId`, or unassigned (same rule the Dashboard board's scope
+ * toggle already uses). With `scope: 'all'` or no `currentUserId`, every
+ * task passes through unchanged.
+ */
+export function scopeTasksForAttention(tasks: Task[], scope: AttentionScope, currentUserId?: string): Task[] {
+  if (scope === 'all' || !currentUserId) return tasks;
+  return tasks.filter(t => t.assignedTo === currentUserId || !t.assignedTo);
+}
+
+/**
+ * Filters deadlines to a scope by the *case's* owner (a deadline itself has
+ * no assignee) — "mine" keeps deadlines for cases I own, or with no owner,
+ * or with no linked case at all (e.g. a client-only passport-expiry
+ * deadline). With `scope: 'all'` or no `currentUserId`, every deadline
+ * passes through unchanged.
+ */
+export function scopeDeadlinesForAttention(
+  deadlines: Deadline[],
+  cases: Case[],
+  scope: AttentionScope,
+  currentUserId?: string,
+): Deadline[] {
+  if (scope === 'all' || !currentUserId) return deadlines;
+  return deadlines.filter(d => {
+    if (!d.caseId) return true;
+    const c = cases.find(cc => cc.id === d.caseId);
+    if (!c) return true;
+    return !c.caseOwner || c.caseOwner === currentUserId;
+  });
+}
+
 /** One row in the Dashboard's "Needs attention" list. */
 export interface AttentionItem {
   id: string;

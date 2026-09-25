@@ -27,6 +27,8 @@ export interface VerifiedUser {
   accessToken: string;
   /** The verified account email, straight from Supabase Auth's /user response. Used by api/accept-invite.ts's email-match check. */
   email: string | null;
+  /** `user_metadata.full_name`, falling back to email — used as the inviter's display name (api/invite-member.ts's `inviter_name` invite data, Step 1 · 1G.4). */
+  fullName: string | null;
 }
 
 function extractBearerToken(headers: Record<string, string | string[] | undefined>): string | null {
@@ -64,7 +66,11 @@ export async function verifySupabaseUser(headers: Record<string, string | string
     const data = await res.json();
     if (!data?.id || typeof data.id !== "string") return null;
 
-    return { userId: data.id, accessToken: token, email: typeof data.email === "string" ? data.email : null };
+    const email = typeof data.email === "string" ? data.email : null;
+    const metaFullName = typeof data.user_metadata?.full_name === "string" ? data.user_metadata.full_name.trim() : "";
+    const fullName = metaFullName || email;
+
+    return { userId: data.id, accessToken: token, email, fullName };
   } catch (error) {
     console.error("Supabase auth verification failed:", error);
     return null;

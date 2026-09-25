@@ -37,8 +37,11 @@ import { LocalFolderProvider, useLocalFolder } from './contexts/LocalFolderConte
 import { FirmProvider, useFirm } from './contexts/FirmContext';
 import { CreateFirmGate } from './components/CreateFirmGate';
 import { InviteAccept } from './pages/InviteAccept';
+import { ResetPassword } from './pages/ResetPassword';
 import { LinkFolderGate } from './components/LinkFolderGate';
-import { isSupabaseConfigured } from './lib/supabaseClient';
+import { PendingInvitationsBanner } from './components/team/PendingInvitationsBanner';
+import { isSupabaseConfigured, supabase } from './lib/supabaseClient';
+import { shouldNotifyAssignment } from './lib/assignmentNotify';
 
 // ---------------------------------------------------------------------------
 // Inner app — has access to repositories and router
@@ -50,7 +53,7 @@ const AppShell: React.FC = () => {
   const { collapsed } = useSidebar();
   const { user } = useAuth();
   const { profile, updateProfile } = useProfile();
-  const { firm, teamMembers: firmTeamMembers } = useFirm();
+  const { firm, teamMembers: firmTeamMembers, lostAccessNotice, dismissLostAccessNotice } = useFirm();
   // Safe: AppShell is only ever rendered inside ProtectedRoute, once a profile exists.
   const currentUserId = user!.id;
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -82,6 +85,24 @@ const AppShell: React.FC = () => {
   const pushUsageEvent = useCallback(async (ev: Omit<UsageEvent, 'id' | 'createdAt' | 'userId' | 'firmId'>) => {
     await repos.usage.create({ ...ev, id: uuidv4(), userId: currentUserId, firmId: firm?.id, createdAt: new Date().toISOString() });
   }, [repos, currentUserId, firm]);
+
+  // Step 1 · 1G.7 — "assigned to you" notifications, cloud mode only (local
+  // mode has no other firm members to notify). Fire-and-forget: never blocks
+  // or rolls back the save that triggered it, only logs on failure. The RPC
+  // itself (supabase/migrations/20260927000500_assignment_notifications.sql)
+  // re-derives the recipient and message server-side from the task/case row
+  // — this call only says *which* row changed.
+  const notifyAssignment = useCallback((kind: 'task' | 'case', entityId: string) => {
+    if (storageMode !== 'cloud' || !firm) return;
+    (async () => {
+      try {
+        const { error } = await supabase.rpc('notify_assignment', { f: firm.id, p_kind: kind, p_entity_id: entityId });
+        if (error) console.error('notify_assignment failed:', error);
+      } catch (err) {
+        console.error('notify_assignment failed:', err);
+      }
+    })();
+  }, [storageMode, firm]);
 
   // Load all data from repositories on mount, and (cloud mode only) refetch
   // cases/tasks/deadlines whenever the tab regains focus, so a change made by
@@ -167,11 +188,15 @@ const AppShell: React.FC = () => {
       const now = Date.now();
       if (now - lastFocusRefetch.current < REFETCH_MIN_INTERVAL_MS) return;
       lastFocusRefetch.current = now;
-      Promise.all([repos.cases.getAll(), repos.tasks.getAll(), repos.deadlines.getAll()])
-        .then(([cs, t, d]) => {
+      // notifications is included here (Step 1 · 1G.7) so an "assigned to
+      // you" notification another firm member's save triggered actually
+      // shows up when this tab regains focus, not just on the next full load.
+      Promise.all([repos.cases.getAll(), repos.tasks.getAll(), repos.deadlines.getAll(), repos.notifications.getAll()])
+        .then(([cs, t, d, notifs]) => {
           setCases(cs);
           setTasks(t);
           setDeadlines(d);
+          setNotifications(notifs);
         })
         .catch(err => console.error('Refetch-on-focus failed:', err));
     };
@@ -336,7 +361,10 @@ const AppShell: React.FC = () => {
         summary: `Case "${updated.title}" moved from ${CASE_STAGE_LABELS[prev.stage]} to ${CASE_STAGE_LABELS[updated.stage]}.`,
       });
     }
-  }, [repos, cases, pushActivity, currentUserId]);
+    if (prev && shouldNotifyAssignment(prev.caseOwner, updated.caseOwner, currentUserId)) {
+      notifyAssignment('case', updated.id);
+    }
+  }, [repos, cases, pushActivity, currentUserId, notifyAssignment]);
 
   // --- Task Actions ---
   const handleAddTask = useCallback(async (task: Task) => {
@@ -377,7 +405,10 @@ const AppShell: React.FC = () => {
         rescheduleCaseFromSnapshot(updatedTask.caseId, nextTasks, deadlines);
       }
     }
-  }, [repos, tasks, deadlines, pushActivity, currentUserId, rescheduleCaseFromSnapshot]);
+    if (prev && shouldNotifyAssignment(prev.assignedTo, updatedTask.assignedTo, currentUserId)) {
+      notifyAssignment('task', updatedTask.id);
+    }
+  }, [repos, tasks, deadlines, pushActivity, currentUserId, rescheduleCaseFromSnapshot, notifyAssignment]);
 
   const handleDeleteTask = useCallback(async (id: string) => {
     await repos.tasks.delete(id);
@@ -494,7 +525,21 @@ const AppShell: React.FC = () => {
     });
     const visaSubclass = caseWithOwner.visaSubclass ?? templates.find(t => t.id === caseWithOwner.templateId)?.visaSubclass;
     pushUsageEvent({ type: 'case_created', metadata: { visaSubclass, templateId: caseWithOwner.templateId } });
-  }, [repos, currentUserId, pushActivity, pushUsageEvent, cases, templates]);
+
+    // Case creation with an explicit owner/assignee is another "assignment
+    // changed to someone else" moment — see Step 1 · 1G.7's plan. Only the
+    // case owner and any task explicitly assigned away from the default
+    // (rather than every task, which would otherwise spam one notification
+    // per generated task when they all just inherit the case owner).
+    if (shouldNotifyAssignment(undefined, caseWithOwner.caseOwner, currentUserId)) {
+      notifyAssignment('case', caseWithOwner.id);
+    }
+    newTasks.forEach((original, i) => {
+      if (original.assignedTo && shouldNotifyAssignment(undefined, original.assignedTo, currentUserId)) {
+        notifyAssignment('task', tasksWithAssignee[i].id);
+      }
+    });
+  }, [repos, currentUserId, pushActivity, pushUsageEvent, cases, templates, notifyAssignment]);
 
   // --- Template Actions ---
   const handleAddTemplate = useCallback(async (template: WorkflowTemplate) => {
@@ -580,7 +625,10 @@ const AppShell: React.FC = () => {
       summary: `${caseItem.title} assigned to ${newOwner?.name || 'team member'}.`,
     });
     toast.success(`Case assigned to ${newOwner?.name || 'team member'}`);
-  }, [cases, repos, teamMembers, pushActivity, currentUserId]);
+    if (shouldNotifyAssignment(caseItem.caseOwner, newOwnerId, currentUserId)) {
+      notifyAssignment('case', caseId);
+    }
+  }, [cases, repos, teamMembers, pushActivity, currentUserId, notifyAssignment]);
 
   // --- Client Actions ---
   const handleAddClient = useCallback(async (client: Client) => {
@@ -644,6 +692,18 @@ const AppShell: React.FC = () => {
             onDeleteTask={handleDeleteTask}
             onMoveTaskDate={handleMoveTaskDate}
           />
+          <PendingInvitationsBanner />
+          {lostAccessNotice && (
+            <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-ink/15 bg-paper-2 px-4 py-3 text-sm text-ink-soft dark:border-plate-ink/20 dark:bg-plate-card dark:text-plate-ink-soft">
+              <span>{lostAccessNotice}</span>
+              <button
+                onClick={dismissLostAccessNotice}
+                className="flex-shrink-0 font-semibold underline underline-offset-2"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           {loadWarning && (
             <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
               <span>{loadWarning}</span>
@@ -665,6 +725,7 @@ const AppShell: React.FC = () => {
                 deadlines={deadlines}
                 teamMembers={teamMembers}
                 currentUserId={currentUserId}
+                storageMode={storageMode}
                 onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask}
                 onMoveTaskOrder={handleMoveTaskOrder}
@@ -691,6 +752,8 @@ const AppShell: React.FC = () => {
                 onAddMember={handleAddTeamMember}
                 onUpdateMember={handleUpdateTeamMember}
                 onDeleteMember={handleDeleteTeamMember}
+                onUpdateTask={handleUpdateTask}
+                onUpdateCase={handleUpdateCase}
               />
             } />
             <Route path="/clients" element={
@@ -721,6 +784,8 @@ const AppShell: React.FC = () => {
                 templates={templates}
                 teamMembers={teamMembers}
                 deadlines={deadlines}
+                storageMode={storageMode}
+                currentUserId={currentUserId}
                 onTasksConfirmed={handleTasksConfirmed}
                 onAssignCase={handleAssignCase}
               />
@@ -1028,6 +1093,12 @@ const AppRoutes: React.FC = () => {
           redirects (ProtectedRoute, sign-out) and shared links still work. */}
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
       <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+      {/* Fully public, and deliberately outside ProtectedRoute/ProfileProvider: the
+          Supabase recovery link signs the visitor in via a short-lived recovery
+          session (see pages/ResetPassword.tsx), which would otherwise get bounced
+          around by the "signed-in users get sent to /dashboard" rule above or the
+          onboarding/firm gates further down the tree before the form ever shows. */}
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<ProtectedRoute />}>
         {/* Accepting a firm invite needs a session but not a resolved profile/firm — see pages/InviteAccept.tsx. ProtectedRoute already redirects a signed-out visitor to /login and back here (location.state.from), via LandingPage's own sign-in flow. */}
         <Route path="/invite/:token" element={

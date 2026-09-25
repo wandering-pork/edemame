@@ -100,9 +100,9 @@ Which flow runs depends on whether the case's `WorkflowTemplate` has `timing` se
 Registration/login gates the **entire app** (not just cloud storage mode) via Supabase Auth (email/password).
 
 1. `AuthProvider` (`src/contexts/AuthContext.tsx`) wraps the whole router in `App.tsx`, resolving `supabase.auth.getSession()` on mount and subscribing to `onAuthStateChange`.
-2. `ProtectedRoute` (`src/components/ProtectedRoute.tsx`) reads `useAuth()` — redirects to `/login` if no session, shows a spinner while `loading` is true. It gates `/onboarding` and the `/*` app-shell route; `/`, `/login`, `/register` stay public.
+2. `ProtectedRoute` (`src/components/ProtectedRoute.tsx`) reads `useAuth()` — redirects to `/login` if no session, shows a spinner while `loading` is true. It gates `/onboarding` and the `/*` app-shell route; `/`, `/login`, `/register`, and `/reset-password` stay public.
 3. `pages/Register.tsx` calls `signUp(email, password, fullName)` — full name is stored in Supabase's `user_metadata.full_name` (no separate `profiles` table). If Supabase requires email confirmation, the page shows a "check your email" state instead of navigating away.
-4. `pages/Login.tsx` calls `signIn(email, password)`, with a "Forgot password?" link that calls `resetPassword(email)`.
+4. `pages/Login.tsx` calls `signIn(email, password)`, with a "Forgot password?"/"Send reset link" action that calls `resetPassword(email)` — `AuthContext.tsx`'s `resetPassword()` passes `redirectTo: {origin}/reset-password`, so the emailed link lands on `pages/ResetPassword.tsx`. That page reads `useAuth()`'s `session` (Supabase's client auto-detects the recovery token in the URL and establishes a short-lived recovery session, firing `onAuthStateChange` with `PASSWORD_RECOVERY`, which `AuthProvider`'s existing subscription already picks up) to decide between showing the "set a new password" form or an expired-link message, then calls `updatePassword(newPassword)` (`AuthContext.tsx`, wraps `supabase.auth.updateUser({ password })`). `/reset-password` is registered in `App.tsx` as a fully public route, deliberately outside `ProtectedRoute`/`ProfileProvider`/the onboarding-and-firm-gate tree, so nothing redirects the recovery session away before the form renders and it works whether or not the user has a profile yet. Shared password rules (`validateNewPassword`, min length) live in `lib/passwordValidation.ts`, used by both the sign-up form and this page.
 5. Sign-out is available both in `pages/Settings.tsx` (Account section) and as a link in `components/Sidebar.tsx` — both call `signOut()` then navigate to `/login`.
 
 **Important:** Auth (who you are) and `StorageMode` (`'local' | 'cloud'`, where your data lives) are independent axes, chosen at `/onboarding` and persisted in the `profiles` table (see "Local-First Storage" below). Both modes are fully implemented; the mode can also be changed later from `pages/Settings.tsx`'s "Storage Mode" section (see "Switching Storage Mode" below).
@@ -128,7 +128,7 @@ Registration/login gates the **entire app** (not just cloud storage mode) via Su
 
 - **Case lifecycle stages + derived At Risk** (Step 1 · Foundations 1C): `Case.stage` (`CaseStage` in `types.ts`: `draft` | `assessment` | `engaged` | `preparing` | `ready_to_lodge` | `lodged` | `info_requested` | `decision` | `closed`) replaces the old `CaseStatus` (`open` | `in_progress` | `on_hold` | `closed`) as the source of truth for a case's progress — `status` is kept for one release as a read-only fallback and, on the cloud row, a derived mirror (`lib/caseStage.ts`'s `deriveLegacyStatus()`: closed→closed, onHold→on_hold, draft/assessment→open, else in_progress). `Case.outcome` (`CaseOutcome`: `granted` | `refused` | `withdrawn` | `lapsed`) is required once `stage` is `closed`; `Case.onHold` is a pause flag orthogonal to `stage`. New cases start at `draft` (`pages/NewCase.tsx`, `lib/openCaseFromAdvisor.ts`), not `engaged`. `lib/caseStage.ts`'s `normalizeCase()` fills in `stage`/`onHold` for a case that predates this field — legacy `open`/`in_progress` → `preparing`; `on_hold` → `preparing` + `onHold: true`; `closed` → `closed` with no outcome (the UI prompts for one the next time the case is opened) — called by both repositories' `getAll`/`getById`/`create`/`update` on every read/write, the same normalize-at-the-boundary pattern as `lib/taskStatus.ts`'s `normalizeTask()`. `lib/caseStage.ts`'s `evaluateTransition(from, to)` allows every stage-to-stage move (a real case can go backward) but flags `isBackward` (asks for an inline confirm) and `requiresOutcome` (moving to `closed` — asks for an outcome pick first); `lodged`/`info_requested` share a rank so toggling between them is never flagged backward. `caseStageGroup()` buckets a stage into `pre_lodgement` (draft→ready_to_lodge) / `with_department` (lodged, info_requested, decision) / `closed`, driving the Case Manager's board filters. The cloud `cases` table gained `stage`/`outcome`/`on_hold` columns via `supabase/migrations/20260926000050_add_case_stage.sql`. **At Risk is derived, never stored** — `lib/risk.ts`'s `computeCaseRisk(caseItem, tasks, deadlines, checklist?)` returns `{ atRisk, reasons[] }`, true when any of: an open deadline on the case is ≤14 days away; an overdue, non-waiting task exists, restricted to gate tasks (`WorkflowStep.isGate`, resolved via a task's `stepKey`) once the task carries one — a task with no `stepKey`, or one whose step isn't found, falls back to "any overdue task" (Step 1 · 1E resolved this TODO — see "Template task timing" above); the case is at `ready_to_lodge` and a checklist item is still `pending` (the `checklist` param is optional and only fetched by callers for cases at that stage, since there are few); or an s56/s57 deadline has ≤7 days left. `pages/CaseManager.tsx` replaced its old computed Active/Pending/At Risk/Completed filters (derived from task-completion %) with the three stage-group chips plus an At Risk chip that overlays any group (not a group itself), fetching checklists only for `ready_to_lodge` cases; each row shows a compact stage stepper (`lib/caseStage.ts`'s `CASE_STAGE_STEPPER`, task count secondary) and, when at risk, a red badge whose reasons are visible on hover *and* keyboard focus (not only a `title` attribute). `pages/CaseDetails.tsx`'s header replaced the old status dropdown with a stage-chip control built on `evaluateTransition()` (inline backward-move confirm, inline outcome picker before closing — no `window.prompt`/`confirm`) plus a standalone On hold toggle; a closed case with no `outcome` shows an amber banner prompting for one every time it's opened. Every stage change writes a `case_stage_changed` `ActivityEvent` via `App.tsx`'s `handleUpdateCase()` (the same `pushActivity` pattern as `handleAddDeadline`/`handleUpdateTask`), threaded down through `CaseDetailsRoute`'s `onUpdateCase` prop. Other stage/status consumers updated to the new model: `pages/Dashboard.tsx`'s `activeCases`, `pages/Clients.tsx`'s open-case count, `pages/TeamDashboard.tsx`'s case row label, and `lib/findOpenCaseForSubclass.ts` (+ its test) all use `lib/caseStage.ts`'s `isCaseClosed()` instead of comparing `status` directly.
 
-**Production:** Supabase project `edamame-legal-flow` (wandering-pork's Org) backs both dev and prod. Its Auth → URL Configuration Site URL is `https://edemame.vercel.app`, with `https://edemame.vercel.app/**` and `http://localhost:3000/**` allow-listed as redirect URLs. The Vercel project `edemame` has `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` set for Production + Preview. The `profiles` table migration, the cloud data tables migration (`20260802000000_create_cloud_data_tables.sql`), the agent issue filings migration (`20260807000000_create_agent_issue_filings.sql`), the case number migration (`20260810000000_add_case_number.sql` — must be applied *before* deploying the frontend that writes `case_number`, or PostgREST rejects every case insert/update), the document types migration (`20260829000000_create_document_types.sql`), the usage events migration (`20260901000000_create_usage_events.sql`), the case visa subclass migration (`20260925000000_add_case_visa_subclass.sql` — like `case_number`, must be applied *before* deploying the frontend that writes `visa_subclass`), the eligibility assessments migration (`20260925000100_create_eligibility_assessments.sql`), the task status migration (`20260926000000_add_task_status.sql` — like `case_number`/`visa_subclass`, must be applied *before* deploying the frontend that writes `status`/`status_reason`), the case stage migration (`20260926000050_add_case_stage.sql` — adds `stage`/`outcome`/`on_hold` to `cases`, backfilled from the legacy `status` column, which is kept for one release as a derived mirror; must be applied *before* deploying the frontend that writes `stage`/`outcome`/`on_hold`, and its timestamp deliberately sits before the deadlines migration below), the deadlines migration (`20260926000100_create_deadlines.sql` — must be applied *before* deploying the frontend that writes to the `deadlines` table), the template version migration (`20260926000200_template_version.sql` — like the others, must be applied *before* deploying the frontend that writes `version`/`timing_verified` on custom templates), the task step fields migration (`20260926000250_task_step_fields.sql` — adds `step_key`/`date_locked`/`date_pending` to `tasks` and `template_version` to `cases`; must be applied *before* deploying the frontend that writes them), the firm accounts migration (`20260926000300_create_firms.sql` — adds firms/firm_members/firm_invites, `firm_id` on every data table, and replaces "own rows" RLS with firm-scoped RLS; depends on the deadlines migration, test on a Supabase branch first, and apply *before* deploying the frontend that sends `firm_id`), and the case number uniqueness migration (`20260926000400_case_number_unique.sql` — a partial unique index on `(firm_id, case_number)`, depends on the firm accounts migration), and the firm function grants migration (`20260926000500_firm_function_grants.sql` — revokes `anon` EXECUTE on the firm helper functions and all EXECUTE on the `firm_members_guard` trigger function; no frontend dependency) must all be applied manually (Supabase SQL editor, or `supabase db push` once the CLI is linked to the project) — migrations are not applied automatically.
+**Production:** Supabase project `edamame-legal-flow` (wandering-pork's Org) backs both dev and prod. Its Auth → URL Configuration Site URL is `https://edemame.vercel.app`, with `https://edemame.vercel.app/**` and `http://localhost:3000/**` allow-listed as redirect URLs. The Vercel project `edemame` has `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` set for Production + Preview. The `profiles` table migration, the cloud data tables migration (`20260802000000_create_cloud_data_tables.sql`), the agent issue filings migration (`20260807000000_create_agent_issue_filings.sql`), the case number migration (`20260810000000_add_case_number.sql` — must be applied *before* deploying the frontend that writes `case_number`, or PostgREST rejects every case insert/update), the document types migration (`20260829000000_create_document_types.sql`), the usage events migration (`20260901000000_create_usage_events.sql`), the case visa subclass migration (`20260925000000_add_case_visa_subclass.sql` — like `case_number`, must be applied *before* deploying the frontend that writes `visa_subclass`), the eligibility assessments migration (`20260925000100_create_eligibility_assessments.sql`), the task status migration (`20260926000000_add_task_status.sql` — like `case_number`/`visa_subclass`, must be applied *before* deploying the frontend that writes `status`/`status_reason`), the case stage migration (`20260926000050_add_case_stage.sql` — adds `stage`/`outcome`/`on_hold` to `cases`, backfilled from the legacy `status` column, which is kept for one release as a derived mirror; must be applied *before* deploying the frontend that writes `stage`/`outcome`/`on_hold`, and its timestamp deliberately sits before the deadlines migration below), the deadlines migration (`20260926000100_create_deadlines.sql` — must be applied *before* deploying the frontend that writes to the `deadlines` table), the template version migration (`20260926000200_template_version.sql` — like the others, must be applied *before* deploying the frontend that writes `version`/`timing_verified` on custom templates), the task step fields migration (`20260926000250_task_step_fields.sql` — adds `step_key`/`date_locked`/`date_pending` to `tasks` and `template_version` to `cases`; must be applied *before* deploying the frontend that writes them), the firm accounts migration (`20260926000300_create_firms.sql` — adds firms/firm_members/firm_invites, `firm_id` on every data table, and replaces "own rows" RLS with firm-scoped RLS; depends on the deadlines migration, test on a Supabase branch first, and apply *before* deploying the frontend that sends `firm_id`), and the case number uniqueness migration (`20260926000400_case_number_unique.sql` — a partial unique index on `(firm_id, case_number)`, depends on the firm accounts migration), the firm function grants migration (`20260926000500_firm_function_grants.sql` — revokes `anon` EXECUTE on the firm helper functions and all EXECUTE on the `firm_members_guard` trigger function; no frontend dependency), the firm roles migration (`20260927000000_firm_roles.sql` — replaces the `owner`/`agent`/`paralegal` roles with `owner`/`admin`/`member` plus a display-only `job_title` column, rewrites `firm_members_guard()` and `firm_member_directory()`, and updates every policy that named the old roles; must be applied *together with* the deploy that stops sending `agent`/`paralegal`, the same as the 1F firm accounts migration), the invite checks migration (`20260927000100_invite_checks.sql` — adds `firm_invites.declined_at`, a partial unique index limiting a firm+email pair to one open invite, and the `firm_email_status()` security-definer function; must be applied *before* deploying the frontend that calls `firm_email_status` from `api/invite-member.ts`, and depends on the firm roles migration), the invitations migration (`20260927000200_invitations.sql` — adds the private `_accept_invite_for_user()` transaction helper and the `accept_invite()`/`accept_invite_by_token()`/`decline_invite()`/`my_pending_invites()` RPCs; must be applied *before* deploying the frontend that calls them from `api/accept-invite.ts`, `PendingInvitationsBanner` and `CreateFirmGate`, and depends on the invite checks migration), the leave-firm migration (`20260927000300_leave_firm.sql` — adds the `leave_firm(f)` RPC used by Settings → Firm and `FirmContext.leaveFirm()`; must be applied *before* deploying the frontend that calls it, and depends on the firm roles migration), the member lifecycle migration (`20260927000400_member_lifecycle.sql` — adds the `firm_former_members` table and `remove_member(f, user_id)` RPC, and updates `leave_firm()`/`_accept_invite_for_user()` to snapshot/clear former-member rows; must be applied *before* deploying the frontend that calls `remove_member` from `components/team/FirmTeamMembers.tsx` or reads `firm_former_members` from `FirmContext.tsx`, and depends on the leave-firm and invitations migrations), and the assignment notifications migration (`20260927000500_assignment_notifications.sql` — adds the `notify_assignment(f, p_kind, p_entity_id)` security-definer RPC, which derives an "assigned to you" notification's title/message server-side from the task/case row rather than trusting client-supplied text; must be applied *before* deploying the frontend that calls it from `App.tsx`'s `handleUpdateTask`/`handleUpdateCase`/`handleAssignCase`/`handleTasksConfirmed`, and depends on the firm roles migration) must all be applied manually (Supabase SQL editor, or `supabase db push` once the CLI is linked to the project) — migrations are not applied automatically.
 
 ### Firm accounts (Step 1 · Foundations 1F)
 
@@ -149,13 +149,19 @@ before this feature).
   null` column, backfilled with one personal firm per pre-existing user (nobody's data moved or
   became visible to anyone new). `notifications`, `profiles`, and `agent_issue_filings` stay
   per-user, not firm-scoped — see the migration's own comment for why.
-- **Roles**: `owner`, `agent` (registered migration agent), `paralegal`. No `admin` role for MVP
-  (see `docs/plans/step-1-foundations.md`'s Decisions). Owners manage members (invite, change
-  role, disable) and can delete clients/cases/documents; agents can delete clients/cases/documents
-  but not manage members; paralegals can't do either — see `lib/firmDirectory.ts`'s
-  `canDeleteFirmData()`/`canManageMembers()`, used only to hide UI (RLS is the real enforcement). A
-  firm always keeps at least one active owner — a Postgres trigger
-  (`firm_members_guard()`) rejects demoting/disabling the last one.
+- **Roles** (Step 1 · 1G.2, replacing the earlier `owner`/`agent`/`paralegal` mix): a plain access
+  role — `owner`, `admin`, `member` — plus a display-only, never-used-for-permissions `job_title`
+  (`registered_migration_agent` | `lawyer` | `paralegal` | `case_officer` | `office_staff` |
+  `other`, `FirmMemberRow.jobTitle`). Owners and admins can delete clients/cases/documents, invite
+  people, and disable/re-enable/remove Members; only owners can promote/demote/remove Admins or
+  other Owners, or rename the firm — an admin can manage Members but never another Admin or Owner
+  (see `lib/firmDirectory.ts`'s `canDeleteFirmData()`/`canManageMembers()`/`canManageAdmins()`/
+  `canManageMember()`/`grantableRoles()`, used only to hide UI — RLS and the `firm_members_guard()`
+  trigger are the real enforcement). Deleting activity/usage history remains owner-only. Everyone
+  can edit their own availability and job title, never their own role or status. A firm always
+  keeps at least one active owner — the trigger rejects demoting/disabling the last one. Migration:
+  `supabase/migrations/20260927000000_firm_roles.sql` (see "Production" below — must be applied
+  together with this deploy, since the old frontend sent `agent`/`paralegal`).
 - **RLS**: `is_firm_member(firmId)` / `has_firm_role(firmId, roles[])` (security-definer SQL
   functions, so policies that call them don't recurse into `firm_members`' own RLS) replace every
   "own rows" (`user_id = auth.uid()`) policy with "firm rows" (`is_firm_member(firm_id)`). No
@@ -177,29 +183,87 @@ before this feature).
   cloud table is firm-scoped), so a cloud user with no firm yet sees
   `components/CreateFirmGate.tsx` ("Create your firm": just a name, calls `create_firm`) instead of
   the app shell. A user following an invite link instead never sees this gate — see below.
-- **Invites**: `api/invite-member.ts` (POST, Bearer-authed, caller must be an active owner of the
-  target firm — checked via a normal RLS-scoped read of their own `firm_members` row, not the
-  service role) generates a random token, stores its sha256 hash in `firm_invites`, and sends a
-  Supabase Auth admin invite email (`POST {SUPABASE_URL}/auth/v1/invite`) with
-  `redirect_to: {origin}/invite/{token}`. If the address already belongs to a registered user, that
-  call fails in an expected, non-fatal way (Supabase reports "already registered") and the endpoint
-  falls back to returning the invite link for the owner to copy and send directly — either way the
-  response reports `sent`/`inviteLink` so the UI can show the right thing. `api/accept-invite.ts`
-  (POST `{token}`, Bearer-authed) verifies the token hash, checks not expired/revoked/accepted and
-  that the invite's email matches the signed-in user's (case-insensitively), then writes the
-  `firm_members` row, sets `profiles.current_firm_id`, and marks the invite accepted. Both
-  endpoints need `SUPABASE_SERVICE_ROLE_KEY` (server-only env var, read only inside `api/_lib/firms.ts`,
-  **never** sent to the client or logged — add it to `src/.env.local` for local dev and as a Vercel
-  project env var for production; the owner adds it by hand, it's not entered by an AI agent) because
-  `firm_invites`/`firm_members` have no insert policy for `authenticated` by design, and only the
-  service role can call the Auth admin invite endpoint. Without it configured, both endpoints return
-  500 "Invites aren't configured yet" rather than silently failing. Known gap: neither endpoint's
-  multi-step write is one atomic transaction over plain PostgREST calls — documented in each file's
-  top comment, acceptable for this one-time, user-initiated action.
+- **Invites**: `api/invite-member.ts` (POST, Bearer-authed, caller must be an active owner or admin
+  of the target firm — checked via a normal RLS-scoped read of their own `firm_members` row, not
+  the service role; an admin caller may only invite as Member) checks the address against the
+  firm first (Step 1 · 1G.3), calling `firm_email_status(firmId, email)` — a security-definer
+  function (`supabase/migrations/20260927000100_invite_checks.sql`) that raises unless the caller
+  is an owner/admin of that firm and only ever looks inside it (see "Never look outside your own
+  firm" in `docs/plans/step-1g-team-experience.md`) — as the *caller*, via a plain RPC POST with
+  their own access token, before creating anything: `'active'` → `409 { code: 'already_member' }`
+  ("Already in your firm", no invite created); `'disabled'` → `409 { code: 'disabled_member' }`
+  (the UI's inline hint offers a **Re-enable** button instead); `'pending'` is treated as a
+  **resend** — the endpoint revokes the existing open invite(s) for that firm+email with the
+  service role, then creates a fresh one with a new token exactly as for a new address, returning
+  `resent: true`; anything else creates the invite as before. A 23505 (unique-violation) on the
+  insert — e.g. a concurrent request raced the same firm+email between the status check and the
+  insert — is reported as a clear 409 rather than a 500. At most one **open** invite (accepted_at,
+  revoked_at and declined_at all null) can exist per `(firm_id, lower(email))`, enforced by a
+  partial unique index from the same migration. Once authorized, the endpoint generates a random
+  token, stores its sha256 hash in `firm_invites`, and sends a Supabase Auth admin invite email
+  (`POST {SUPABASE_URL}/auth/v1/invite`) with `redirect_to: {origin}/invite/{token}`. If the
+  address already belongs to a registered user, that call fails in an expected, non-fatal way
+  (Supabase reports "already registered") and the endpoint falls back to returning the invite link
+  for the owner/admin to copy and send directly — either way the response reports
+  `sent`/`inviteLink`/`resent` so the UI can show the right thing (`components/team/FirmTeamMembers.tsx`
+  shows "Invite email sent to X" when `sent`, or "X already has an Edamame account, so no email was
+  sent — send them this link" with a copy box otherwise; the same wording appears inline under a
+  Pending Invites row after **Resend**). As the agent types an email into the invite form,
+  `src/lib/inviteHints.ts`'s `inviteHintFor()` (unit-tested) checks it against the already-loaded
+  member directory and pending invites client-side for an instant hint — the server call above
+  stays the authority, this is only a head start. `invite-member.ts` also passes `firm_name` and
+  `inviter_name` (from the caller's own `user_metadata.full_name`/email, via
+  `api/_lib/auth.ts`'s `verifySupabaseUser()`) in the invite email's `data`, for the Supabase
+  dashboard's *Invite user* template to interpolate (`{{ .Data.inviter_name }}` /
+  `{{ .Data.firm_name }}` — the owner applies the template text by hand; see the 1G.4 PR
+  description). Sending the email itself still needs `SUPABASE_SERVICE_ROLE_KEY` (server-only env
+  var, read only inside `api/_lib/firms.ts`, **never** sent to the client or logged — add it to
+  `src/.env.local` for local dev and as a Vercel project env var for production; the owner adds it
+  by hand, it's not entered by an AI agent), since `firm_invites` has no insert policy for
+  `authenticated` by design and only the service role can call the Auth admin invite endpoint.
+  Without it configured, `invite-member.ts` returns 500 "Invites aren't configured yet" rather
+  than silently failing.
+  **Accepting** (Step 1 · 1G.4) is a single Postgres transaction, not several PostgREST calls: the
+  private helper `_accept_invite_for_user()` (`supabase/migrations/20260927000200_invitations.sql`,
+  EXECUTE revoked from everyone — only its own wrappers call it) locks the invite row `for update`,
+  rejects it if accepted/revoked/declined/expired, requires the invite's email to equal the
+  target user's own **confirmed** email in `auth.users` (`email_confirmed_at is not null` — see
+  "Never look outside your own firm" / the confirmed-email rule in
+  `docs/plans/step-1g-team-experience.md`'s cross-cutting rules), inserts the `firm_members` row
+  (a no-op if they're already a member, rather than changing their existing role/status), and
+  upserts `profiles` (`storage_mode: 'cloud'` + `current_firm_id`, inserting the row if it doesn't
+  exist yet — a brand-new invitee has never been through onboarding). Two thin SECURITY DEFINER
+  wrappers call it for `auth.uid()`: `accept_invite_by_token(token_hash)`, which
+  `api/accept-invite.ts` (POST `{token}`, Bearer-authed) calls **as the signed-in user** (their own
+  access token, not the service role — the old "not atomic"/service-role KNOWN GAP is gone), and
+  `accept_invite(invite_id)`, which the in-app `PendingInvitationsBanner` and `CreateFirmGate` call
+  directly via `supabase.rpc()`. `decline_invite(invite_id)` sets `declined_at` the same way (a
+  no-op if already declined). `my_pending_invites()` returns every open, unexpired invite addressed
+  to the caller's own confirmed email (firm name, role, inviter's display name resolved
+  server-side — never the token hash) — the in-app entry point for an *existing* user, so nobody
+  needs an email or a copied link to join until 1G.8 ships real email; the emailed link still works
+  as a fallback for everyone.
 - **Frontend**: `/invite/:token` (`pages/InviteAccept.tsx`) sits behind `ProtectedRoute` (so a
   signed-out visitor is bounced to `/login` and back via the existing `location.state.from`
-  mechanism `pages/LandingPage.tsx` already honors) but outside the normal
-  `ProfileProvider`/`FirmProvider` app-shell tree, so it works before a user has ever onboarded.
+  mechanism `pages/LandingPage.tsx` already honors), inside `ProfileProvider` but outside
+  `FirmProvider`/the normal app-shell tree, so it works before a user has ever onboarded. Before
+  accepting, it checks `useProfile()`'s `storageMode`: **local mode** shows an inline warning
+  ("Firms only work with cloud storage… Joining *Firm* will switch your account to cloud storage
+  now. Your local folder isn't changed, moved or deleted.") with **Switch to cloud and join** /
+  **Cancel** — only Confirm accepts (the RPC itself flips `storage_mode` to `'cloud'`), Cancel
+  leaves the invite pending and links back to the app. After a successful accept, it re-reads
+  `supabase.auth.getUser()` and checks `lib/firmInvites.ts`'s `needsAccountSetup()` (`invited_at`
+  set and `user_metadata.password_set !== true`) — a first-time invitee sees **Finish setting up
+  your account** (full name + password + confirm, `supabase.auth.updateUser({ password, data: {
+  full_name, password_set: true } })`) before "Go to dashboard"; an existing user goes straight to
+  the success screen. "Go to dashboard" always does a full `window.location.assign()` rather than
+  a router navigation, so Profile/Firm contexts re-fetch against the new profile/firm instead of
+  showing `/onboarding` off a stale null profile. The same local-mode warning gates **Accept** on
+  the in-app `components/team/PendingInvitationsBanner.tsx` (shown in the app shell in both storage
+  modes — Supabase auth exists in local mode too — whenever `my_pending_invites()` returns rows;
+  Decline calls `decline_invite` and hides it; loaded once per session, failures are silent
+  console errors and never block the app) and on `CreateFirmGate`, which lists pending invitations
+  *above* "Create your firm" so an invited person doesn't create an empty firm by mistake.
   `pages/TeamMembers.tsx` branches on storage mode: cloud renders
   `components/team/FirmTeamMembers.tsx` (the real member list, invite/pending-invites/revoke,
   role change and disable for owners, and a self-service availability picker for everyone); local
@@ -228,6 +292,107 @@ before this feature).
   inline explanation rather than failing after the fact. Local → Cloud auto-creates a personal firm
   first if the user doesn't have one yet (e.g. their very first switch to cloud), since cloud
   repositories can't be constructed without a `firmId`.
+- **Several firms, the switcher, and lost access** (Step 1 · 1G.5): a user can belong to more than
+  one firm (their own personal one plus any they've been invited into), but only one is ever
+  "current" — `profiles.current_firm_id`, which every cloud repository is built against. Deciding
+  which firm that should be, given the profile's `currentFirmId` and the user's active
+  `firm_members` rows, is a pure function, `lib/firmSwitch.ts`'s `resolveCurrentFirm()`
+  (unit-tested in `firmSwitch.test.ts`) — it handles both the older self-heal case (`currentFirmId`
+  never set, e.g. an invite accepted mid-onboarding) and lost access (`currentFirmId` names a firm
+  the user is no longer an active member of — disabled, removed, or the firm itself gone) the same
+  way: fall back to another active membership (most recently joined first), or `null` with none
+  left (→ `CreateFirmGate`, unchanged). `contexts/FirmContext.tsx` also loads `memberships` (every
+  firm the user is an active member of, with its name and their role — a plain `firm_members`
+  select embedding `firms(name)`, no new RPC needed since RLS already allows it) and exposes
+  `switchFirm(firmId)` (`updateProfile({ currentFirmId })` then `window.location.reload()` — the
+  same full-reload pattern the storage-mode switch already uses, since cloud repositories are built
+  for one firm) and `leaveFirm(firmId)` (the `leave_firm(f)` RPC,
+  `supabase/migrations/20260927000300_leave_firm.sql` — deletes the caller's own `firm_members` row,
+  refuses with a friendly message if they're the firm's last active owner the same way
+  `firm_members_guard()` does for a role/status change, and repoints `profiles.current_firm_id` if
+  it pointed at the firm just left — then reloads). When `resolveCurrentFirm()` reports a
+  `lostFirmId`, `FirmContext` shows a one-time "You no longer have access to *X*" notice (name
+  best-effort re-read from `firms` before access is fully gone; falls back to "that firm" once RLS
+  hides it), deduplicated per user+firm via `sessionStorage` (wrapped in try/catch) so it survives
+  re-renders but not a fresh session. `App.tsx`'s `AppShell` renders it as a dismissible banner next
+  to `PendingInvitationsBanner` (own state, doesn't touch that component). `components/Sidebar.tsx`
+  shows the current firm's name under the logo in cloud mode (respecting the collapsed sidebar
+  state — icon-only with a tooltip when collapsed); with more than one membership it becomes a
+  keyboard-accessible switcher menu (checkmark on the current firm, role label on each). **Settings
+  → Firm** (cloud mode only, `pages/Settings.tsx`) shows the firm name (owners can rename it inline
+  — a plain `firms` table update, allowed by the existing "owners update firm" RLS policy), the
+  user's own role and job title (job title editable by everyone, same `firm_members` update
+  `components/team/FirmTeamMembers.tsx` already uses for a member's own row), the active member
+  count with a link to Team Members, and **Leave firm** with an inline confirm (no
+  `window.confirm`) that surfaces the RPC's last-owner message inline on failure.
+- **Member lifecycle: disable, remove, hand over work, former members** (Step 1 · 1G.6, Decision 4:
+  remove deletes). **Disable** is a reversible pause (unchanged from 1F/1G.2): the member can't sign
+  in to the firm and drops out of pickers, but keeps their row on the Team page ("Disabled") and can
+  be re-enabled with one click. **Remove** is final — the `firm_members` row is deleted, so they
+  disappear from the Team page entirely; re-inviting the same person brings back all their old work
+  automatically, since their `auth.users` id never changes. Both actions, from
+  `components/team/FirmTeamMembers.tsx`, first open an inline panel listing the member's open tasks
+  (`!isTaskClosed`) and non-closed cases they own, with a "Reassign to another active member, or
+  leave unassigned" picker — applying it calls the same `onUpdateTask`/`onUpdateCase` callbacks
+  `App.tsx` passes everywhere else (threaded through `pages/TeamMembers.tsx`), so activity events are
+  written as usual; a member with nothing open skips straight to the action (Remove still shows its
+  confirm). Remove's confirm is inline ("*Name* will lose access to this firm and be removed from
+  the team. Their past work keeps their name.") — no `window.confirm`. Both call
+  `supabase/migrations/20260927000400_member_lifecycle.sql`'s new `remove_member(f, user_id)` RPC
+  (security definer; enforces the same owner-or-admin-on-a-Member rule as the "owners or admins
+  remove members" DELETE policy, refuses to remove the last active owner, and rejects removing
+  yourself — use `leave_firm` for that) or the existing disable path (a plain `firm_members.status`
+  update). **Former members**: since a removed member's name lives only in `auth.users` (which the
+  client can't read), removal first snapshots it into the new `firm_former_members` table
+  (`firm_id`, `user_id`, `full_name`, `email`, `removed_at`, `removed_by`; RLS lets any firm member
+  read it, no direct writes — only `remove_member()` and the updated `leave_firm()` write it, and
+  `_accept_invite_for_user()` deletes a stale row on re-accept). `FirmContext.tsx` loads it and
+  exposes `allMembers` (alias for `members` — every directory row, active and disabled),
+  `formerMembers`, and `memberNameFor(userId)`, which `lib/memberDirectory.ts`'s (unit-tested)
+  `resolveMemberDisplayName()` backs: active → plain name, disabled → "Name (disabled)", former →
+  "Name (former member)", otherwise `null`. `pages/CaseManager.tsx` (case-owner avatar) and
+  `pages/TeamDashboard.tsx` (activity-feed actor, case-owner avatar, assignment-history from/to) fall
+  back to it wherever `teamMembers.find()` (active-only) comes up empty, so old work never just goes
+  blank. `lib/memberLifecycleErrors.ts`'s (unit-tested) `friendlyMemberLifecycleError()` maps the
+  trigger/RPC's raw Postgres exception text (last-owner, admin-can't-manage-admins, etc.) to plain
+  inline copy for `FirmTeamMembers.tsx`'s role/disable/remove actions, instead of a raw error string.
+- **Working as a team, day to day** (Step 1 · 1G.7): three "mine by default" changes for firms with
+  more than one member, all cloud-only (hidden in local mode, where every scope is trivially the
+  same one user). (1) **Dashboard**: `lib/attention.ts`'s `AttentionScope` (`'mine' | 'all'`) plus
+  its pure `scopeTasksForAttention()`/`scopeDeadlinesForAttention()` filter the Needs Attention list
+  and the overdue/due-today/waiting/due-this-week stat cards — "mine" is a task assigned to me or
+  unassigned, or a deadline on a case I own or with no owner (or no linked case at all, e.g. a bare
+  passport expiry); this is a separate scope from the task board's own My Tasks/Team/All tabs
+  further down `Dashboard.tsx`. Defaults to "Mine" in cloud mode via a compact toggle in the Needs
+  Attention card header (whose rule line says which one is showing), and straight to "All" with the
+  toggle hidden in local mode. (2) **Case Manager**: `lib/caseManagerScope.ts`'s
+  `filterCasesByOwnerScope()`/`defaultCaseOwnerScope()` back a "My cases / All cases" toggle in
+  `pages/CaseManager.tsx`'s header, filtering by `Case.caseOwner` — defaults to All for owners/admins
+  and Mine for plain Members (`useFirm()`'s `role`), remembered for the browser session via
+  `sessionStorage` (wrapped in try/catch, see `loadCaseOwnerScope()`/`saveCaseOwnerScope()`). (3)
+  **"Assigned to you" notifications**: `lib/assignmentNotify.ts`'s pure `shouldNotifyAssignment()`
+  decides whether a task's `assignedTo` or a case's `caseOwner` changed to someone *other* than the
+  person making the change; `App.tsx`'s `notifyAssignment()` then fire-and-forgets (never blocks or
+  rolls back the triggering save, only `console.error`s on failure) the
+  `notify_assignment(f, p_kind, p_entity_id)` RPC
+  (`supabase/migrations/20260927000500_assignment_notifications.sql`) — called from
+  `handleUpdateTask`/`handleUpdateCase`/`handleAssignCase`/`handleTasksConfirmed` (case creation with
+  an explicit owner, or a task explicitly assigned away from the case's default owner). The RPC
+  deliberately doesn't take free-text title/message from the client (a Member could otherwise spam
+  colleagues) — it re-reads the task/case row itself (scoped to firm `f`) and builds the
+  notification server-side, checks caller and recipient are both active members of `f` and that
+  they differ, and dedupes by the deterministic id `assign:{kind}:{entityId}:{recipientId}` with
+  `on conflict do nothing`, the same pattern as `lib/deadlineAlerts.ts`'s deadline-threshold ids.
+  Since `notifications` is per-user (not firm-scoped), it's included in `AppShell`'s existing
+  cloud-mode refetch-on-window-focus alongside `cases`/`tasks`/`deadlines`, so another member's
+  assignment actually shows up without a full reload. (4) **Team Dashboard**: verified and fixed to
+  use the real firm directory — `pages/TeamDashboard.tsx`'s per-member columns now show a live
+  availability dot (from `TeamMember.status`, which is `FirmMemberRow.availability` under the
+  hood) and the member's real `FirmJobTitle` label (via `lib/firmDirectory.ts`'s
+  `firmJobTitleLabel()`, looked up against `useFirm()`'s `allMembers`) instead of just the cosmetic
+  partner/lawyer/assistant bucket; disabled/former members already dropped out of the workload
+  columns (`teamMembers` is active-only) while still being named via `memberNameFor()` on cases they
+  own or old activity-feed entries — unchanged from 1G.6.
 
 ### Agentic Issue Filing (Case Manager Focus Mode chat only)
 

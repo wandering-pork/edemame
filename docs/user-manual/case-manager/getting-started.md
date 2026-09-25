@@ -3,6 +3,15 @@
 Case Manager is where you track a client's visa application from intake through to lodgement and
 decision.
 
+## My cases / All cases (cloud/firm accounts only)
+
+In cloud mode, the Case Manager header shows a **My cases / All cases** toggle next to
+**Configurations**, filtering the list by case owner. It defaults to **All cases** for firm Owners
+and Admins, and to **My cases** for plain Members — since a Member typically only needs to see
+their own book, while an Owner or Admin usually needs the whole firm's view. Whichever you pick is
+remembered for the rest of your browser session. This toggle is hidden in local mode, where every
+case is by definition yours.
+
 ## Creating a case
 
 1. From the sidebar, open **Cases** and click **New Case**.

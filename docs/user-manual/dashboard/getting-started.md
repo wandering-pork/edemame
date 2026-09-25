@@ -3,9 +3,19 @@
 Dashboard is the home screen — it gives you a daily snapshot of what needs attention across all
 your cases, and a week-at-a-glance view of scheduled tasks.
 
+## Mine vs. All (cloud/firm accounts only)
+
+Needs Attention and the stat cards below follow a small **Mine / All** toggle (shown in the Needs
+Attention card's header, cloud mode only — local mode is always single-user, so there's nothing to
+toggle). **Mine** is the default: tasks assigned to you, or unassigned, plus deadlines on cases you
+own or that have no owner. **All** shows the whole firm's tasks and deadlines. The rule line under
+the Needs Attention heading ("Your tasks — overdue first, then due today" / "All tasks — overdue
+first, then due today") always says which one you're looking at. This is separate from the task
+board's own **My Tasks / Team / All** tabs further down the page, which only affect the board.
+
 ## Stat cards
 
-Five cards at the top summarise your workload:
+Five cards at the top summarise your workload, scoped by the Mine/All toggle above:
 
 - **Cases in motion** — cases currently open or in progress, with how many were created this
   month.

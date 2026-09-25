@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Case, Client, Task, WorkflowTemplate, TeamMember, DocumentChecklistItem, Deadline } from '../types';
-import { Search, Plus, FileText, X, ChevronRight, Calendar, UserPlus, Settings2, AlertTriangle } from 'lucide-react';
+import { Search, Plus, FileText, X, ChevronRight, Calendar, UserPlus, Settings2, AlertTriangle, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { NewCase } from './NewCase';
 import { ConfigurationsPanel } from '../components/case-manager/ConfigurationsPanel';
@@ -9,6 +9,10 @@ import { isTaskClosed } from '../lib/taskStatus';
 import { CASE_STAGE_LABELS, CASE_STAGE_STEPPER, CASE_STAGE_GROUP_LABELS, caseStageGroup, CaseStageGroup } from '../lib/caseStage';
 import { computeCaseRisk } from '../lib/risk';
 import { useRepositories } from '../contexts/RepositoryContext';
+import { useFirm } from '../contexts/FirmContext';
+import {
+  CaseOwnerScope, filterCasesByOwnerScope, defaultCaseOwnerScope, loadCaseOwnerScope, saveCaseOwnerScope,
+} from '../lib/caseManagerScope';
 
 interface CaseManagerProps {
   cases: Case[];
@@ -17,6 +21,9 @@ interface CaseManagerProps {
   templates: WorkflowTemplate[];
   teamMembers?: TeamMember[];
   deadlines?: Deadline[];
+  /** Cloud mode only — drives the "My cases / All cases" toggle's default and visibility. Local mode is always single-user, so the toggle is hidden. */
+  storageMode?: 'local' | 'cloud';
+  currentUserId?: string;
   onTasksConfirmed: (tasks: Task[], newCase: Case) => void;
   onAssignCase?: (caseId: string, newOwnerId: string, note?: string) => void;
 }
@@ -96,6 +103,8 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   templates,
   teamMembers = [],
   deadlines = [],
+  storageMode = 'local',
+  currentUserId,
   onTasksConfirmed,
   onAssignCase,
 }) => {
@@ -114,6 +123,29 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   // At Risk rule 3 only applies to cases at ready_to_lodge — checklists are
   // fetched just for those (few of them), per lib/risk.ts's doc comment.
   const [checklistsByCase, setChecklistsByCase] = useState<Record<string, DocumentChecklistItem[]>>({});
+  // Step 1 · 1G.6: a case owner who's disabled or was removed no longer
+  // shows up in `teamMembers` (active only) — fall back to their name for
+  // display so the row doesn't wrongly offer "Assign" on an already-owned case.
+  const { memberNameFor, role } = useFirm();
+
+  // Step 1 · 1G.7 — "My cases / All cases" toggle, cloud mode only. Default:
+  // All for owners/admins, Mine for plain Members; remembered for the
+  // browser session via sessionStorage once the agent picks one explicitly.
+  const [ownerScope, setOwnerScope] = useState<CaseOwnerScope>(
+    () => loadCaseOwnerScope() ?? defaultCaseOwnerScope(role),
+  );
+  const handleSetOwnerScope = (scope: CaseOwnerScope) => {
+    setOwnerScope(scope);
+    saveCaseOwnerScope(scope);
+  };
+  // `role` resolves asynchronously (FirmContext loads after mount) — once it
+  // does, and the agent hasn't already picked a scope this session, re-apply
+  // the role-based default rather than sticking with the pre-role guess.
+  useEffect(() => {
+    if (loadCaseOwnerScope() !== null) return;
+    setOwnerScope(defaultCaseOwnerScope(role));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
 
   // Auto-open intake form with suggested template if coming from VisaAdvisor
   useEffect(() => {
@@ -143,8 +175,13 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
     navigate(`/cases/${caseId}`);
   };
 
+  const scopedCases = useMemo(
+    () => (storageMode === 'cloud' ? filterCasesByOwnerScope(cases, ownerScope, currentUserId) : cases),
+    [cases, storageMode, ownerScope, currentUserId],
+  );
+
   const searchedCases = useMemo(() => {
-    return cases.filter(c => {
+    return scopedCases.filter(c => {
       const client = clients.find(cl => cl.id === c.clientId);
       const searchLower = searchTerm.toLowerCase();
       return (
@@ -163,12 +200,16 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
       const caseTasks = tasks.filter(t => t.caseId === c.id);
       const template = templates.find(t => t.id === c.templateId);
       const owner = teamMembers.find(m => m.id === c.caseOwner);
+      // Step 1 · 1G.6: the case still has an owner even once they're
+      // disabled/removed — show their name (rather than offering "Assign"
+      // as if the case were unowned) when we can't find them in the active list.
+      const ownerName = owner ? null : (c.caseOwner ? memberNameFor(c.caseOwner) : null);
       const rowStatus = computeRowStatus(caseTasks);
       const group = caseStageGroup(c.stage);
       const risk = computeCaseRisk(c, tasks, deadlines, checklistsByCase[c.id], new Date(), template?.steps);
-      return { case: c, client, applicant, template, owner, group, risk, ...rowStatus };
+      return { case: c, client, applicant, template, owner, ownerName, group, risk, ...rowStatus };
     });
-  }, [searchedCases, clients, tasks, templates, teamMembers, deadlines, checklistsByCase]);
+  }, [searchedCases, clients, tasks, templates, teamMembers, deadlines, checklistsByCase, memberNameFor]);
 
   const filterCounts = useMemo(() => {
     const counts: Record<GroupFilter, number> = { all: rows.length, pre_lodgement: 0, with_department: 0, closed: 0 };
@@ -217,6 +258,31 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {storageMode === 'cloud' && (
+              <div className="flex gap-0.5 p-[3px] bg-paper-2 dark:bg-plate rounded-[9px]" role="group" aria-label="Case ownership scope">
+                <button
+                  onClick={() => handleSetOwnerScope('mine')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-xs font-semibold transition-all ${
+                    ownerScope === 'mine'
+                      ? 'bg-paper dark:bg-plate-card text-ink dark:text-plate-ink'
+                      : 'text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink'
+                  }`}
+                >
+                  My cases
+                </button>
+                <button
+                  onClick={() => handleSetOwnerScope('all')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-xs font-semibold transition-all ${
+                    ownerScope === 'all'
+                      ? 'bg-paper dark:bg-plate-card text-ink dark:text-plate-ink'
+                      : 'text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink'
+                  }`}
+                >
+                  <Users size={12} strokeWidth={2} className="inline -mt-0.5 mr-1" />
+                  All cases
+                </button>
+              </div>
+            )}
             <button
               onClick={() => setShowConfigurations(true)}
               title="Case Manager configurations — document types and other module settings"
@@ -421,6 +487,13 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                       title={`Owned by ${r.owner.name}`}
                     >
                       {r.owner.avatar || initialsOf(r.owner.name)}
+                    </div>
+                  ) : r.ownerName ? (
+                    <div
+                      className="w-6 h-6 rounded-full bg-ink/10 dark:bg-plate-ink/15 text-ink-faint dark:text-plate-ink-faint flex items-center justify-center text-[9.5px] font-bold flex-shrink-0"
+                      title={`Owned by ${r.ownerName}`}
+                    >
+                      {initialsOf(r.ownerName)}
                     </div>
                   ) : (
                     onAssignCase && (

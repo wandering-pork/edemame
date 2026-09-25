@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, FileText, Settings, LogOut, Users, Menu, X,
   BookTemplate, Sparkles, UsersRound, UserCog, PanelLeftClose, PanelLeftOpen,
+  Building2, Check, ChevronsUpDown,
 } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { SidebarLogoArea } from './SidebarLogoArea';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useStorageMode } from '../contexts/RepositoryContext';
+import { useFirm } from '../contexts/FirmContext';
+import { firmRoleLabel } from '../lib/firmDirectory';
 
 interface NavGroup {
   label?: string;
@@ -98,6 +102,127 @@ const NavItem: React.FC<{
   </NavLink>
 );
 
+/**
+ * Step 1 · 1G.5 — the current firm's name under the logo, cloud mode only
+ * (local mode has no firm concept — useFirm() returns firm: null there, so
+ * this renders nothing). With more than one active membership it becomes a
+ * switcher: a menu listing every firm the user belongs to, their role in
+ * each, and a checkmark on the current one. Picking another firm updates
+ * profiles.current_firm_id and reloads (FirmContext.switchFirm) — the same
+ * full-reload pattern the storage-mode switch already uses, since cloud
+ * repositories are built for one firm.
+ */
+const FirmSwitcher: React.FC<{ collapsed: boolean; isDrawer: boolean }> = ({ collapsed, isDrawer }) => {
+  const storageMode = useStorageMode();
+  const { firm, memberships, switchFirm } = useFirm();
+  const [open, setOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const effectivelyCollapsed = collapsed && !isDrawer;
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  if (storageMode !== 'cloud' || !firm) return null;
+
+  const canSwitch = memberships.length > 1;
+
+  const handlePick = async (firmId: string) => {
+    if (firmId === firm.id || switching) return;
+    setSwitching(true);
+    setOpen(false);
+    try {
+      await switchFirm(firmId);
+    } catch (err) {
+      console.error('Failed to switch firms:', err);
+      setSwitching(false);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className={`relative px-3 pb-2 ${effectivelyCollapsed ? 'flex justify-center' : ''}`}>
+      <button
+        type="button"
+        onClick={() => canSwitch && setOpen(o => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={effectivelyCollapsed ? firm.name : undefined}
+        className={`group relative flex items-center rounded-lg text-[12px] font-medium transition-all duration-150 ${
+          effectivelyCollapsed ? 'w-9 h-9 justify-center' : 'w-full px-2.5 py-2 gap-2'
+        } ${canSwitch ? 'cursor-pointer hover:bg-ink/6 dark:hover:bg-plate-ink/10' : 'cursor-default'} ${
+          open ? 'bg-ink/6 dark:bg-plate-ink/10' : ''
+        }`}
+        disabled={switching}
+      >
+        <Building2 size={effectivelyCollapsed ? 15 : 14} className="flex-shrink-0 text-ink-faint dark:text-plate-ink-faint" />
+        {!effectivelyCollapsed && (
+          <>
+            <span className="flex-1 min-w-0 text-left truncate text-ink-soft dark:text-plate-ink-soft">
+              {switching ? 'Switching...' : firm.name}
+            </span>
+            {canSwitch && (
+              <ChevronsUpDown size={12} className="flex-shrink-0 text-ink-faint dark:text-plate-ink-faint" />
+            )}
+          </>
+        )}
+        {effectivelyCollapsed && (
+          <span
+            className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-md text-[12px] font-medium whitespace-nowrap z-[100] shadow-xl
+                       bg-ink dark:bg-plate-card text-paper dark:text-plate-ink
+                       opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100
+                       transition-all duration-100 origin-left"
+          >
+            {firm.name}
+            <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-ink dark:border-r-plate-card" />
+          </span>
+        )}
+      </button>
+
+      {open && canSwitch && (
+        <div
+          role="menu"
+          aria-label="Switch firm"
+          className={`absolute z-[110] mt-1 min-w-[220px] rounded-xl border border-ink/10 dark:border-plate-ink/15 bg-paper dark:bg-plate-card shadow-xl py-1.5 ${
+            effectivelyCollapsed ? 'left-[calc(100%+10px)] top-0' : 'left-3 right-3'
+          }`}
+        >
+          {memberships.map(m => (
+            <button
+              key={m.firmId}
+              type="button"
+              role="menuitemradio"
+              aria-checked={m.firmId === firm.id}
+              onClick={() => handlePick(m.firmId)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12.5px] text-ink dark:text-plate-ink hover:bg-ink/6 dark:hover:bg-plate-ink/10 transition-colors"
+            >
+              <span className="w-3.5 flex-shrink-0">
+                {m.firmId === firm.id && <Check size={13} className="text-edamame-600 dark:text-edamame-400" />}
+              </span>
+              <span className="flex-1 min-w-0 truncate font-medium">{m.firmName}</span>
+              <span className="flex-shrink-0 text-[10px] uppercase tracking-wide text-ink-faint dark:text-plate-ink-faint">
+                {firmRoleLabel(m.role)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const Sidebar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -170,6 +295,9 @@ export const Sidebar: React.FC = () => {
             </div>
           )}
         </NavLink>
+
+        {/* Current firm / switcher (cloud mode only) */}
+        <FirmSwitcher collapsed={collapsed} isDrawer={isDrawer} />
 
         {/* Divider */}
         <div className="mx-4 h-px bg-ink/10 dark:bg-plate-ink/15" />

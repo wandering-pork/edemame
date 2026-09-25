@@ -14,6 +14,16 @@ import type { Case, Client, Task, TeamMember, ActivityEvent } from '../types';
 import { toLocalISODate } from '../lib/dates';
 import { isTaskClosed } from '../lib/taskStatus';
 import { CASE_STAGE_LABELS } from '../lib/caseStage';
+import { firmJobTitleLabel } from '../lib/firmDirectory';
+import { useFirm } from '../contexts/FirmContext';
+
+// Same palette as components/team/FirmTeamMembers.tsx's availability picker
+// — small enough not to be worth sharing a module for.
+const availabilityDot: Record<string, string> = {
+  available: '#10B981',
+  busy: '#F59E0B',
+  offline: '#94A3B8',
+};
 
 interface TeamDashboardProps {
   teamMembers: TeamMember[];
@@ -115,7 +125,23 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
     setAssignNote('');
   };
 
+  const { memberNameFor, allMembers } = useFirm();
   const getMember = (id?: string) => teamMembers.find(m => m.id === id);
+  // Step 1 · 1G.7: prefer the real, agent-chosen job title (e.g.
+  // "Registered migration agent") from the firm directory over
+  // TeamMember.role's cosmetic partner/lawyer/assistant bucket — it's more
+  // informative and is exactly what the Team page's own member rows show.
+  // Falls back to the cosmetic role in local mode, where there's no firm
+  // directory at all.
+  const jobTitleLabel = (member: TeamMember): string => {
+    const row = allMembers.find(m => m.userId === member.id);
+    return (row && firmJobTitleLabel(row.jobTitle)) || roleLabel[member.role];
+  };
+  // Step 1 · 1G.6: getMember only finds *active* members (teamMembers is
+  // active-only) — for display of past work (activity actor, assignment
+  // history, case owner), fall back to a disabled/former member's name
+  // instead of showing nothing.
+  const getMemberDisplayName = (id?: string) => getMember(id)?.name ?? memberNameFor(id) ?? undefined;
   const getClient = (id: string) => clients.find(c => c.id === id);
 
   const caseProgress = (caseId: string) => {
@@ -156,19 +182,26 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                 className="bg-paper-2 dark:bg-plate-card/50 border border-ink/10 dark:border-plate-ink/15 rounded-xl p-3"
               >
                 <div className="flex items-center gap-2.5 px-1 pb-3">
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-                    style={{ background: `oklch(0.93 0.05 ${hue})`, color: `oklch(0.42 0.12 ${hue})` }}
-                  >
-                    {member.avatar || initialsOf(member.name)}
+                  <div className="relative flex-shrink-0">
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold"
+                      style={{ background: `oklch(0.93 0.05 ${hue})`, color: `oklch(0.42 0.12 ${hue})` }}
+                    >
+                      {member.avatar || initialsOf(member.name)}
+                    </div>
+                    <span
+                      title={member.status}
+                      className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full border-2 border-paper-2 dark:border-plate-card"
+                      style={{ background: availabilityDot[member.status] || availabilityDot.offline }}
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-bold tracking-[-0.01em] text-ink dark:text-plate-ink truncate">
                       {member.name}
                     </div>
-                    <div className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{roleLabel[member.role]}</div>
+                    <div className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint truncate">{jobTitleLabel(member)}</div>
                   </div>
-                  <span className="text-[11px] font-bold text-ink-faint dark:text-plate-ink-faint flex-shrink-0">
+                  <span className="text-[11px] font-bold text-ink-faint dark:text-plate-ink-faint flex-shrink-0" title="Open tasks">
                     {openTasks.length}
                   </span>
                 </div>
@@ -257,6 +290,9 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
               )}
               {filteredCases.map(c => {
                 const owner = getMember(c.caseOwner);
+                // Step 1 · 1G.6: an owner who's disabled/removed still owns
+                // the case — show their name instead of the "Assign" prompt.
+                const ownerName = owner ? null : (c.caseOwner ? memberNameFor(c.caseOwner) : null);
                 const client = getClient(c.clientId);
                 const progress = caseProgress(c.id);
                 const hue = hueFromId(client?.id || c.clientId || c.id);
@@ -298,6 +334,13 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                           title={`Owned by ${owner.name}`}
                         >
                           {owner.avatar || initialsOf(owner.name)}
+                        </div>
+                      ) : ownerName ? (
+                        <div
+                          className="w-8 h-8 rounded-full bg-ink/10 dark:bg-plate-ink/15 text-ink-faint dark:text-plate-ink-faint flex items-center justify-center text-[10.5px] font-bold"
+                          title={`Owned by ${ownerName}`}
+                        >
+                          {initialsOf(ownerName)}
                         </div>
                       ) : (
                         <button
@@ -342,6 +385,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                 <ul className="space-y-4">
                   {recentActivity.map(ev => {
                     const actor = getMember(ev.actorId);
+                    const actorName = actor?.name ?? memberNameFor(ev.actorId) ?? undefined;
                     const hue = hueFromId(actor?.id || ev.actorId || ev.id);
                     return (
                       <li key={ev.id} className="flex items-start gap-3">
@@ -349,7 +393,7 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                           className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
                           style={{ background: `oklch(0.93 0.05 ${hue})`, color: `oklch(0.42 0.12 ${hue})` }}
                         >
-                          {actor ? (actor.avatar || initialsOf(actor.name)) : '—'}
+                          {actor ? (actor.avatar || initialsOf(actor.name)) : actorName ? initialsOf(actorName) : '—'}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[12.5px] text-ink dark:text-plate-ink-soft leading-snug">{ev.summary}</p>
@@ -430,15 +474,18 @@ export const TeamDashboard: React.FC<TeamDashboardProps> = ({
                     </p>
                     <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
                       {history.slice().reverse().map(ev => {
-                        const fromMember = getMember(ev.fromOwnerId);
-                        const toMember = getMember(ev.toOwnerId);
+                        // Step 1 · 1G.6: an assignment history entry can name
+                        // a disabled/removed member — fall back to their
+                        // name instead of "Unknown".
+                        const fromName = getMemberDisplayName(ev.fromOwnerId);
+                        const toName = getMemberDisplayName(ev.toOwnerId);
                         return (
                           <div key={ev.id} className="text-xs text-ink-soft dark:text-plate-ink-soft flex items-center gap-2">
                             <Clock size={12} strokeWidth={1.8} />
                             <span>
-                              {fromMember ? `${fromMember.name} → ` : 'Assigned to '}
+                              {fromName ? `${fromName} → ` : 'Assigned to '}
                               <span className="font-semibold text-ink-soft dark:text-plate-ink-soft">
-                                {toMember?.name || 'Unknown'}
+                                {toName || 'Unknown'}
                               </span>
                               <span className="ml-2 text-ink-faint dark:text-plate-ink-faint">{format(new Date(ev.changedAt), 'MMM d')}</span>
                             </span>
