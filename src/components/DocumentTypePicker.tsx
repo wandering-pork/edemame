@@ -56,18 +56,28 @@ export const DocumentTypePicker: React.FC<DocumentTypePickerProps> = ({
     const panelHeight = panelRef.current?.offsetHeight ?? 320;
     const spaceBelow = window.innerHeight - rect.bottom;
     const openUpward = spaceBelow < panelHeight && rect.top > spaceBelow;
+    // The panel renders at least 260px wide, so clamp with that width, not the trigger's.
+    const panelWidth = Math.max(rect.width, 260);
     setPanelPos({
       top: openUpward ? Math.max(8, rect.top - panelHeight - 4) : rect.bottom + 4,
-      left: Math.min(rect.left, window.innerWidth - rect.width - 8),
-      width: rect.width,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - panelWidth - 8)),
+      width: panelWidth,
     });
   };
 
   useLayoutEffect(() => {
     if (!open) return;
     updatePanelPos();
-    inputRef.current?.focus();
   }, [open]);
+
+  // The panel only mounts once panelPos is set, so focus it (and re-measure with its
+  // real height) after that render — not in the same pass that sets panelPos.
+  const panelMounted = open && panelPos !== null;
+  useLayoutEffect(() => {
+    if (!panelMounted) return;
+    inputRef.current?.focus();
+    updatePanelPos();
+  }, [panelMounted]);
 
   useEffect(() => {
     if (!open) return;

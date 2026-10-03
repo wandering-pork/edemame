@@ -187,7 +187,7 @@ export async function compressDocument(doc: Document, blob: Blob): Promise<Compr
     ext,
     flagged,
     note: flagged
-      ? `${kindLabel(kind)}s can't be safely compressed client-side — this file exceeds 5 MB and needs manual attention (re-save with smaller embedded images, or split the content).`
+      ? `${kindLabel(kind)} is not supported for client-side compression — this file exceeds 5 MB and needs manual attention (re-save with smaller embedded images, export to PDF, or split the content).`
       : 'Within size limit — no compression needed.',
   };
 }

@@ -36,24 +36,30 @@ From there it walks through three steps:
 1. **Select & Check** — every file in the chosen source is listed with its format and size. Files
    over 5 MB in a supported format are ticked automatically; you can tick/untick freely. A file
    already under 5 MB shows a green "already meets requirement, no need to compress" label and
-   isn't ticked by default, but you can still tick it if you want. A file in an unsupported format
-   shows a red "format is not eligible for compressing" flag and can't be ticked. If nothing in the
-   source is an eligible format at all, the screen tells you so and lets you exit.
+   isn't ticked by default, but you can still tick it if you want. A file in a format Case Files
+   doesn't accept at all shows a red "format is not eligible for compressing" flag and can't be
+   ticked — and a DOCX over 5 MB shows a red "this document type is not supported for compression"
+   flag and can't be ticked either, since there's no in-browser Word engine to shrink it (export it
+   to PDF first, or leave it in Case Files as-is). If nothing in the source is an eligible format at
+   all, the screen tells you so and lets you exit.
 2. **Compress** — every ticked file is compressed on its own (never bundled with any other file).
    Each result lands in one of three states:
    - **Under 5 MB** — success, ticked automatically to continue to Step 3.
    - **5–50 MB** — a warning that DoHA will likely reject it, left unticked; you can still tick it
      yourself if you want to save or download it anyway.
-   - **Still over 50 MB** — a hard failure. This file cannot continue to Step 3 at all, which is
-     what stops an oversized file from ever reaching Case Files by going through the compressor —
-     if nothing in the batch got under 50 MB, the screen tells you so and lets you exit or go back
-     and pick different files.
+   - **Still over 50 MB, or compression failed outright** — a hard failure either way. This file
+     cannot continue to Step 3 at all, which is what stops an oversized file from ever reaching
+     Case Files by going through the compressor. If nothing in the batch can proceed, the screen
+     tells you why — a size message if files are still over 50 MB after compressing, a failure
+     message if compression itself errored out (which can happen even for a file well under
+     50 MB), or both — and lets you exit or go back and pick different files.
 3. **Save or Download** — each file that continued gets an editable, auto-suggested name (original
    file name + today's date). **Save to Case Files** and **Download** are independent per file, so
    you can do either, both, or move on to the next file — trying to save a name that's already
    used in Case Files (or elsewhere in this batch) prompts you to rename it first. A file still
    flagged from the 5–50 MB warning tier keeps its warning icon here as a reminder even though
-   Case Files will accept it. **Complete** (bottom-right) exits the tool at any time.
+   Case Files will accept it. **Complete** (bottom-right — labelled **Cancel** on the earlier
+   steps) exits the tool at any time.
 
 ### What gets compressed, and how
 
@@ -62,11 +68,14 @@ From there it walks through three steps:
   (the text layer is no longer selectable, an accepted tradeoff for what was already a scan) and
   reassembled into a new PDF, iterating resolution/quality down until it fits or the safety floor
   (72 DPI / JPEG quality 0.4) is hit.
-- **Images** (JPG, PNG, and legacy BMP/GIF) are resized and re-encoded as JPG, targeting the
-  Department's recommended ~500 KB per image. BMP and GIF are always converted to JPG.
-- **DOCX / XLSX / TXT and other formats** can't be compressed client-side (there's no in-browser
-  Word/Excel engine). The Document Compressor only flags these if they're already over 5 MB —
-  recreate them with smaller embedded images, or export to PDF first.
+- **Images** (JPG and PNG) are resized and re-encoded as JPG, targeting the Department's
+  recommended ~500 KB per image.
+- **Word documents (DOCX)** under 5 MB can be selected and pass through unchanged (nothing to
+  compress). A DOCX over 5 MB can't be compressed client-side (there's no in-browser Word engine),
+  so it's shown as not supported in Step 1 rather than ticked — export it to PDF and compress the
+  PDF instead, or recreate it with smaller embedded images.
+- **Any other format** (BMP, GIF, XLSX, TXT, …) isn't supported: it can't be picked from your PC,
+  and in Case Files it's shown as "format is not eligible for compressing".
 
 ## Other packaging tools
 

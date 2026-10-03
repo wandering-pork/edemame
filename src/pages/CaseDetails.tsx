@@ -2449,7 +2449,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         <DocumentCompressor
           caseId={caseItem.id}
           documents={documents}
-          applicant={applicant ?? client}
           initialLocalFiles={compressorInitialFiles}
           initialCaseDocIds={compressorInitialDocIds}
           onClose={() => { setShowDocumentCompressor(false); setCompressorInitialFiles(undefined); setCompressorInitialDocIds(undefined); }}

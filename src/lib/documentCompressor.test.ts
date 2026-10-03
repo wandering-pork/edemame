@@ -378,7 +378,7 @@ describe('compressDocument — DOCX / XLSX / TXT / other passthrough', () => {
     expect(outcome.mimeType).toBe(fileType);
     expect(outcome.ext).toBe(ext);
     expect(outcome.flagged).toBe(true);
-    expect(outcome.note.startsWith(`${label}s can't be safely compressed client-side`)).toBe(true);
+    expect(outcome.note.startsWith(`${label} is not supported for client-side compression`)).toBe(true);
     expect(outcome.note).toMatch(/exceeds 5 MB/);
   });
 

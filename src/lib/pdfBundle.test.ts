@@ -331,6 +331,19 @@ describe('createDownloadUrl', () => {
     expect(result.filename).toBe('output.pdf');
     expect(result.url).toBe('blob:mock-url');
   });
+
+  it('honours an explicit mimeType for non-PDF output (e.g. a compressed JPG)', () => {
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:mock-url');
+    vi.stubGlobal('URL', { ...URL, createObjectURL });
+
+    const bytes = new Uint8Array(42);
+    const result = createDownloadUrl(bytes, 'scan.jpg', 'image/jpeg');
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const passedBlob = createObjectURL.mock.calls[0][0];
+    expect(passedBlob.type).toBe('image/jpeg');
+    expect(result.filename).toBe('scan.jpg');
+  });
 });
 
 describe('Run Crusher bundle filename composition (proxy for PdfPackager.tsx)', () => {

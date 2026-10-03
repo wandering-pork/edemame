@@ -5,13 +5,14 @@ import {
   Package, X, ArrowRight, ArrowLeft, Loader2, CheckCircle, AlertCircle,
   FileWarning, Download, Save, FolderOpen, Monitor, Plus, XCircle, CircleCheck,
 } from 'lucide-react';
-import type { Client, Document } from '../types';
+import type { Document } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import {
   classifyKind, kindLabel, compressDocument, suggestOutputName, validateOutputNames,
   DOHA_MAX_BYTES, formatBytes, exceedsCaseFilesLimit, type CompressOutcome,
 } from '../lib/documentCompressor';
 import { ACCEPTED_DOCUMENT_EXTENSIONS, SUPPORTED_FORMATS_LABEL, isSupportedDocumentFile, CASE_FILES_MAX_BYTES } from '../lib/supportedFormats';
+import { createDownloadUrl, triggerDownload } from '../lib/pdfBundle';
 
 /**
  * Document Compressor (formerly "Auto-Packager", renamed and redesigned per
@@ -32,7 +33,8 @@ import { ACCEPTED_DOCUMENT_EXTENSIONS, SUPPORTED_FORMATS_LABEL, isSupportedDocum
  *      catching it at save time.
  *   3. Save or Download — per file, save to Case Files (auto-suggested
  *      name, prompts on a duplicate name) and/or download to the computer.
- *      "Complete" exits at any point.
+ *      The footer button reads "Cancel" on every step except the last,
+ *      where it becomes "Complete" — either way it exits the tool.
  *
  * Complements (does not replace) PdfPackager ("5MB Crusher", PDF-only quick
  * merge) and BundleBuilder820 (per-aspect 820 bundling) — this is the
@@ -42,7 +44,6 @@ import { ACCEPTED_DOCUMENT_EXTENSIONS, SUPPORTED_FORMATS_LABEL, isSupportedDocum
 interface DocumentCompressorProps {
   caseId: string;
   documents: Document[];
-  applicant: Client;
   onClose: () => void;
   /** Called after a file is saved into the case's documents, so the caller can refresh its list. */
   onSaved?: () => void;
@@ -86,13 +87,36 @@ function tierFor(sizeBytes: number, failed = false): SizeTier {
   return 'failed';
 }
 
-/** Step 1: files eligible to be auto-selected — over the DoHA ceiling and in a format the compressor can process. */
+/**
+ * Step 1: files eligible to be auto-selected — over the DoHA ceiling and in a
+ * format the compressor can actually shrink. DOCX is a selectable/supported
+ * format (see `isSupportedDocumentFile`) but `compressDocument`'s docx branch
+ * is pass-through only, so it's excluded here to avoid promising a
+ * compression that can never happen.
+ */
 function isAutoSelectEligible(doc: Document): boolean {
-  return doc.fileSize > DOHA_MAX_BYTES && isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType });
+  if (doc.fileSize <= DOHA_MAX_BYTES) return false;
+  const kind = classifyKind(doc);
+  return (kind === 'pdf' || kind === 'image') && isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType });
+}
+
+/**
+ * Whether the Document Compressor can actually do something with this file.
+ * DOCX is a format Case Files accepts (`isSupportedDocumentFile`), but
+ * `compressDocument`'s docx branch is pass-through only — so once it's over
+ * the DoHA limit, there's nothing this tool can offer and it should be
+ * surfaced as "not supported" rather than left tickable with a soft warning
+ * that promises a compression that can never happen.
+ */
+function isCompressorSupported(doc: Document): boolean {
+  if (!isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType })) return false;
+  if (doc.fileSize <= DOHA_MAX_BYTES) return true;
+  const kind = classifyKind(doc);
+  return kind === 'pdf' || kind === 'image';
 }
 
 export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
-  caseId, documents, applicant, onClose, onSaved, initialLocalFiles, initialCaseDocIds,
+  caseId, documents, onClose, onSaved, initialLocalFiles, initialCaseDocIds,
 }) => {
   const repos = useRepositories();
 
@@ -123,11 +147,25 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
   const docsById = useMemo(() => new Map([...documents, ...localDocs].map(d => [d.id, d])), [documents, localDocs]);
 
   // ---- Step 1: Select & Check ----
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(initialCaseDocIds || []));
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(
+    // The per-row "Compress" quick action pre-selects a single doc by id regardless of
+    // format — drop it here if it's one this tool can't do anything with (e.g. an
+    // oversized DOCX), so it lands unticked with a "not supported" message instead of
+    // silently going through Step 2 as a no-op "compression".
+    (initialCaseDocIds || []).filter(id => {
+      const doc = documents.find(d => d.id === id);
+      return !doc || isCompressorSupported(doc);
+    }),
+  ));
   // Tracks which candidate ids we've already evaluated for auto-select, so a
   // user manually unticking an auto-selected file doesn't get overridden on
   // the next render — newly-added local files still get evaluated once.
-  const autoCheckedRef = useRef<Set<string>>(new Set());
+  const autoCheckedRef = useRef<Set<string>>(
+    // The "Compress" quick action pre-selects exactly the file(s) it was opened for —
+    // treat every other existing document as already evaluated so auto-select doesn't
+    // tick the rest of them too.
+    hasInitialCaseDocIds ? new Set(documents.map(d => d.id)) : new Set(),
+  );
 
   useEffect(() => {
     setSelectedIds(prev => {
@@ -194,7 +232,6 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
   const [processing, setProcessing] = useState(false);
   const [processProgress, setProcessProgress] = useState('');
 
-  const lastName = (applicant.name || '').trim().split(/\s+/).pop() || 'Applicant';
   const dateStr = format(new Date(), 'yyyyMMdd');
 
   const runCompression = async () => {
@@ -202,6 +239,9 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
     setProcessing(true);
     setResults({});
     setProceedIds(new Set());
+    // A real re-compression produces new output, so Step 3 should start fresh
+    // (as opposed to a plain Back → Continue, which preserves rowState — see enterOutputPhase).
+    setRowState({});
     const ids: string[] = Array.from(selectedIds);
     const next: Record<string, FileResult> = {};
     const proceed = new Set<string>();
@@ -217,7 +257,7 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
         if (!blob) throw new Error('Could not load file data');
         // eslint-disable-next-line no-await-in-loop
         const outcome = await compressDocument(doc, blob);
-        const outputName = suggestOutputName({ doc, ext: outcome.ext, dateStr, applicantLastName: lastName, existingNames: usedNames });
+        const outputName = suggestOutputName({ doc, ext: outcome.ext, dateStr, existingNames: usedNames });
         usedNames.add(outputName.toLowerCase());
         const failed = outcome.bytes.length === 0;
         next[docId] = {
@@ -271,17 +311,26 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
     [selectedIds, results],
   );
   const noneCanProceed = !processing && resultList.length > 0 && resultList.every(r => tierFor(r.sizeBytes, r.failed) === 'failed');
+  // `noneCanProceed` lumps two different reasons under the 'failed' tier: a file whose
+  // compressed output is still over the Case Files ceiling (genuinely a size problem),
+  // and a file where compression itself errored out (r.failed — e.g. "Could not load
+  // file data"), which can happen even when the original was already well under that
+  // ceiling. The banner below needs to say the right thing for each case.
+  const anyGenuineFailures = noneCanProceed && resultList.some(r => r.failed);
+  const allGenuineFailures = noneCanProceed && resultList.every(r => r.failed);
 
   // ---- Step 3: Save or Download ----
   const [rowState, setRowState] = useState<Record<string, RowOutputState>>({});
   const [sessionSavedNames, setSessionSavedNames] = useState<Set<string>>(new Set());
 
   const enterOutputPhase = () => {
-    setRowState(() => {
+    setRowState(prev => {
       const seeded: Record<string, RowOutputState> = {};
       for (const id of proceedIds) {
         const r = results[id];
-        if (r) seeded[id] = { name: r.outputName };
+        // Keep a row's saved/downloaded state across Back → Continue so a
+        // file already saved to Case Files can't be saved there again.
+        if (r) seeded[id] = prev[id] ?? { name: r.outputName };
       }
       return seeded;
     });
@@ -342,6 +391,10 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
         evidenceNote: `Document Compressor output from "${doc.fileName}"`,
       };
       await repos.documents.create(outDoc, blob);
+      // The refreshed `documents` prop (via `onSaved`) will include this copy — mark
+      // it as already evaluated so Step 1's auto-select doesn't tick it (and offer
+      // to re-compress an already-compressed file) if the user goes Back.
+      autoCheckedRef.current.add(outDoc.id);
       setSessionSavedNames(prev => new Set(prev).add(name.toLowerCase()));
       setRowState(prev => ({ ...prev, [id]: { ...prev[id], name, saving: false, saved: true } }));
       onSaved?.();
@@ -362,15 +415,10 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
       setRowState(prev => ({ ...prev, [id]: { ...prev[id], error: 'File name cannot be empty.' } }));
       return;
     }
-    const blob = new Blob([r.outcome.bytes], { type: r.outcome.mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const { url } = createDownloadUrl(r.outcome.bytes, name, r.outcome.mimeType);
+    triggerDownload(url, name);
+    // Revoking synchronously can cancel a large download in Firefox/Safari — give it a moment.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
     setRowState(prev => ({ ...prev, [id]: { ...prev[id], name, downloaded: true, error: undefined } }));
   };
 
@@ -404,7 +452,12 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
                 Each file is compressed on its own to fit DoHA's 5 MB attachment limit — nothing leaves this machine.
               </p>
             </div>
-            <button onClick={onClose} aria-label="Close" className="-mt-1 -mr-1 p-2 rounded-lg text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 transition-colors">
+            <button
+              onClick={onClose}
+              disabled={processing}
+              aria-label="Close"
+              className="-mt-1 -mr-1 p-2 rounded-lg text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            >
               <X size={18} strokeWidth={2.25} />
             </button>
           </div>
@@ -507,15 +560,17 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
                   const kind = classifyKind(doc);
                   const eligible = isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType });
                   const underLimit = doc.fileSize <= DOHA_MAX_BYTES;
+                  const canCompress = kind === 'pdf' || kind === 'image';
+                  const supported = isCompressorSupported(doc);
                   const checked = selectedIds.has(doc.id);
                   return (
                     <div
                       key={doc.id}
                       className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[11.5px] bg-white dark:bg-[#13161A] border ${
-                        !eligible ? 'border-red-200 dark:border-red-900/40' : underLimit ? 'border-emerald-200 dark:border-emerald-900/40' : 'border-ink/10 dark:border-white/[0.06]'
+                        !supported ? 'border-red-200 dark:border-red-900/40' : underLimit ? 'border-emerald-200 dark:border-emerald-900/40' : 'border-ink/10 dark:border-white/[0.06]'
                       }`}
                     >
-                      {eligible ? (
+                      {supported ? (
                         <input
                           type="checkbox"
                           checked={checked}
@@ -535,6 +590,10 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
                       ) : underLimit ? (
                         <span className="flex-shrink-0 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                           Already meets requirement, no need to compress.
+                        </span>
+                      ) : !canCompress ? (
+                        <span className="flex-shrink-0 text-[10px] font-bold text-red-600 dark:text-red-400 max-w-[220px] text-right leading-tight">
+                          This document type is not supported for compression — export to PDF first, or save it to Case Files as-is.
                         </span>
                       ) : (
                         <span className="flex-shrink-0 text-[10px] font-bold text-amber-600 dark:text-amber-400">
@@ -564,7 +623,13 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
                 <div className="flex flex-col gap-2 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl px-3.5 py-3">
                   <div className="flex items-start gap-2">
                     <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-                    <span>None of these files could be brought under {formatBytes(CASE_FILES_MAX_BYTES)} — none can proceed. Go back and choose different files, or exit.</span>
+                    <span>
+                      {allGenuineFailures
+                        ? 'Compression failed for every selected file — none can proceed. Go back and choose different files, or exit.'
+                        : anyGenuineFailures
+                          ? `Compression failed for some files, and the rest are still over ${formatBytes(CASE_FILES_MAX_BYTES)} after compressing — none can proceed. Go back and choose different files, or exit.`
+                          : `None of these files could be brought under ${formatBytes(CASE_FILES_MAX_BYTES)} — none can proceed. Go back and choose different files, or exit.`}
+                    </span>
                   </div>
                   <div>
                     <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[12px] font-bold transition-colors">
@@ -629,7 +694,7 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
           {phase === 'output' && (
             <div className="space-y-2">
               <p className="text-[12.5px] text-ink-soft dark:text-plate-ink-soft">
-                Auto-suggested from the applicant, original file name, and today's date — edit before saving. Save and download are independent, so you can do either or both per file.
+                Auto-suggested from the original file name and today's date — edit before saving. Save and download are independent, so you can do either or both per file.
               </p>
               {Array.from(proceedIds).map((id: string) => {
                 const r = results[id];
@@ -643,9 +708,13 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
                       <input
                         type="text"
                         value={state.name}
-                        onChange={(e) => setRowState(prev => ({ ...prev, [id]: { ...prev[id], name: e.target.value, error: undefined, saved: false } }))}
+                        onChange={(e) => setRowState(prev => ({ ...prev, [id]: { ...prev[id], name: e.target.value, error: undefined } }))}
+                        // A saved row's name is locked rather than reset to unsaved, so
+                        // editing it after the fact can't trigger a second save of the
+                        // same compressed output under a different name.
+                        readOnly={state.saved}
                         aria-invalid={!!state.error}
-                        className={`flex-1 min-w-0 text-[12.5px] font-mono bg-transparent border-b outline-none py-1 text-ink dark:text-plate-ink-soft ${state.error ? 'border-red-400 dark:border-red-600' : 'border-ink/15 dark:border-plate-ink/20 focus:border-edamame-500'}`}
+                        className={`flex-1 min-w-0 text-[12.5px] font-mono bg-transparent border-b outline-none py-1 text-ink dark:text-plate-ink-soft ${state.error ? 'border-red-400 dark:border-red-600' : 'border-ink/15 dark:border-plate-ink/20 focus:border-edamame-500'} ${state.saved ? 'opacity-70 cursor-default' : ''}`}
                       />
                       {tier === 'warning' && <FileWarning size={14} className="flex-shrink-0 text-amber-500" title="Still over 5 MB — DoHA may reject this attachment." />}
                       <span className="flex-shrink-0 font-mono text-[11px] text-ink-faint dark:text-plate-ink-faint">{formatBytes(r.sizeBytes)}</span>
@@ -687,7 +756,11 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
             </button>
           )}
           <div className="flex-1" />
-          <button onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 rounded-lg transition-colors">
+          <button
+            onClick={onClose}
+            disabled={processing}
+            className="px-3.5 py-2 text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card dark:hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50 disabled:pointer-events-none"
+          >
             {phase === 'output' ? 'Complete' : 'Cancel'}
           </button>
           {phase === 'select' && (
