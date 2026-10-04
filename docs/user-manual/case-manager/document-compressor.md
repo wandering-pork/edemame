@@ -17,8 +17,8 @@ instead of re-browsing for it.
 
 ## Using the Document Compressor
 
-Open a case, click the **⋯** menu in the top bar (or the **Document Compressor** tile on the
-Workspace tab), and choose **Document Compressor**. It starts by asking where the files are:
+Open a case, click **Case actions** in the top bar and choose **Document Compressor**, or use the
+**Document Compressor** tile on the Workspace tab. It starts by asking where the files are:
 
 - **Compress files in Case Files** — works from documents already uploaded to this case. Files
   over 5 MB in a supported format are automatically ticked for you.
@@ -43,6 +43,11 @@ From there it walks through three steps:
    to PDF first, or leave it in Case Files as-is). If nothing in the source is an eligible format at
    all, the screen tells you so and lets you exit.
 2. **Compress** — every ticked file is compressed on its own (never bundled with any other file).
+   If one file takes longer than about 15 seconds (large scanned PDFs can), an amber prompt offers
+   three choices: **Keep waiting** (asks again after another 15 seconds), **Skip this file,
+   continue with next** (that file is marked as not compressed and can't continue to Step 3), or
+   **Stop all compression** (finished files are kept; the current and remaining files are marked
+   as not compressed).
    Each result lands in one of three states:
    - **Under 5 MB** — success, ticked automatically to continue to Step 3.
    - **5–50 MB** — a warning that DoHA will likely reject it, left unticked; you can still tick it

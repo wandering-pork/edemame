@@ -2,6 +2,7 @@ import type { Document } from '../types';
 import { loadPdf, mergePdfs, sanitiseFilenameSegment } from './pdfBundle';
 import { compressImage, isRasterImage, needsFormatConversion, isUncompressibleImage } from './imageCompress';
 import { rasterizeAndCompressPdf } from './pdfRasterize';
+import { CASE_FILES_MAX_BYTES, isSupportedDocumentFile } from './supportedFormats';
 
 /**
  * Document Compressor orchestration — classification + per-file compression
@@ -13,6 +14,7 @@ import { rasterizeAndCompressPdf } from './pdfRasterize';
 
 /** ImmiAccount's hard per-attachment ceiling. */
 export const DOHA_MAX_BYTES = 5 * 1024 * 1024;
+export type SizeTier = 'success' | 'warning' | 'failed';
 /** The Document Compressor's working target — a safety margin under the hard ceiling. */
 export const SAFE_TARGET_BYTES = 4.9 * 1024 * 1024;
 /** DoHA's recommended size for image attachments. */
@@ -47,6 +49,29 @@ export function classifyKind(doc: Document): PackagerFileKind {
   }
   if (/\.txt$/.test(name) || doc.fileType === 'text/plain') return 'text';
   return 'other';
+}
+
+/** Classify a compressed result against the DoHA and Case Files size limits. */
+export function tierFor(sizeBytes: number, failed = false): SizeTier {
+  if (failed) return 'failed';
+  if (sizeBytes <= DOHA_MAX_BYTES) return 'success';
+  if (sizeBytes <= CASE_FILES_MAX_BYTES) return 'warning';
+  return 'failed';
+}
+
+/** Step 1 files auto-selected for compression: supported PDFs/images over 5 MB. */
+export function isAutoSelectEligible(doc: Document): boolean {
+  if (doc.fileSize <= DOHA_MAX_BYTES) return false;
+  const kind = classifyKind(doc);
+  return (kind === 'pdf' || kind === 'image') && isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType });
+}
+
+/** Whether the compressor can process a document without a pass-through no-op. */
+export function isCompressorSupported(doc: Document): boolean {
+  if (!isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType })) return false;
+  if (doc.fileSize <= DOHA_MAX_BYTES) return true;
+  const kind = classifyKind(doc);
+  return kind === 'pdf' || kind === 'image';
 }
 
 /** Human label for a PackagerFileKind, used in flags/notes. */
@@ -84,7 +109,7 @@ export interface CompressOutcome {
  *    (DOCX->PDF conversion is out of reach without a server) — passed
  *    through unchanged and flagged only if it exceeds the DoHA limit.
  */
-export async function compressDocument(doc: Document, blob: Blob): Promise<CompressOutcome> {
+export async function compressDocument(doc: Document, blob: Blob, signal?: AbortSignal): Promise<CompressOutcome> {
   const kind = classifyKind(doc);
   const originalBytes = new Uint8Array(await blob.arrayBuffer());
   const ext = doc.fileName.includes('.') ? doc.fileName.split('.').pop()!.toLowerCase() : 'bin';
@@ -107,7 +132,7 @@ export async function compressDocument(doc: Document, blob: Blob): Promise<Compr
       // to rasterizing each page and re-encoding as a reduced-DPI/quality
       // JPEG (see pdfRasterize.ts) — this loses the text layer, an accepted
       // tradeoff for what was already just a photo of a document.
-      const rasterized = await rasterizeAndCompressPdf(bytes, SAFE_TARGET_BYTES);
+      const rasterized = await rasterizeAndCompressPdf(bytes, SAFE_TARGET_BYTES, signal);
       if (rasterized && rasterized.length < bytes.length) {
         const flagged = rasterized.length > DOHA_MAX_BYTES;
         return {
@@ -127,7 +152,8 @@ export async function compressDocument(doc: Document, blob: Blob): Promise<Compr
         flagged: true,
         note: 'Still over 5 MB after lossless compression — split into multiple uploads or reduce scan resolution upstream (150 DPI is enough for ImmiAccount).',
       };
-    } catch {
+    } catch (err) {
+      if (signal?.aborted) throw err;
       return {
         bytes: originalBytes,
         mimeType: doc.fileType || 'application/pdf',
@@ -238,6 +264,24 @@ export function suggestOutputName(opts: {
 }
 
 /**
+ * Keep a user-edited output name within the suggested extension and ensure its
+ * base is a single safe filename segment. An empty edit stays empty so the
+ * validator can report it rather than silently substituting a name.
+ */
+export function sanitiseOutputName(outputName: string, expectedOutputName: string): string {
+  const trimmed = outputName.trim();
+  if (!trimmed) return '';
+
+  const extension = expectedOutputName.match(/\.[^.]+$/)?.[0] ?? '';
+  const expectedBase = extension
+    ? expectedOutputName.slice(0, -extension.length)
+    : expectedOutputName;
+  const editedBase = trimmed.replace(/\.[^.]*$/, '');
+  const safeBase = sanitiseFilenameSegment(editedBase) || sanitiseFilenameSegment(expectedBase);
+  return `${safeBase}${extension}`;
+}
+
+/**
  * Validate a batch of proposed output names before finalising: every name
  * must be non-empty (after trimming) and unique (case-insensitive) across
  * the batch. Returns a map of docId -> error message for invalid entries;
@@ -252,7 +296,7 @@ export function validateOutputNames(items: { docId: string; outputName: string }
       errors[docId] = 'File name cannot be empty.';
       continue;
     }
-    const key = trimmed.toLowerCase();
+    const key = sanitiseOutputName(trimmed, trimmed).toLowerCase();
     const firstDocId = seen.get(key);
     if (firstDocId && firstDocId !== docId) {
       errors[docId] = 'Duplicate file name — give this file a unique name.';

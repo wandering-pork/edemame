@@ -12,6 +12,8 @@ the case, not a place case data lives. It has two sections:
   **Document Compressor**, and, for 820 cases, the **820 Bundle Builder**.
   Same pattern as View — AI-recommended tools first, plus quick search.
 
+You can also open the **Document Compressor** from **Case actions** in the case's top bar.
+
 If you're not sure what you need, use **Chat with Edamame** on the right of the Workspace tab —
 describe what you're trying to do, and the View and Tools suggestions above refresh based on the
 conversation. New recommendations also appear as clickable links directly under the agent's reply,

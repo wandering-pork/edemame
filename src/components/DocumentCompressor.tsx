@@ -9,7 +9,9 @@ import type { Document } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
 import {
   classifyKind, kindLabel, compressDocument, suggestOutputName, validateOutputNames,
+  sanitiseOutputName, tierFor, isAutoSelectEligible, isCompressorSupported,
   DOHA_MAX_BYTES, formatBytes, exceedsCaseFilesLimit, type CompressOutcome,
+  type SizeTier,
 } from '../lib/documentCompressor';
 import { ACCEPTED_DOCUMENT_EXTENSIONS, SUPPORTED_FORMATS_LABEL, isSupportedDocumentFile, CASE_FILES_MAX_BYTES } from '../lib/supportedFormats';
 import { createDownloadUrl, triggerDownload } from '../lib/pdfBundle';
@@ -57,9 +59,11 @@ interface DocumentCompressorProps {
   initialCaseDocIds?: string[];
 }
 
+/** How long one file may compress before the user is offered keep-waiting / skip / stop. */
+const SLOW_PROMPT_MS = 15_000;
+
 type Phase = 'source' | 'select' | 'compress' | 'output';
 type Source = 'case' | 'local';
-type SizeTier = 'success' | 'warning' | 'failed';
 
 interface FileResult {
   docId: string;
@@ -79,42 +83,6 @@ interface RowOutputState {
   error?: string;
 }
 
-/** DoHA-compliant / needs-attention / can't-go-to-Case-Files tiers a compressed result lands in. */
-function tierFor(sizeBytes: number, failed = false): SizeTier {
-  if (failed) return 'failed';
-  if (sizeBytes <= DOHA_MAX_BYTES) return 'success';
-  if (sizeBytes <= CASE_FILES_MAX_BYTES) return 'warning';
-  return 'failed';
-}
-
-/**
- * Step 1: files eligible to be auto-selected â€” over the DoHA ceiling and in a
- * format the compressor can actually shrink. DOCX is a selectable/supported
- * format (see `isSupportedDocumentFile`) but `compressDocument`'s docx branch
- * is pass-through only, so it's excluded here to avoid promising a
- * compression that can never happen.
- */
-function isAutoSelectEligible(doc: Document): boolean {
-  if (doc.fileSize <= DOHA_MAX_BYTES) return false;
-  const kind = classifyKind(doc);
-  return (kind === 'pdf' || kind === 'image') && isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType });
-}
-
-/**
- * Whether the Document Compressor can actually do something with this file.
- * DOCX is a format Case Files accepts (`isSupportedDocumentFile`), but
- * `compressDocument`'s docx branch is pass-through only â€” so once it's over
- * the DoHA limit, there's nothing this tool can offer and it should be
- * surfaced as "not supported" rather than left tickable with a soft warning
- * that promises a compression that can never happen.
- */
-function isCompressorSupported(doc: Document): boolean {
-  if (!isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType })) return false;
-  if (doc.fileSize <= DOHA_MAX_BYTES) return true;
-  const kind = classifyKind(doc);
-  return kind === 'pdf' || kind === 'image';
-}
-
 export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
   caseId, documents, onClose, onSaved, initialLocalFiles, initialCaseDocIds,
 }) => {
@@ -126,6 +94,7 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
 
   const [phase, setPhase] = useState<Phase>(skipSourceScreen ? 'select' : 'source');
   const [source, setSource] = useState<Source>(hasInitialLocalFiles ? 'local' : 'case');
+  const [selectionEpoch, setSelectionEpoch] = useState(0);
 
   // ---- Local-PC source ----
   const [localFiles, setLocalFiles] = useState<{ id: string; file: File }[]>(
@@ -168,20 +137,18 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
   );
 
   useEffect(() => {
-    setSelectedIds(prev => {
-      let changed = false;
-      const next = new Set(prev);
-      for (const doc of sourceDocs) {
-        if (autoCheckedRef.current.has(doc.id)) continue;
-        autoCheckedRef.current.add(doc.id);
-        if (isAutoSelectEligible(doc)) {
-          next.add(doc.id);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [sourceDocs]);
+    // Evaluate outside the state updater: React StrictMode double-invokes updaters in
+    // dev, and mutating the ref inside one made the second pass skip every document.
+    const toSelect: string[] = [];
+    for (const doc of sourceDocs) {
+      if (autoCheckedRef.current.has(doc.id)) continue;
+      autoCheckedRef.current.add(doc.id);
+      if (isAutoSelectEligible(doc)) toSelect.push(doc.id);
+    }
+    if (toSelect.length > 0) {
+      setSelectedIds(prev => new Set([...prev, ...toSelect]));
+    }
+  }, [sourceDocs, selectionEpoch]);
 
   const toggleSelected = (id: string) => {
     setSelectedIds(prev => {
@@ -195,6 +162,7 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
     setSource(next);
     setSelectedIds(new Set());
     autoCheckedRef.current = new Set();
+    setSelectionEpoch(epoch => epoch + 1);
     setPhase('select');
   };
 
@@ -234,6 +202,36 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
 
   const dateStr = format(new Date(), 'yyyyMMdd');
 
+  // Slow-compression escape hatch: after SLOW_PROMPT_MS on one file we offer to keep
+  // waiting, skip just that file, or stop the whole batch (already-finished files are kept).
+  const [slowPrompt, setSlowPrompt] = useState(false);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const abortReasonRef = useRef<'one' | 'all' | null>(null);
+
+  const clearSlowTimer = () => {
+    if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    slowTimerRef.current = null;
+  };
+  const startSlowTimer = () => {
+    clearSlowTimer();
+    slowTimerRef.current = setTimeout(() => setSlowPrompt(true), SLOW_PROMPT_MS);
+  };
+  const keepWaiting = () => {
+    setSlowPrompt(false);
+    startSlowTimer();
+  };
+  const stopCurrent = (reason: 'one' | 'all') => {
+    abortReasonRef.current = reason;
+    setSlowPrompt(false);
+    clearSlowTimer();
+    abortRef.current?.abort();
+  };
+
+  useEffect(() => () => {
+    clearSlowTimer();
+    abortRef.current?.abort();
+  }, []);
   const runCompression = async () => {
     setPhase('compress');
     setProcessing(true);
@@ -246,17 +244,41 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
     const next: Record<string, FileResult> = {};
     const proceed = new Set<string>();
     const usedNames = new Set<string>();
+    abortReasonRef.current = null;
+    const skippedResult = (doc: Document, note: string): FileResult => {
+      usedNames.add(doc.fileName.toLowerCase());
+      return {
+        docId: doc.id,
+        outcome: { bytes: new Uint8Array(0), mimeType: doc.fileType, ext: doc.fileName.split('.').pop() || 'bin', flagged: true, note },
+        outputName: doc.fileName,
+        sizeBytes: 0,
+        failed: true,
+      };
+    };
     for (let i = 0; i < ids.length; i++) {
       const docId = ids[i];
       const doc = docsById.get(docId);
       if (!doc) continue;
+      if (abortReasonRef.current === 'all') {
+        next[docId] = skippedResult(doc, 'Not compressed — compression was stopped.');
+        continue;
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setSlowPrompt(false);
+      startSlowTimer();
       setProcessProgress(`Compressing ${i + 1} of ${ids.length} â€” ${doc.fileName}`);
       try {
         // eslint-disable-next-line no-await-in-loop
         const blob = localFileMap.has(docId) ? localFileMap.get(docId)! : await repos.documents.getFileData(doc);
         if (!blob) throw new Error('Could not load file data');
         // eslint-disable-next-line no-await-in-loop
-        const outcome = await compressDocument(doc, blob);
+        const aborted = new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () => reject(new DOMException('Compression aborted', 'AbortError')));
+        });
+        const work = compressDocument(doc, blob, controller.signal);
+        work.catch(() => undefined);
+        const outcome = await Promise.race([work, aborted]);
         const outputName = suggestOutputName({ doc, ext: outcome.ext, dateStr, existingNames: usedNames });
         usedNames.add(outputName.toLowerCase());
         const failed = outcome.bytes.length === 0;
@@ -271,6 +293,12 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
         };
         if (!failed && tierFor(outcome.bytes.length) === 'success') proceed.add(docId);
       } catch (err) {
+        if (controller.signal.aborted) {
+          next[docId] = skippedResult(doc, abortReasonRef.current === 'all'
+            ? 'Not compressed — compression was stopped.'
+            : 'Skipped — compression was taking too long.');
+          continue;
+        }
         // Treat a compression failure as a hard fail (never a false "success") â€”
         // forced past the Case Files ceiling without allocating a same-size
         // dummy buffer for a potentially huge original file.
@@ -290,6 +318,9 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
         };
       }
     }
+    clearSlowTimer();
+    setSlowPrompt(false);
+    abortRef.current = null;
     setResults(next);
     setProceedIds(proceed);
     setProcessing(false);
@@ -338,12 +369,21 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
   };
 
   const batchErrors = useMemo(
-    () => validateOutputNames(Array.from(proceedIds).map((id: string) => ({ docId: id, outputName: rowState[id]?.name ?? '' }))),
-    [proceedIds, rowState],
+    () => validateOutputNames(Array.from(proceedIds).map((id: string) => {
+      const expectedName = results[id]?.outputName ?? '';
+      return {
+        docId: id,
+        outputName: sanitiseOutputName(rowState[id]?.name ?? expectedName, expectedName),
+      };
+    })),
+    [proceedIds, results, rowState],
   );
 
   const existingNamesLower = useMemo(
-    () => new Set([...documents.map(d => d.fileName.toLowerCase()), ...Array.from(sessionSavedNames)]),
+    () => new Set([
+      ...documents.map(d => sanitiseOutputName(d.fileName, d.fileName).toLowerCase()),
+      ...Array.from(sessionSavedNames),
+    ]),
     [documents, sessionSavedNames],
   );
 
@@ -355,7 +395,7 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
       setRowState(prev => ({ ...prev, [id]: { ...prev[id], error: 'Compression failed - no usable file is available to save.' } }));
       return;
     }
-    const name = (rowState[id]?.name ?? r.outputName).trim();
+    const name = sanitiseOutputName(rowState[id]?.name ?? r.outputName, r.outputName);
     if (batchErrors[id]) {
       setRowState(prev => ({ ...prev, [id]: { ...prev[id], name, error: batchErrors[id] } }));
       return;
@@ -410,7 +450,7 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
       setRowState(prev => ({ ...prev, [id]: { ...prev[id], error: 'Compression failed - no usable file is available to download.' } }));
       return;
     }
-    const name = (rowState[id]?.name ?? r.outputName).trim();
+    const name = sanitiseOutputName(rowState[id]?.name ?? r.outputName, r.outputName);
     if (!name) {
       setRowState(prev => ({ ...prev, [id]: { ...prev[id], error: 'File name cannot be empty.' } }));
       return;
@@ -619,7 +659,17 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
                   <Loader2 size={16} className="animate-spin text-edamame-500 flex-shrink-0" />
                   {processProgress}
                 </div>
-              ) : noneCanProceed ? (
+              ) : null}
+              {processing && slowPrompt ? (
+                <div role="alert" className="space-y-2 text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded-xl px-3.5 py-3">
+                  <p className="font-semibold">This file is taking longer than expected. Large scanned PDFs can take a while to compress.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={keepWaiting} className="px-3 py-1.5 rounded-lg bg-edamame hover:bg-edamame-600 text-white text-[12px] font-bold transition-colors">Keep waiting</button>
+                    <button type="button" onClick={() => stopCurrent('one')} className="px-3 py-1.5 rounded-lg border border-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-[12px] font-bold transition-colors">Skip this file, continue with next</button>
+                    <button type="button" onClick={() => stopCurrent('all')} className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[12px] font-bold transition-colors">Stop all compression</button>
+                  </div>
+                </div>
+              ) : !processing && noneCanProceed ? (
                 <div className="flex flex-col gap-2 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl px-3.5 py-3">
                   <div className="flex items-start gap-2">
                     <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
@@ -709,6 +759,13 @@ export const DocumentCompressor: React.FC<DocumentCompressorProps> = ({
                         type="text"
                         value={state.name}
                         onChange={(e) => setRowState(prev => ({ ...prev, [id]: { ...prev[id], name: e.target.value, error: undefined } }))}
+                        onBlur={() => setRowState(prev => ({
+                          ...prev,
+                          [id]: {
+                            ...prev[id],
+                            name: sanitiseOutputName(prev[id]?.name ?? r.outputName, r.outputName),
+                          },
+                        }))}
                         // A saved row's name is locked rather than reset to unsaved, so
                         // editing it after the fact can't trigger a second save of the
                         // same compressed output under a different name.

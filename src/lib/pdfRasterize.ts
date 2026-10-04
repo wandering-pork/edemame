@@ -24,12 +24,17 @@ const MIN_DPI = 72;
 const MIN_QUALITY = 0.4;
 const MAX_ATTEMPTS = 6;
 
-async function renderAllPages(bytes: Uint8Array, dpi: number, quality: number): Promise<{ jpegs: Uint8Array[]; sizes: { width: number; height: number }[] }> {
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) throw new DOMException('Compression aborted', 'AbortError');
+}
+
+async function renderAllPages(bytes: Uint8Array, dpi: number, quality: number, signal?: AbortSignal): Promise<{ jpegs: Uint8Array[]; sizes: { width: number; height: number }[] }> {
   const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
   const jpegs: Uint8Array[] = [];
   const sizes: { width: number; height: number }[] = [];
   try {
     for (let i = 1; i <= pdf.numPages; i++) {
+      throwIfAborted(signal);
       // eslint-disable-next-line no-await-in-loop
       const page = await pdf.getPage(i);
       const viewport = page.getViewport({ scale: dpi / 72 });
@@ -78,7 +83,7 @@ async function buildPdfFromJpegs(jpegs: Uint8Array[], sizes: { width: number; he
  * PDF (e.g. it's corrupt or password-protected) — caller should fall back
  * to the original bytes in that case.
  */
-export async function rasterizeAndCompressPdf(bytes: Uint8Array, targetBytes: number): Promise<Uint8Array | null> {
+export async function rasterizeAndCompressPdf(bytes: Uint8Array, targetBytes: number, signal?: AbortSignal): Promise<Uint8Array | null> {
   try {
     let dpi = 150;
     let quality = 0.8;
@@ -86,7 +91,7 @@ export async function rasterizeAndCompressPdf(bytes: Uint8Array, targetBytes: nu
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       // eslint-disable-next-line no-await-in-loop
-      const { jpegs, sizes } = await renderAllPages(bytes, dpi, quality);
+      const { jpegs, sizes } = await renderAllPages(bytes, dpi, quality, signal);
       // eslint-disable-next-line no-await-in-loop
       const rebuilt = await buildPdfFromJpegs(jpegs, sizes);
       if (!best || rebuilt.length < best.length) best = rebuilt;
@@ -102,7 +107,8 @@ export async function rasterizeAndCompressPdf(bytes: Uint8Array, targetBytes: nu
       }
     }
     return best;
-  } catch {
+  } catch (err) {
+    if (signal?.aborted) throw err;
     return null;
   }
 }

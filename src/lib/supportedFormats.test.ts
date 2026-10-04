@@ -110,39 +110,3 @@ describe('constants coherence', () => {
     expect(CASE_FILES_MAX_BYTES).toBe(DOHA_MAX_BYTES * 10);
   });
 });
-
-describe('auto-select eligibility (proxy for DocumentCompressor.tsx isAutoSelectEligible, not exported)', () => {
-  // isAutoSelectEligible(doc) = fileSize > DOHA_MAX_BYTES && isSupportedDocumentFile(...)
-  // Re-implemented locally since the real predicate lives unexported inside a .tsx component.
-  function isAutoSelectEligible(fileSize: number, fileName: string, fileType: string): boolean {
-    return fileSize > DOHA_MAX_BYTES && isSupportedDocumentFile({ name: fileName, type: fileType });
-  }
-
-  it('an oversized, supported PDF is eligible', () => {
-    expect(isAutoSelectEligible(8 * 1024 * 1024, 'scan.pdf', 'application/pdf')).toBe(true);
-  });
-
-  it('an under-ceiling file is not eligible (already compliant)', () => {
-    expect(isAutoSelectEligible(4 * 1024 * 1024, 'scan.pdf', 'application/pdf')).toBe(false);
-  });
-
-  it('exactly at the ceiling is not eligible (strictly-greater)', () => {
-    expect(isAutoSelectEligible(5_242_880, 'scan.pdf', 'application/pdf')).toBe(false);
-  });
-
-  it('one byte over the ceiling is eligible', () => {
-    expect(isAutoSelectEligible(5_242_881, 'scan.pdf', 'application/pdf')).toBe(true);
-  });
-
-  it('an oversized but unsupported format (HEIC) is not eligible', () => {
-    expect(isAutoSelectEligible(8 * 1024 * 1024, 'photo.heic', 'image/heic')).toBe(false);
-  });
-
-  it('an oversized but unsupported format (TIFF) is not eligible', () => {
-    expect(isAutoSelectEligible(8 * 1024 * 1024, 'book.tiff', 'image/tiff')).toBe(false);
-  });
-
-  it('a file over the Case Files ceiling too is still eligible', () => {
-    expect(isAutoSelectEligible(60 * 1024 * 1024, 'huge.pdf', 'application/pdf')).toBe(true);
-  });
-});

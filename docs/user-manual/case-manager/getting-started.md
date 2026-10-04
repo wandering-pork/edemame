@@ -102,7 +102,7 @@ actually does:
   [Visa Eligibility Advisor](../visa-advisor/getting-started.md) for how that report is produced.
 - **Open/Close Agent panel** (previously a separate "Agent" toggle button) — shows or hides the
   case-aware chat panel on the right.
-- **Document checklist**, **Workspace**, **Auto-Packager**, **Run Crusher** (supported subclasses
+- **Document checklist**, **Workspace**, **Document Compressor**, **Run Crusher** (supported subclasses
   only), **820 bundle builder** (subclass 820 only), **Edit case**, and **Delete case** — unchanged
   from the old **⋯** menu, just folded into the same menu as everything above.
 
