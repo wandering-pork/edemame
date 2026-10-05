@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Document } from '../types';
 
 // Mock the two heavier collaborators compressDocument delegates to for PDFs,
-// so these tests exercise autoPackager.ts's own decision logic (which path
-// to take, how to size/flag the result) without needing a real PDF parser,
-// pdf.js worker, or canvas.
+// so these tests exercise documentCompressor.ts's own decision logic (which
+// path to take, how to size/flag the result) without needing a real PDF
+// parser, pdf.js worker, or canvas.
 vi.mock('./pdfBundle', () => ({
   loadPdf: vi.fn(async (doc: Document, blob: Blob) => ({ doc, bytes: new Uint8Array(await blob.arrayBuffer()), pageCount: 1 })),
   mergePdfs: vi.fn(),
@@ -31,13 +31,18 @@ import {
   exceedsCaseFilesLimit,
   classifyKind,
   kindLabel,
+  tierFor,
+  isAutoSelectEligible,
+  isCompressorSupported,
   suggestOutputName,
+  sanitiseOutputName,
   validateOutputNames,
   formatBytes,
   DOHA_MAX_BYTES,
   SAFE_TARGET_BYTES,
   IMAGE_TARGET_BYTES,
-} from './autoPackager';
+} from './documentCompressor';
+import { CASE_FILES_MAX_BYTES } from './supportedFormats';
 import { formatBytes as formatBytesFromPdfBundle } from './pdfBundle';
 
 function makeDoc(overrides: Partial<Document> = {}): Document {
@@ -99,10 +104,23 @@ describe('compressDocument — PDF path', () => {
 
     const outcome = await compressDocument(doc, blob);
 
-    expect(rasterizeAndCompressPdf).toHaveBeenCalledWith(expect.any(Uint8Array), SAFE_TARGET_BYTES);
+    expect(rasterizeAndCompressPdf).toHaveBeenCalledWith(expect.any(Uint8Array), SAFE_TARGET_BYTES, undefined);
     expect(outcome.flagged).toBe(false);
     expect(outcome.bytes.length).toBe(4 * 1024 * 1024);
     expect(outcome.note).toMatch(/flatten/i);
+  });
+
+  it('rejects instead of returning a fallback outcome when the caller aborts mid-compression', async () => {
+    const controller = new AbortController();
+    vi.mocked(mergePdfs).mockResolvedValue({ bytes: bytesOfSize(9 * 1024 * 1024), pageMap: new Map() });
+    vi.mocked(rasterizeAndCompressPdf).mockImplementation(async () => {
+      controller.abort();
+      throw new DOMException('Compression aborted', 'AbortError');
+    });
+    const doc = makeDoc();
+    const blob = new Blob([bytesOfSize(doc.fileSize)]);
+
+    await expect(compressDocument(doc, blob, controller.signal)).rejects.toThrow(/aborted/i);
   });
 
   it('flags the result when rasterizing still leaves it over the DoHA ceiling', async () => {
@@ -193,6 +211,49 @@ describe('kindLabel', () => {
     });
     const distinct = new Set(Object.values(labels));
     expect(distinct.size).toBe(Object.values(labels).length);
+  });
+});
+
+describe('tierFor', () => {
+  it('treats exactly 5 MB as DoHA-compliant', () => {
+    expect(tierFor(DOHA_MAX_BYTES)).toBe('success');
+  });
+
+  it('warns above 5 MB through the exact 50 MB Case Files limit', () => {
+    expect(tierFor(DOHA_MAX_BYTES + 1)).toBe('warning');
+    expect(tierFor(CASE_FILES_MAX_BYTES)).toBe('warning');
+  });
+
+  it('fails above 50 MB and always fails an explicit compression failure', () => {
+    expect(tierFor(CASE_FILES_MAX_BYTES + 1)).toBe('failed');
+    expect(tierFor(0, true)).toBe('failed');
+  });
+});
+
+describe('compressor eligibility', () => {
+  it('auto-selects oversized supported PDFs and images, but not compliant files', () => {
+    expect(isAutoSelectEligible(makeDoc({ fileSize: DOHA_MAX_BYTES + 1 }))).toBe(true);
+    expect(isAutoSelectEligible(makeDoc({ fileName: 'photo.jpg', fileType: 'image/jpeg', fileSize: DOHA_MAX_BYTES + 1 }))).toBe(true);
+    expect(isAutoSelectEligible(makeDoc({ fileSize: DOHA_MAX_BYTES }))).toBe(false);
+  });
+
+  it('does not auto-select unsupported formats or oversized DOCX pass-throughs', () => {
+    expect(isAutoSelectEligible(makeDoc({
+      fileName: 'letter.docx',
+      fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      fileSize: DOHA_MAX_BYTES + 1,
+    }))).toBe(false);
+    expect(isAutoSelectEligible(makeDoc({ fileName: 'photo.heic', fileType: 'image/heic', fileSize: DOHA_MAX_BYTES + 1 }))).toBe(false);
+  });
+
+  it('accepts DOCX only while already within the DoHA limit', () => {
+    const docx = makeDoc({
+      fileName: 'letter.docx',
+      fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      fileSize: DOHA_MAX_BYTES,
+    });
+    expect(isCompressorSupported(docx)).toBe(true);
+    expect(isCompressorSupported({ ...docx, fileSize: DOHA_MAX_BYTES + 1 })).toBe(false);
   });
 });
 
@@ -378,7 +439,7 @@ describe('compressDocument — DOCX / XLSX / TXT / other passthrough', () => {
     expect(outcome.mimeType).toBe(fileType);
     expect(outcome.ext).toBe(ext);
     expect(outcome.flagged).toBe(true);
-    expect(outcome.note.startsWith(`${label}s can't be safely compressed client-side`)).toBe(true);
+    expect(outcome.note.startsWith(`${label} is not supported for client-side compression`)).toBe(true);
     expect(outcome.note).toMatch(/exceeds 5 MB/);
   });
 
@@ -588,6 +649,15 @@ describe('validateOutputNames', () => {
     expect(errors.c).toBe('Duplicate file name — give this file a unique name.');
   });
 
+  it('compares sanitized names so path-like input cannot bypass duplicate checks', () => {
+    const errors = validateOutputNames([
+      { docId: 'a', outputName: 'folder/passport.pdf' },
+      { docId: 'b', outputName: 'folder_passport.pdf' },
+    ]);
+    expect(errors.a).toBeUndefined();
+    expect(errors.b).toBe('Duplicate file name — give this file a unique name.');
+  });
+
   it('the same docId repeating the same name is not a duplicate', () => {
     const errors = validateOutputNames([
       { docId: 'a', outputName: 'Smith_Passport.pdf' },
@@ -597,8 +667,18 @@ describe('validateOutputNames', () => {
   });
 });
 
+describe('sanitiseOutputName', () => {
+  it('removes path segments and keeps the generated extension', () => {
+    expect(sanitiseOutputName('../folder/passport.exe', 'Passport_20261004.pdf')).toBe('___folder_passport.pdf');
+  });
+
+  it('preserves an empty edit for the validator to reject', () => {
+    expect(sanitiseOutputName('  ', 'Passport_20261004.pdf')).toBe('');
+  });
+});
+
 describe('formatBytes re-export identity', () => {
-  it('autoPackager re-exports the exact same function as pdfBundle', () => {
+  it('documentCompressor re-exports the exact same function as pdfBundle', () => {
     expect(formatBytes).toBe(formatBytesFromPdfBundle);
   });
 });

@@ -3,11 +3,11 @@ import { useRepositories } from '@/contexts/RepositoryContext';
 import { useFirm } from '@/contexts/FirmContext';
 import { canDeleteFirmData } from '@/lib/firmDirectory';
 import { format } from 'date-fns';
-import { FileText, Image, Download, Trash2, File, Eye, AlertTriangle } from 'lucide-react';
+import { FileText, Image, Download, Trash2, File, Eye, AlertTriangle, Package } from 'lucide-react';
 import type { Document, Aspect820 } from '../types';
 import { ASPECTS_820, ASPECT_ORDER_820 } from '../lib/aspects820';
 import { DocumentTypeBadge } from './DocumentTypePicker';
-import { DOHA_MAX_BYTES } from '../lib/autoPackager';
+import { DOHA_MAX_BYTES } from '../lib/documentCompressor';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -39,9 +39,11 @@ interface DocumentListProps {
   excludeIds?: string[];
   /** Called after a document is deleted, so a caller keeping its own document list in state (e.g. the case-details rail) can stay in sync. */
   onDeleted?: (id: string) => void;
+  /** Opens the Document Compressor pre-loaded with this one file — the "Compress" quick action on an oversized row. */
+  onCompressDoc?: (doc: Document) => void;
 }
 
-export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, visaSubclass, excludeIds, onDeleted }) => {
+export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, visaSubclass, excludeIds, onDeleted, onCompressDoc }) => {
   const repos = useRepositories();
   // RLS is the real enforcement (see the firms migration's delete policies on
   // `documents`) — this only hides the control for a role that would be
@@ -200,10 +202,19 @@ export const DocumentList: React.FC<DocumentListProps> = ({ caseId, refreshKey, 
               {oversized && (
                 <p
                   title="This file is over 5MB and will be rejected by the Department of Home Affairs."
-                  className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400"
+                  className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400"
                 >
                   <AlertTriangle className="w-3 h-3 shrink-0" />
-                  Over 5MB — will be rejected by DoHA. Use Auto-Packager to compress.
+                  <span>Over 5MB — will be rejected by DoHA.</span>
+                  {onCompressDoc && (
+                    <button
+                      type="button"
+                      onClick={() => onCompressDoc(doc)}
+                      className="inline-flex items-center gap-1 underline decoration-amber-400 underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                    >
+                      <Package className="w-3 h-3" /> Compress
+                    </button>
+                  )}
                 </p>
               )}
               {show820Tags && (

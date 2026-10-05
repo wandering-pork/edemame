@@ -11,7 +11,7 @@ import {
   createDownloadUrl,
   type LoadedPdf,
 } from './pdfBundle';
-import { DOHA_MAX_BYTES, formatBytes as formatBytesFromAutoPackager } from './autoPackager';
+import { DOHA_MAX_BYTES, formatBytes as formatBytesFromDocumentCompressor } from './documentCompressor';
 
 function makeDoc(overrides: Partial<Document> = {}): Document {
   return {
@@ -307,8 +307,8 @@ describe('formatBytes', () => {
     expect(formatBytes(bytes)).toBe(expected);
   });
 
-  it('is the same function reference as the one re-exported from autoPackager.ts', () => {
-    expect(formatBytesFromAutoPackager).toBe(formatBytes);
+  it('is the same function reference as the one re-exported from documentCompressor.ts', () => {
+    expect(formatBytesFromDocumentCompressor).toBe(formatBytes);
   });
 });
 
@@ -330,6 +330,19 @@ describe('createDownloadUrl', () => {
     expect(passedBlob.size).toBe(1234);
     expect(result.filename).toBe('output.pdf');
     expect(result.url).toBe('blob:mock-url');
+  });
+
+  it('honours an explicit mimeType for non-PDF output (e.g. a compressed JPG)', () => {
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:mock-url');
+    vi.stubGlobal('URL', { ...URL, createObjectURL });
+
+    const bytes = new Uint8Array(42);
+    const result = createDownloadUrl(bytes, 'scan.jpg', 'image/jpeg');
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const passedBlob = createObjectURL.mock.calls[0][0];
+    expect(passedBlob.type).toBe('image/jpeg');
+    expect(result.filename).toBe('scan.jpg');
   });
 });
 

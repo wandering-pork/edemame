@@ -2,17 +2,20 @@ import type { Document } from '../types';
 import { loadPdf, mergePdfs, sanitiseFilenameSegment } from './pdfBundle';
 import { compressImage, isRasterImage, needsFormatConversion, isUncompressibleImage } from './imageCompress';
 import { rasterizeAndCompressPdf } from './pdfRasterize';
+import { CASE_FILES_MAX_BYTES, isSupportedDocumentFile } from './supportedFormats';
 
 /**
- * Auto-Packager orchestration — classification + per-file compression
- * primitives, driven by the DoHA rules and compression-tier priorities from
- * GitHub issue #2. Pure logic, no React/DOM beyond what imageCompress needs
+ * Document Compressor orchestration — classification + per-file compression
+ * primitives, driven by the DoHA rules and compression-tier priorities
+ * (originally GitHub issue #2, redesigned per the "Document Compressor"
+ * rebuild brief). Pure logic, no React/DOM beyond what imageCompress needs
  * (canvas), so it's usable from any component or a future headless test.
  */
 
 /** ImmiAccount's hard per-attachment ceiling. */
 export const DOHA_MAX_BYTES = 5 * 1024 * 1024;
-/** The Auto-Packager's working target — a safety margin under the hard ceiling. */
+export type SizeTier = 'success' | 'warning' | 'failed';
+/** The Document Compressor's working target — a safety margin under the hard ceiling. */
 export const SAFE_TARGET_BYTES = 4.9 * 1024 * 1024;
 /** DoHA's recommended size for image attachments. */
 export const IMAGE_TARGET_BYTES = 500 * 1024;
@@ -23,10 +26,11 @@ export type PackagerFileKind = 'pdf' | 'image' | 'docx' | 'spreadsheet' | 'text'
  * Whether a compressed output is still too large to be saved into Case
  * Files, which enforces its own upload ceiling (`CASE_FILES_MAX_BYTES` in
  * supportedFormats.ts) independently of the DoHA-lodgement 5 MB target this
- * module otherwise targets. Centralised here so the Auto-Packager's
- * pre-flight warning and its finalize() skip check can't drift apart —
- * a file that fails this must never be written to Case Files (see the
- * "Auto-Packager Circular Dependency" defect this guards against).
+ * module otherwise targets. Centralised here so the Document Compressor's
+ * pre-flight warning and its save-step skip check can't drift apart — a
+ * file that fails this must never be written to Case Files (see the
+ * "Auto-Packager Circular Dependency" defect this guards against, and the
+ * Step 2 "over 50 MB is a hard fail" rule in the redesign brief).
  */
 export function exceedsCaseFilesLimit(sizeBytes: number, maxBytes: number): boolean {
   return sizeBytes > maxBytes;
@@ -45,6 +49,29 @@ export function classifyKind(doc: Document): PackagerFileKind {
   }
   if (/\.txt$/.test(name) || doc.fileType === 'text/plain') return 'text';
   return 'other';
+}
+
+/** Classify a compressed result against the DoHA and Case Files size limits. */
+export function tierFor(sizeBytes: number, failed = false): SizeTier {
+  if (failed) return 'failed';
+  if (sizeBytes <= DOHA_MAX_BYTES) return 'success';
+  if (sizeBytes <= CASE_FILES_MAX_BYTES) return 'warning';
+  return 'failed';
+}
+
+/** Step 1 files auto-selected for compression: supported PDFs/images over 5 MB. */
+export function isAutoSelectEligible(doc: Document): boolean {
+  if (doc.fileSize <= DOHA_MAX_BYTES) return false;
+  const kind = classifyKind(doc);
+  return (kind === 'pdf' || kind === 'image') && isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType });
+}
+
+/** Whether the compressor can process a document without a pass-through no-op. */
+export function isCompressorSupported(doc: Document): boolean {
+  if (!isSupportedDocumentFile({ name: doc.fileName, type: doc.fileType })) return false;
+  if (doc.fileSize <= DOHA_MAX_BYTES) return true;
+  const kind = classifyKind(doc);
+  return kind === 'pdf' || kind === 'image';
 }
 
 /** Human label for a PackagerFileKind, used in flags/notes. */
@@ -71,7 +98,7 @@ export interface CompressOutcome {
 
 /**
  * Compress a single document's blob per the Tier 1/2/3 rules in the
- * Auto-Packager spec:
+ * Document Compressor spec:
  *  - PDF: lossless recompression via pdf-lib (strip metadata, object streams).
  *    Downsampling embedded images inside a PDF isn't feasible with pdf-lib —
  *    out of scope here; oversized scanned PDFs are flagged for the agent to
@@ -82,7 +109,7 @@ export interface CompressOutcome {
  *    (DOCX->PDF conversion is out of reach without a server) — passed
  *    through unchanged and flagged only if it exceeds the DoHA limit.
  */
-export async function compressDocument(doc: Document, blob: Blob): Promise<CompressOutcome> {
+export async function compressDocument(doc: Document, blob: Blob, signal?: AbortSignal): Promise<CompressOutcome> {
   const kind = classifyKind(doc);
   const originalBytes = new Uint8Array(await blob.arrayBuffer());
   const ext = doc.fileName.includes('.') ? doc.fileName.split('.').pop()!.toLowerCase() : 'bin';
@@ -105,7 +132,7 @@ export async function compressDocument(doc: Document, blob: Blob): Promise<Compr
       // to rasterizing each page and re-encoding as a reduced-DPI/quality
       // JPEG (see pdfRasterize.ts) — this loses the text layer, an accepted
       // tradeoff for what was already just a photo of a document.
-      const rasterized = await rasterizeAndCompressPdf(bytes, SAFE_TARGET_BYTES);
+      const rasterized = await rasterizeAndCompressPdf(bytes, SAFE_TARGET_BYTES, signal);
       if (rasterized && rasterized.length < bytes.length) {
         const flagged = rasterized.length > DOHA_MAX_BYTES;
         return {
@@ -125,7 +152,8 @@ export async function compressDocument(doc: Document, blob: Blob): Promise<Compr
         flagged: true,
         note: 'Still over 5 MB after lossless compression — split into multiple uploads or reduce scan resolution upstream (150 DPI is enough for ImmiAccount).',
       };
-    } catch {
+    } catch (err) {
+      if (signal?.aborted) throw err;
       return {
         bytes: originalBytes,
         mimeType: doc.fileType || 'application/pdf',
@@ -185,16 +213,18 @@ export async function compressDocument(doc: Document, blob: Blob): Promise<Compr
     ext,
     flagged,
     note: flagged
-      ? `${kindLabel(kind)}s can't be safely compressed client-side — this file exceeds 5 MB and needs manual attention (re-save with smaller embedded images, or split the content).`
+      ? `${kindLabel(kind)} is not supported for client-side compression — this file exceeds 5 MB and needs manual attention (re-save with smaller embedded images, export to PDF, or split the content).`
       : 'Within size limit — no compression needed.',
   };
 }
 
 /**
- * Auto-suggest an ImmiAccount-friendly output filename for a packaged file.
- * When assigned to a checklist slot, prefers `<Applicant>_<SlotLabel>_<date>.<ext>`;
- * otherwise falls back to `<originalBase>_<date>.<ext>`. Always editable by the
- * agent before finalising (Phase 4 of the Auto-Packager flow).
+ * Auto-suggest an ImmiAccount-friendly output filename for a compressed file:
+ * `<originalBase>_<date>.<ext>`, or `<Applicant>_<label>_<date>.<ext>` when a
+ * caller supplies a `slotLabel` (kept for callers with a checklist-style
+ * categorisation; the Document Compressor itself no longer has one). Always
+ * editable by the user before saving/downloading (Step 3 of the Document
+ * Compressor flow).
  *
  * Pass `existingNames` (case-insensitive set of names already claimed in this
  * batch) to guarantee uniqueness — when the suggested name collides, a `_2`,
@@ -234,6 +264,24 @@ export function suggestOutputName(opts: {
 }
 
 /**
+ * Keep a user-edited output name within the suggested extension and ensure its
+ * base is a single safe filename segment. An empty edit stays empty so the
+ * validator can report it rather than silently substituting a name.
+ */
+export function sanitiseOutputName(outputName: string, expectedOutputName: string): string {
+  const trimmed = outputName.trim();
+  if (!trimmed) return '';
+
+  const extension = expectedOutputName.match(/\.[^.]+$/)?.[0] ?? '';
+  const expectedBase = extension
+    ? expectedOutputName.slice(0, -extension.length)
+    : expectedOutputName;
+  const editedBase = trimmed.replace(/\.[^.]*$/, '');
+  const safeBase = sanitiseFilenameSegment(editedBase) || sanitiseFilenameSegment(expectedBase);
+  return `${safeBase}${extension}`;
+}
+
+/**
  * Validate a batch of proposed output names before finalising: every name
  * must be non-empty (after trimming) and unique (case-insensitive) across
  * the batch. Returns a map of docId -> error message for invalid entries;
@@ -248,7 +296,7 @@ export function validateOutputNames(items: { docId: string; outputName: string }
       errors[docId] = 'File name cannot be empty.';
       continue;
     }
-    const key = trimmed.toLowerCase();
+    const key = sanitiseOutputName(trimmed, trimmed).toLowerCase();
     const firstDocId = seen.get(key);
     if (firstDocId && firstDocId !== docId) {
       errors[docId] = 'Duplicate file name — give this file a unique name.';

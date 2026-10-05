@@ -19,7 +19,8 @@ interface DocumentUploadProps {
    * Called when a file was rejected for exceeding CASE_FILES_MAX_BYTES and the
    * user opts to compress it instead (CF-2). Hands off the raw File(s) in
    * memory — these were never accepted into Case Files, so there's nothing to
-   * re-browse to; the caller should open Auto-Packager with them pre-loaded.
+   * re-browse to; the caller should open the Document Compressor with them
+   * pre-loaded.
    */
   onRequestCompress?: (files: File[]) => void;
 }
@@ -246,7 +247,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
               {oversizedFiles.length === 1
                 ? `"${oversizedFiles[0].name}" exceeds ${formatMB(CASE_FILES_MAX_BYTES)}.`
                 : `${oversizedFiles.length} files exceed ${formatMB(CASE_FILES_MAX_BYTES)}.`}
-              {' '}Compress {oversizedFiles.length === 1 ? 'it' : 'them'} with Auto-Packager first?
+              {' '}Compress {oversizedFiles.length === 1 ? 'it' : 'them'} with Document Compressor first?
             </span>
           </div>
           <div className="flex items-center gap-2 pl-6">
@@ -258,7 +259,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, visaSubc
               }}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-edamame-600 hover:bg-edamame-700 text-white text-[12px] font-bold transition-colors"
             >
-              <Package className="w-3.5 h-3.5" /> Use Auto-Packager
+              <Package className="w-3.5 h-3.5" /> Use Document Compressor
             </button>
             <button
               type="button"

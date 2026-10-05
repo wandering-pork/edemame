@@ -100,11 +100,12 @@ export function splitIntoGroups(loaded: LoadedPdf[], targetBytes: number): Loade
 }
 
 /**
- * Build a download URL + filename for a Uint8Array PDF.
+ * Build a download URL + filename for a Uint8Array file (`mimeType` defaults
+ * to PDF for existing PDF-only callers like PdfPackager/BundleBuilder820).
  * Caller must URL.revokeObjectURL when done.
  */
-export function createDownloadUrl(bytes: Uint8Array, filename: string): { url: string; filename: string } {
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+export function createDownloadUrl(bytes: Uint8Array, filename: string, mimeType = 'application/pdf'): { url: string; filename: string } {
+  const blob = new Blob([bytes], { type: mimeType });
   return { url: URL.createObjectURL(blob), filename };
 }
 

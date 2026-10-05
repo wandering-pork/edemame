@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Aspect820, Document } from '../types';
 import { ASPECTS_820, ASPECT_ORDER_820, suggestAspectFromFilename, aspectFilenameToken } from './aspects820';
 import { splitIntoGroups, type LoadedPdf } from './pdfBundle';
-import { classifyKind } from './autoPackager';
+import { classifyKind } from './documentCompressor';
 
 function makeDoc(overrides: Partial<Document> = {}): Document {
   return {
@@ -144,10 +144,10 @@ describe('aspectFilenameToken', () => {
   });
 });
 
-describe('820 filename composition — non-ASCII surname now sanitised like autoPackager', () => {
+describe('820 filename composition — non-ASCII surname now sanitised like documentCompressor', () => {
   // BundleBuilder820.tsx now runs `lastName` through sanitiseFilenameSegment
   // before interpolating it into `820_${token}_${lastName}_${date}${partSuffix}.pdf`,
-  // matching suggestOutputName() in autoPackager.ts.
+  // matching suggestOutputName() in documentCompressor.ts.
   it('sanitiseFilenameSegment makes a non-ASCII surname filename-safe', async () => {
     const { sanitiseFilenameSegment } = await import('./pdfBundle');
     expect(sanitiseFilenameSegment('Nguyễn')).toBe('Nguy_n');
