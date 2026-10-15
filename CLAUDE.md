@@ -41,9 +41,9 @@ Auth requires `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `src/.env.loca
 
 - **Frontend:** React 19 + TypeScript SPA, built with Vite 6. Tailwind CSS via CDN (config inline in `src/index.html`).
 - **Backend:** Vercel serverless functions in root `api/` directory (not `src/api/`):
-  - `/api/generate-tasks.ts` — generates task schedules from case descriptions using Gemini 3.5 Flash
+  - `/api/generate-tasks.ts` — generates task schedules from case descriptions using Gemini 3.6 Flash (model ID and retry logic live in `api/_lib/gemini.ts` — change the model there only)
   - `/api/scan-passport-gemini.ts` — extracts passport data from images using Gemini Vision API
-  - `/api/check-eligibility.ts` — assesses visa eligibility using Gemini 3.5 Flash with structured JSON schema
+  - `/api/check-eligibility.ts` — assesses visa eligibility using Gemini 3.6 Flash with structured JSON schema
 
 ### State Management
 
@@ -496,7 +496,7 @@ A firm/account-level **Document Type** reference list is the shared vocabulary b
 1. User navigates to Visa Advisor page (sidebar or "Check Eligibility" button on client card)
 2. 4-step wizard collects: personal info → immigration goal → conditional details → supporting factors
 3. On submit, POSTs collected data to `/api/check-eligibility` via `VisaAdvisor.tsx`
-4. Vercel function calls Gemini 3.5 Flash with visa assessment prompt
+4. Vercel function calls Gemini 3.6 Flash with visa assessment prompt
 5. Returns JSON with visa verdict cards: 10 Australian visa subclasses (189, 190, 482, 186, 500, 820, 485, 600, 417, 491). Every subclass the Advisor can return has a matching system workflow template (`src/lib/seedData.ts`) and document checklist (`CHECKLIST_CATEGORIES` in `src/lib/checklistTemplates.ts`), so "Open Case" always gets a real template and generated checklist rather than falling back to a bare/empty one.
 6. Each card shows verdict (qualifies/possibly/unlikely/needs_more_info), reasons, and gaps, rendered by the shared `components/visa-advisor/PathwayCard.tsx` (styling dictionaries in `components/visa-advisor/verdictStyles.ts`)
 7. As soon as a report comes back, `VisaAdvisor.tsx` saves it as an `EligibilityAssessment` via `repos.eligibility.create()` — see "Eligibility Assessments" under "Local-First Storage" above — whether or not a case is ever opened from it.
