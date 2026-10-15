@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { getUserManualContext } from "./_lib/userManual";
 import { searchGithubIssues } from "./_lib/github";
 import { verifySupabaseUser } from "./_lib/auth";
+import { callGemini as postToGemini } from "./_lib/gemini";
 
 interface VercelRequest extends IncomingMessage {
   method: string;
@@ -13,8 +14,6 @@ interface VercelResponse extends ServerResponse {
   status(code: number): VercelResponse;
   json(data: any): VercelResponse;
 }
-
-const GEMINI_MODEL = "gemini-3.5-flash";
 
 // Per-session cap on how many issues the agent will *offer* to file from a
 // single Focus Mode conversation. This only steers the model's own behaviour
@@ -113,29 +112,17 @@ Keep responses concise but complete. Use markdown formatting for lists and headi
 }
 
 async function callGemini(apiKey: string, systemPrompt: string, contents: any[]) {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents,
-        tools,
-        generationConfig: {
-          maxOutputTokens: 2048,
-          temperature: 0.7,
-        },
-      }),
-    }
-  );
+  const response = await postToGemini(apiKey, {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents,
+    tools,
+    generationConfig: {
+      maxOutputTokens: 2048,
+      temperature: 0.7,
+    },
+  });
 
   if (!response.ok) {
-    const errorData = await response.text();
-    console.error("Gemini API error:", response.status, errorData);
     throw new Error("Gemini API request failed");
   }
 

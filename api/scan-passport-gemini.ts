@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "http";
+import { callGemini } from "./_lib/gemini";
 
 interface VercelRequest extends IncomingMessage {
   method: string;
@@ -58,21 +59,9 @@ Use empty string for fields you cannot read. Return ONLY the JSON object.`;
       ],
     };
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify(requestBody),
-      }
-    );
+    const response = await callGemini(apiKey, requestBody);
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Gemini API error:", response.status, errorData);
       return res.status(200).json({
         success: false,
         error: "Failed to process image. Please try again.",

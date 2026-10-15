@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "http";
+import { callGemini } from "./_lib/gemini";
 
 interface VercelRequest extends IncomingMessage {
   method: string;
@@ -10,7 +11,6 @@ interface VercelResponse extends ServerResponse {
   json(data: any): VercelResponse;
 }
 
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -101,35 +101,29 @@ Generate 10–15 specific tasks that realistically schedule this case from start
 Tailor the tasks to the client's specific background and circumstances noted above.`;
 
   try {
-    const response = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: "You are a precise Australian immigration case manager. Generate task lists that are specific, actionable, and correctly timed for Australian visa processing. Output only valid JSON." }],
-        },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                title: { type: "string", description: "The title of the task" },
-                description: { type: "string", description: "A brief description of what needs to be done" },
-                daysOffset: { type: "integer", description: "Number of days from the start date this task should be scheduled" },
-              },
-              required: ["title", "description", "daysOffset"],
+    const response = await callGemini(apiKey, {
+      systemInstruction: {
+        parts: [{ text: "You are a precise Australian immigration case manager. Generate task lists that are specific, actionable, and correctly timed for Australian visa processing. Output only valid JSON." }],
+      },
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "The title of the task" },
+              description: { type: "string", description: "A brief description of what needs to be done" },
+              daysOffset: { type: "integer", description: "Number of days from the start date this task should be scheduled" },
             },
+            required: ["title", "description", "daysOffset"],
           },
         },
-      }),
+      },
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Gemini API error:", response.status, errorData);
       return res.status(502).json({ error: "Gemini API request failed" });
     }
 
@@ -197,43 +191,37 @@ For each suggestion, give:
 - offsetDays: days after the anchor step's due date (or after the case start date, if no anchorStepKey) this task should be due`;
 
   try {
-    const response = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: "You are a precise Australian immigration case manager. You only suggest additional, non-duplicate tasks tailored to this specific case. Output only valid JSON." }],
-        },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "object",
-            properties: {
-              additions: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    title: { type: "string" },
-                    description: { type: "string" },
-                    reason: { type: "string" },
-                    anchorStepKey: { type: "string" },
-                    offsetDays: { type: "integer" },
-                  },
-                  required: ["title", "description", "reason", "offsetDays"],
+    const response = await callGemini(apiKey, {
+      systemInstruction: {
+        parts: [{ text: "You are a precise Australian immigration case manager. You only suggest additional, non-duplicate tasks tailored to this specific case. Output only valid JSON." }],
+      },
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            additions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  reason: { type: "string" },
+                  anchorStepKey: { type: "string" },
+                  offsetDays: { type: "integer" },
                 },
+                required: ["title", "description", "reason", "offsetDays"],
               },
             },
-            required: ["additions"],
           },
+          required: ["additions"],
         },
-      }),
+      },
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Gemini API error:", response.status, errorData);
       return res.status(502).json({ error: "Gemini API request failed" });
     }
 

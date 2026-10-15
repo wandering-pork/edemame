@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import { estimateCostUsd } from "./_lib/aiPricing";
+import { callGemini } from "./_lib/gemini";
 
 interface VercelRequest extends IncomingMessage {
   method: string;
@@ -53,31 +54,14 @@ Return ONLY valid JSON (no markdown, no extra text):
 Assess: 189, 190, 482, 186, 500, 820, 485, 600, 417, 491`;
 
   try {
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-        }),
-      }
-    );
+    const response = await callGemini(apiKey, {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
 
+    // A real error status (not a 200 with an empty report) so the Visa Advisor shows its
+    // "try again" toast instead of rendering and saving an empty assessment.
     if (!response.ok) {
-      console.error("API error:", response.status);
-      return res.status(200).json({
-        result: {
-          visaOptions: [],
-          summary: "Unable to assess eligibility",
-          primaryRecommendation: "Please try again",
-          suggestedTemplateKeyword: "",
-        },
-        usage: null,
-      });
+      return res.status(502).json({ error: "Gemini API request failed" });
     }
 
     const data = await response.json();
@@ -114,14 +98,6 @@ Assess: 189, 190, 482, 186, 500, 820, 485, 600, 417, 491`;
     });
   } catch (error) {
     console.error("Error:", error);
-    return res.status(200).json({
-      result: {
-        visaOptions: [],
-        summary: "An error occurred",
-        primaryRecommendation: "Please try again",
-        suggestedTemplateKeyword: "",
-      },
-      usage: null,
-    });
+    return res.status(500).json({ error: "Failed to check eligibility" });
   }
 }
