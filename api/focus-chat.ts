@@ -118,7 +118,6 @@ async function callGemini(apiKey: string, systemPrompt: string, contents: any[])
     tools,
     generationConfig: {
       maxOutputTokens: 2048,
-      temperature: 0.7,
     },
   });
 
