@@ -102,25 +102,27 @@ actually does:
   [Visa Eligibility Advisor](../visa-advisor/getting-started.md) for how that report is produced.
 - **Open/Close Agent panel** (previously a separate "Agent" toggle button) — shows or hides the
   case-aware chat panel on the right.
-- **Document checklist**, **Workspace**, **Document Compressor**, **Run Crusher** (supported subclasses
+- **Document checklist**, **Overview**, **Document Compressor**, **Run Crusher** (supported subclasses
   only), **820 bundle builder** (subclass 820 only), **Edit case**, and **Delete case** — unchanged
   from the old **⋯** menu, just folded into the same menu as everything above.
 
-## Landing on the Workspace tab
+## Landing on the Overview tab
 
-Every time you open a case, you land on the **Workspace** tab. This is the AI-assisted entry point
-for the case — it doesn't hold case data itself, it's a launcher for the case's Views (Tasks,
-Document Checklist, Case Files, Notes) and Tools (Document Checklist Generator, Document
-Compressor, and the 820 Bundle Builder where applicable). See
-[Workspace, tabs, and pinning](./workspace-and-tabs.md) for how the Workspace tab, tab opening, and
-tab pinning work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
+Every time you open a case, you land on the **Overview** tab: a stage stepper and the current task
+across the top, then case info and a task timeline on the left and a document checklist breakdown
+and recent case files on the right. A floating **Workspace** bar at the bottom of every case tab
+holds suggested quick actions for the current task plus searchable **View** (Tasks, Document
+Checklist, Case Files, Notes) and **Tools** (Document Checklist Generator, Document Compressor, the
+820 Bundle Builder where applicable, and more) menus. See
+[Overview, the Workspace bar, tabs, and pinning](./workspace-and-tabs.md) for how the Overview,
+the Workspace bar, tab opening, and tab pinning work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
 
-The left-hand rail on a case also has a compact **Case Files** panel — every file attached to the
+On every tab except Overview, the left-hand rail on a case also has a compact **Case Files** panel — every file attached to the
 case, which you can drag directly onto a Document Checklist item to link it (see Document Checklist
 doc above). For a bigger, easier-to-work-with view of the same files — upload, preview, download,
 and delete, with full-size thumbnails rather than the rail's condensed list — click **Open in tab**
-next to the rail's Case Files heading, or open **Case Files** from the Workspace tab's View section.
+next to the rail's Case Files heading, or open **Case files** from the Workspace bar's **View** menu (or **View all files** on the Overview).
 
 When you drop files into any Case Files upload area, they wait in a short list until you give each
 one a **Document Type** — this is required, and nothing is uploaded until every file has one. Type

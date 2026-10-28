@@ -15,7 +15,9 @@ import { DocumentCompressor } from '../components/DocumentCompressor';
 import { CaseRail, RailAlert, CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
 import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList';
 import { AgentPanel } from '../components/case-details/AgentPanel';
-import { Workspace, WorkspaceCatalogItem, MessageRecommendation } from '../components/case-details/Workspace';
+import { CaseOverview } from '../components/case-details/CaseOverview';
+import { WorkspaceDock, DockMenuItem, DockQuickAction } from '../components/case-details/WorkspaceDock';
+import { currentFocusTask, taskTimeline, checklistBreakdown, suggestQuickActions } from '../lib/caseOverview';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
 import { DocumentTypePicker, DocumentTypeBadge } from '../components/DocumentTypePicker';
 import { EligibilityAssessmentModal } from '../components/visa-advisor/EligibilityAssessmentModal';
@@ -58,6 +60,7 @@ import {
   PinOff,
   RefreshCw,
   Columns2,
+  LayoutGrid,
   UserPlus,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -166,7 +169,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // on `cases` is owner/agent only) — this only hides the control for a role
   // that would be rejected server-side anyway. `role` is null in local mode,
   // where deletes stay allowed (single user, always their own data).
-  const { role: firmRole, allMembers } = useFirm();
+  const { role: firmRole, allMembers, memberNameFor } = useFirm();
   const canDeleteCase = canDeleteFirmData(firmRole);
 
   // ---- Task state ----
@@ -233,9 +236,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   /** §4.4 — renders the Case Files tab's content beside the checklist for drag-to-link. */
   const [caseFilesSplit, setCaseFilesSplit] = useState(false);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
-  const [recommendedViewKinds, setRecommendedViewKinds] = useState<CaseTabKind[]>(['checklist', 'tasks', 'notes']);
-  const [recommendedToolKinds, setRecommendedToolKinds] = useState<CaseTabKind[]>(['checklist-generator', 'document-compressor', 'bundle-builder-820']);
-  const [messageRecommendations, setMessageRecommendations] = useState<Record<string, MessageRecommendation[]>>({});
+  const [recommendedViewKinds, setRecommendedViewKinds] = useState<CaseTabKind[]>([]);
+  const [recommendedToolKinds, setRecommendedToolKinds] = useState<CaseTabKind[]>([]);
 
   // ---- Top-bar menu state ----
   const [statusOpen, setStatusOpen] = useState(false);
@@ -953,8 +955,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         return next;
       });
 
-      // Refresh Workspace View/Tools suggestions from the exchange, and record
-      // which items to render as inline hyperlinks under this assistant message.
+      // Refresh the Workspace dock's View/Tools "AI pick" ranking from the exchange.
       const combinedText = `${userMsg.content}\n${assistantMsg.content}`;
       const matchedKinds = RECOMMEND_KEYWORDS.filter(([, re]) => re.test(combinedText)).map(([kind]) => kind);
       if (matchedKinds.length > 0) {
@@ -966,10 +967,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         if (matchedTools.length > 0) {
           setRecommendedToolKinds(prev => [...matchedTools, ...prev.filter(k => !matchedTools.includes(k))]);
         }
-        setMessageRecommendations(prev => ({
-          ...prev,
-          [assistantMsg.id]: matchedKinds.map(kind => ({ kind, label: TAB_LABELS[kind as Exclude<CaseTabKind, 'workspace'>] })),
-        }));
       }
     } catch {
       const errMsg: FocusChatMessage = {
@@ -1330,6 +1327,66 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     );
   };
 
+  // ---- Overview + Workspace dock (design option B) ----
+  const onOverview = activeTabId === 'workspace';
+  const focusTask = useMemo(() => currentFocusTask(caseTasks), [caseTasks]);
+  const timeline = useMemo(() => taskTimeline(caseTasks), [caseTasks]);
+  const checklistRows = useMemo(() => checklistBreakdown(checklist, ADDITIONAL_DOCUMENTS_CATEGORY), [checklist]);
+  const ownerName = currentCase.caseOwner
+    ? teamMembers.find(m => m.id === currentCase.caseOwner)?.name ?? memberNameFor(currentCase.caseOwner) ?? undefined
+    : undefined;
+
+  const openEditCase = () => {
+    setCaseEditForm({ title: currentCase.title, description: currentCase.description });
+    setIsEditingCase(true);
+  };
+
+  const dockQuickActions: DockQuickAction[] = suggestQuickActions({
+    currentTask: focusTask,
+    caseTasks,
+    checklist,
+    clientName: client.name,
+  }).map(action => ({
+    id: action.id,
+    label: action.label,
+    onSelect: () => {
+      if (action.kind === 'agent') handleSkillAction(action.prompt);
+      else if (action.kind === 'open') openOrFocusTab(action.target);
+      else {
+        const task = caseTasks.find(t => t.id === action.taskId);
+        if (task) handleOpenTaskModal(task);
+      }
+    },
+  }));
+
+  const dockViewItems: DockMenuItem[] = [
+    { id: 'overview', group: 'Case', label: 'Overview', onSelect: () => openOrFocusTab('workspace') },
+    { id: 'tasks', group: 'Case', label: 'Tasks & deadlines', hint: `${pendingTasks.length} open`, recommended: recommendedViewKinds.includes('tasks'), onSelect: () => openOrFocusTab('tasks') },
+    { id: 'notes', group: 'Case', label: 'Notes', recommended: recommendedViewKinds.includes('notes'), onSelect: () => openOrFocusTab('notes') },
+    { id: 'documents', group: 'Documents', label: 'Case files', hint: String(documents.length), onSelect: () => openOrFocusTab('documents') },
+    { id: 'checklist', group: 'Documents', label: 'Document checklist', hint: checklist.length > 0 ? `${uploadedCount}/${checklist.length}` : undefined, recommended: recommendedViewKinds.includes('checklist'), onSelect: () => openOrFocusTab('checklist') },
+    ...(eligibilityAssessment
+      ? [{ id: 'eligibility', group: 'Documents', label: 'Eligibility assessment', onSelect: () => setShowEligibilityAssessment(true) }]
+      : []),
+  ];
+
+  const dockToolItems: DockMenuItem[] = [
+    { id: 'add-task', group: 'Case', label: 'Add task', onSelect: () => handleOpenTaskModal() },
+    { id: 'add-deadline', group: 'Case', label: 'Add deadline', onSelect: () => { openOrFocusTab('tasks'); setShowAddDeadline(true); } },
+    { id: 'edit-case', group: 'Case', label: 'Edit case', onSelect: openEditCase },
+    { id: 'checklist-generator', group: 'Documents', label: 'Document Checklist Generator', recommended: recommendedToolKinds.includes('checklist-generator'), onSelect: () => openOrFocusTab('checklist-generator') },
+    { id: 'document-compressor', group: 'Documents', label: 'Document Compressor', recommended: recommendedToolKinds.includes('document-compressor'), onSelect: () => openOrFocusTab('document-compressor') },
+    ...(SUPPORTED_SUBCLASSES.includes(visaSubclass || '')
+      ? [{ id: 'crusher', group: 'Documents', label: 'Run Crusher', onSelect: handleRunCrusher }]
+      : []),
+    ...(visaSubclass === '820'
+      ? [{ id: 'bundle-builder-820', group: 'Documents', label: '820 Bundle Builder', recommended: recommendedToolKinds.includes('bundle-builder-820'), onSelect: () => openOrFocusTab('bundle-builder-820') }]
+      : []),
+    { id: 'agent', group: 'Agent', label: agentOpen ? 'Close Agent chat' : 'Chat with Edamame', onSelect: () => setAgentOpen(o => !o) },
+    { id: 'cover-letter', group: 'Agent', label: 'Draft cover letter', onSelect: () => handleSkillAction('Please help me draft a cover letter for this immigration case.') },
+    { id: 'eligibility-check', group: 'Agent', label: 'Re-check eligibility', onSelect: handleEligibility },
+  ];
+
   // ---- Render ----
   const needsOutcomePrompt = currentCase.stage === 'closed' && !currentCase.outcome;
 
@@ -1418,7 +1475,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
                   <div className="h-px bg-paper dark:bg-plate my-1" />
                   <button onClick={() => { openOrFocusTab('checklist'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
-                  <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Workspace</button>
+                  <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Overview</button>
                   <button onClick={() => { setShowDocumentCompressor(true); setMoreOpen(false); }} className={menuItemCls}>Document Compressor</button>
                   {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && (
                     <button onClick={handleRunCrusher} className={menuItemCls}>Run Crusher</button>
@@ -1427,7 +1484,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     <button onClick={() => { setShowBundleBuilder(true); setMoreOpen(false); }} className={menuItemCls}>820 bundle builder</button>
                   )}
                   <button
-                    onClick={() => { setCaseEditForm({ title: currentCase.title, description: currentCase.description }); setIsEditingCase(true); setMoreOpen(false); }}
+                    onClick={() => { openEditCase(); setMoreOpen(false); }}
                     className={menuItemCls}
                   >
                     Edit case
@@ -1492,10 +1549,16 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       {/* ══════════════════════════════════════════
           3-COLUMN GRID
       ══════════════════════════════════════════ */}
-      <div className={`mt-4 grid grid-cols-1 gap-3.5 items-start ${agentOpen ? 'xl:grid-cols-[220px_minmax(320px,1fr)_minmax(280px,330px)]' : 'xl:grid-cols-[220px_minmax(320px,1fr)]'}`}>
+      <div
+        className={`mt-4 grid grid-cols-1 gap-3.5 items-start ${
+          onOverview
+            ? (agentOpen ? 'xl:grid-cols-[minmax(320px,1fr)_minmax(280px,330px)]' : '')
+            : (agentOpen ? 'xl:grid-cols-[220px_minmax(320px,1fr)_minmax(280px,330px)]' : 'xl:grid-cols-[220px_minmax(320px,1fr)]')
+        }`}
+      >
 
-        {/* ── LEFT RAIL ── */}
-        <CaseRail
+        {/* ── LEFT RAIL (hidden on Overview, whose Case info + Recent case files cards cover it) ── */}
+        {!onOverview && <CaseRail
           client={client}
           applicant={applicant}
           progress={progress}
@@ -1513,7 +1576,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           onRequestCompress={handleRequestCompress}
           onRemoveDocument={handleRemoveDocument}
           onOpenCaseFilesTab={() => openOrFocusTab('documents')}
-        />
+        />}
 
         {/* ── CENTER COLUMN ── */}
         <div className="min-w-0">
@@ -1527,8 +1590,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
               }`}
             >
-              <Sparkles size={13} className={activeTabId === 'workspace' ? 'text-edamame' : ''} />
-              Workspace
+              <LayoutGrid size={13} className={activeTabId === 'workspace' ? 'text-edamame' : ''} />
+              Overview
             </button>
 
             {openTabs.map(tab => (
@@ -1575,31 +1638,43 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             ))}
           </div>
 
-          {/* ── WORKSPACE ── */}
-          {activeTabId === 'workspace' && (
-            <Workspace
-              viewCatalog={[
-                { kind: 'tasks', label: 'Tasks', description: `${pendingTasks.length} pending · ${completedTasks.length} completed` },
-                { kind: 'checklist', label: 'Document Checklist', description: `${uploadedCount}/${checklist.length} documents linked` },
-                { kind: 'documents', label: 'Case Files', description: `${documents.length} file${documents.length === 1 ? '' : 's'} uploaded` },
-                { kind: 'notes', label: 'Notes', description: 'Case notes and history' },
-              ] as WorkspaceCatalogItem[]}
-              toolCatalog={[
-                { kind: 'checklist-generator', label: 'Document Checklist Generator', description: 'Pick categories to generate a checklist from the system default + workflow template' },
-                { kind: 'document-compressor', label: 'Document Compressor', description: 'Compress documents to meet DoHA\'s 5MB-per-attachment requirement' },
-                ...(visaSubclass === '820' ? [{ kind: 'bundle-builder-820', label: '820 Bundle Builder', description: 'Build the ImmiAccount submission bundle' }] as WorkspaceCatalogItem[] : []),
-              ]}
-              recommendedViewKinds={recommendedViewKinds}
-              recommendedToolKinds={recommendedToolKinds}
-              onOpen={(kind) => openOrFocusTab(kind)}
-              conversationMessages={activeConv?.messages || []}
-              chatInput={chatInput}
-              setChatInput={setChatInput}
-              isSending={isSending}
-              onSend={sendMessage}
-              onNewChat={createConversation}
-              messageRecommendations={messageRecommendations}
-              chatEndRef={chatEndRef}
+          {/* ── OVERVIEW ── */}
+          {onOverview && (
+            <CaseOverview
+              stage={currentCase.stage}
+              outcome={currentCase.outcome}
+              onHold={!!currentCase.onHold}
+              currentTask={focusTask}
+              openTaskCount={pendingTasks.length}
+              totalTaskCount={caseTasks.length}
+              onOpenTask={handleOpenTaskModal}
+              timeline={timeline.entries}
+              hiddenTaskCount={timeline.hiddenCount}
+              onViewAllTasks={() => openOrFocusTab('tasks')}
+              client={client}
+              applicant={applicant}
+              visaSubclass={visaSubclass}
+              templateTitle={workflowTemplate?.title}
+              ownerName={ownerName}
+              openedAt={currentCase.startDate || currentCase.createdAt}
+              nextDeadline={nextDeadline}
+              description={currentCase.description}
+              onEditCase={openEditCase}
+              onOpenDeadlines={() => openOrFocusTab('tasks')}
+              checklistRows={checklistRows}
+              checklistTotal={checklist.length}
+              checklistDone={uploadedCount}
+              onOpenChecklist={() => openOrFocusTab('checklist')}
+              onGenerateChecklist={() => openOrFocusTab('checklist-generator')}
+              documents={documents}
+              caseId={currentCase.id}
+              onOpenDocument={handleChecklistPreview}
+              onViewAllFiles={() => openOrFocusTab('documents')}
+              onDocumentUploaded={(doc) => {
+                setDocuments(prev => [...prev, doc]);
+                setDocRefreshKey(k => k + 1);
+              }}
+              onRequestCompress={handleRequestCompress}
             />
           )}
 
@@ -2151,6 +2226,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         )}
       </div>
 
+
+      {/* ── WORKSPACE DOCK (floating, every tab) ── */}
+      <WorkspaceDock
+        quickActions={dockQuickActions}
+        currentTaskTitle={focusTask?.title}
+        viewItems={dockViewItems}
+        toolItems={dockToolItems}
+      />
 
       {/* ── MODALS ── */}
 
