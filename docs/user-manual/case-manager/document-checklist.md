@@ -55,17 +55,12 @@ matches).
 
 An auto-link is only ever an offer: use **×** to unlink and pick a different file yourself.
 
-### Dragging from the left rail
+### Dragging files onto checklist items
 
-Every case's files are listed in the **Case Files** panel on the left-hand rail. Drag the file you
-want onto the checklist item you want to link it to — items with no file show the hint *"Drag a
-file from Case Files to link it here"*. Dropping the file sets it as the item's linked file and
-sets the status to **Linked**.
-
-### Side by side with Case Files
-
-Click **Case Files** at the top of the Document Checklist tab to show the case's files in a panel
-beside the checklist, so you can drag across without switching tabs. The panel includes the upload
+Click **Case Files** at the top of the Checklist tab to show the case's files in a panel beside the
+checklist. Drag the file you want onto the checklist item you want to link it to — items with no
+file show the hint *"Drag a file from Case Files to link it here"*. Dropping the file sets it as the
+item's linked file and sets the status to **Linked**. The panel includes the upload
 dropzone, so you can add a file and link it in one pass. Click the button again to hide it.
 
 Use the **×** next to a linked file to unlink it (the file itself stays in Case Files), or click the

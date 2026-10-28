@@ -19,8 +19,9 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
 - **Recent case files** — the five most recently uploaded files, plus an upload area. Click a file
   to preview it, or **View all files** to open the Case Files tab.
 
-The left-hand Case Files rail is hidden on the Overview (the cards above cover it) and comes back
-on every other tab, where you can still drag files onto checklist items.
+The tabs and the layout around them stay the same on every tab; switching tabs only changes the
+content below the tab row. To drag files onto checklist items, use the **Case Files** button on the
+Checklist tab.
 
 ## The Workspace drawer
 
