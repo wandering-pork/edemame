@@ -12,10 +12,13 @@ import { DocumentList } from '../components/DocumentList';
 import { PdfPackager } from '../components/PdfPackager';
 import { BundleBuilder820 } from '../components/BundleBuilder820';
 import { DocumentCompressor } from '../components/DocumentCompressor';
-import { CaseRail, RailAlert, CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
+import { CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
 import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList';
 import { AgentPanel } from '../components/case-details/AgentPanel';
-import { Workspace, WorkspaceCatalogItem, MessageRecommendation } from '../components/case-details/Workspace';
+import { CaseOverview } from '../components/case-details/CaseOverview';
+import { WorkspacePanel } from '../components/case-details/WorkspacePanel';
+import type { WorkspaceMenuItem, WorkspaceQuickAction } from '../components/case-details/WorkspaceControls';
+import { currentFocusTask, taskTimeline, checklistBreakdown, suggestQuickActions } from '../lib/caseOverview';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
 import { DocumentTypePicker, DocumentTypeBadge } from '../components/DocumentTypePicker';
 import { EligibilityAssessmentModal } from '../components/visa-advisor/EligibilityAssessmentModal';
@@ -54,10 +57,9 @@ import {
   MoreVertical,
   ArrowLeft,
   FileText,
-  Pin,
-  PinOff,
   RefreshCw,
   Columns2,
+  LayoutGrid,
   UserPlus,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -116,6 +118,15 @@ const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
   'bundle-builder-820': '820 Bundle Builder',
 };
 
+// The case's fixed tab row. Tools (generator, compressor, bundle builder) open as modals, not tabs.
+const CASE_FIXED_TABS: { kind: CaseTabKind; label: string }[] = [
+  { kind: 'workspace', label: 'Overview' },
+  { kind: 'tasks', label: 'Tasks' },
+  { kind: 'documents', label: 'Case files' },
+  { kind: 'checklist', label: 'Checklist' },
+  { kind: 'notes', label: 'Notes' },
+];
+
 const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: string }> = {
   verified: { cls: 'bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400', label: 'Verified' },
   linked: { cls: 'bg-blue-500/[0.13] text-blue-700 dark:text-blue-400', label: 'Linked' },
@@ -166,7 +177,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // on `cases` is owner/agent only) — this only hides the control for a role
   // that would be rejected server-side anyway. `role` is null in local mode,
   // where deletes stay allowed (single user, always their own data).
-  const { role: firmRole, allMembers } = useFirm();
+  const { role: firmRole, allMembers, memberNameFor } = useFirm();
   const canDeleteCase = canDeleteFirmData(firmRole);
 
   // ---- Task state ----
@@ -233,9 +244,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   /** §4.4 — renders the Case Files tab's content beside the checklist for drag-to-link. */
   const [caseFilesSplit, setCaseFilesSplit] = useState(false);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
-  const [recommendedViewKinds, setRecommendedViewKinds] = useState<CaseTabKind[]>(['checklist', 'tasks', 'notes']);
-  const [recommendedToolKinds, setRecommendedToolKinds] = useState<CaseTabKind[]>(['checklist-generator', 'document-compressor', 'bundle-builder-820']);
-  const [messageRecommendations, setMessageRecommendations] = useState<Record<string, MessageRecommendation[]>>({});
+  const [recommendedViewKinds, setRecommendedViewKinds] = useState<CaseTabKind[]>([]);
+  const [recommendedToolKinds, setRecommendedToolKinds] = useState<CaseTabKind[]>([]);
 
   // ---- Top-bar menu state ----
   const [statusOpen, setStatusOpen] = useState(false);
@@ -311,14 +321,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const hasOverdue = pendingTasks.some(t => !isWaiting(t) && new Date(t.date) < new Date());
   const uploadedCount = checklist.filter(c => c.status === 'linked' || c.status === 'verified').length;
   const overdueCount = pendingTasks.filter(t => new Date(t.date) < new Date()).length;
-  const outstandingDocs = checklist.length > 0 ? checklist.length - uploadedCount : 0;
-
-  // Rail alerts — just docs outstanding now; overdue tasks and passport expiry
-  // are covered by the case summary strip's At Risk chip and Next Deadline
-  // chip (which shows any open deadline's countdown, not just an urgent one),
-  // so showing them again here would just duplicate the strip.
-  const railAlerts: RailAlert[] = [];
-  if (outstandingDocs > 0) railAlerts.push({ color: 'amber', text: `${outstandingDocs} doc${outstandingDocs !== 1 ? 's' : ''} outstanding` });
 
   // ── Case summary strip: At Risk + next deadline (Step 1's case info at a glance) ──
   const caseRisk = useMemo(
@@ -505,15 +507,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       return [...prev, { id, kind, label: label || TAB_LABELS[kind], pinned: false }];
     });
     setActiveTabId(id);
-  };
-
-  const closeTab = (id: string) => {
-    setOpenTabs(prev => prev.filter(t => t.id !== id));
-    setActiveTabId(current => (current === id ? 'workspace' : current));
-  };
-
-  const togglePinTab = (id: string) => {
-    setOpenTabs(prev => prev.map(t => t.id === id ? { ...t, pinned: !t.pinned } : t));
   };
 
   const handleChecklistPreview = async (doc: Document) => {
@@ -953,8 +946,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         return next;
       });
 
-      // Refresh Workspace View/Tools suggestions from the exchange, and record
-      // which items to render as inline hyperlinks under this assistant message.
+      // Refresh the Workspace dock's View/Tools "AI pick" ranking from the exchange.
       const combinedText = `${userMsg.content}\n${assistantMsg.content}`;
       const matchedKinds = RECOMMEND_KEYWORDS.filter(([, re]) => re.test(combinedText)).map(([kind]) => kind);
       if (matchedKinds.length > 0) {
@@ -966,10 +958,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         if (matchedTools.length > 0) {
           setRecommendedToolKinds(prev => [...matchedTools, ...prev.filter(k => !matchedTools.includes(k))]);
         }
-        setMessageRecommendations(prev => ({
-          ...prev,
-          [assistantMsg.id]: matchedKinds.map(kind => ({ kind, label: TAB_LABELS[kind as Exclude<CaseTabKind, 'workspace'>] })),
-        }));
       }
     } catch {
       const errMsg: FocusChatMessage = {
@@ -1330,13 +1318,74 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     );
   };
 
+  // ---- Overview + Workspace side card (design option A) ----
+  const onOverview = activeTabId === 'workspace';
+  const focusTask = useMemo(() => currentFocusTask(caseTasks), [caseTasks]);
+  const timeline = useMemo(() => taskTimeline(caseTasks), [caseTasks]);
+  const checklistRows = useMemo(() => checklistBreakdown(checklist, ADDITIONAL_DOCUMENTS_CATEGORY), [checklist]);
+  const ownerName = currentCase.caseOwner
+    ? teamMembers.find(m => m.id === currentCase.caseOwner)?.name ?? memberNameFor(currentCase.caseOwner) ?? undefined
+    : undefined;
+
+  const openEditCase = () => {
+    setCaseEditForm({ title: currentCase.title, description: currentCase.description });
+    setIsEditingCase(true);
+  };
+
+  const workspaceQuickActions: WorkspaceQuickAction[] = suggestQuickActions({
+    currentTask: focusTask,
+    caseTasks,
+    checklist,
+    clientName: client.name,
+  }).map(action => ({
+    id: action.id,
+    label: action.label,
+    detail: action.detail,
+    onSelect: () => {
+      if (action.kind === 'agent') handleSkillAction(action.prompt);
+      else if (action.kind === 'open') openOrFocusTab(action.target);
+      else {
+        const task = caseTasks.find(t => t.id === action.taskId);
+        if (task) handleOpenTaskModal(task);
+      }
+    },
+  }));
+
+  const workspaceViewItems: WorkspaceMenuItem[] = [
+    { id: 'overview', group: 'Case', label: 'Overview', onSelect: () => openOrFocusTab('workspace') },
+    { id: 'tasks', group: 'Case', label: 'Tasks & deadlines', hint: `${pendingTasks.length} open`, recommended: recommendedViewKinds.includes('tasks'), onSelect: () => openOrFocusTab('tasks') },
+    { id: 'notes', group: 'Case', label: 'Notes', recommended: recommendedViewKinds.includes('notes'), onSelect: () => openOrFocusTab('notes') },
+    { id: 'documents', group: 'Documents', label: 'Case files', hint: String(documents.length), onSelect: () => openOrFocusTab('documents') },
+    { id: 'checklist', group: 'Documents', label: 'Document checklist', hint: checklist.length > 0 ? `${uploadedCount}/${checklist.length}` : undefined, recommended: recommendedViewKinds.includes('checklist'), onSelect: () => openOrFocusTab('checklist') },
+    ...(eligibilityAssessment
+      ? [{ id: 'eligibility', group: 'Documents', label: 'Eligibility assessment', onSelect: () => setShowEligibilityAssessment(true) }]
+      : []),
+  ];
+
+  const workspaceToolItems: WorkspaceMenuItem[] = [
+    { id: 'add-task', group: 'Case', label: 'Add task', onSelect: () => handleOpenTaskModal() },
+    { id: 'add-deadline', group: 'Case', label: 'Add deadline', onSelect: () => { openOrFocusTab('tasks'); setShowAddDeadline(true); } },
+    { id: 'edit-case', group: 'Case', label: 'Edit case', onSelect: openEditCase },
+    { id: 'checklist-generator', group: 'Documents', label: 'Document Checklist Generator', recommended: recommendedToolKinds.includes('checklist-generator'), onSelect: () => openOrFocusTab('checklist-generator') },
+    { id: 'document-compressor', group: 'Documents', label: 'Document Compressor', recommended: recommendedToolKinds.includes('document-compressor'), onSelect: () => openOrFocusTab('document-compressor') },
+    ...(SUPPORTED_SUBCLASSES.includes(visaSubclass || '')
+      ? [{ id: 'crusher', group: 'Documents', label: 'Run Crusher', onSelect: handleRunCrusher }]
+      : []),
+    ...(visaSubclass === '820'
+      ? [{ id: 'bundle-builder-820', group: 'Documents', label: '820 Bundle Builder', recommended: recommendedToolKinds.includes('bundle-builder-820'), onSelect: () => openOrFocusTab('bundle-builder-820') }]
+      : []),
+    { id: 'agent', group: 'Agent', label: agentOpen ? 'Close Agent chat' : 'Chat with Edamame', onSelect: () => setAgentOpen(o => !o) },
+    { id: 'cover-letter', group: 'Agent', label: 'Draft cover letter', onSelect: () => handleSkillAction('Please help me draft a cover letter for this immigration case.') },
+    { id: 'eligibility-check', group: 'Agent', label: 'Re-check eligibility', onSelect: handleEligibility },
+  ];
+
   // ---- Render ----
   const needsOutcomePrompt = currentCase.stage === 'closed' && !currentCase.outcome;
 
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
   return (
-    <div className="px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate min-h-full">
+    <div className="flex-1 px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate">
 
       {/* ══════════════════════════════════════════
           TOP BAR
@@ -1418,7 +1467,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
                   <div className="h-px bg-paper dark:bg-plate my-1" />
                   <button onClick={() => { openOrFocusTab('checklist'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
-                  <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Workspace</button>
+                  <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Overview</button>
                   <button onClick={() => { setShowDocumentCompressor(true); setMoreOpen(false); }} className={menuItemCls}>Document Compressor</button>
                   {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && (
                     <button onClick={handleRunCrusher} className={menuItemCls}>Run Crusher</button>
@@ -1427,7 +1476,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     <button onClick={() => { setShowBundleBuilder(true); setMoreOpen(false); }} className={menuItemCls}>820 bundle builder</button>
                   )}
                   <button
-                    onClick={() => { setCaseEditForm({ title: currentCase.title, description: currentCase.description }); setIsEditingCase(true); setMoreOpen(false); }}
+                    onClick={() => { openEditCase(); setMoreOpen(false); }}
                     className={menuItemCls}
                   >
                     Edit case
@@ -1490,116 +1539,81 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       )}
 
       {/* ══════════════════════════════════════════
-          3-COLUMN GRID
+          CONTENT GRID (tabs + panel | Workspace card + optional Agent panel)
       ══════════════════════════════════════════ */}
-      <div className={`mt-4 grid grid-cols-1 gap-3.5 items-start ${agentOpen ? 'xl:grid-cols-[220px_minmax(320px,1fr)_minmax(280px,330px)]' : 'xl:grid-cols-[220px_minmax(320px,1fr)]'}`}>
-
-        {/* ── LEFT RAIL ── */}
-        <CaseRail
-          client={client}
-          applicant={applicant}
-          progress={progress}
-          completedCount={completedTasks.length}
-          pendingCount={pendingTasks.length}
-          alerts={railAlerts}
-          documents={documents}
-          onOpenDocument={handleChecklistPreview}
-          caseId={currentCase.id}
-          visaSubclass={visaSubclass}
-          onDocumentUploaded={(doc) => {
-            setDocuments(prev => [...prev, doc]);
-            setDocRefreshKey(k => k + 1);
-          }}
-          onRequestCompress={handleRequestCompress}
-          onRemoveDocument={handleRemoveDocument}
-          onOpenCaseFilesTab={() => openOrFocusTab('documents')}
-        />
+      <div
+        className="mt-4 grid grid-cols-1 gap-3.5 items-start xl:grid-cols-[minmax(320px,1fr)_minmax(280px,320px)]"
+      >
 
         {/* ── CENTER COLUMN ── */}
         <div className="min-w-0">
-          {/* Tabs — Workspace is always present; opening a View/Tool adds a closable, pinnable tab */}
-          <div className="flex items-center gap-0.5 border-b border-ink/10 dark:border-plate-ink/15 overflow-x-auto custom-scrollbar">
-            <button
-              onClick={() => setActiveTabId('workspace')}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${
-                activeTabId === 'workspace'
-                  ? 'border-edamame text-ink dark:text-plate-ink'
-                  : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
-              }`}
-            >
-              <Sparkles size={13} className={activeTabId === 'workspace' ? 'text-edamame' : ''} />
-              Workspace
-            </button>
-
-            {openTabs.map(tab => (
-              <div
-                key={tab.id}
-                className={`group flex items-center gap-1.5 pl-4 pr-2 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors cursor-pointer ${
-                  activeTabId === tab.id
-                    ? 'border-edamame text-ink dark:text-plate-ink'
-                    : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
-                }`}
-                onClick={() => setActiveTabId(tab.id)}
-              >
-                {tab.label}
-                {tab.kind === 'checklist' && checklist.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
-                    {checklist.length}
-                  </span>
-                )}
-                {tab.kind === 'tasks' && caseTasks.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
-                    {caseTasks.length}
-                  </span>
-                )}
-                {tab.kind === 'documents' && documents.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
-                    {documents.length}
-                  </span>
-                )}
+          {/* Tabs (design option C): a fixed, full-width row above the content. Switching tabs only
+              swaps the panel below — the frame (tabs, column widths) never moves. */}
+          <div role="tablist" aria-label="Case views" className="flex items-center gap-0.5 border-b border-ink/10 dark:border-plate-ink/15 overflow-x-auto custom-scrollbar">
+            {CASE_FIXED_TABS.map(({ kind, label }) => {
+              const id = kind === 'workspace' ? 'workspace' : `tab:${kind}`;
+              const active = activeTabId === id;
+              const count = kind === 'tasks' ? caseTasks.length : kind === 'documents' ? documents.length : kind === 'checklist' ? checklist.length : 0;
+              return (
                 <button
-                  onClick={(e) => { e.stopPropagation(); togglePinTab(tab.id); }}
-                  title={tab.pinned ? 'Unpin tab' : 'Pin tab (persists across reloads)'}
-                  className={`p-0.5 rounded transition-colors ${tab.pinned ? 'text-edamame' : 'text-ink-soft/40 dark:text-plate-ink-soft/40 opacity-0 group-hover:opacity-100 hover:text-edamame'}`}
+                  key={kind}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => openOrFocusTab(kind)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                    active
+                      ? 'border-edamame text-ink dark:text-plate-ink'
+                      : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
+                  }`}
                 >
-                  {tab.pinned ? <Pin size={11} /> : <PinOff size={11} />}
+                  {kind === 'workspace' && <LayoutGrid size={13} className={active ? 'text-edamame' : ''} />}
+                  {label}
+                  {count > 0 && (
+                    <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${active ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
+                      {count}
+                    </span>
+                  )}
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
-                  title="Close tab"
-                  className="p-0.5 rounded text-ink-soft/40 dark:text-plate-ink-soft/40 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-colors"
-                >
-                  <X size={11} />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* ── WORKSPACE ── */}
-          {activeTabId === 'workspace' && (
-            <Workspace
-              viewCatalog={[
-                { kind: 'tasks', label: 'Tasks', description: `${pendingTasks.length} pending · ${completedTasks.length} completed` },
-                { kind: 'checklist', label: 'Document Checklist', description: `${uploadedCount}/${checklist.length} documents linked` },
-                { kind: 'documents', label: 'Case Files', description: `${documents.length} file${documents.length === 1 ? '' : 's'} uploaded` },
-                { kind: 'notes', label: 'Notes', description: 'Case notes and history' },
-              ] as WorkspaceCatalogItem[]}
-              toolCatalog={[
-                { kind: 'checklist-generator', label: 'Document Checklist Generator', description: 'Pick categories to generate a checklist from the system default + workflow template' },
-                { kind: 'document-compressor', label: 'Document Compressor', description: 'Compress documents to meet DoHA\'s 5MB-per-attachment requirement' },
-                ...(visaSubclass === '820' ? [{ kind: 'bundle-builder-820', label: '820 Bundle Builder', description: 'Build the ImmiAccount submission bundle' }] as WorkspaceCatalogItem[] : []),
-              ]}
-              recommendedViewKinds={recommendedViewKinds}
-              recommendedToolKinds={recommendedToolKinds}
-              onOpen={(kind) => openOrFocusTab(kind)}
-              conversationMessages={activeConv?.messages || []}
-              chatInput={chatInput}
-              setChatInput={setChatInput}
-              isSending={isSending}
-              onSend={sendMessage}
-              onNewChat={createConversation}
-              messageRecommendations={messageRecommendations}
-              chatEndRef={chatEndRef}
+          {/* ── OVERVIEW ── */}
+          {onOverview && (
+            <CaseOverview
+              stage={currentCase.stage}
+              onHold={!!currentCase.onHold}
+              currentTask={focusTask}
+              openTaskCount={pendingTasks.length}
+              totalTaskCount={caseTasks.length}
+              onOpenTask={handleOpenTaskModal}
+              timeline={timeline.entries}
+              hiddenTaskCount={timeline.hiddenCount}
+              onViewAllTasks={() => openOrFocusTab('tasks')}
+              client={client}
+              applicant={applicant}
+              visaSubclass={visaSubclass}
+              templateTitle={workflowTemplate?.title}
+              ownerName={ownerName}
+              openedAt={currentCase.startDate || currentCase.createdAt}
+              nextDeadline={nextDeadline}
+              description={currentCase.description}
+              onEditCase={openEditCase}
+              onOpenDeadlines={() => openOrFocusTab('tasks')}
+              checklistRows={checklistRows}
+              checklistTotal={checklist.length}
+              checklistDone={uploadedCount}
+              onOpenChecklist={() => openOrFocusTab('checklist')}
+              onGenerateChecklist={() => openOrFocusTab('checklist-generator')}
+              documents={documents}
+              caseId={currentCase.id}
+              onOpenDocument={handleChecklistPreview}
+              onViewAllFiles={() => openOrFocusTab('documents')}
+              onDocumentUploaded={(doc) => {
+                setDocuments(prev => [...prev, doc]);
+                setDocRefreshKey(k => k + 1);
+              }}
+              onRequestCompress={handleRequestCompress}
             />
           )}
 
@@ -2129,7 +2143,14 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           )}
         </div>
 
-        {/* ── AGENT PANEL ── */}
+        {/* ── RIGHT COLUMN: Workspace card (every tab) + Agent panel ── */}
+        <div className="min-w-0 space-y-3.5">
+        <WorkspacePanel
+          quickActions={workspaceQuickActions}
+          currentTaskTitle={focusTask?.title}
+          viewItems={workspaceViewItems}
+          toolItems={workspaceToolItems}
+        />
         {agentOpen && (
           <AgentPanel
             conversations={conversations}
@@ -2149,6 +2170,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             onCancelIssueDraft={handleCancelIssueDraft}
           />
         )}
+        </div>
       </div>
 
 

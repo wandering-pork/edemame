@@ -1,13 +1,13 @@
 # Document Checklist & the Document Checklist Generator
 
-The **Document Checklist** tab (opened as a View from the Workspace tab — this is the renamed and
+The **Document Checklist** tab (opened from the Workspace card's **View** menu, or **Open checklist** on the Overview — this is the renamed and
 upgraded version of the old "Documents" tab) tracks every document a case needs, grouped into
 collapsible categories such as "482 — Sponsor & Nomination Documents" or "820/801 — Relationship
 Evidence: Financial Aspects".
 
 ## Generating a checklist
 
-Open the **Document Checklist Generator** tool from the Workspace tab's Tools section:
+Open the **Document Checklist Generator** tool from the Workspace card's **Tools** menu:
 
 1. **Select categories** — pick one or more document categories relevant to the case (categories
    are the per-visa-subclass subsections of the system default checklist, e.g. "186 — Applicant:
@@ -55,17 +55,12 @@ matches).
 
 An auto-link is only ever an offer: use **×** to unlink and pick a different file yourself.
 
-### Dragging from the left rail
-
-Every case's files are listed in the **Case Files** panel on the left-hand rail. Drag the file you
-want onto the checklist item you want to link it to — items with no file show the hint *"Drag a
-file from Case Files to link it here"*. Dropping the file sets it as the item's linked file and
-sets the status to **Linked**.
-
-### Side by side with Case Files
+### Dragging files onto checklist items
 
 Click **Case Files** at the top of the Document Checklist tab to show the case's files in a panel
-beside the checklist, so you can drag across without switching tabs. The panel includes the upload
+beside the checklist. Drag the file you want onto the checklist item you want to link it to — items
+with no file show the hint *"Drag a file from Case Files to link it here"*. Dropping the file sets
+it as the item's linked file and sets the status to **Linked**. The panel includes the upload
 dropzone, so you can add a file and link it in one pass. Click the button again to hide it.
 
 Use the **×** next to a linked file to unlink it (the file itself stays in Case Files), or click the
