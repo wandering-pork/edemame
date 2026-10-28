@@ -109,12 +109,13 @@ actually does:
 ## Landing on the Overview tab
 
 Every time you open a case, you land on the **Overview** tab: case info and the case's progress
-on the left, recent case files and a document checklist breakdown in the middle, and the
-**Workspace** card on the right. The Workspace card holds searchable **View** (Tasks, Document
+on the left and recent case files and a document checklist breakdown on the right, under a row of
+tabs (Overview, Tasks, Case files, Checklist, Notes). The **Workspace** card sits beside every
+tab. The Workspace card holds searchable **View** (Tasks, Document
 Checklist, Case Files, Notes) and **Tools** (Document Checklist Generator, Document Compressor, the
 820 Bundle Builder where applicable, and more) menus plus suggested next steps for the current
-task. See [Overview, the Workspace card, tabs, and pinning](./workspace-and-tabs.md) for how the
-Overview, the Workspace card, tab opening, and tab pinning work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
+task. See [Overview, the Workspace card, and tabs](./workspace-and-tabs.md) for how the Overview,
+the Workspace card, and the case's tabs work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
 
 Every file attached to the case is on the **Case Files** tab, where you can upload, preview,

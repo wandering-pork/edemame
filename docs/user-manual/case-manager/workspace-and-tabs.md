@@ -1,9 +1,9 @@
-# Overview, the Workspace card, Tabs, and Pinning
+# Overview, the Workspace card, and Tabs
 
 ## The Overview tab
 
 Opening a case lands you on the **Overview** tab — a one-screen summary of where the case is up to,
-in three columns (two on narrower screens, or while the Agent panel is open):
+in two columns, with the Workspace card beside it:
 
 - **Case info** — client (and applicant, if different), visa subclass and template, case owner,
   stage, next deadline (click it to jump to the Deadlines panel), and the date the case was opened.
@@ -17,7 +17,6 @@ in three columns (two on narrower screens, or while the Agent panel is open):
 - **Document checklist** — one progress bar per checklist category showing how many items are
   verified, linked, pending, or waived. Click a category (or **Open checklist**) to open the
   Document Checklist tab. If the case has no checklist yet, use **Generate one**.
-- **Workspace** — see below.
 
 The tab bar and the layout around it stay the same on every tab; switching tabs only changes the
 content below the tab bar. To drag files onto checklist items, use the **Case Files** button on the
@@ -25,7 +24,8 @@ Document Checklist tab.
 
 ## The Workspace card
 
-The **Workspace** card sits in the Overview's right-hand column. It has:
+The **Workspace** card sits in a column on the right of every tab (below the content on narrower
+screens). When the Agent panel is open, it appears under the Workspace card. The card has:
 
 - **View** menu — Overview, Tasks & deadlines, Notes, Case files, Document checklist, and (when the
   case has one) Eligibility assessment.
@@ -44,23 +44,15 @@ open the highlighted item, and **Esc** to close. After you chat with the Agent, 
 what you discussed are marked **AI PICK** and listed first in their group.
 
 **Hide** collapses the card to a small **Show Workspace** button; it stays hidden for the rest of
-your browser session. The Workspace card is only on the Overview — on other tabs, use the tab bar
-or the **Case actions** menu in the top bar.
+your browser session.
 
-## Opening tabs
+## Tabs
 
-Choosing a View or Tool opens it in a **new tab** next to Overview — it never replaces the Overview
-tab. You can have several tabs open at once (e.g. Tasks and Document Checklist side by side) and
-switch between them along the tab bar.
+A row of tabs is always visible: **Overview**, **Tasks**, **Case files**, **Checklist**, and
+**Notes**. Tasks, Case files, and Checklist show a count. Click a tab to switch to it; choosing a
+View from the Workspace **View** menu switches to the matching tab. Only the content below the tabs
+changes when you switch.
 
-## Pinning tabs
-
-Hover a tab to reveal a pin icon and a close (×) icon:
-
-- **Pin** a tab you want to keep around — pinned tabs persist across page reloads and when you
-  leave and come back to the case.
-- Unpinned tabs are temporary: if you reload the page or navigate away and back, only your pinned
-  tabs plus whichever tab was active when you left are restored. Every other unpinned tab is
-  discarded, keeping the tab bar from accumulating clutter over time.
-
-The Overview tab itself is always available and doesn't need to be pinned.
+Tools (Document Checklist Generator, Document Compressor, 820 Bundle Builder) open in their own
+window over the case rather than as a tab. When you come back to a case, it reopens on the tab you
+were last using.

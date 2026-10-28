@@ -86,19 +86,15 @@ interface CaseOverviewProps {
   onViewAllFiles: () => void;
   onDocumentUploaded: (doc: Document) => void;
   onRequestCompress: (files: File[]) => void;
-
-  /** The Workspace side card, rendered as the third column. */
-  workspace: React.ReactNode;
-  /** True when the Agent panel takes space beside the Overview — drops to two columns. */
-  narrow?: boolean;
 }
 
 /**
  * Case Details landing view (design option A — "Overview + side Workspace"):
  * case info + case progress on the left, recent case files + document
- * checklist breakdown in the middle, and the Workspace side card on the
- * right (`WorkspacePanel.tsx`, passed in as `workspace`). The current task is
- * called out inline in the progress timeline as "Focus now".
+ * checklist breakdown on the right. The current task is called out inline in
+ * the progress timeline as "Focus now". The Workspace side card
+ * (`WorkspacePanel.tsx`) is a page-level column rendered by `CaseDetails.tsx`,
+ * so it stays beside every tab.
  */
 export const CaseOverview: React.FC<CaseOverviewProps> = props => {
   const {
@@ -108,7 +104,6 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
     client, applicant, visaSubclass, templateTitle, ownerName, openedAt, nextDeadline, description, onEditCase, onOpenDeadlines,
     checklistRows, checklistTotal, checklistDone, onOpenChecklist, onGenerateChecklist,
     documents, caseId, onOpenDocument, onViewAllFiles, onDocumentUploaded, onRequestCompress,
-    workspace, narrow,
   } = props;
 
   const recentDocs = [...documents].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 5);
@@ -116,11 +111,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
 
   return (
     <div className="mt-4">
-      <div
-        className={`grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start ${
-          narrow ? '' : 'xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_300px]'
-        }`}
-      >
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-3.5 items-start">
         {/* ── Left: case info + timeline ── */}
         <div className="space-y-3.5 min-w-0">
           <section className={cardCls}>
@@ -254,7 +245,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
           </section>
         </div>
 
-        {/* ── Middle: recent files + checklist ── */}
+        {/* ── Right: recent files + checklist ── */}
         <div className="space-y-3.5 min-w-0">
           <section className={cardCls}>
             <CardTitle
@@ -351,9 +342,6 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
           </section>
 
         </div>
-
-        {/* ── Right: Workspace side card ── */}
-        <div className={`min-w-0 lg:col-span-2 ${narrow ? '' : 'xl:col-span-1'}`}>{workspace}</div>
       </div>
     </div>
   );
