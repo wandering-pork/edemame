@@ -16,7 +16,7 @@ import { CaseRail, RailAlert, CASE_FILE_DRAG_MIME } from '../components/case-det
 import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList';
 import { AgentPanel } from '../components/case-details/AgentPanel';
 import { CaseOverview } from '../components/case-details/CaseOverview';
-import { WorkspaceDock } from '../components/case-details/WorkspaceDock';
+import { WorkspacePanel } from '../components/case-details/WorkspacePanel';
 import type { WorkspaceMenuItem, WorkspaceQuickAction } from '../components/case-details/WorkspaceControls';
 import { currentFocusTask, taskTimeline, checklistBreakdown, suggestQuickActions } from '../lib/caseOverview';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
@@ -1328,7 +1328,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     );
   };
 
-  // ---- Overview + Workspace dock (design option B) ----
+  // ---- Overview + Workspace side card (design option A) ----
   const onOverview = activeTabId === 'workspace';
   const focusTask = useMemo(() => currentFocusTask(caseTasks), [caseTasks]);
   const timeline = useMemo(() => taskTimeline(caseTasks), [caseTasks]);
@@ -1342,7 +1342,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setIsEditingCase(true);
   };
 
-  const dockQuickActions: WorkspaceQuickAction[] = suggestQuickActions({
+  const workspaceQuickActions: WorkspaceQuickAction[] = suggestQuickActions({
     currentTask: focusTask,
     caseTasks,
     checklist,
@@ -1361,7 +1361,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     },
   }));
 
-  const dockViewItems: WorkspaceMenuItem[] = [
+  const workspaceViewItems: WorkspaceMenuItem[] = [
     { id: 'overview', group: 'Case', label: 'Overview', onSelect: () => openOrFocusTab('workspace') },
     { id: 'tasks', group: 'Case', label: 'Tasks & deadlines', hint: `${pendingTasks.length} open`, recommended: recommendedViewKinds.includes('tasks'), onSelect: () => openOrFocusTab('tasks') },
     { id: 'notes', group: 'Case', label: 'Notes', recommended: recommendedViewKinds.includes('notes'), onSelect: () => openOrFocusTab('notes') },
@@ -1372,7 +1372,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       : []),
   ];
 
-  const dockToolItems: WorkspaceMenuItem[] = [
+  const workspaceToolItems: WorkspaceMenuItem[] = [
     { id: 'add-task', group: 'Case', label: 'Add task', onSelect: () => handleOpenTaskModal() },
     { id: 'add-deadline', group: 'Case', label: 'Add deadline', onSelect: () => { openOrFocusTab('tasks'); setShowAddDeadline(true); } },
     { id: 'edit-case', group: 'Case', label: 'Edit case', onSelect: openEditCase },
@@ -1644,7 +1644,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           {onOverview && (
             <CaseOverview
               stage={currentCase.stage}
-              outcome={currentCase.outcome}
               onHold={!!currentCase.onHold}
               currentTask={focusTask}
               openTaskCount={pendingTasks.length}
@@ -1677,6 +1676,15 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 setDocRefreshKey(k => k + 1);
               }}
               onRequestCompress={handleRequestCompress}
+              narrow={agentOpen}
+              workspace={
+                <WorkspacePanel
+                  quickActions={workspaceQuickActions}
+                  currentTaskTitle={focusTask?.title}
+                  viewItems={workspaceViewItems}
+                  toolItems={workspaceToolItems}
+                />
+              }
             />
           )}
 
@@ -2228,14 +2236,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         )}
       </div>
 
-
-      {/* ── WORKSPACE DOCK (floating, every tab) ── */}
-      <WorkspaceDock
-        quickActions={dockQuickActions}
-        currentTaskTitle={focusTask?.title}
-        viewItems={dockViewItems}
-        toolItems={dockToolItems}
-      />
 
       {/* ── MODALS ── */}
 

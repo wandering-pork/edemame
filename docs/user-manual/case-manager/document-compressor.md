@@ -18,7 +18,7 @@ instead of re-browsing for it.
 ## Using the Document Compressor
 
 Open a case, click **Case actions** in the top bar and choose **Document Compressor**, or use the
-**Tools** menu on the Workspace bar at the bottom of the case. It starts by asking where the files are:
+**Tools** menu on the Workspace card on the case's Overview. It starts by asking where the files are:
 
 - **Compress files in Case Files** — works from documents already uploaded to this case. Files
   over 5 MB in a supported format are automatically ticked for you.
