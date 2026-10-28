@@ -725,7 +725,7 @@ const AppShell: React.FC = () => {
       <Toaster position="top-right" richColors theme={theme === 'dark' ? 'dark' : 'light'} />
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 font-sans text-gray-900 dark:text-gray-100 transition-colors duration-200">
         <Sidebar />
-        <div className={`${collapsed ? 'md:ml-16' : 'md:ml-[240px]'} min-w-0 transition-[margin-left] duration-300 ease-in-out`}>
+        <div className={`${collapsed ? 'md:ml-16' : 'md:ml-[240px]'} min-w-0 min-h-screen flex flex-col transition-[margin-left] duration-300 ease-in-out`}>
           <Header
             theme={theme}
             onThemeChange={handleThemeChange}
@@ -768,7 +768,8 @@ const AppShell: React.FC = () => {
               </button>
             </div>
           )}
-          <main>
+          {/* flex-1 + flex-col so a page can fill the rest of the window (Case Details' paper background does). */}
+          <main className="flex-1 flex flex-col">
           <Routes>
             <Route path="/dashboard" element={
               <Dashboard
