@@ -1,35 +1,33 @@
-# Overview, the Workspace bar, Tabs, and Pinning
+# Overview, the Workspace bar, and Tabs
 
 ## The Overview tab
 
 Opening a case lands you on the **Overview** tab — a one-screen summary of where the case is up to:
 
-- **Stage stepper** — the case's journey (Draft → Assessment → Engaged → Preparing → Ready to lodge →
-  Lodged → Decision → Closed), with completed stages ticked and the current one highlighted. Change
-  the stage from the **Stage** chip in the summary strip under the case title, as before.
-- **You are here** — under the stepper: the current task (the earliest task that isn't done yet),
-  how many of the case's tasks are done, its due date and status. Click **Open task** to edit it.
+- **You are here** — the current task (the earliest task that isn't done yet), how many of the
+  case's tasks are done, its due date and status. Click **Open task** to edit it.
 - **Case info** — client (and applicant, if different), visa subclass and template, case owner,
   stage, next deadline (click it to jump to the Deadlines panel), and the date the case was opened.
-  **Edit** opens the Edit case form.
-- **Progress** — the last couple of completed tasks, the current task, and the next few coming
-  up. Click any task to open it, or **View all** to open the Tasks tab.
+  **Edit** opens the Edit case form. Change the stage from the **Stage** chip in the summary strip
+  under the case title, as before.
+- **Progress** — the last couple of completed tasks, the current task, and the next few coming up.
+  Click any task to open it, or **View all** to open the Tasks tab.
 - **Document checklist** — a donut showing how many of the case's documents are in overall, then
   one progress bar per checklist category showing how many items are verified, linked, pending, or
-  waived. Click a category (or **Open**) to open the
-  Document Checklist tab. If the case has no checklist yet, use **Generate one**.
+  waived. Click a category (or **Open**) to open the Document Checklist tab. If the case has no
+  checklist yet, use **Generate one**.
 - **Recent case files** — the five most recently uploaded files, plus an upload area. Click a file
   to preview it, or **View all files** to open the Case Files tab.
 
-The tab bar and the layout around it stay the same on every tab; switching tabs only changes the
-content below the tab bar. To drag files onto checklist items, use the **Case Files** button on the
-Document Checklist tab.
+The tabs and the layout around them stay the same on every tab; switching tabs only changes the
+content below the tab row. To drag files onto checklist items, use the **Case Files** button on the
+Checklist tab.
 
 ## The Workspace bar
 
 A dark **Workspace** bar floats at the bottom of every case tab. It has:
 
-- **Suggested quick actions** for the current task (hover one for a short description) — for example *Chase client* (when the current
+- **Suggested quick actions** for the current task — for example *Chase client* (when the current
   task is waiting on the client), *Request N missing documents*, *Verify N documents*, *Update
   current task*, *Create a task plan*, *Generate checklist*, or *Summarise case*. These are worked
   out from the case's tasks and checklist (not an AI call). Actions that need writing — an email
@@ -41,28 +39,16 @@ A dark **Workspace** bar floats at the bottom of every case tab. It has:
   Compressor, Run Crusher (supported subclasses), 820 Bundle Builder (subclass 820 only), Chat with
   Edamame, Draft cover letter, and Re-check eligibility.
 
-Click the **⌄** button at the right-hand end to collapse the bar to a small **Workspace** pill
-(showing how many suggestions are waiting); click the pill to bring the bar back. It stays collapsed
-for the rest of your browser session.
-
 Both menus open upwards and have a search box — start typing to filter, use the arrow keys to move,
 **Enter** to open the highlighted item, and **Esc** to close. After you chat with the Agent, items
 related to what you discussed are marked **AI PICK** and listed first in their group.
 
-## Opening tabs
+## Tabs
 
-Choosing a View or Tool opens it in a **new tab** next to Overview — it never replaces the Overview
-tab. You can have several tabs open at once (e.g. Tasks and Document Checklist side by side) and
-switch between them along the tab bar.
+A row of tabs under the case header is always visible: **Overview**, **Tasks**, **Case files**,
+**Checklist**, and **Notes**. Tasks, Case files, and Checklist show a count. Click a tab to switch to
+it. Choosing a View from the Workspace bar switches to the matching tab.
 
-## Pinning tabs
-
-Hover a tab to reveal a pin icon and a close (×) icon:
-
-- **Pin** a tab you want to keep around — pinned tabs persist across page reloads and when you
-  leave and come back to the case.
-- Unpinned tabs are temporary: if you reload the page or navigate away and back, only your pinned
-  tabs plus whichever tab was active when you left are restored. Every other unpinned tab is
-  discarded, keeping the tab bar from accumulating clutter over time.
-
-The Overview tab itself is always available and doesn't need to be pinned.
+Tools (Document Checklist Generator, Document Compressor, 820 Bundle Builder) open in their own
+window over the case rather than as a tab. When you come back to a case, it reopens on the tab you
+were last using.

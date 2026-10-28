@@ -1,8 +1,8 @@
 import React from 'react';
 import { Check, FileText, Image as ImageIcon, File as FileIcon, ArrowRight, Pause } from 'lucide-react';
 import { format } from 'date-fns';
-import type { CaseOutcome, CaseStage, Client, Deadline, Document, Task } from '../../types';
-import { CASE_STAGE_LABELS, CASE_STAGE_STEPPER, STAGE_META, OUTCOME_LABELS } from '../../lib/caseStage';
+import type { CaseStage, Client, Deadline, Document, Task } from '../../types';
+import { CASE_STAGE_LABELS, STAGE_META } from '../../lib/caseStage';
 import { DEADLINE_KIND_LABELS, daysLeft } from '../../lib/deadlines';
 import { TASK_STATUS_LABELS, isWaiting } from '../../lib/taskStatus';
 import type { ChecklistCategorySummary, TimelineEntry } from '../../lib/caseOverview';
@@ -45,58 +45,6 @@ const LinkButton: React.FC<{ onClick: () => void; children: React.ReactNode }> =
     {children}
   </button>
 );
-
-// ---------------------------------------------------------------------------
-// Stage stepper
-// ---------------------------------------------------------------------------
-
-const StageStepper: React.FC<{ stage: CaseStage; outcome?: CaseOutcome }> = ({ stage, outcome }) => {
-  // info_requested is a branch off lodged (see CASE_STAGE_STEPPER's doc comment).
-  const effective = stage === 'info_requested' ? 'lodged' : stage;
-  const currentIndex = CASE_STAGE_STEPPER.indexOf(effective);
-  return (
-    <ol className="flex items-start" aria-label="Case stage">
-      {CASE_STAGE_STEPPER.map((s, i) => {
-        const done = i < currentIndex || (s === 'closed' && stage === 'closed');
-        const current = i === currentIndex && stage !== 'closed';
-        const label = s === 'lodged' && stage === 'info_requested'
-          ? CASE_STAGE_LABELS.info_requested
-          : s === 'closed' && stage === 'closed' && outcome
-            ? OUTCOME_LABELS[outcome]
-            : CASE_STAGE_LABELS[s];
-        return (
-          <li
-            key={s}
-            aria-current={current ? 'step' : undefined}
-            className={`relative flex-1 min-w-0 text-center text-[11px] leading-tight px-0.5 ${
-              current ? 'font-bold text-ink dark:text-plate-ink' : done ? 'text-ink-soft dark:text-plate-ink-soft' : 'text-ink-faint/70 dark:text-plate-ink-faint/70'
-            }`}
-          >
-            {i > 0 && (
-              <span
-                aria-hidden
-                className={`absolute top-[9px] right-1/2 w-full h-0.5 ${i <= currentIndex ? 'bg-edamame' : 'bg-ink/10 dark:bg-plate-ink/15'}`}
-              />
-            )}
-            <span
-              className={`relative z-[1] mx-auto mb-1.5 w-5 h-5 rounded-full flex items-center justify-center border-2 ${
-                done
-                  ? 'bg-edamame border-edamame text-white'
-                  : current
-                    ? 'bg-paper-2 dark:bg-plate-card border-edamame ring-4 ring-edamame/15'
-                    : 'bg-paper-2 dark:bg-plate-card border-ink/15 dark:border-plate-ink/20'
-              }`}
-            >
-              {done && <Check size={11} strokeWidth={3} />}
-              {current && <span className="w-2 h-2 rounded-full bg-edamame" />}
-            </span>
-            <span className="block truncate">{label}</span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-};
 
 // ---------------------------------------------------------------------------
 // Checklist donut
@@ -142,7 +90,6 @@ const ChecklistDonut: React.FC<{ rows: ChecklistCategorySummary[] }> = ({ rows }
 
 interface CaseOverviewProps {
   stage: CaseStage;
-  outcome?: CaseOutcome;
   onHold: boolean;
 
   currentTask: Task | null;
@@ -180,16 +127,15 @@ interface CaseOverviewProps {
 }
 
 /**
- * Case Details landing view (design option D, combining the best of A/B/C):
- * a journey card across the top (option B's stage stepper over option C's
- * "You are here" current-task strip), then case info + progress on the left
- * and the document checklist (C's overall donut + per-category bars) + recent
- * case files on the right. The collapsible Workspace dock is rendered
- * separately by `CaseDetails.tsx` (see `WorkspaceDock.tsx`).
+ * Case Details landing view (design option D, option C's overview): a "You
+ * are here" current-task hero, then case info + progress on the left and the
+ * document checklist (overall donut + per-category bars) + recent case files
+ * on the right. The floating Workspace bar is rendered separately by
+ * `CaseDetails.tsx` (see `WorkspaceDock.tsx`).
  */
 export const CaseOverview: React.FC<CaseOverviewProps> = props => {
   const {
-    stage, outcome, onHold,
+    stage, onHold,
     currentTask, openTaskCount, totalTaskCount, onOpenTask,
     timeline, hiddenTaskCount, onViewAllTasks,
     client, applicant, visaSubclass, templateTitle, ownerName, openedAt, nextDeadline, description, onEditCase, onOpenDeadlines,
@@ -202,10 +148,8 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
 
   return (
     <div className="mt-4 space-y-3.5">
-      {/* ── Journey: stage stepper + where you are ── */}
-      <section className={cardCls}>
-        <StageStepper stage={stage} outcome={outcome} />
-        <div className="mt-4 flex items-center gap-4 flex-wrap rounded-xl border border-ink/10 dark:border-plate-ink/15 border-l-4 border-l-edamame bg-paper dark:bg-plate px-4 py-3">
+      {/* ── You are here: current task ── */}
+      <section className="flex items-center gap-4 flex-wrap rounded-xl border border-ink/15 dark:border-plate-ink/20 border-l-4 border-l-edamame bg-paper-2 dark:bg-plate-card shadow-sm px-[18px] py-3.5">
           {currentTask ? (
             <>
               <div className="min-w-0">
@@ -249,7 +193,6 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
               <Pause size={12} /> On hold
             </span>
           )}
-        </div>
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-3.5 items-start">

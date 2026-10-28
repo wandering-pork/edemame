@@ -108,21 +108,21 @@ actually does:
 
 ## Landing on the Overview tab
 
-Every time you open a case, you land on the **Overview** tab: a stage stepper with a "You are
-here" strip for the current task across the top, then case info and the case's progress on the
-left and the document checklist (an overall donut plus a bar per category) and recent case files on
-the right. A floating **Workspace** bar at the bottom of every case tab
-holds suggested quick actions for the current task plus searchable **View** (Tasks, Document
-Checklist, Case Files, Notes) and **Tools** (Document Checklist Generator, Document Compressor, the
-820 Bundle Builder where applicable, and more) menus. See
-[Overview, the Workspace bar, tabs, and pinning](./workspace-and-tabs.md) for how the Overview,
-the Workspace bar, tab opening, and tab pinning work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
+Every time you open a case, you land on the **Overview** tab: a "You are here" card with the
+current task across the top, then case info and the case's progress on the left and the document
+checklist (an overall donut plus a bar per category) and recent case files on the right. A floating
+**Workspace** bar at the bottom of every case tab holds searchable **View** (Tasks, Document Checklist, Case Files, Notes) and **Tools** (Document
+Checklist Generator, Document Compressor, the 820 Bundle Builder where applicable, and more) menus
+plus suggested next steps for the current task. See
+[Overview, the Workspace bar, and tabs](./workspace-and-tabs.md) for how the Overview, the
+Workspace bar, and the case's tabs work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
 
-Every file attached to the case is on the **Case Files** tab, where you can upload, preview,
-download, and delete them (open it from the **View** menu, or **View all files** on the Overview).
-To link files to checklist items, open the Document Checklist tab and click **Case Files** to show
-the files beside the checklist, then drag a file onto an item (see Document Checklist doc above).
+Every file attached to the case is on the **Case files** tab, where you can upload, preview,
+download, and delete them (also reachable from the Workspace bar's **View** menu, or **View all
+files** on the Overview). To link files to checklist items, open the **Checklist** tab and click
+**Case Files** to show the files beside the checklist, then drag a file onto an item (see Document
+Checklist doc above).
 
 When you drop files into any Case Files upload area, they wait in a short list until you give each
 one a **Document Type** — this is required, and nothing is uploaded until every file has one. Type
