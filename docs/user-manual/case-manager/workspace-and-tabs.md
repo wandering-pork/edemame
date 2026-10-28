@@ -1,4 +1,4 @@
-# Overview, the Workspace drawer, Tabs, and Pinning
+# Overview, the Workspace drawer, and Tabs
 
 ## The Overview tab
 
@@ -47,20 +47,12 @@ The drawer closes by itself after you pick something, or with **Esc** or the **�
 **pin** icon to keep it open while you work — on a wide screen the page moves over to make room for
 it. A pinned drawer stays open for the rest of your browser session; closing it with **×** unpins it.
 
-## Opening tabs
+## Tabs
 
-Choosing a View or Tool opens it in a **new tab** next to Overview — it never replaces the Overview
-tab. You can have several tabs open at once (e.g. Tasks and Document Checklist side by side) and
-switch between them along the tab bar.
+A row of tabs under the case header is always visible: **Overview**, **Tasks**, **Case files**,
+**Checklist**, and **Notes**. Tasks, Case files, and Checklist show a count. Click a tab to switch to
+it. Choosing a View from the Workspace drawer switches to the matching tab.
 
-## Pinning tabs
-
-Hover a tab to reveal a pin icon and a close (×) icon:
-
-- **Pin** a tab you want to keep around — pinned tabs persist across page reloads and when you
-  leave and come back to the case.
-- Unpinned tabs are temporary: if you reload the page or navigate away and back, only your pinned
-  tabs plus whichever tab was active when you left are restored. Every other unpinned tab is
-  discarded, keeping the tab bar from accumulating clutter over time.
-
-The Overview tab itself is always available and doesn't need to be pinned.
+Tools (Document Checklist Generator, Document Compressor, 820 Bundle Builder) open in their own
+window over the case rather than as a tab. When you come back to a case, it reopens on the tab you
+were last using.

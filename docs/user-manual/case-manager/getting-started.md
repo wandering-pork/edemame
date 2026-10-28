@@ -115,8 +115,8 @@ checklist (an overall donut plus a bar per category) and recent case files on th
 holds searchable **View** (Tasks, Document Checklist, Case Files, Notes) and **Tools** (Document
 Checklist Generator, Document Compressor, the 820 Bundle Builder where applicable, and more) menus
 plus suggested next steps for the current task. See
-[Overview, the Workspace drawer, tabs, and pinning](./workspace-and-tabs.md) for how the Overview,
-the Workspace drawer, tab opening, and tab pinning work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
+[Overview, the Workspace drawer, and tabs](./workspace-and-tabs.md) for how the Overview, the
+Workspace drawer, and the case's tabs work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
 
 On every tab except Overview, the left-hand rail on a case also has a compact **Case Files** panel — every file attached to the

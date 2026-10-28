@@ -57,8 +57,6 @@ import {
   MoreVertical,
   ArrowLeft,
   FileText,
-  Pin,
-  PinOff,
   RefreshCw,
   Columns2,
   LayoutGrid,
@@ -119,6 +117,15 @@ const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
   'document-compressor': 'Document Compressor',
   'bundle-builder-820': '820 Bundle Builder',
 };
+
+// Option C's fixed tab row. Tools (generator, compressor, bundle builder) open as modals, not tabs.
+const CASE_FIXED_TABS: { kind: CaseTabKind; label: string }[] = [
+  { kind: 'workspace', label: 'Overview' },
+  { kind: 'tasks', label: 'Tasks' },
+  { kind: 'documents', label: 'Case files' },
+  { kind: 'checklist', label: 'Checklist' },
+  { kind: 'notes', label: 'Notes' },
+];
 
 const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: string }> = {
   verified: { cls: 'bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400', label: 'Verified' },
@@ -510,15 +517,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       return [...prev, { id, kind, label: label || TAB_LABELS[kind], pinned: false }];
     });
     setActiveTabId(id);
-  };
-
-  const closeTab = (id: string) => {
-    setOpenTabs(prev => prev.filter(t => t.id !== id));
-    setActiveTabId(current => (current === id ? 'workspace' : current));
-  };
-
-  const togglePinTab = (id: string) => {
-    setOpenTabs(prev => prev.map(t => t.id === id ? { ...t, pinned: !t.pinned } : t));
   };
 
   const handleChecklistPreview = async (doc: Document) => {
@@ -1584,62 +1582,34 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
         {/* ── CENTER COLUMN ── */}
         <div className="min-w-0">
-          {/* Tabs — Workspace is always present; opening a View/Tool adds a closable, pinnable tab */}
-          <div className="flex items-center gap-0.5 border-b border-ink/10 dark:border-plate-ink/15 overflow-x-auto custom-scrollbar">
-            <button
-              onClick={() => setActiveTabId('workspace')}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${
-                activeTabId === 'workspace'
-                  ? 'border-edamame text-ink dark:text-plate-ink'
-                  : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
-              }`}
-            >
-              <LayoutGrid size={13} className={activeTabId === 'workspace' ? 'text-edamame' : ''} />
-              Overview
-            </button>
-
-            {openTabs.map(tab => (
-              <div
-                key={tab.id}
-                className={`group flex items-center gap-1.5 pl-4 pr-2 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors cursor-pointer ${
-                  activeTabId === tab.id
-                    ? 'border-edamame text-ink dark:text-plate-ink'
-                    : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
-                }`}
-                onClick={() => setActiveTabId(tab.id)}
-              >
-                {tab.label}
-                {tab.kind === 'checklist' && checklist.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
-                    {checklist.length}
-                  </span>
-                )}
-                {tab.kind === 'tasks' && caseTasks.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
-                    {caseTasks.length}
-                  </span>
-                )}
-                {tab.kind === 'documents' && documents.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
-                    {documents.length}
-                  </span>
-                )}
+          {/* Tabs (design option C): a fixed row, always showing every view of the case. */}
+          <div role="tablist" aria-label="Case views" className="flex items-center gap-0.5 border-b border-ink/10 dark:border-plate-ink/15 overflow-x-auto custom-scrollbar">
+            {CASE_FIXED_TABS.map(({ kind, label }) => {
+              const id = kind === 'workspace' ? 'workspace' : `tab:${kind}`;
+              const active = activeTabId === id;
+              const count = kind === 'tasks' ? caseTasks.length : kind === 'documents' ? documents.length : kind === 'checklist' ? checklist.length : 0;
+              return (
                 <button
-                  onClick={(e) => { e.stopPropagation(); togglePinTab(tab.id); }}
-                  title={tab.pinned ? 'Unpin tab' : 'Pin tab (persists across reloads)'}
-                  className={`p-0.5 rounded transition-colors ${tab.pinned ? 'text-edamame' : 'text-ink-soft/40 dark:text-plate-ink-soft/40 opacity-0 group-hover:opacity-100 hover:text-edamame'}`}
+                  key={kind}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => openOrFocusTab(kind)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                    active
+                      ? 'border-edamame text-ink dark:text-plate-ink'
+                      : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
+                  }`}
                 >
-                  {tab.pinned ? <Pin size={11} /> : <PinOff size={11} />}
+                  {kind === 'workspace' && <LayoutGrid size={13} className={active ? 'text-edamame' : ''} />}
+                  {label}
+                  {count > 0 && (
+                    <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${active ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
+                      {count}
+                    </span>
+                  )}
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
-                  title="Close tab"
-                  className="p-0.5 rounded text-ink-soft/40 dark:text-plate-ink-soft/40 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-colors"
-                >
-                  <X size={11} />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* ── OVERVIEW ── */}
