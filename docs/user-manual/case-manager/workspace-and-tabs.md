@@ -19,8 +19,9 @@ in three columns (two on narrower screens, or while the Agent panel is open):
   Document Checklist tab. If the case has no checklist yet, use **Generate one**.
 - **Workspace** — see below.
 
-The left-hand Case Files rail is hidden on the Overview (the cards above cover it) and comes back
-on every other tab, where you can still drag files onto checklist items.
+The tab bar and the layout around it stay the same on every tab; switching tabs only changes the
+content below the tab bar. To drag files onto checklist items, use the **Case Files** button on the
+Document Checklist tab.
 
 ## The Workspace card
 

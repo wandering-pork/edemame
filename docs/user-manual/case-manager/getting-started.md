@@ -117,11 +117,10 @@ task. See [Overview, the Workspace card, tabs, and pinning](./workspace-and-tabs
 Overview, the Workspace card, tab opening, and tab pinning work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
 
-On every tab except Overview, the left-hand rail on a case also has a compact **Case Files** panel — every file attached to the
-case, which you can drag directly onto a Document Checklist item to link it (see Document Checklist
-doc above). For a bigger, easier-to-work-with view of the same files — upload, preview, download,
-and delete, with full-size thumbnails rather than the rail's condensed list — click **Open in tab**
-next to the rail's Case Files heading, or open **Case files** from the Workspace card's **View** menu (or **View all files** on the Overview).
+Every file attached to the case is on the **Case Files** tab, where you can upload, preview,
+download, and delete them (open it from the **View** menu, or **View all files** on the Overview).
+To link files to checklist items, open the Document Checklist tab and click **Case Files** to show
+the files beside the checklist, then drag a file onto an item (see Document Checklist doc above).
 
 When you drop files into any Case Files upload area, they wait in a short list until you give each
 one a **Document Type** — this is required, and nothing is uploaded until every file has one. Type
