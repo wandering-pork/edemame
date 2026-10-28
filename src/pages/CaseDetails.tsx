@@ -1395,7 +1395,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
   return (
-    <div className="px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate min-h-full">
+    <div className="flex-1 px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate">
 
       {/* ══════════════════════════════════════════
           TOP BAR
