@@ -1,8 +1,8 @@
 import React from 'react';
 import { Check, FileText, Image as ImageIcon, File as FileIcon, ArrowRight, Pause } from 'lucide-react';
 import { format } from 'date-fns';
-import type { CaseOutcome, CaseStage, Client, Deadline, Document, Task } from '../../types';
-import { CASE_STAGE_LABELS, CASE_STAGE_STEPPER, STAGE_META, OUTCOME_LABELS } from '../../lib/caseStage';
+import type { CaseStage, Client, Deadline, Document, Task } from '../../types';
+import { CASE_STAGE_LABELS, STAGE_META } from '../../lib/caseStage';
 import { DEADLINE_KIND_LABELS, daysLeft } from '../../lib/deadlines';
 import { TASK_STATUS_LABELS, isWaiting } from '../../lib/taskStatus';
 import type { ChecklistCategorySummary, TimelineEntry } from '../../lib/caseOverview';
@@ -47,54 +47,40 @@ const LinkButton: React.FC<{ onClick: () => void; children: React.ReactNode }> =
 );
 
 // ---------------------------------------------------------------------------
-// Stage stepper + current task hero
+// Checklist donut
 // ---------------------------------------------------------------------------
 
-const StageStepper: React.FC<{ stage: CaseStage; outcome?: CaseOutcome }> = ({ stage, outcome }) => {
-  // info_requested is a branch off lodged (see CASE_STAGE_STEPPER's doc comment).
-  const effective = stage === 'info_requested' ? 'lodged' : stage;
-  const currentIndex = CASE_STAGE_STEPPER.indexOf(effective);
+const ChecklistDonut: React.FC<{ rows: ChecklistCategorySummary[] }> = ({ rows }) => {
+  const sum = (key: 'verified' | 'linked' | 'pending' | 'waived') => rows.reduce((n, r) => n + r[key], 0);
+  const total = rows.reduce((n, r) => n + r.total, 0);
+  const verified = sum('verified');
+  const linked = sum('linked');
+  const pending = sum('pending');
+  const waived = sum('waived');
+  const pct = (n: number) => (total ? (n / total) * 100 : 0);
+  // Verified → linked → waived → (pending as the empty track), matching the category bars.
+  const v = pct(verified);
+  const l = v + pct(linked);
+  const w = l + pct(waived);
+  const needed = total - waived;
   return (
-    <ol className="flex items-start" aria-label="Case stage">
-      {CASE_STAGE_STEPPER.map((s, i) => {
-        const done = i < currentIndex || (s === 'closed' && stage === 'closed');
-        const current = i === currentIndex && stage !== 'closed';
-        const label = s === 'lodged' && stage === 'info_requested'
-          ? CASE_STAGE_LABELS.info_requested
-          : s === 'closed' && stage === 'closed' && outcome
-            ? OUTCOME_LABELS[outcome]
-            : CASE_STAGE_LABELS[s];
-        return (
-          <li
-            key={s}
-            aria-current={current ? 'step' : undefined}
-            className={`relative flex-1 min-w-0 text-center text-[11px] leading-tight px-0.5 ${
-              current ? 'font-bold text-ink dark:text-plate-ink' : done ? 'text-ink-soft dark:text-plate-ink-soft' : 'text-ink-faint/70 dark:text-plate-ink-faint/70'
-            }`}
-          >
-            {i > 0 && (
-              <span
-                aria-hidden
-                className={`absolute top-[9px] right-1/2 w-full h-0.5 ${i <= currentIndex ? 'bg-edamame' : 'bg-ink/10 dark:bg-plate-ink/15'}`}
-              />
-            )}
-            <span
-              className={`relative z-[1] mx-auto mb-1.5 w-5 h-5 rounded-full flex items-center justify-center border-2 ${
-                done
-                  ? 'bg-edamame border-edamame text-white'
-                  : current
-                    ? 'bg-paper-2 dark:bg-plate-card border-edamame ring-4 ring-edamame/15'
-                    : 'bg-paper-2 dark:bg-plate-card border-ink/15 dark:border-plate-ink/20'
-              }`}
-            >
-              {done && <Check size={11} strokeWidth={3} />}
-              {current && <span className="w-2 h-2 rounded-full bg-edamame" />}
-            </span>
-            <span className="block truncate">{label}</span>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="flex items-center gap-4 mb-4">
+      <div
+        aria-hidden
+        className="w-[84px] h-[84px] rounded-full flex items-center justify-center flex-shrink-0"
+        style={{
+          background: `conic-gradient(#29B767 0 ${v}%, #3b82f6 ${v}% ${l}%, #94a3b8 ${l}% ${w}%, rgba(127,127,127,0.15) ${w}% 100%)`,
+        }}
+      >
+        <div className="w-[58px] h-[58px] rounded-full bg-paper-2 dark:bg-plate-card flex items-center justify-center text-[13px] font-bold text-ink dark:text-plate-ink">
+          {verified + linked}/{needed}
+        </div>
+      </div>
+      <div className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint leading-relaxed">
+        <span className="block text-ink dark:text-plate-ink font-semibold">{verified + linked} of {needed} documents in</span>
+        {verified} verified · {linked} linked · {pending} pending{waived > 0 ? ` · ${waived} waived` : ''}
+      </div>
+    </div>
   );
 };
 
@@ -104,7 +90,6 @@ const StageStepper: React.FC<{ stage: CaseStage; outcome?: CaseOutcome }> = ({ s
 
 interface CaseOverviewProps {
   stage: CaseStage;
-  outcome?: CaseOutcome;
   onHold: boolean;
 
   currentTask: Task | null;
@@ -142,15 +127,16 @@ interface CaseOverviewProps {
 }
 
 /**
- * Case Details landing view (design option B — "Journey bar + bottom
- * Workspace"): stage stepper and current-task hero across the top, then
- * case info + task timeline on the left, document checklist breakdown +
- * recent case files on the right. The floating Workspace dock is rendered
- * separately by `CaseDetails.tsx` (see `WorkspaceDock.tsx`).
+ * Case Details landing view (design option C — "Tabbed + Workspace drawer"):
+ * a "You are here" current-task hero, then case info + progress on the left
+ * and the document checklist (overall donut + per-category bars) + recent
+ * case files on the right. The Workspace lives in an on-demand drawer
+ * rendered separately by `CaseDetails.tsx` (see `WorkspaceDrawer.tsx`), so
+ * the case itself stays the focus here.
  */
 export const CaseOverview: React.FC<CaseOverviewProps> = props => {
   const {
-    stage, outcome, onHold,
+    stage, onHold,
     currentTask, openTaskCount, totalTaskCount, onOpenTask,
     timeline, hiddenTaskCount, onViewAllTasks,
     client, applicant, visaSubclass, templateTitle, ownerName, openedAt, nextDeadline, description, onEditCase, onOpenDeadlines,
@@ -163,17 +149,15 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
 
   return (
     <div className="mt-4 space-y-3.5">
-      {/* ── Journey: stepper + current task ── */}
-      <section className={cardCls}>
-        <StageStepper stage={stage} outcome={outcome} />
-        <div className="mt-4 flex items-center gap-4 flex-wrap rounded-xl border border-ink/10 dark:border-plate-ink/15 border-l-4 border-l-edamame bg-paper dark:bg-plate px-4 py-3">
+      {/* ── You are here: current task ── */}
+      <section className="flex items-center gap-4 flex-wrap rounded-xl border border-ink/15 dark:border-plate-ink/20 border-l-4 border-l-edamame bg-paper-2 dark:bg-plate-card shadow-sm px-[18px] py-3.5">
           {currentTask ? (
             <>
               <div className="min-w-0">
                 <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
-                  Current task · {totalTaskCount - openTaskCount} of {totalTaskCount} done
+                  You are here · {totalTaskCount - openTaskCount} of {totalTaskCount} tasks done
                 </div>
-                <div className="text-[16px] font-bold text-ink dark:text-plate-ink tracking-tight truncate">{currentTask.title}</div>
+                <div className="text-[18px] font-bold text-ink dark:text-plate-ink tracking-tight truncate">{currentTask.title}</div>
                 <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft">
                   Due {fmtDate(currentTask.date)}
                   {currentTask.datePending && ' (estimated)'}
@@ -210,10 +194,9 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
               <Pause size={12} /> On hold
             </span>
           )}
-        </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-3.5 items-start">
         {/* ── Left: case info + timeline ── */}
         <div className="space-y-3.5 min-w-0">
           <section className={cardCls}>
@@ -283,7 +266,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
               ) : undefined}
               action={<LinkButton onClick={onViewAllTasks}>{hiddenTaskCount > 0 ? `View all ${totalTaskCount}` : 'Open tasks'} <ArrowRight size={11} /></LinkButton>}
             >
-              Task timeline
+              Progress
             </CardTitle>
             {timeline.length === 0 ? (
               <p className="text-[12px] text-ink-faint dark:text-plate-ink-faint">No tasks on this case yet.</p>
@@ -341,7 +324,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
                   {checklistDone}/{checklistTotal} in
                 </span>
               ) : undefined}
-              action={checklistTotal > 0 ? <LinkButton onClick={onOpenChecklist}>Open checklist <ArrowRight size={11} /></LinkButton> : undefined}
+              action={checklistTotal > 0 ? <LinkButton onClick={onOpenChecklist}>Open <ArrowRight size={11} /></LinkButton> : undefined}
             >
               Document checklist
             </CardTitle>
@@ -352,6 +335,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
               </div>
             ) : (
               <>
+                <ChecklistDonut rows={checklistRows} />
                 <div className="space-y-3">
                   {checklistRows.map(row => {
                     const pct = (n: number) => `${(n / row.total) * 100}%`;

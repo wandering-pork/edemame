@@ -108,21 +108,22 @@ actually does:
 
 ## Landing on the Overview tab
 
-Every time you open a case, you land on the **Overview** tab: a stage stepper and the current task
-across the top, then case info and a task timeline on the left and a document checklist breakdown
-and recent case files on the right. A floating **Workspace** bar at the bottom of every case tab
-holds suggested quick actions for the current task plus searchable **View** (Tasks, Document
-Checklist, Case Files, Notes) and **Tools** (Document Checklist Generator, Document Compressor, the
-820 Bundle Builder where applicable, and more) menus. See
-[Overview, the Workspace bar, tabs, and pinning](./workspace-and-tabs.md) for how the Overview,
-the Workspace bar, tab opening, and tab pinning work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
+Every time you open a case, you land on the **Overview** tab: a "You are here" card with the
+current task across the top, then case info and the case's progress on the left and the document
+checklist (an overall donut plus a bar per category) and recent case files on the right. A green
+**Workspace** button in the bottom-right corner of every case tab opens the Workspace drawer, which
+holds searchable **View** (Tasks, Document Checklist, Case Files, Notes) and **Tools** (Document
+Checklist Generator, Document Compressor, the 820 Bundle Builder where applicable, and more) menus
+plus suggested next steps for the current task. See
+[Overview, the Workspace drawer, tabs, and pinning](./workspace-and-tabs.md) for how the Overview,
+the Workspace drawer, tab opening, and tab pinning work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
 
 On every tab except Overview, the left-hand rail on a case also has a compact **Case Files** panel — every file attached to the
 case, which you can drag directly onto a Document Checklist item to link it (see Document Checklist
 doc above). For a bigger, easier-to-work-with view of the same files — upload, preview, download,
 and delete, with full-size thumbnails rather than the rail's condensed list — click **Open in tab**
-next to the rail's Case Files heading, or open **Case files** from the Workspace bar's **View** menu (or **View all files** on the Overview).
+next to the rail's Case Files heading, or open **Case files** from the Workspace drawer's **View** menu (or **View all files** on the Overview).
 
 When you drop files into any Case Files upload area, they wait in a short list until you give each
 one a **Document Type** — this is required, and nothing is uploaded until every file has one. Type

@@ -1,13 +1,13 @@
 # Document Checklist & the Document Checklist Generator
 
-The **Document Checklist** tab (opened from the Workspace bar's **View** menu, or **Open checklist** on the Overview — this is the renamed and
+The **Document Checklist** tab (opened from the Workspace drawer's **View** menu, or **Open checklist** on the Overview — this is the renamed and
 upgraded version of the old "Documents" tab) tracks every document a case needs, grouped into
 collapsible categories such as "482 — Sponsor & Nomination Documents" or "820/801 — Relationship
 Evidence: Financial Aspects".
 
 ## Generating a checklist
 
-Open the **Document Checklist Generator** tool from the Workspace bar's **Tools** menu:
+Open the **Document Checklist Generator** tool from the Workspace drawer's **Tools** menu:
 
 1. **Select categories** — pick one or more document categories relevant to the case (categories
    are the per-visa-subclass subsections of the system default checklist, e.g. "186 — Applicant:

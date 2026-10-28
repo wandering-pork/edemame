@@ -16,7 +16,7 @@ import { CaseRail, RailAlert, CASE_FILE_DRAG_MIME } from '../components/case-det
 import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList';
 import { AgentPanel } from '../components/case-details/AgentPanel';
 import { CaseOverview } from '../components/case-details/CaseOverview';
-import { WorkspaceDock } from '../components/case-details/WorkspaceDock';
+import { WorkspaceDrawer } from '../components/case-details/WorkspaceDrawer';
 import type { WorkspaceMenuItem, WorkspaceQuickAction } from '../components/case-details/WorkspaceControls';
 import { currentFocusTask, taskTimeline, checklistBreakdown, suggestQuickActions } from '../lib/caseOverview';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
@@ -254,6 +254,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- Agent panel state (closed by default per design) ----
   const [agentOpen, setAgentOpen] = useState(false);
+  // True while the Workspace drawer is open and pinned, so the page makes room for it.
+  const [workspaceDocked, setWorkspaceDocked] = useState(false);
 
   // ---- Document checklist state ----
   const [checklist, setChecklist] = useState<DocumentChecklistItem[]>([]);
@@ -1328,7 +1330,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     );
   };
 
-  // ---- Overview + Workspace dock (design option B) ----
+  // ---- Overview + Workspace drawer (design option C) ----
   const onOverview = activeTabId === 'workspace';
   const focusTask = useMemo(() => currentFocusTask(caseTasks), [caseTasks]);
   const timeline = useMemo(() => taskTimeline(caseTasks), [caseTasks]);
@@ -1342,7 +1344,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setIsEditingCase(true);
   };
 
-  const dockQuickActions: WorkspaceQuickAction[] = suggestQuickActions({
+  const workspaceQuickActions: WorkspaceQuickAction[] = suggestQuickActions({
     currentTask: focusTask,
     caseTasks,
     checklist,
@@ -1361,7 +1363,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     },
   }));
 
-  const dockViewItems: WorkspaceMenuItem[] = [
+  const workspaceViewItems: WorkspaceMenuItem[] = [
     { id: 'overview', group: 'Case', label: 'Overview', onSelect: () => openOrFocusTab('workspace') },
     { id: 'tasks', group: 'Case', label: 'Tasks & deadlines', hint: `${pendingTasks.length} open`, recommended: recommendedViewKinds.includes('tasks'), onSelect: () => openOrFocusTab('tasks') },
     { id: 'notes', group: 'Case', label: 'Notes', recommended: recommendedViewKinds.includes('notes'), onSelect: () => openOrFocusTab('notes') },
@@ -1372,7 +1374,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       : []),
   ];
 
-  const dockToolItems: WorkspaceMenuItem[] = [
+  const workspaceToolItems: WorkspaceMenuItem[] = [
     { id: 'add-task', group: 'Case', label: 'Add task', onSelect: () => handleOpenTaskModal() },
     { id: 'add-deadline', group: 'Case', label: 'Add deadline', onSelect: () => { openOrFocusTab('tasks'); setShowAddDeadline(true); } },
     { id: 'edit-case', group: 'Case', label: 'Edit case', onSelect: openEditCase },
@@ -1395,7 +1397,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
   return (
-    <div className="px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate min-h-full">
+    <div className={`px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate min-h-full ${workspaceDocked ? 'xl:mr-[340px]' : ''}`}>
 
       {/* ══════════════════════════════════════════
           TOP BAR
@@ -1644,7 +1646,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           {onOverview && (
             <CaseOverview
               stage={currentCase.stage}
-              outcome={currentCase.outcome}
               onHold={!!currentCase.onHold}
               currentTask={focusTask}
               openTaskCount={pendingTasks.length}
@@ -2229,12 +2230,13 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       </div>
 
 
-      {/* ── WORKSPACE DOCK (floating, every tab) ── */}
-      <WorkspaceDock
-        quickActions={dockQuickActions}
+      {/* ── WORKSPACE DRAWER (floating button + on-demand drawer, every tab) ── */}
+      <WorkspaceDrawer
+        quickActions={workspaceQuickActions}
         currentTaskTitle={focusTask?.title}
-        viewItems={dockViewItems}
-        toolItems={dockToolItems}
+        viewItems={workspaceViewItems}
+        toolItems={workspaceToolItems}
+        onDockedChange={setWorkspaceDocked}
       />
 
       {/* ── MODALS ── */}
