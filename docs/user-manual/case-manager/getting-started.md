@@ -108,9 +108,10 @@ actually does:
 
 ## Landing on the Overview tab
 
-Every time you open a case, you land on the **Overview** tab: a stage stepper and the current task
-across the top, then case info and a task timeline on the left and a document checklist breakdown
-and recent case files on the right. A floating **Workspace** bar at the bottom of every case tab
+Every time you open a case, you land on the **Overview** tab: a stage stepper with a "You are
+here" strip for the current task across the top, then case info and the case's progress on the
+left and the document checklist (an overall donut plus a bar per category) and recent case files on
+the right. A floating **Workspace** bar at the bottom of every case tab
 holds suggested quick actions for the current task plus searchable **View** (Tasks, Document
 Checklist, Case Files, Notes) and **Tools** (Document Checklist Generator, Document Compressor, the
 820 Bundle Builder where applicable, and more) menus. See

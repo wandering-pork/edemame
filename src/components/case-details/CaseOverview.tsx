@@ -47,7 +47,7 @@ const LinkButton: React.FC<{ onClick: () => void; children: React.ReactNode }> =
 );
 
 // ---------------------------------------------------------------------------
-// Stage stepper + current task hero
+// Stage stepper
 // ---------------------------------------------------------------------------
 
 const StageStepper: React.FC<{ stage: CaseStage; outcome?: CaseOutcome }> = ({ stage, outcome }) => {
@@ -99,6 +99,44 @@ const StageStepper: React.FC<{ stage: CaseStage; outcome?: CaseOutcome }> = ({ s
 };
 
 // ---------------------------------------------------------------------------
+// Checklist donut
+// ---------------------------------------------------------------------------
+
+const ChecklistDonut: React.FC<{ rows: ChecklistCategorySummary[] }> = ({ rows }) => {
+  const sum = (key: 'verified' | 'linked' | 'pending' | 'waived') => rows.reduce((n, r) => n + r[key], 0);
+  const total = rows.reduce((n, r) => n + r.total, 0);
+  const verified = sum('verified');
+  const linked = sum('linked');
+  const pending = sum('pending');
+  const waived = sum('waived');
+  const pct = (n: number) => (total ? (n / total) * 100 : 0);
+  // Verified → linked → waived → (pending as the empty track), matching the category bars.
+  const v = pct(verified);
+  const l = v + pct(linked);
+  const w = l + pct(waived);
+  const needed = total - waived;
+  return (
+    <div className="flex items-center gap-4 mb-4">
+      <div
+        aria-hidden
+        className="w-[84px] h-[84px] rounded-full flex items-center justify-center flex-shrink-0"
+        style={{
+          background: `conic-gradient(#29B767 0 ${v}%, #3b82f6 ${v}% ${l}%, #94a3b8 ${l}% ${w}%, rgba(127,127,127,0.15) ${w}% 100%)`,
+        }}
+      >
+        <div className="w-[58px] h-[58px] rounded-full bg-paper-2 dark:bg-plate-card flex items-center justify-center text-[13px] font-bold text-ink dark:text-plate-ink">
+          {verified + linked}/{needed}
+        </div>
+      </div>
+      <div className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint leading-relaxed">
+        <span className="block text-ink dark:text-plate-ink font-semibold">{verified + linked} of {needed} documents in</span>
+        {verified} verified · {linked} linked · {pending} pending{waived > 0 ? ` · ${waived} waived` : ''}
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Overview
 // ---------------------------------------------------------------------------
 
@@ -142,10 +180,11 @@ interface CaseOverviewProps {
 }
 
 /**
- * Case Details landing view (design option B — "Journey bar + bottom
- * Workspace"): stage stepper and current-task hero across the top, then
- * case info + task timeline on the left, document checklist breakdown +
- * recent case files on the right. The floating Workspace dock is rendered
+ * Case Details landing view (design option D, combining the best of A/B/C):
+ * a journey card across the top (option B's stage stepper over option C's
+ * "You are here" current-task strip), then case info + progress on the left
+ * and the document checklist (C's overall donut + per-category bars) + recent
+ * case files on the right. The collapsible Workspace dock is rendered
  * separately by `CaseDetails.tsx` (see `WorkspaceDock.tsx`).
  */
 export const CaseOverview: React.FC<CaseOverviewProps> = props => {
@@ -163,7 +202,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
 
   return (
     <div className="mt-4 space-y-3.5">
-      {/* ── Journey: stepper + current task ── */}
+      {/* ── Journey: stage stepper + where you are ── */}
       <section className={cardCls}>
         <StageStepper stage={stage} outcome={outcome} />
         <div className="mt-4 flex items-center gap-4 flex-wrap rounded-xl border border-ink/10 dark:border-plate-ink/15 border-l-4 border-l-edamame bg-paper dark:bg-plate px-4 py-3">
@@ -171,9 +210,9 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
             <>
               <div className="min-w-0">
                 <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
-                  Current task · {totalTaskCount - openTaskCount} of {totalTaskCount} done
+                  You are here · {totalTaskCount - openTaskCount} of {totalTaskCount} tasks done
                 </div>
-                <div className="text-[16px] font-bold text-ink dark:text-plate-ink tracking-tight truncate">{currentTask.title}</div>
+                <div className="text-[18px] font-bold text-ink dark:text-plate-ink tracking-tight truncate">{currentTask.title}</div>
                 <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft">
                   Due {fmtDate(currentTask.date)}
                   {currentTask.datePending && ' (estimated)'}
@@ -213,7 +252,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-3.5 items-start">
         {/* ── Left: case info + timeline ── */}
         <div className="space-y-3.5 min-w-0">
           <section className={cardCls}>
@@ -283,7 +322,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
               ) : undefined}
               action={<LinkButton onClick={onViewAllTasks}>{hiddenTaskCount > 0 ? `View all ${totalTaskCount}` : 'Open tasks'} <ArrowRight size={11} /></LinkButton>}
             >
-              Task timeline
+              Progress
             </CardTitle>
             {timeline.length === 0 ? (
               <p className="text-[12px] text-ink-faint dark:text-plate-ink-faint">No tasks on this case yet.</p>
@@ -341,7 +380,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
                   {checklistDone}/{checklistTotal} in
                 </span>
               ) : undefined}
-              action={checklistTotal > 0 ? <LinkButton onClick={onOpenChecklist}>Open checklist <ArrowRight size={11} /></LinkButton> : undefined}
+              action={checklistTotal > 0 ? <LinkButton onClick={onOpenChecklist}>Open <ArrowRight size={11} /></LinkButton> : undefined}
             >
               Document checklist
             </CardTitle>
@@ -352,6 +391,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
               </div>
             ) : (
               <>
+                <ChecklistDonut rows={checklistRows} />
                 <div className="space-y-3">
                   {checklistRows.map(row => {
                     const pct = (n: number) => `${(n / row.total) * 100}%`;

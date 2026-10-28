@@ -1328,7 +1328,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     );
   };
 
-  // ---- Overview + Workspace dock (design option B) ----
+  // ---- Overview + Workspace dock (design option D) ----
   const onOverview = activeTabId === 'workspace';
   const focusTask = useMemo(() => currentFocusTask(caseTasks), [caseTasks]);
   const timeline = useMemo(() => taskTimeline(caseTasks), [caseTasks]);
