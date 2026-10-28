@@ -99,71 +99,27 @@ const StageStepper: React.FC<{ stage: CaseStage; outcome?: CaseOutcome }> = ({ s
 };
 
 // ---------------------------------------------------------------------------
-// Overview
+// Journey (shown above the tabs on every case tab)
 // ---------------------------------------------------------------------------
 
-interface CaseOverviewProps {
+interface CaseJourneyProps {
   stage: CaseStage;
   outcome?: CaseOutcome;
   onHold: boolean;
-
   currentTask: Task | null;
   openTaskCount: number;
   totalTaskCount: number;
   onOpenTask: (task: Task) => void;
-
-  timeline: TimelineEntry[];
-  hiddenTaskCount: number;
   onViewAllTasks: () => void;
-
-  client: Client;
-  applicant?: Client;
-  visaSubclass?: string;
-  templateTitle?: string;
-  ownerName?: string;
-  openedAt: string;
-  nextDeadline: Deadline | null;
-  description?: string;
-  onEditCase: () => void;
-  onOpenDeadlines: () => void;
-
-  checklistRows: ChecklistCategorySummary[];
-  checklistTotal: number;
-  checklistDone: number;
-  onOpenChecklist: () => void;
-  onGenerateChecklist: () => void;
-
-  documents: Document[];
-  caseId: string;
-  onOpenDocument: (doc: Document) => void;
-  onViewAllFiles: () => void;
-  onDocumentUploaded: (doc: Document) => void;
-  onRequestCompress: (files: File[]) => void;
 }
 
 /**
- * Case Details landing view (design option B — "Journey bar + bottom
- * Workspace"): stage stepper and current-task hero across the top, then
- * case info + task timeline on the left, document checklist breakdown +
- * recent case files on the right. The floating Workspace dock is rendered
- * separately by `CaseDetails.tsx` (see `WorkspaceDock.tsx`).
+ * Option B's spine: the stage stepper over the current task. Rendered by
+ * `CaseDetails.tsx` above the tab row, so it stays put whichever tab is open.
  */
-export const CaseOverview: React.FC<CaseOverviewProps> = props => {
-  const {
-    stage, outcome, onHold,
-    currentTask, openTaskCount, totalTaskCount, onOpenTask,
-    timeline, hiddenTaskCount, onViewAllTasks,
-    client, applicant, visaSubclass, templateTitle, ownerName, openedAt, nextDeadline, description, onEditCase, onOpenDeadlines,
-    checklistRows, checklistTotal, checklistDone, onOpenChecklist, onGenerateChecklist,
-    documents, caseId, onOpenDocument, onViewAllFiles, onDocumentUploaded, onRequestCompress,
-  } = props;
-
-  const recentDocs = [...documents].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 5);
-  const nextDeadlineDays = nextDeadline ? daysLeft(nextDeadline, new Date()) : null;
-
-  return (
-    <div className="mt-4 space-y-3.5">
-      {/* ── Journey: stepper + current task ── */}
+export const CaseJourney: React.FC<CaseJourneyProps> = ({
+  stage, outcome, onHold, currentTask, openTaskCount, totalTaskCount, onOpenTask, onViewAllTasks,
+}) => (
       <section className={cardCls}>
         <StageStepper stage={stage} outcome={outcome} />
         <div className="mt-4 flex items-center gap-4 flex-wrap rounded-xl border border-ink/10 dark:border-plate-ink/15 border-l-4 border-l-edamame bg-paper dark:bg-plate px-4 py-3">
@@ -212,7 +168,70 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
           )}
         </div>
       </section>
+);
 
+// ---------------------------------------------------------------------------
+// Overview
+// ---------------------------------------------------------------------------
+
+interface CaseOverviewProps {
+  stage: CaseStage;
+
+  openTaskCount: number;
+  totalTaskCount: number;
+  onOpenTask: (task: Task) => void;
+
+  timeline: TimelineEntry[];
+  hiddenTaskCount: number;
+  onViewAllTasks: () => void;
+
+  client: Client;
+  applicant?: Client;
+  visaSubclass?: string;
+  templateTitle?: string;
+  ownerName?: string;
+  openedAt: string;
+  nextDeadline: Deadline | null;
+  description?: string;
+  onEditCase: () => void;
+  onOpenDeadlines: () => void;
+
+  checklistRows: ChecklistCategorySummary[];
+  checklistTotal: number;
+  checklistDone: number;
+  onOpenChecklist: () => void;
+  onGenerateChecklist: () => void;
+
+  documents: Document[];
+  caseId: string;
+  onOpenDocument: (doc: Document) => void;
+  onViewAllFiles: () => void;
+  onDocumentUploaded: (doc: Document) => void;
+  onRequestCompress: (files: File[]) => void;
+}
+
+/**
+ * Case Details landing view (design option B — "Journey bar + bottom
+ * Workspace"): case info + task timeline on the left, document checklist
+ * breakdown + recent case files on the right. The journey card
+ * (`CaseJourney`) and the floating Workspace dock are rendered separately by
+ * `CaseDetails.tsx`, so they stay in place on every tab.
+ */
+export const CaseOverview: React.FC<CaseOverviewProps> = props => {
+  const {
+    stage,
+    openTaskCount, totalTaskCount, onOpenTask,
+    timeline, hiddenTaskCount, onViewAllTasks,
+    client, applicant, visaSubclass, templateTitle, ownerName, openedAt, nextDeadline, description, onEditCase, onOpenDeadlines,
+    checklistRows, checklistTotal, checklistDone, onOpenChecklist, onGenerateChecklist,
+    documents, caseId, onOpenDocument, onViewAllFiles, onDocumentUploaded, onRequestCompress,
+  } = props;
+
+  const recentDocs = [...documents].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 5);
+  const nextDeadlineDays = nextDeadline ? daysLeft(nextDeadline, new Date()) : null;
+
+  return (
+    <div className="mt-4 space-y-3.5">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
         {/* ── Left: case info + timeline ── */}
         <div className="space-y-3.5 min-w-0">

@@ -1,14 +1,17 @@
-# Overview, the Workspace bar, Tabs, and Pinning
+# Overview, the Workspace bar, and Tabs
 
 ## The Overview tab
 
-Opening a case lands you on the **Overview** tab — a one-screen summary of where the case is up to:
+Above the tabs, on every tab, is the case's **journey**:
 
 - **Stage stepper** — the case's journey (Draft → Assessment → Engaged → Preparing → Ready to lodge →
   Lodged → Decision → Closed), with completed stages ticked and the current one highlighted. Change
   the stage from the **Stage** chip in the summary strip under the case title, as before.
 - **Current task** — the earliest task that isn't done yet, with its due date and status. Click
   **Open task** to edit it.
+
+Opening a case lands you on the **Overview** tab — a one-screen summary of where the case is up to:
+
 - **Case info** — client (and applicant, if different), visa subclass and template, case owner,
   stage, next deadline (click it to jump to the Deadlines panel), and the date the case was opened.
   **Edit** opens the Edit case form.
@@ -44,20 +47,13 @@ Both menus open upwards and have a search box — start typing to filter, use th
 **Enter** to open the highlighted item, and **Esc** to close. After you chat with the Agent, items
 related to what you discussed are marked **AI PICK** and listed first in their group.
 
-## Opening tabs
+## Tabs
 
-Choosing a View or Tool opens it in a **new tab** next to Overview — it never replaces the Overview
-tab. You can have several tabs open at once (e.g. Tasks and Document Checklist side by side) and
-switch between them along the tab bar.
+A row of tabs is always visible: **Overview**, **Tasks**, **Case files**, **Checklist**, and
+**Notes**. Tasks, Case files, and Checklist show a count. Click a tab to switch to it; choosing a
+View from the Workspace **View** menu switches to the matching tab. Only the content below the tabs
+changes when you switch.
 
-## Pinning tabs
-
-Hover a tab to reveal a pin icon and a close (×) icon:
-
-- **Pin** a tab you want to keep around — pinned tabs persist across page reloads and when you
-  leave and come back to the case.
-- Unpinned tabs are temporary: if you reload the page or navigate away and back, only your pinned
-  tabs plus whichever tab was active when you left are restored. Every other unpinned tab is
-  discarded, keeping the tab bar from accumulating clutter over time.
-
-The Overview tab itself is always available and doesn't need to be pinned.
+Tools (Document Checklist Generator, Document Compressor, 820 Bundle Builder) open in their own
+window over the case rather than as a tab. When you come back to a case, it reopens on the tab you
+were last using.
