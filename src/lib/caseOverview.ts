@@ -1,5 +1,5 @@
 import type { CaseTabKind, DocumentChecklistItem, Task } from '../types';
-import { isTaskClosed, isWaiting } from './taskStatus';
+import { TASK_STATUS_LABELS, isTaskClosed, isWaiting } from './taskStatus';
 
 /**
  * Pure helpers behind the Case Details Overview (design option B: stage
@@ -74,10 +74,11 @@ export function checklistBreakdown(items: DocumentChecklistItem[], fallbackCateg
  * Agent chat with `prompt`; `open` opens a View/Tool tab; `task` opens the
  * current task's detail modal.
  */
+/** `detail` is a short second line for layouts that show suggestions as cards. */
 export type QuickAction =
-  | { id: string; label: string; kind: 'agent'; prompt: string }
-  | { id: string; label: string; kind: 'open'; target: CaseTabKind }
-  | { id: string; label: string; kind: 'task'; taskId: string };
+  | { id: string; label: string; detail: string; kind: 'agent'; prompt: string }
+  | { id: string; label: string; detail: string; kind: 'open'; target: CaseTabKind }
+  | { id: string; label: string; detail: string; kind: 'task'; taskId: string };
 
 /**
  * Up to `limit` suggested next steps for the case, driven by its current
@@ -98,13 +99,14 @@ export function suggestQuickActions(
   const linked = checklist.filter(i => i.status === 'linked');
 
   if (caseTasks.length === 0) {
-    actions.push({ id: 'plan', label: 'Create a task plan', kind: 'open', target: 'tasks' });
+    actions.push({ id: 'plan', label: 'Create a task plan', detail: 'No tasks on this case yet', kind: 'open', target: 'tasks' });
   }
 
   if (currentTask && isWaiting(currentTask)) {
     actions.push({
       id: 'chase',
       label: currentTask.status === 'waiting_client' ? 'Chase client' : 'Follow up',
+      detail: `Draft a follow-up email · ${TASK_STATUS_LABELS[currentTask.status]}`,
       kind: 'agent',
       prompt: `Draft a short, polite follow-up email to ${clientName} about "${currentTask.title}", which we're still waiting on.`,
     });
@@ -115,6 +117,7 @@ export function suggestQuickActions(
     actions.push({
       id: 'request-docs',
       label: pending.length === 1 ? 'Request 1 missing document' : `Request ${pending.length} missing documents`,
+      detail: `Draft email to client · ${pending.length} outstanding`,
       kind: 'agent',
       prompt: `Draft an email to ${clientName} requesting these outstanding documents:\n${list}`,
     });
@@ -124,22 +127,24 @@ export function suggestQuickActions(
     actions.push({
       id: 'verify-docs',
       label: linked.length === 1 ? 'Verify 1 document' : `Verify ${linked.length} documents`,
+      detail: 'Linked and ready to review in the checklist',
       kind: 'open',
       target: 'checklist',
     });
   }
 
   if (currentTask) {
-    actions.push({ id: 'open-current', label: 'Update current task', kind: 'task', taskId: currentTask.id });
+    actions.push({ id: 'open-current', label: 'Update current task', detail: 'Change its status, date or notes', kind: 'task', taskId: currentTask.id });
   }
 
   if (checklist.length === 0) {
-    actions.push({ id: 'gen-checklist', label: 'Generate checklist', kind: 'open', target: 'checklist-generator' });
+    actions.push({ id: 'gen-checklist', label: 'Generate checklist', detail: 'No checklist on this case yet', kind: 'open', target: 'checklist-generator' });
   }
 
   actions.push({
     id: 'summarise',
     label: 'Summarise case',
+    detail: 'Ask the Agent where things are up to',
     kind: 'agent',
     prompt: 'Summarise where this case is up to, what is outstanding, and what I should do next.',
   });
