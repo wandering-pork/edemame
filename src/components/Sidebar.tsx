@@ -403,12 +403,6 @@ export const Sidebar: React.FC = () => {
           ${collapsed ? 'w-16' : 'w-[240px]'}
         `}
       >
-        {/* Subtle depth texture */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.035] text-ink dark:text-plate-ink"
-          style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 24px, currentColor 24px, currentColor 25px)',
-          }}
-        />
         <div className="relative z-10 flex flex-col h-full">
           {sidebarContent(false)}
         </div>
