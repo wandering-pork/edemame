@@ -20,8 +20,8 @@ Entry** if the scan fails.
 ## Searching and browsing the list
 
 Use the search box above the table to filter clients by name. The table shows each client's
-contact details, visa status/active case (with a **VEVO** badge once a passport number and expiry
-are on file), and date of birth.
+contact details, active case, and date of birth. Edamame doesn't check visa status with VEVO yet,
+so the list doesn't show a VEVO or visa-verified badge.
 
 ## Case history
 
