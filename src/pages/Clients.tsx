@@ -241,7 +241,6 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
               const activeCase = getActiveCase(client.id);
               // Approximation: no visaSubclass/expiry field is fed to this page today —
               // the active case title stands in for a "visa status" chip until that data exists.
-              const verified = Boolean(client.passportNumber && client.passportExpiry);
 
               return (
                 <div
@@ -273,17 +272,9 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
 
                     <div className="col-span-2 hidden lg:flex items-center gap-1.5 min-w-0">
                       {activeCase ? (
-                        <>
-                          <span className="text-[11px] font-bold px-2 py-[3px] rounded-md bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft truncate">
-                            {activeCase.title}
-                          </span>
-                          {verified && (
-                            <span title="Passport verified" className="inline-flex items-center gap-[3px] text-[9.5px] font-bold text-edamame-700 dark:text-edamame-400 flex-shrink-0">
-                              <Check size={11} strokeWidth={2.5} />
-                              VEVO
-                            </span>
-                          )}
-                        </>
+                        <span className="text-[11px] font-bold px-2 py-[3px] rounded-md bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft truncate">
+                          {activeCase.title}
+                        </span>
                       ) : (
                         <span className="text-xs text-ink-soft/40 dark:text-plate-ink-soft/40">—</span>
                       )}
