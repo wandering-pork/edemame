@@ -321,7 +321,7 @@ export const OpenCasePanel: React.FC<OpenCasePanelProps> = ({
 
           {/* Template */}
           <div>
-            <label className={labelClass}>Workflow Template</label>
+            <label className={labelClass}>Work Plan</label>
             <select
               value={templateId === undefined ? '' : templateId === null ? NO_TEMPLATE_OPTION : templateId}
               onChange={(e) => {
@@ -338,11 +338,11 @@ export const OpenCasePanel: React.FC<OpenCasePanelProps> = ({
                   {t.visaSubclass ? ` (SC-${t.visaSubclass})` : ''}
                 </option>
               ))}
-              <option value={NO_TEMPLATE_OPTION}>No template (general case)</option>
+              <option value={NO_TEMPLATE_OPTION}>No work plan (general case)</option>
             </select>
             {!matchedTemplate && templateId === undefined && (
               <p className="text-[11px] text-red-500 dark:text-red-400 mt-1.5">
-                No template matches subclass {visaSubclass} exactly — pick one, or choose "No template".
+                No work plan matches subclass {visaSubclass} exactly — pick one, or choose "No work plan".
               </p>
             )}
           </div>

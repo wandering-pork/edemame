@@ -752,7 +752,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       if (workflowTemplate.version !== undefined) {
         onUpdateCase({ ...currentCase, templateVersion: workflowTemplate.version });
       }
-      toast.success(`${newTasks.length} task${newTasks.length === 1 ? '' : 's'} generated from the template`);
+      toast.success(`${newTasks.length} task${newTasks.length === 1 ? '' : 's'} generated from the work plan`);
     } finally {
       setGeneratingPlan(false);
     }
@@ -1832,7 +1832,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     className="btn-press flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-edamame hover:bg-edamame-600 text-white text-[12px] font-bold transition-colors disabled:opacity-50"
                   >
                     <Sparkles size={14} />
-                    Generate plan from template
+                    Generate tasks from work plan
                   </button>
                 </section>
               )}

@@ -1,10 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Case, Client, Task, WorkflowTemplate, TeamMember, DocumentChecklistItem, Deadline } from '../types';
-import { Search, Plus, FileText, ChevronRight, Calendar, UserPlus, Settings2, AlertTriangle, Users } from 'lucide-react';
+import { Search, Plus, FileText, ChevronRight, Calendar, UserPlus, AlertTriangle, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { NewCase } from './NewCase';
-import { ConfigurationsPanel } from '../components/case-manager/ConfigurationsPanel';
 import { isTaskClosed } from '../lib/taskStatus';
 import { CASE_STAGE_LABELS, CASE_STAGE_STEPPER, CASE_STAGE_GROUP_LABELS, caseStageGroup, CaseStageGroup } from '../lib/caseStage';
 import { computeCaseRisk } from '../lib/risk';
@@ -113,7 +112,6 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   const location = useLocation();
   const repos = useRepositories();
   const [showIntake, setShowIntake] = useState(false);
-  const [showConfigurations, setShowConfigurations] = useState(false);
   const [suggestedTemplateKeyword, setSuggestedTemplateKeyword] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
@@ -283,14 +281,6 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
               </div>
             )}
             <button
-              onClick={() => setShowConfigurations(true)}
-              title="Case Manager configurations — document types and other module settings"
-              className="btn-press focus-ring flex items-center justify-center gap-1.5 border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame-500 hover:text-edamame-600 dark:hover:text-edamame-400 px-4 py-2.5 rounded-xl font-bold transition-colors text-[13px] whitespace-nowrap"
-            >
-              <Settings2 size={16} strokeWidth={1.8} />
-              Configurations
-            </button>
-            <button
               onClick={() => setShowIntake(true)}
               className="btn-press focus-ring flex items-center justify-center gap-1.5 bg-edamame-500 hover:bg-edamame-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors text-[13px] whitespace-nowrap"
             >
@@ -300,7 +290,6 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
           </div>
         </div>
 
-        {showConfigurations && <ConfigurationsPanel onClose={() => setShowConfigurations(false)} />}
 
         {/* Search bar */}
         <div className="relative max-w-md mt-6">

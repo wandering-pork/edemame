@@ -40,12 +40,12 @@ export function buildTaskPlanSummary(taskCount: number, source: PlanSource, temp
   switch (source) {
     case 'template':
       return templateName
-        ? `Created a ${taskCount}-task plan from the ${templateName} template.`
-        : `Created a ${taskCount}-task plan from the workflow template.`;
+        ? `Created a ${taskCount}-task plan from the ${templateName} work plan.`
+        : `Created a ${taskCount}-task plan from a work plan.`;
     case 'ai':
       return `Generated a ${taskCount}-task plan with AI.`;
     case 'mixed':
-      return `Created a ${taskCount}-task plan (template plan plus AI-suggested additions).`;
+      return `Created a ${taskCount}-task plan (work plan plus AI-suggested additions).`;
     case 'none':
     default:
       return '';

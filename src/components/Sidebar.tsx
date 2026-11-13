@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, FileText, Settings, LogOut, Users, Menu, X,
   BookTemplate, Sparkles, UsersRound, UserCog, PanelLeftClose, PanelLeftOpen,
-  Building2, Check, ChevronsUpDown,
+  Building2, Check, ChevronsUpDown, SlidersHorizontal,
 } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { SidebarLogoArea } from './SidebarLogoArea';
@@ -25,7 +25,8 @@ const navGroups: NavGroup[] = [
       { to: '/cases', label: 'Case Manager', icon: FileText },
       { to: '/clients', label: 'Clients', icon: Users },
       { to: '/visa-advisor', label: 'Visa Advisor', icon: Sparkles },
-      { to: '/templates', label: 'Templates', icon: BookTemplate },
+      { to: '/templates', label: 'Work Plans', icon: BookTemplate },
+      { to: '/configuration', label: 'Configuration', icon: SlidersHorizontal },
     ],
   },
   {

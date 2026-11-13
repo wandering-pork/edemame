@@ -13,10 +13,10 @@ Open the **Document Checklist Generator** tool from the Workspace bar's **Tools*
    are the per-visa-subclass subsections of the system default checklist, e.g. "186 — Applicant:
    Skills & Work Experience"). Click **Next**.
 2. **Review the generated checklist** — the generator merges the system default checklist for your
-   selected categories with any steps from the case's workflow template (your firm's customisation
+   selected categories with any steps from the case's work plan (your firm's customisation
    on top of the system default), skipping duplicates. Each generated item arrives with a
    **Document Type** already suggested from your firm's list (see
-   [Configurations & Document Types](./configurations.md)); change any that were guessed wrong
+   [Configuration & Document Types](../configuration/getting-started.md)); change any that were guessed wrong
    using the picker on the item's row.
    - Use the **+ Add** button on a category header to add a missing item to *that* category,
      giving it a document name and a document type.
@@ -44,7 +44,7 @@ There are three ways a file ends up on a checklist item.
 ### Auto-link
 
 If a Case File's Document Type matches a checklist item's Document Type, and that type has
-**Auto-link** ticked in Case Manager → Configurations, the file links itself and the item flips to
+**Auto-link** ticked in Configuration → Document Types, the file links itself and the item flips to
 **Linked**. If several files share the same type, the **most recently uploaded** one wins.
 
 Auto-link is a check that runs when you open the Document Checklist tab — plus whenever you press

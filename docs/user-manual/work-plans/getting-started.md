@@ -1,18 +1,20 @@
-# Getting Started with Templates
+# Getting Started with Work Plans
 
-Templates define the standard procedure a case follows — both the steps a case manager walks
-through and, for templates with **timing** set, exactly when each step's task falls due. There are
-two kinds: **built-in templates** covering every visa subclass the Visa Eligibility Advisor can
-assess — Skilled Independent 189, Skilled Nominated 190, TSS 482, ENS 186, Student 500, Skilled
+Work Plans were called **Templates** in earlier versions of Edamame — same feature, new name.
+
+Work Plans define the standard procedure a case follows — both the steps a case manager walks
+through and, for plans with **timing** set, exactly when each step's task falls due. There are
+two kinds: **built-in plans** covering every visa subclass the Visa Eligibility Advisor can
+assess — Skilled Independent 189, Skilled Nominated 190, Skills in Demand 482, ENS 186, Student 500, Skilled
 Work Regional (Provisional) 491, Partner 820/801, Temporary Graduate 485, Visitor 600, and Working Holiday 417 —
-and **custom templates** you create yourself.
+and **custom plans** you create yourself.
 
-## Browsing templates
+## Browsing work plans
 
-Templates are shown as cards, grouped into **Built-in Templates** and **Custom Templates**. Each
+Plans are shown as cards, grouped into **Built-in Plans** and **Custom Plans**. Each
 card shows the visa subclass (if set), a short description, a **Typical length** line (the
 shortest-to-longest span from the first step to the last, worked out from every step's timing), and
-— if the template has predefined steps — a **N steps** toggle you can expand into a timeline.
+— if the plan has predefined steps — a **N steps** toggle you can expand into a timeline.
 
 Each step in the expanded timeline shows:
 
@@ -28,19 +30,19 @@ Each step in the expanded timeline shows:
   advance — an overdue gate step is one of the reasons a case shows as At Risk on the Case Manager
   board. Hover or focus the marker for this explanation.
 
-If any built-in or custom template on the page hasn't had its timing signed off yet, a single note
+If any built-in or custom plan on the page hasn't had its timing signed off yet, a single note
 above the grid explains: "Timing not yet reviewed by a registered agent — dates can be changed on
 each task," and also recaps what **Set by law** and **Gate** mean. Each affected card additionally
 shows a small **Not yet reviewed** chip (hover/focus for the same explanation) rather than
 repeating the full notice on every card. The note and chip clear once someone verifies that
-template's step timing is correct for current legislation and processing times.
+plan's step timing is correct for current legislation and processing times.
 
-## Creating or editing a custom template
+## Creating or editing a custom plan
 
-1. From the sidebar, open **Templates** and click **New Template** (or the pencil icon on one of
-   your own templates to edit it).
-2. Give it a **Template Title** (e.g. "190 Visa Application — Standard") and a **Process
-   Description** — the AI reads this when suggesting extra tasks for a case using this template.
+1. From the sidebar, open **Work Plans** and click **New Plan** (or the pencil icon on one of
+   your own plans to edit it).
+2. Give it a **Plan Name** (e.g. "190 Visa Application — Standard") and a **Process
+   Description** — the AI reads this when suggesting extra tasks for a case using this plan.
 3. Optionally set a **Visa Subclass**.
 4. Under **Steps & Timing**, click **Add step** for each step in the procedure. For each step, set:
    - **Title** and **Description**.
@@ -56,29 +58,29 @@ template's step timing is correct for current legislation and processing times.
    - **Gate** — check this if the step must be done before the case can be considered ready to
      advance.
    - Use the up/down arrows to reorder steps, or the trash icon to remove one.
-5. Click **Save Template**. Saving validates the steps — a step counting from another step in a
+5. Click **Save**. Saving validates the steps — a step counting from another step in a
    loop, or from a step that no longer exists, is flagged inline and blocks saving until fixed.
 
-Your new template then appears under **Custom Templates** and is selectable from **New Case** the
-same way a built-in template is. Editing an existing custom template bumps its internal version
+Your new plan then appears under **Custom Plans** and is selectable from **New Case** the
+same way a built-in plan is. Editing an existing custom plan bumps its internal version
 number and resets its "reviewed by a registered agent" flag, since the timing just changed.
 
-## Duplicating a built-in template
+## Duplicating a built-in plan
 
-Built-in templates are read-only — they're maintained centrally so every user starts from the same
-set of Australian visa workflows. Click the copy icon on a built-in template's card to **duplicate
-it to customise**: this creates a new custom template ("… (copy)") with the same steps and timing,
+Built-in plans are read-only — they're maintained centrally so every user starts from the same
+set of Australian visa workflows. Click the copy icon on a built-in plan's card to **duplicate
+it to customise**: this creates a new custom plan ("… (copy)") with the same steps and timing,
 which you can then edit freely.
 
-## Deleting a template
+## Deleting a plan
 
-Custom templates have a delete (trash) icon on their card. Built-in templates are marked
+Custom plans have a delete (trash) icon on their card. Built-in plans are marked
 **System** and can't be deleted.
 
 ## How timing affects task generation
 
-Once a template has timing set on its steps, New Case and the Visa Advisor's Open Case panel stop
+Once a plan has timing set on its steps, New Case and the Visa Advisor's Open Case panel stop
 asking the AI for a whole plan and instead build one task per step deterministically from that
-timing — see "Generating tasks" in [Case Manager](../case-manager/getting-started.md). Templates
+timing — see "Generating tasks" in [Case Manager](../case-manager/getting-started.md). Plans
 with no timing set yet keep the old AI-only behaviour. Either way, case-specific extra tasks can
 still be suggested by AI from the case page once the plan exists.

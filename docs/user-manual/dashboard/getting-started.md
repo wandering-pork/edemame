@@ -80,9 +80,9 @@ above it already took effect the moment you clicked it.
 
 The **Recent activity** panel shows a feed of what's happened lately across your cases — new cases,
 task plans, deadline and stage changes, and so on. A new case's task plan entry says exactly how the
-plan was produced: "Created a 12-task plan from the *Subclass 189* template" for a template with
+plan was produced: "Created a 12-task plan from the *Subclass 189* work plan" for a work plan with
 timing set (no AI involved — see "How timing affects task generation" in
-[Templates](../templates/getting-started.md)), or "Generated a 12-task plan with AI" when Gemini
+[Work Plans](../work-plans/getting-started.md)), or "Generated a 12-task plan with AI" when Gemini
 actually wrote the plan, so the wording never implies AI did something it didn't.
 
 ## This week's task board

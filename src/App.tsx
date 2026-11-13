@@ -15,6 +15,7 @@ import { VisaAdvisor } from './pages/VisaAdvisor';
 import { openCaseFromAdvisor, OpenCaseParams, OpenCaseOutcome } from './lib/openCaseFromAdvisor';
 import { generateTasksFromCase } from './services/geminiService';
 import { Templates } from './pages/Templates';
+import Configuration from './pages/Configuration';
 import { Settings } from './pages/Settings';
 import { TeamDashboard } from './pages/TeamDashboard';
 import { TeamMembers } from './pages/TeamMembers';
@@ -876,6 +877,7 @@ const AppShell: React.FC = () => {
                 onDeleteTemplate={handleDeleteTemplate}
               />
             } />
+            <Route path="/configuration" element={<Configuration />} />
             <Route path="/settings" element={
               <Settings
                 currentTheme={theme}

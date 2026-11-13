@@ -290,7 +290,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
   const handleSave = () => {
     if (!editor) return;
     const fieldErrors: string[] = [];
-    if (!editor.title.trim()) fieldErrors.push('Template title is required.');
+    if (!editor.title.trim()) fieldErrors.push('Plan name is required.');
     if (!editor.description.trim()) fieldErrors.push('Process description is required.');
     editor.steps.forEach((s, i) => {
       if (!s.title.trim()) fieldErrors.push(`Step ${i + 1}: title is required.`);
@@ -374,15 +374,15 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                   <button
                     onClick={() => openEdit(template)}
                     className="p-1.5 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-edamame-600 dark:hover:text-edamame-400 hover:bg-edamame/10 rounded-lg transition-all"
-                    aria-label="Edit template"
-                    title="Edit template"
+                    aria-label="Edit plan"
+                    title="Edit plan"
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => onDeleteTemplate(template.id)}
                     className="p-1.5 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                    aria-label="Delete template"
+                    aria-label="Delete plan"
                   >
                     <Trash2 size={15} />
                   </button>
@@ -512,10 +512,10 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-[26px] font-extrabold text-ink dark:text-plate-ink font-ibm-serif tracking-tight">
-              Workflow Templates
+              Work Plans
             </h1>
             <p className="text-sm text-ink-soft dark:text-plate-ink-soft mt-1">
-              Define standard procedures for different visa types.
+              Reusable task plans for each visa type.
             </p>
           </div>
           <div className="flex sm:justify-end">
@@ -524,7 +524,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
               className="btn-press flex items-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm whitespace-nowrap"
             >
               <Plus size={16} />
-              New Template
+              New Plan
             </button>
           </div>
         </div>
@@ -537,7 +537,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
             <Info size={14} strokeWidth={2} className="flex-shrink-0 mt-[1px]" />
             <p className="leading-relaxed">
               <span className="font-semibold">Timing not yet reviewed by a registered agent.</span>{' '}
-              Templates marked <span className="font-semibold">Not yet reviewed</span> below use estimated
+              Plans marked <span className="font-semibold">Not yet reviewed</span> below use estimated
               step timing — dates can always be changed on each task. A step's <span className="font-semibold">Set by law</span> chip
               means that step's window is fixed by regulation rather than estimated; steps with no chip use an
               estimate. A <span className="font-semibold">Gate</span> step has to be done before the case can move
@@ -555,7 +555,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                 <Sparkles size={16} />
               </div>
               <h3 className="text-base font-bold text-ink dark:text-plate-ink">
-                {editor.mode === 'edit' ? 'Edit Template' : 'Create New Template'}
+                {editor.mode === 'edit' ? 'Edit Plan' : 'New Plan'}
               </h3>
             </div>
             <button
@@ -569,7 +569,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wider mb-1.5">
-                Template Title
+                Plan Name
               </label>
               <input
                 type="text"
@@ -584,7 +584,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                 Process Description
               </label>
               <p className="text-xs text-ink-faint dark:text-plate-ink-faint mb-2">
-                Describe the steps — the AI reads this when suggesting extra tasks for a case using this template.
+                Describe the steps — the AI reads this when suggesting extra tasks for a case using this plan.
               </p>
               <textarea
                 value={editor.description}
@@ -800,7 +800,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                 onClick={handleSave}
                 className="btn-press px-5 py-2 text-sm font-semibold bg-edamame hover:bg-edamame-600 text-white rounded-xl shadow-sm shadow-edamame/20 transition-all"
               >
-                Save Template
+                Save
               </button>
             </div>
           </div>
@@ -813,7 +813,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
           <div className="flex items-center gap-2.5 mb-3">
             <span className="w-[22px] h-px bg-ink/20 dark:bg-plate-ink/20" />
             <span className="text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.12em]">
-              Built-in Templates
+              Built-in Plans
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -830,7 +830,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
           <div className="flex items-center gap-2.5 mb-3">
             <span className="w-[22px] h-px bg-ink/20 dark:bg-plate-ink/20" />
             <span className="text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.12em]">
-              Custom Templates
+              Custom Plans
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -845,7 +845,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
           <div className="text-center py-20">
             <div className="flex flex-col items-center gap-3 text-ink-faint dark:text-plate-ink-faint">
               <FileText size={36} className="opacity-25" />
-              <p className="text-sm">No templates yet. Create your first template to get started.</p>
+              <p className="text-sm">No plans yet. Create your first plan to get started.</p>
             </div>
           </div>
         )}

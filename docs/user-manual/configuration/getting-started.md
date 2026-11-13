@@ -1,11 +1,12 @@
-# Case Manager Configurations & Document Types
+# Configuration & Document Types
 
-**Configurations** is the Case Manager's own settings area, separate from the global **Settings**
-page in the sidebar (which covers your account, theme, and where your data is stored). Open it with
-the **Configurations** button at the top-right of the Cases list, next to **New Case**.
+**Configuration** is the central place for settings used across modules, separate from the global
+**Settings** page (which covers your account, theme, and where your data is stored). Open it from
+**Configuration** in the sidebar, under **Workspace**. (It used to be a **Configurations** button
+inside the Case Manager; that button has moved here.)
 
-The panel has a list of setting types on the left and the selected setting's detail on the right.
-Today it holds one setting type: **Document Type**.
+Settings are listed on the left, grouped by the module they belong to, and the selected setting
+opens on the right. Today it holds one setting: **Case Manager → Document Types**.
 
 ## What a Document Type is
 

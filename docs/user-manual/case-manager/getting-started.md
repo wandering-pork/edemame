@@ -6,7 +6,7 @@ decision.
 ## My cases / All cases (cloud/firm accounts only)
 
 In cloud mode, the Case Manager header shows a **My cases / All cases** toggle next to
-**Configurations**, filtering the list by case owner. It defaults to **All cases** for firm Owners
+**New Case**, filtering the list by case owner. It defaults to **All cases** for firm Owners
 and Admins, and to **My cases** for plain Members — since a Member typically only needs to see
 their own book, while an Owner or Admin usually needs the whole firm's view. Whichever you pick is
 remembered for the rest of your browser session. This toggle is hidden in local mode, where every
@@ -25,8 +25,8 @@ already-owned case.
 ## Creating a case
 
 1. From the sidebar, open **Cases** and click **New Case**.
-2. Select an existing client or create a new one, then choose a visa subclass and a workflow
-   template (e.g. Student 500, Skilled 190, Partner 820/801).
+2. Select an existing client or create a new one, then choose a visa subclass and a work
+   plan (e.g. Student 500, Skilled 190, Partner 820/801).
 3. Set the application start date. This is used to calculate due dates for every generated task.
 
 Each new case is automatically given a **case number** in the form `EDM-2026-0001` (the year, plus
@@ -69,8 +69,8 @@ tooltip, or a quiet "On track" when none apply), as well as a red badge on the C
 (hover or focus it there to see the specific reasons) and a red edge on the row. A case is flagged
 At Risk when any of the following is true:
 - it has an open deadline due within 14 days,
-- it has an overdue task generated from a template step marked **Gate** — or, for a task with no
-  such step behind it (a manually added task, or a plan from a template with no timing set), any
+- it has an overdue task generated from a work plan step marked **Gate** — or, for a task with no
+  such step behind it (a manually added task, or a plan from a work plan with no timing set), any
   overdue task,
 - it's at **Ready to lodge** and a document checklist item is still outstanding, or
 - it has an s56/s57 statutory response deadline due within 7 days.
@@ -128,32 +128,32 @@ When you drop files into any Case Files upload area, they wait in a short list u
 one a **Document Type** — this is required, and nothing is uploaded until every file has one. Type
 to search the list by code or description; pick `OTH — Other` if nothing fits. The document type is
 what lets a file link itself to a Document Checklist item automatically — see
-[Configurations & Document Types](./configurations.md).
+[Configuration & Document Types](../configuration/getting-started.md).
 
 ## Generating tasks
 
-How a case's plan is built depends on whether its workflow template has **timing** set on its
-steps (see [Templates](../templates/getting-started.md)):
+How a case's plan is built depends on whether its work plan has **timing** set on its
+steps (see [Work Plans](../work-plans/getting-started.md)):
 
-- **Template with timing** — New Case and the Visa Advisor's Open Case panel build the plan
-  deterministically: one task per step, dated by the template's own anchors (case start, another
+- **Work plan with timing** — New Case and the Visa Advisor's Open Case panel build the plan
+  deterministically: one task per step, dated by the plan's own anchors (case start, another
   step's completion, or a deadline like invitation received) rather than asked of the AI. The
-  button reads **Generate plan from template**. A date the scheduler can't yet pin down exactly
+  button reads **Generate tasks from work plan**. A date the scheduler can't yet pin down exactly
   (an anchor that hasn't happened yet) is marked **Estimated** and firms up automatically once that
   anchor becomes known — see "Rescheduling" below. If a case somehow reaches Case Details with no
-  tasks yet (its template's steps changed after the case was created, for example), a banner in the
-  Tasks tab offers the same **Generate plan from template** button.
-- **Template with no timing set yet, or no template** — the button reads **Generate Plan with
-  AI**. The agent reads the case description, the selected workflow template's steps, and the start
+  tasks yet (its plan's steps changed after the case was created, for example), a banner in the
+  Tasks tab offers the same **Generate tasks from work plan** button.
+- **Work plan with no timing set yet, or no work plan** — the button reads **Generate Plan with
+  AI**. The agent reads the case description, the selected work plan's steps, and the start
   date, then produces a whole chronological task list with realistic due dates based on typical
   Australian processing timeframes. Review the generated tasks — you can edit titles,
   descriptions, and due dates, or delete tasks that don't apply — before saving them to the case.
 
 ### Suggesting extra tasks with AI
 
-Once a case has a deterministic plan from a timed template, the Tasks tab shows an **AI
+Once a case has a deterministic plan from a timed work plan, the Tasks tab shows an **AI
 suggestions** section with a **Suggest extra tasks with AI** button. This asks the agent for a
-small number of tasks specific to this client's circumstances that the template's own steps don't
+small number of tasks specific to this client's circumstances that the work plan's own steps don't
 already cover — each with a one-line reason. Nothing is added automatically: review each
 suggestion and click **Accept** (it's added as a task, dated relative to the step it's anchored
 to, or the case start date if none) or **Reject** (it's dismissed).
@@ -181,7 +181,7 @@ separate Save. New tasks still default to the case owner. The same picker backs 
 
 ### Rescheduling and locking a date
 
-A task generated from a template step keeps recalculating automatically until you or an event
+A task generated from a work plan step keeps recalculating automatically until you or an event
 pins it down:
 
 - Marking a step's task **done** gives the rest of the plan a real date to count from instead of

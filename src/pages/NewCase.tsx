@@ -81,7 +81,7 @@ const GUIDED_CHIPS: Record<string, string[]> = {
 
 function getDescriptionPlaceholder(template: WorkflowTemplate | undefined): string {
   if (!template) {
-    return 'Select a workflow template above, then describe the case — current visa status, goals, deadlines, and any complications...';
+    return 'Select a work plan above, then describe the case — current visa status, goals, deadlines, and any complications...';
   }
   const key = template.visaSubclass ?? 'default';
   return DESCRIPTION_HINTS[key] ?? DESCRIPTION_HINTS['default'];
@@ -486,7 +486,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
             )}
 
             <div className="focus-ring rounded-lg">
-              <label className="block text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5">Workflow Template</label>
+              <label className="block text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft mb-1.5">Work Plan</label>
               <select
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
@@ -534,7 +534,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                 <span className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint">
                   {templateId
                     ? 'Placeholder shows what to include for this visa type'
-                    : 'Select a template to see guided prompts'}
+                    : 'Select a work plan to see guided prompts'}
                 </span>
               </div>
 
@@ -582,7 +582,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                 ) : (
                   <>
                     <Sparkles size={18} />
-                    {templateHasTiming(selectedTemplate) ? 'Generate plan from template' : 'Generate Plan with AI'}
+                    {templateHasTiming(selectedTemplate) ? 'Generate tasks from work plan' : 'Generate Plan with AI'}
                   </>
                 )}
               </button>
@@ -650,7 +650,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
 
             {templateHasTiming(selectedTemplate) && (
               <p className="mt-3 text-[11.5px] text-ink-faint dark:text-plate-ink-faint">
-                This plan was built from the template's own timing — dates marked "Estimated" will firm up as deadlines are recorded. Once the case is created, you can ask for AI-suggested extra tasks tailored to this case from the case page.
+                This plan was built from the work plan's own timing — dates marked "Estimated" will firm up as deadlines are recorded. Once the case is created, you can ask for AI-suggested extra tasks tailored to this case from the case page.
               </p>
             )}
 
