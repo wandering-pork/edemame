@@ -200,7 +200,8 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
   };
 
   const handleAnalyze = async () => {
-    if (!description || !templateId || !clientId) return;
+    // Case notes are optional: a plan can be built from the work plan alone.
+    if (!templateId || !clientId) return;
 
     setErrorMessage(null);
     setGeneratedTasks([]);
@@ -242,7 +243,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
 
     try {
       const tasks = await generateTasksFromCase(
-        clientContext + description,
+        clientContext + (description.trim() || '(No case notes provided.)'),
         selectedTemplate?.description || '',
         startDate,
         selectedTemplate?.visaSubclass,
@@ -325,7 +326,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
     setIsApplicantDropdownOpen(false);
   };
 
-  const canGenerate = !isLoading && !!description && !!templateId && !!clientId;
+  const canGenerate = !isLoading && !!templateId && !!clientId;
 
   return (
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-paper dark:bg-plate min-h-screen transition-colors duration-200">
@@ -546,7 +547,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
             <div>
               <div className="flex items-baseline justify-between mb-1.5">
                 <label className="text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft">
-                  Case Notes
+                  Case Notes <span className="font-normal text-ink-faint dark:text-plate-ink-faint">(optional)</span>
                 </label>
                 <span className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint">
                   {templateId

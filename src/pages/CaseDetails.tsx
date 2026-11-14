@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Case, Client, Task, CaseStage, CaseOutcome, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind, TeamMember } from '../types';
+import { Case, Client, Task, CaseStage, CaseOutcome, DocumentChecklistItem, ChecklistItemStatus, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind, TeamMember } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
-import { useAuth } from '../contexts/AuthContext';
 import { useFirm } from '../contexts/FirmContext';
 import { canDeleteFirmData, firmJobTitleLabel } from '../lib/firmDirectory';
 import { PersonPicker } from '../components/PersonPicker';
@@ -14,8 +13,10 @@ import { BundleBuilder820 } from '../components/BundleBuilder820';
 import { DocumentCompressor } from '../components/DocumentCompressor';
 import { CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
 import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList';
-import { EdiePanel, EDIE_PUSH_PADDING_CLASS, type EdieSkill, type EdieSuggestion } from '../components/case-details/EdiePanel';
-import { loadEdieOpen, saveEdieOpen } from '../lib/ediePanelState';
+import { createPortal } from 'react-dom';
+import { EdiePanel, type EdieSkill, type EdieSuggestion } from '../components/edie/EdiePanel';
+import { useEdieChat } from '../components/edie/useEdieChat';
+import { useEdie } from '../contexts/EdieContext';
 import { CaseOverview } from '../components/case-details/CaseOverview';
 import { currentFocusTask, taskTimeline, checklistBreakdown, suggestQuickActions } from '../lib/caseOverview';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
@@ -175,7 +176,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 }) => {
   const repos = useRepositories();
   const navigate = useNavigate();
-  const { session } = useAuth();
   const { documentTypes, byCode: documentTypesByCode } = useDocumentTypes();
   // RLS is the real enforcement (firms migration's "firm rows delete" policy
   // on `cases` is owner/agent only) — this only hides the control for a role
@@ -266,30 +266,11 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [outcomePickerOpen, setOutcomePickerOpen] = useState(false);
   const [outcomeDraft, setOutcomeDraft] = useState<CaseOutcome | ''>('');
 
-  // ---- Edie panel state ----
-  // Remembered for the browser session so it stays open when moving between
-  // cases (a UI preference, not case data).
-  const [edieOpen, setEdieOpenState] = useState<boolean>(() => loadEdieOpen());
-  const setEdieOpen = useCallback((next: boolean | ((open: boolean) => boolean)) => {
-    setEdieOpenState(prev => {
-      const value = typeof next === 'function' ? next(prev) : next;
-      saveEdieOpen(value);
-      return value;
-    });
-  }, []);
+  // ---- Edie (the panel itself is in the app shell; this case fills it) ----
+  const edie = useEdie();
+  const { claimPanel, setSuggestionCount } = edie;
+  useEffect(() => claimPanel(), [claimPanel]);
   const edieInputRef = useRef<HTMLInputElement>(null);
-
-  // Ctrl+J (Cmd+J on a Mac) toggles Edie from anywhere on the page.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'j') {
-        e.preventDefault();
-        setEdieOpen(o => !o);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [setEdieOpen]);
 
   // ---- Document checklist state ----
   const [checklist, setChecklist] = useState<DocumentChecklistItem[]>([]);
@@ -315,14 +296,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [showEligibilityAssessment, setShowEligibilityAssessment] = useState(false);
 
   // ---- Chat state ----
-  const [conversations, setConversations] = useState<FocusConversation[]>([]);
-  const [activeConvId, setActiveConvId] = useState<string | null>(null);
-  const [chatInput, setChatInput] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [filingIssueMessageId, setFilingIssueMessageId] = useState<string | null>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  const activeConv = conversations.find(c => c.id === activeConvId);
 
   // ---- Derived values ----
   const caseTasks = useMemo(() => {
@@ -446,10 +419,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     saveCaseTabsState(caseItem.id, { tabs: openTabs, activeTabId });
   }, [openTabs, activeTabId, tabsLoaded, caseItem.id]);
 
-  // Auto-scroll chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeConv?.messages]);
 
   // ---- Checklist handlers ----
   const [checklistStatusMenuId, setChecklistStatusMenuId] = useState<string | null>(null);
@@ -912,257 +881,30 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     }
   };
 
-  // Load conversations for this case
-  useEffect(() => {
-    let cancelled = false;
-    repos.chat.getByCaseId(caseItem.id).then(convs => {
-      if (cancelled) return;
-      setConversations(convs);
-      setActiveConvId(convs[0]?.id ?? null);
-    });
-    return () => { cancelled = true; };
-  }, [caseItem.id, repos.chat]);
-
-  // ---- Chat handlers ----
-  const persistConvs = (convs: FocusConversation[]) => {
-    repos.chat.setForCase(caseItem.id, convs);
-  };
-
-  const createConversation = () => {
-    const conv: FocusConversation = {
-      id: uuidv4(),
-      caseId: caseItem.id,
-      title: `Chat ${conversations.length + 1}`,
-      messages: [],
-      createdAt: new Date().toISOString(),
-    };
-    const next = [conv, ...conversations];
-    setConversations(next);
-    persistConvs(next);
-    setActiveConvId(conv.id);
-  };
-
-  const sendMessage = useCallback(async () => {
-    if (!chatInput.trim() || isSending) return;
-
-    const convId = activeConvId || (() => {
-      const id = uuidv4();
-      const conv: FocusConversation = {
-        id,
-        caseId: caseItem.id,
-        title: chatInput.slice(0, 40),
-        messages: [],
-        createdAt: new Date().toISOString(),
-      };
-      const next = [conv, ...conversations];
-      setConversations(next);
-      persistConvs(next);
-      setActiveConvId(id);
-      return id;
-    })();
-
-    const userMsg: FocusChatMessage = {
-      id: uuidv4(),
-      role: 'user',
-      content: chatInput.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
-    setConversations(prev => {
-      const next = prev.map(c => {
-        if (c.id !== convId) return c;
-        const updated = { ...c, messages: [...c.messages, userMsg] };
-        if (c.messages.length === 0) updated.title = userMsg.content.slice(0, 40);
-        return updated;
-      });
-      persistConvs(next);
-      return next;
-    });
-    setChatInput('');
-    setIsSending(true);
-
-    try {
-      const caseContext = [
-        `Case: ${caseItem.title}`,
-        `Client: ${client.name}`,
-        applicant && applicant.id !== client.id ? `Applicant: ${applicant.name}` : null,
-        visaSubclass ? `Visa Type: ${subclassShortLabel(visaSubclass, currentCase.visaSubstream)}` : null,
-        `Stage: ${CASE_STAGE_LABELS[caseItem.stage]}${caseItem.onHold ? ' (on hold)' : ''}`,
-        `Progress: ${completedTasks.length}/${caseTasks.length} tasks completed (${progress}%)`,
-        pendingTasks.length > 0 ? `Next task: ${pendingTasks[0]?.title}` : null,
-        checklist.length > 0 ? `Documents: ${uploadedCount}/${checklist.length} collected` : null,
-      ].filter(Boolean).join('\n');
-
-      const currentConv = conversations.find(c => c.id === convId);
-      const historyMessages = [...(currentConv?.messages || []), userMsg];
-
-      // Per-session cap on agent-filed GitHub issues (see api/focus-chat.ts /
-      // api/file-github-issue.ts) — counted from this conversation's own
-      // history so it resets per Focus Mode chat thread.
-      const issuesFiledInSession = historyMessages.filter(m => m.kind === 'issue-filed').length;
-
-      const response = await fetch('/api/focus-chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
-          messages: historyMessages.map(m => ({ role: m.role, content: m.content })),
-          caseContext,
-          issuesFiledInSession,
-        }),
-      });
-
-      const data = await response.json();
-
-      const assistantMsg: FocusChatMessage =
-        data.kind === 'issue-draft' && data.draft
-          ? {
-              id: uuidv4(),
-              role: 'assistant',
-              content: "I think this is worth tracking — here's a drafted GitHub issue for your review.",
-              createdAt: new Date().toISOString(),
-              kind: 'issue-draft',
-              issueDraft: { title: data.draft.title, body: data.draft.body },
-            }
-          : {
-              id: uuidv4(),
-              role: 'assistant',
-              content: data.reply || 'Sorry, I could not generate a response.',
-              createdAt: new Date().toISOString(),
-              kind: 'text',
-            };
-
-      setConversations(prev => {
-        const next = prev.map(c => {
-          if (c.id !== convId) return c;
-          return { ...c, messages: [...c.messages, assistantMsg] };
-        });
-        persistConvs(next);
-        return next;
-      });
-
-    } catch {
-      const errMsg: FocusChatMessage = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: 'Connection error. Please check your API key and try again.',
-        createdAt: new Date().toISOString(),
-      };
-      setConversations(prev => {
-        const next = prev.map(c => {
-          if (c.id !== convId) return c;
-          return { ...c, messages: [...c.messages, errMsg] };
-        });
-        persistConvs(next);
-        return next;
-      });
-    } finally {
-      setIsSending(false);
-    }
-  }, [chatInput, isSending, activeConvId, conversations, caseItem, client, applicant, visaSubclass, completedTasks, caseTasks, pendingTasks, checklist, progress, uploadedCount, session]);
+  // ---- Edie's case chat (stored per case in repos.chat) ----
+  const chat = useEdieChat({
+    scopeKey: caseItem.id,
+    caseId: caseItem.id,
+    load: () => repos.chat.getByCaseId(caseItem.id),
+    save: convs => { repos.chat.setForCase(caseItem.id, convs); },
+    getCaseContext: () => [
+      `Case: ${caseItem.title}`,
+      `Client: ${client.name}`,
+      applicant && applicant.id !== client.id ? `Applicant: ${applicant.name}` : null,
+      visaSubclass ? `Visa Type: ${subclassShortLabel(visaSubclass, currentCase.visaSubstream)}` : null,
+      `Stage: ${CASE_STAGE_LABELS[caseItem.stage]}${caseItem.onHold ? ' (on hold)' : ''}`,
+      `Progress: ${completedTasks.length}/${caseTasks.length} tasks completed (${progress}%)`,
+      pendingTasks.length > 0 ? `Next task: ${pendingTasks[0]?.title}` : null,
+      checklist.length > 0 ? `Documents: ${uploadedCount}/${checklist.length} collected` : null,
+    ].filter(Boolean).join('\n'),
+  });
 
   /** Pre-fills Edie's chat with `msg` for the agent to review and send. */
   const handleSkillAction = (msg: string) => {
-    setChatInput(msg);
-    setEdieOpen(true);
+    chat.setChatInput(msg);
+    edie.setOpen(true);
     requestAnimationFrame(() => edieInputRef.current?.focus());
   };
-
-  // ---- Agentic GitHub issue filing (GitHub issue #15) ----
-  // Confirm/Cancel are the only two ways a drafted issue is resolved — the
-  // draft itself is produced by /api/focus-chat's function-calling loop and
-  // is never filed automatically. Only Confirm hits /api/file-github-issue,
-  // the sole endpoint that performs the real POST /repos/.../issues call.
-  const updateMessageInActiveConv = useCallback(
-    (messageId: string, patch: Partial<FocusChatMessage>) => {
-      setConversations(prev => {
-        const next = prev.map(c => {
-          if (c.id !== activeConvId) return c;
-          return {
-            ...c,
-            messages: c.messages.map(m => (m.id === messageId ? { ...m, ...patch } : m)),
-          };
-        });
-        persistConvs(next);
-        return next;
-      });
-    },
-    [activeConvId]
-  );
-
-  const handleCancelIssueDraft = useCallback(
-    (messageId: string) => {
-      updateMessageInActiveConv(messageId, { issueDraftResolved: 'cancelled' });
-    },
-    [updateMessageInActiveConv]
-  );
-
-  const handleConfirmIssueDraft = useCallback(
-    async (messageId: string) => {
-      const conv = conversations.find(c => c.id === activeConvId);
-      const message = conv?.messages.find(m => m.id === messageId);
-      if (!message?.issueDraft || filingIssueMessageId) return;
-
-      const issuesFiledInSession = (conv?.messages || []).filter(m => m.kind === 'issue-filed').length;
-
-      setFilingIssueMessageId(messageId);
-      try {
-        const response = await fetch('/api/file-github-issue', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-          },
-          body: JSON.stringify({
-            title: message.issueDraft.title,
-            body: message.issueDraft.body,
-            issuesFiledInSession,
-          }),
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          updateMessageInActiveConv(messageId, { issueDraftResolved: 'cancelled' });
-          const errMsg: FocusChatMessage = {
-            id: uuidv4(),
-            role: 'assistant',
-            content: data.error || 'Failed to file the GitHub issue. Please try again or file it manually.',
-            createdAt: new Date().toISOString(),
-            kind: 'text',
-          };
-          setConversations(prev => {
-            const next = prev.map(c => (c.id === activeConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
-            persistConvs(next);
-            return next;
-          });
-          return;
-        }
-
-        updateMessageInActiveConv(messageId, { issueDraftResolved: 'filed' });
-        const filedMsg: FocusChatMessage = {
-          id: uuidv4(),
-          role: 'assistant',
-          content: `Done — filed [#${data.number}](${data.url}).`,
-          createdAt: new Date().toISOString(),
-          kind: 'issue-filed',
-          issueUrl: data.url,
-          issueNumber: data.number,
-        };
-        setConversations(prev => {
-          const next = prev.map(c => (c.id === activeConvId ? { ...c, messages: [...c.messages, filedMsg] } : c));
-          persistConvs(next);
-          return next;
-        });
-      } catch {
-        updateMessageInActiveConv(messageId, { issueDraftResolved: 'cancelled' });
-      } finally {
-        setFilingIssueMessageId(null);
-      }
-    },
-    [conversations, activeConvId, filingIssueMessageId, updateMessageInActiveConv, session]
-  );
 
   // ---- Top-bar action handlers ----
   const handleEligibility = () => {
@@ -1437,6 +1179,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     },
   }));
 
+  // Badge on the top bar's Edie button.
+  const edieSuggestionCount = edieSuggestions.length;
+  useEffect(() => { setSuggestionCount(edieSuggestionCount); }, [edieSuggestionCount, setSuggestionCount]);
+
   // Edie's fixed AI skills. Each has exactly one home: here.
   const prefillTitle = 'Pre-fills the chat for you to review and send';
   const edieSkills: EdieSkill[] = [
@@ -1453,7 +1199,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
   return (
-    <div className={`flex-1 px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate transition-[padding] duration-200 ${edieOpen ? EDIE_PUSH_PADDING_CLASS : ''}`}>
+    <div className={`flex-1 px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate`}>
 
       {/* ══════════════════════════════════════════
           TOP BAR
@@ -1534,26 +1280,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             )}
           </div>
 
-          {/* Edie toggle */}
-          <button
-            onClick={() => setEdieOpen(o => !o)}
-            aria-pressed={edieOpen}
-            aria-label={edieSuggestions.length > 0 ? `Edie, ${edieSuggestions.length} suggestions` : 'Edie'}
-            title="Edie, case assistant (Ctrl+J)"
-            className={`relative inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
-              edieOpen
-                ? 'border-edamame bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400'
-                : 'border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame'
-            }`}
-          >
-            <Sparkles size={14} />
-            <span className="hidden md:inline">Edie</span>
-            {!edieOpen && edieSuggestions.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-edamame text-white text-[9.5px] font-bold flex items-center justify-center">
-                {edieSuggestions.length}
-              </span>
-            )}
-          </button>
         </div>
       </div>
 
@@ -2243,28 +1969,33 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
       </div>
 
-      {/* ── EDIE (right-hand panel; pushes the page on wide screens) ── */}
-      <EdiePanel
-        open={edieOpen}
-        onClose={() => setEdieOpen(false)}
-        currentTaskTitle={focusTask?.title}
-        suggestions={edieSuggestions}
-        skills={edieSkills}
-        conversations={conversations}
-        activeConv={activeConv}
-        activeConvId={activeConvId}
-        onSelectConversation={setActiveConvId}
-        onNewChat={createConversation}
-        chatInput={chatInput}
-        setChatInput={setChatInput}
-        isSending={isSending}
-        onSend={sendMessage}
-        chatEndRef={chatEndRef}
-        inputRef={edieInputRef}
-        filingIssueMessageId={filingIssueMessageId}
-        onConfirmIssueDraft={handleConfirmIssueDraft}
-        onCancelIssueDraft={handleCancelIssueDraft}
-      />
+      {/* ── EDIE: this case's suggestions, skills and chat, inside the app shell's panel ── */}
+      {edie.open && edie.panelEl && createPortal(
+        <EdiePanel
+          onClose={() => edie.setOpen(false)}
+          subtitle="Case assistant"
+          helpHeading={focusTask ? `Suggested for “${focusTask.title}”` : 'Suggested next steps'}
+          suggestions={edieSuggestions}
+          skills={edieSkills}
+          emptyText="Ask Edie anything about this case. Edie already knows the client, the tasks and the checklist."
+          placeholder="Ask Edie about this case…"
+          conversations={chat.conversations}
+          activeConv={chat.activeConv}
+          activeConvId={chat.activeConvId}
+          onSelectConversation={chat.setActiveConvId}
+          onNewChat={chat.createConversation}
+          chatInput={chat.chatInput}
+          setChatInput={chat.setChatInput}
+          isSending={chat.isSending}
+          onSend={chat.sendMessage}
+          chatEndRef={chat.chatEndRef}
+          inputRef={edieInputRef}
+          filingIssueMessageId={chat.filingIssueMessageId}
+          onConfirmIssueDraft={chat.confirmIssueDraft}
+          onCancelIssueDraft={chat.cancelIssueDraft}
+        />,
+        edie.panelEl,
+      )}
 
       {/* ── MODALS ── */}
 

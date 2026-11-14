@@ -42,12 +42,9 @@ Checklist tab.
 
 ## Edie, the case assistant
 
-**Edie** is Edamame's AI assistant. Click **Edie** at the top right of a case (next to **Case
-actions**), or press **Ctrl+J** (**Cmd+J** on a Mac), to open a panel down the right-hand side. On a
-wide screen the case moves over to make room, so nothing is hidden. On a narrow screen the panel
-slides over the case. Close it with the **✕**, **Esc**, or **Ctrl+J** again. It stays open as you
-move between cases until you close it. When Edie is closed and has suggestions, a small green number
-on the button shows how many.
+**Edie** is Edamame's AI assistant; see [Edie](../edie/getting-started.md) for opening and closing it
+(the **Edie** button at the top right of the top bar, or **Ctrl+J**). On a case, Edie becomes that
+case's assistant.
 
 Edie only holds AI help. Everything else has one home on the page: the tab row for moving between
 views, **Case actions** for editing or deleting the case, and each document tool on its own tab.

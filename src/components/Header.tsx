@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sun, Moon } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { GlobalSearch } from './GlobalSearch';
+import { EdieButton } from './edie/EdieButton';
 import type { Notification, Theme, Client, Case, Task, WorkflowTemplate, TeamMember } from '../types';
 
 interface HeaderProps {
@@ -60,25 +61,9 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  // Publishes the bar's height as --app-header-h so fixed side panels (Edie)
-  // can start below it instead of covering the bell and profile menu.
-  const headerRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el) return;
-    const root = document.documentElement;
-    const publish = () => root.style.setProperty('--app-header-h', `${el.offsetHeight}px`);
-    publish();
-    const observer = new ResizeObserver(publish);
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      root.style.removeProperty('--app-header-h');
-    };
-  }, []);
 
   return (
-    <header ref={headerRef} className="sticky top-0 z-30 flex items-center gap-3 px-6 py-3 bg-paper/85 dark:bg-plate/85 backdrop-blur-sm border-b border-ink/10 dark:border-plate-ink/15">
+    <header className="sticky top-0 z-30 flex items-center gap-3 px-6 py-3 bg-paper/85 dark:bg-plate/85 backdrop-blur-sm border-b border-ink/10 dark:border-plate-ink/15">
       {/* Global search — available from every module. */}
       <GlobalSearch
         clients={clients}
@@ -123,6 +108,9 @@ export const Header: React.FC<HeaderProps> = ({
           {userName || userEmail}
         </span>
       </button>
+
+      {/* Edie, the AI assistant (every page; Ctrl+J) */}
+      <EdieButton />
     </header>
   );
 };

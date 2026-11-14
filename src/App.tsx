@@ -33,6 +33,8 @@ import { knownAnchorsFromDeadlines, rescheduleCaseTasks } from './lib/tasksFromT
 import { buildDeadlineAlerts } from './lib/deadlineAlerts';
 import { initialsOfName } from './lib/firmDirectory';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
+import { EdieProvider, useEdie } from './contexts/EdieContext';
+import { EdieShell, EDIE_PUSH_PADDING_CLASS } from './components/edie/EdieShell';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
 import { LocalFolderProvider, useLocalFolder } from './contexts/LocalFolderContext';
@@ -56,6 +58,7 @@ const AppShell: React.FC = () => {
   const repos = useRepositories();
   const storageMode = useStorageMode();
   const { collapsed } = useSidebar();
+  const { open: edieOpen } = useEdie();
   const { user } = useAuth();
   const { profile, updateProfile } = useProfile();
   const { firm, teamMembers: firmTeamMembers, lostAccessNotice, dismissLostAccessNotice } = useFirm();
@@ -758,7 +761,7 @@ const AppShell: React.FC = () => {
       <Toaster position="top-right" richColors theme={theme === 'dark' ? 'dark' : 'light'} />
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 font-sans text-gray-900 dark:text-gray-100 transition-colors duration-200">
         <Sidebar />
-        <div className={`${collapsed ? 'md:ml-16' : 'md:ml-[240px]'} min-w-0 min-h-screen flex flex-col transition-[margin-left] duration-300 ease-in-out`}>
+        <div className={`${collapsed ? 'md:ml-16' : 'md:ml-[240px]'} ${edieOpen ? EDIE_PUSH_PADDING_CLASS : ''} min-w-0 min-h-screen flex flex-col transition-[margin-left,padding] duration-300 ease-in-out`}>
           <Header
             theme={theme}
             onThemeChange={handleThemeChange}
@@ -921,6 +924,7 @@ const AppShell: React.FC = () => {
           </Routes>
           </main>
         </div>
+        <EdieShell />
       </div>
     </div>
   );
@@ -1155,7 +1159,9 @@ const StorageGate: React.FC = () => {
       <DocumentTypeProvider>
         <VisaConfigProvider>
         <SidebarProvider>
+        <EdieProvider>
           <AppShell />
+        </EdieProvider>
         </SidebarProvider>
         </VisaConfigProvider>
       </DocumentTypeProvider>
@@ -1181,7 +1187,9 @@ const CloudAppGate: React.FC = () => {
       <DocumentTypeProvider>
         <VisaConfigProvider>
         <SidebarProvider>
+        <EdieProvider>
           <AppShell />
+        </EdieProvider>
         </SidebarProvider>
         </VisaConfigProvider>
       </DocumentTypeProvider>

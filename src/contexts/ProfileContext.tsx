@@ -50,6 +50,7 @@ function readDevProfile(userId: string): Profile | null {
     ...profile,
     linkedFolderName: profile.linkedFolderName ?? null,
     linkedAt: profile.linkedAt ?? null,
+    edieOpen: profile.edieOpen ?? false,
     currentFirmId: null,
   };
 }
@@ -69,6 +70,7 @@ function defaultDevProfile(userId: string, storageMode: StorageMode): Profile {
     storageMode,
     theme: 'classic',
     sidebarCollapsed: false,
+    edieOpen: false,
     linkedFolderName: null,
     linkedAt: null,
     currentFirmId: null,
@@ -121,6 +123,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         storageMode: update.storageMode !== undefined ? update.storageMode : current.storageMode,
         theme: update.theme !== undefined ? update.theme : current.theme,
         sidebarCollapsed: update.sidebarCollapsed !== undefined ? update.sidebarCollapsed : current.sidebarCollapsed,
+        edieOpen: update.edieOpen !== undefined ? update.edieOpen : current.edieOpen,
         linkedFolderName: update.linkedFolderName !== undefined ? update.linkedFolderName : current.linkedFolderName,
         linkedAt: update.linkedAt !== undefined ? update.linkedAt : current.linkedAt,
         currentFirmId: null,

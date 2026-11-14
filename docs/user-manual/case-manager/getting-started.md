@@ -40,8 +40,8 @@ before case numbers were introduced show a reference derived from their internal
 
 Directly under the case title sits a row of four chips that answer "where is this case at" without
 opening anything: **Stage**, **Risk**, **Next deadline**, and **On hold**. The case header itself
-has one primary button, **Add Task**, a small **Case actions** menu (see below), and **Edie**, the AI
-assistant.
+has one primary button, **Add Task**, and a small **Case actions** menu (see below). **Edie**, the AI
+assistant, is the button at the top right of the top bar.
 
 ### Case stage, on hold, and At Risk
 
@@ -129,8 +129,8 @@ Everything that used to be in this menu now has one home elsewhere:
 
 Every time you open a case, you land on the **Overview** tab: a "You are here" card with the
 current task across the top, then case info and the case's progress on the left and the document
-checklist (an overall donut plus a bar per category) and recent case files on the right. Click **Edie** at the top
-right (or press **Ctrl+J**) for suggested next steps, AI skills and the case chat. See
+checklist (an overall donut plus a bar per category) and recent case files on the right. Click **Edie** at the top right
+of the top bar (or press **Ctrl+J**) for suggested next steps, AI skills and the case chat. See
 [Overview, Edie, and tabs](./workspace-and-tabs.md) for how the Overview, Edie and the case's tabs
 work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
@@ -152,6 +152,10 @@ what lets a file link itself to a Document Checklist item automatically — see
 
 How a case's plan is built depends on whether its work plan has **timing** set on its
 steps (see [Work Plans](../work-plans/getting-started.md)):
+
+On New Case, **Case Notes** are optional. You can generate the plan with just a client and a work
+plan, and add notes later from **Edit case**. Notes help most for a work plan with no timing, where
+the AI uses them to tailor the tasks.
 
 - **Work plan with timing** — New Case and the Visa Advisor's Open Case panel build the plan
   deterministically: one task per step, dated by the plan's own anchors (case start, another
@@ -213,7 +217,7 @@ pins it down:
 
 ## Chatting with Edie
 
-Open **Edie** from the top right of a case (or press **Ctrl+J**) to chat about the case. Edie
+Open a case, then click **Edie** at the top right of the top bar (or press **Ctrl+J**) to chat about the case. Edie
 already knows the case's client, visa subclass, stage, task progress and document checklist, so you
 don't need to repeat that context.
 
@@ -234,7 +238,7 @@ finds a match, it tells you and links the existing GitHub issue instead of creat
 it's new, it drafts a GitHub issue and shows it in the chat with **Confirm** and **Cancel** buttons
 — nothing is filed until you click **Confirm**. Each conversation thread can file up to 3 issues
 this way (also capped at 5 per day per account, enforced server-side); after that, file further
-reports manually. This only happens in Edie's chat on a case, not elsewhere in the app.
+reports manually. This works in any Edie chat, on a case or on any other page.
 
 **Filing an issue posts it to the public `wandering-pork/edemame` GitHub repository** — visible to
 anyone on the internet. The draft card says so before you confirm; review the title and body for

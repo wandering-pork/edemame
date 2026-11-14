@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Sparkles, Plus, Send, Github, Check, X, ChevronDown } from 'lucide-react';
+import { BrandImage } from '../BrandImage';
 import { format } from 'date-fns';
 import type { FocusChatMessage, FocusConversation } from '../../types';
 
@@ -207,12 +208,17 @@ export interface EdieSkill {
 }
 
 interface EdiePanelProps {
-  open: boolean;
   onClose: () => void;
-  /** Title of the case's current task, shown in the suggestions heading. */
-  currentTaskTitle?: string;
-  suggestions: EdieSuggestion[];
+  /** Under the name in the header, e.g. "Case assistant". */
+  subtitle: string;
+  /** Heading over the suggestions and skills. */
+  helpHeading: string;
+  /** Suggested next steps; omit for a page with none (the section then shows skills only). */
+  suggestions?: EdieSuggestion[];
   skills: EdieSkill[];
+  /** Shown in the message area before the first message. */
+  emptyText: string;
+  placeholder: string;
   conversations: FocusConversation[];
   activeConv?: FocusConversation;
   activeConvId: string | null;
@@ -253,26 +259,25 @@ const SuggestionCards: React.FC<{ actions: EdieSuggestion[] }> = ({ actions }) =
   </div>
 );
 
-/** Width of the open panel; Case Details pads its content by the same amount on wide screens. */
-export const EDIE_PANEL_WIDTH_CLASS = 'sm:w-[380px]';
-export const EDIE_PUSH_PADDING_CLASS = 'xl:pr-[380px]';
 
 /**
- * Edie, the case assistant: a right-hand panel opened from the Edie button at
- * the top right of Case Details (or Ctrl+J). It sits below the app's top bar,
- * pushes the page aside on wide screens and slides over it on narrow ones.
+ * The inside of Edie's panel: header, suggestions and skills, and the chat.
+ * The panel frame itself is `components/edie/EdieShell.tsx` (on every page);
+ * Case Details renders this into it with its case's suggestions and chat,
+ * and every other page gets the general version (`EdieGeneral.tsx`).
  *
- * It holds AI help only, so nothing in it is reachable another way on the
- * page: suggested next steps for the current task, Edie's skills, and the
- * chat. Navigation lives in the tab row, case admin in Case actions, and
+ * Edie holds AI help only, so nothing in it is reachable another way on the
+ * page: navigation lives in the tab row, case admin in Case actions, and
  * document tools on the tab their data belongs to.
  */
 export const EdiePanel: React.FC<EdiePanelProps> = ({
-  open,
   onClose,
-  currentTaskTitle,
+  subtitle,
+  helpHeading,
   suggestions,
   skills,
+  emptyText,
+  placeholder,
   conversations,
   activeConv,
   activeConvId,
@@ -295,28 +300,24 @@ export const EdiePanel: React.FC<EdiePanelProps> = ({
   useEffect(() => { setHelpOpen(isEmpty); }, [isEmpty, activeConvId]);
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open, inputRef]);
-
-  if (!open) return null;
+    inputRef.current?.focus();
+  }, [inputRef]);
 
   const chipCls = 'btn-press text-[11.5px] font-semibold px-2.5 py-1.5 rounded-full border border-edamame/35 text-edamame-700 dark:text-edamame-400 bg-edamame/[0.07] hover:bg-edamame/15 transition-colors';
 
   return (
-    <aside
-      role="complementary"
-      aria-label="Edie, case assistant"
+    <div
       onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}
-      className={`ed-edie fixed top-[var(--app-header-h,0px)] bottom-0 right-0 z-40 w-full ${EDIE_PANEL_WIDTH_CLASS} flex flex-col bg-paper-2 dark:bg-plate-card border-l border-ink/10 dark:border-plate-ink/15 shadow-2xl xl:shadow-none`}
+      className="flex flex-col h-full min-h-0"
     >
       {/* Header */}
       <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-ink/10 dark:border-plate-ink/15 flex-shrink-0">
-        <span className="w-8 h-8 rounded-xl bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center flex-shrink-0">
-          <Sparkles size={16} className="text-edamame" strokeWidth={1.8} />
+        <span className="w-9 h-9 rounded-xl bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center flex-shrink-0">
+          <BrandImage variant="mark" alt="" className="w-7 h-7 object-contain" />
         </span>
         <div className="min-w-0">
           <div className="text-[14px] font-bold text-ink dark:text-plate-ink leading-tight">Edie</div>
-          <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">Case assistant</div>
+          <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">{subtitle}</div>
         </div>
         <button
           onClick={onNewChat}
@@ -343,22 +344,22 @@ export const EdiePanel: React.FC<EdiePanelProps> = ({
           className="w-full flex items-center gap-1.5 px-4 pt-3 pb-2 text-left"
         >
           <span className="text-[10.5px] font-bold uppercase tracking-wide text-ink-faint dark:text-plate-ink-faint truncate">
-            {currentTaskTitle ? <>Suggested for “{currentTaskTitle}”</> : 'Suggested next steps'}
+            {helpHeading}
           </span>
-          {!helpOpen && suggestions.length > 0 && (
+          {!helpOpen && !!suggestions?.length && (
             <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-edamame/10 text-edamame-700 dark:text-edamame-400">{suggestions.length}</span>
           )}
           <ChevronDown size={13} className={`ml-auto flex-shrink-0 text-ink-faint dark:text-plate-ink-faint transition-transform ${helpOpen ? 'rotate-180' : ''}`} />
         </button>
         {helpOpen && (
           <div className="px-4 pb-3.5 space-y-3 max-h-[45vh] overflow-y-auto custom-scrollbar">
-            {suggestions.length > 0 ? (
+            {suggestions && (suggestions.length > 0 ? (
               <SuggestionCards actions={suggestions} />
             ) : (
               <p className="text-[12px] text-ink-faint dark:text-plate-ink-faint">Nothing needs doing right now.</p>
-            )}
+            ))}
             <div>
-              <div className="text-[10.5px] font-bold uppercase tracking-wide text-ink-faint dark:text-plate-ink-faint mb-1.5">Skills</div>
+              {suggestions && <div className="text-[10.5px] font-bold uppercase tracking-wide text-ink-faint dark:text-plate-ink-faint mb-1.5">Skills</div>}
               <div className="flex flex-wrap gap-1.5">
                 {skills.map(skill => (
                   <button key={skill.id} onClick={skill.onSelect} title={skill.title} className={chipCls}>
@@ -394,9 +395,7 @@ export const EdiePanel: React.FC<EdiePanelProps> = ({
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 custom-scrollbar min-w-0">
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <p className="text-[12.5px] text-ink-faint dark:text-plate-ink-faint leading-relaxed">
-              Ask Edie anything about this case. Edie already knows the client, the tasks and the checklist.
-            </p>
+            <p className="text-[12.5px] text-ink-faint dark:text-plate-ink-faint leading-relaxed">{emptyText}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -430,7 +429,7 @@ export const EdiePanel: React.FC<EdiePanelProps> = ({
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); }
           }}
-          placeholder="Ask Edie about this case…"
+          placeholder={placeholder}
           aria-label="Message Edie"
           className="flex-1 min-w-0 bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-lg px-3 py-2 text-[12.5px] text-ink dark:text-plate-ink-soft placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50 outline-none focus:border-edamame focus-ring transition-all"
         />
@@ -443,7 +442,7 @@ export const EdiePanel: React.FC<EdiePanelProps> = ({
           <Send size={14} />
         </button>
       </div>
-    </aside>
+    </div>
   );
 };
 
