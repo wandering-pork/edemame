@@ -128,6 +128,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: { data: { full_name: fullName, ...extraMetadata } },
     });
     if (error) return { error: mapAuthError(error.message, 'sign-up'), needsEmailConfirmation: false };
+    // An already-registered email gets a fake success (no email sent) so sign-up can't be used to
+    // probe for accounts; the tell is a user with no identities.
+    if (data.user && data.user.identities?.length === 0) {
+      return {
+        error: 'An account with this email already exists. Sign in instead, or use "Send reset link" if you forgot your password.',
+        needsEmailConfirmation: false,
+      };
+    }
     // If email confirmation is required, Supabase returns a user with no session.
     const needsEmailConfirmation = !!data.user && !data.session;
     return { error: null, needsEmailConfirmation };
