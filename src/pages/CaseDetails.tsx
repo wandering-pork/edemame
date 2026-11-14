@@ -106,6 +106,8 @@ interface CaseDetailsProps {
   onUpdateCase: (caseItem: Case) => void;
   /** Applies a confirmed subclass / Work Plan change in one batch (Work Plans step 4). */
   onChangeCasePlan: (change: PlanChangeResult) => Promise<void>;
+  /** Deletes the case with its tasks and deadlines, and updates app state. */
+  onDeleteCase: (caseId: string) => Promise<void>;
   /** Every Work Plan — offered in the subclass-change window. */
   templates: WorkflowTemplate[];
   onBack: () => void;
@@ -172,6 +174,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   onUpdateDeadline,
   onUpdateCase,
   onChangeCasePlan,
+  onDeleteCase,
   templates,
   onBack
 }) => {
@@ -663,7 +666,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   const handleDeleteCase = async () => {
-    await repos.cases.delete(currentCase.id);
+    await onDeleteCase(currentCase.id);
     onBack();
   };
 

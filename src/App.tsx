@@ -681,41 +681,87 @@ const AppShell: React.FC = () => {
     if (member) toast.info(`${member.name} removed`);
   }, [repos, teamMembers, cases, tasks]);
 
-  const handleAssignCase = useCallback(async (caseId: string, newOwnerId: string, note?: string) => {
-    const caseItem = cases.find(c => c.id === caseId);
-    if (!caseItem) return;
-    const event: CaseAssignmentEvent = {
-      id: uuidv4(),
-      caseId,
-      fromOwnerId: caseItem.caseOwner,
-      toOwnerId: newOwnerId,
-      changedAt: new Date().toISOString(),
-      changedBy: currentUserId,
-      note,
-    };
-    const updated: Case = {
-      ...caseItem,
-      caseOwner: newOwnerId,
-      assignmentHistory: [...(caseItem.assignmentHistory || []), event],
-    };
-    try {
-      await repos.cases.update(updated);
-    } catch {
+  /**
+   * Assigns one or more cases to `newOwnerId`, recording an assignment event
+   * on each. One toast for the whole batch; each case gets its own activity
+   * event and "assigned to you" notification.
+   */
+  const handleAssignCases = useCallback(async (caseIds: string[], newOwnerId: string, note?: string) => {
+    const now = new Date().toISOString();
+    const updates: { before: Case; after: Case }[] = [];
+    for (const caseId of caseIds) {
+      const caseItem = cases.find(c => c.id === caseId);
+      if (!caseItem || caseItem.caseOwner === newOwnerId) continue;
+      const event: CaseAssignmentEvent = {
+        id: uuidv4(),
+        caseId,
+        fromOwnerId: caseItem.caseOwner,
+        toOwnerId: newOwnerId,
+        changedAt: now,
+        changedBy: currentUserId,
+        note,
+      };
+      updates.push({
+        before: caseItem,
+        after: { ...caseItem, caseOwner: newOwnerId, assignmentHistory: [...(caseItem.assignmentHistory || []), event] },
+      });
+    }
+    if (updates.length === 0) return;
+    await Promise.all(updates.map(({ after }) => repos.cases.update(after).catch(() => {
       // Repository layer may not persist new optional fields — safe to ignore.
-    }
-    setCases(prev => prev.map(c => c.id === caseId ? updated : c));
+    })));
+    const byId = new Map(updates.map(u => [u.after.id, u.after]));
+    setCases(prev => prev.map(c => byId.get(c.id) ?? c));
     const newOwner = teamMembers.find(m => m.id === newOwnerId);
-    pushActivity({
-      type: 'case_assigned',
-      actorId: currentUserId,
-      subjectId: caseId,
-      summary: `${caseItem.title} assigned to ${newOwner?.name || 'team member'}.`,
-    });
-    toast.success(`Case assigned to ${newOwner?.name || 'team member'}`);
-    if (shouldNotifyAssignment(caseItem.caseOwner, newOwnerId, currentUserId)) {
-      notifyAssignment('case', caseId);
+    const ownerName = newOwner?.name || 'team member';
+    for (const { before } of updates) {
+      pushActivity({
+        type: 'case_assigned',
+        actorId: currentUserId,
+        subjectId: before.id,
+        summary: `${before.title} assigned to ${ownerName}.`,
+      });
+      if (shouldNotifyAssignment(before.caseOwner, newOwnerId, currentUserId)) {
+        notifyAssignment('case', before.id);
+      }
     }
+    toast.success(updates.length === 1 ? `Case assigned to ${ownerName}` : `${updates.length} cases assigned to ${ownerName}`);
   }, [cases, repos, teamMembers, pushActivity, currentUserId, notifyAssignment]);
+
+  const handleAssignCase = useCallback(
+    (caseId: string, newOwnerId: string, note?: string) => handleAssignCases([caseId], newOwnerId, note),
+    [handleAssignCases],
+  );
+
+  /**
+   * Deletes cases together with their tasks and deadlines. Cloud mode
+   * cascades these in the database already; local mode stores them as
+   * separate files, so they're removed explicitly rather than left orphaned.
+   */
+  const handleDeleteCases = useCallback(async (caseIds: string[]) => {
+    const ids = new Set(caseIds);
+    const doomedTasks = tasks.filter(t => t.caseId && ids.has(t.caseId));
+    const doomedDeadlines = deadlines.filter(d => d.caseId && ids.has(d.caseId));
+    const deleted = new Set<string>();
+    for (const caseId of ids) {
+      try {
+        await Promise.all([
+          ...doomedTasks.filter(t => t.caseId === caseId).map(t => repos.tasks.delete(t.id)),
+          ...doomedDeadlines.filter(d => d.caseId === caseId).map(d => repos.deadlines.delete(d.id)),
+        ]);
+        await repos.cases.delete(caseId);
+        deleted.add(caseId);
+      } catch (err) {
+        console.error('Could not delete case', caseId, err);
+      }
+    }
+    setCases(prev => prev.filter(c => !deleted.has(c.id)));
+    setTasks(prev => prev.filter(t => !(t.caseId && deleted.has(t.caseId))));
+    setDeadlines(prev => prev.filter(d => !(d.caseId && deleted.has(d.caseId))));
+    const failed = ids.size - deleted.size;
+    if (deleted.size > 0) toast.success(deleted.size === 1 ? 'Case deleted' : `${deleted.size} cases deleted`);
+    if (failed > 0) toast.error(failed === 1 ? "Couldn't delete 1 case. Please try again." : `Couldn't delete ${failed} cases. Please try again.`);
+  }, [tasks, deadlines, repos]);
 
   // --- Client Actions ---
   const handleAddClient = useCallback(async (client: Client) => {
@@ -882,6 +928,8 @@ const AppShell: React.FC = () => {
                 currentUserId={currentUserId}
                 onTasksConfirmed={handleTasksConfirmed}
                 onAssignCase={handleAssignCase}
+                onAssignCases={handleAssignCases}
+                onDeleteCases={handleDeleteCases}
               />
             } />
             <Route path="/cases/:caseId" element={
@@ -902,6 +950,7 @@ const AppShell: React.FC = () => {
                 onUpdateDeadline={handleUpdateDeadline}
                 onUpdateCase={handleUpdateCase}
                 onChangeCasePlan={handleChangeCasePlan}
+                onDeleteCase={id => handleDeleteCases([id])}
               />
             } />
             <Route path="/templates" element={
@@ -956,6 +1005,7 @@ interface CaseDetailsRouteProps {
   onUpdateDeadline: (deadline: Deadline) => void;
   onUpdateCase: (caseItem: Case) => void;
   onChangeCasePlan: (change: PlanChangeResult) => Promise<void>;
+  onDeleteCase: (caseId: string) => Promise<void>;
 }
 
 const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
@@ -991,6 +1041,7 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       onUpdateDeadline={props.onUpdateDeadline}
       onUpdateCase={props.onUpdateCase}
       onChangeCasePlan={props.onChangeCasePlan}
+      onDeleteCase={props.onDeleteCase}
       templates={props.templates}
       onBack={() => navigate('/cases')}
     />

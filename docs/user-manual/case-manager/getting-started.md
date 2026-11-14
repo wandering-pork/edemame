@@ -20,7 +20,40 @@ email, or job title; an availability dot and open case/task count per row), plus
 that's added to the case's assignment history (visible further down the same dialog). The
 **Confirm assignment** button stays disabled until you pick someone other than the case's current
 owner. The Team Dashboard's Shared Case Board opens the identical dialog for reassigning an
-already-owned case.
+already-owned case, and so does **Assign…** in a row's **⋯** menu (see below).
+
+## Managing cases from the list
+
+Each row in the case list has a **⋯** menu at the right (it appears when you hover over or tab to
+the row) with:
+- **Open case**.
+- **Assign…**: opens **Assign Case** for that row, even if it already has an owner.
+- **Duplicate**: creates a new **Draft** case for the same client with the same title (plus
+  "(copy)"), description, visa subclass and substream, work plan and owner. Its tasks are copied as
+  not started, in the same order and phases, with every date moved so the plan starts today.
+  Deadlines, documents, notes, the checklist and chats aren't copied, because they belong to the
+  original case.
+- **Delete…**: owners and admins only. Asks you to confirm first, and also deletes the case's tasks
+  and deadlines. This can't be undone.
+
+### Selecting several cases
+
+Hover over a row's initials to show a checkbox, and tick it to select the case. Once one case is
+selected, every row shows a checkbox and clicking anywhere on a row selects or clears it (use the
+**›** arrow to open a case). Hold **Shift** while clicking to select every row between your last
+click and this one. The checkbox next to the case count selects or clears every case currently
+shown.
+
+While cases are selected, a bar at the bottom of the list shows how many and offers:
+- **Select all N** (every case currently shown).
+- **Assign**: assigns every selected case to one person in one go, with an optional note added to
+  each case's assignment history.
+- **Duplicate** (only when one case is selected).
+- **Delete** (owners and admins only), with the same confirmation as above.
+- **✕** (or **Esc**) to clear the selection.
+
+Only cases you can see are ever selected: changing the search or a filter drops any selected case
+that's no longer shown.
 
 ## Creating a case
 

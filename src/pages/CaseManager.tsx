@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Case, Client, Task, WorkflowTemplate, TeamMember, DocumentChecklistItem, Deadline } from '../types';
-import { Search, Plus, FileText, ChevronRight, Calendar, UserPlus, AlertTriangle, Users } from 'lucide-react';
+import { Search, Plus, FileText, ChevronRight, Calendar, UserPlus, AlertTriangle, Users, MoreHorizontal, Copy, Trash2, Check, X, ArrowUpRight, Minus } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 import { NewCase } from './NewCase';
 import { isTaskClosed } from '../lib/taskStatus';
@@ -10,6 +11,10 @@ import { computeCaseRisk } from '../lib/risk';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useFirm } from '../contexts/FirmContext';
 import { AssignCaseDialog } from '../components/AssignCaseDialog';
+import { canDeleteFirmData } from '../lib/firmDirectory';
+import { duplicateCase } from '../lib/duplicateCase';
+import { toggleSelection, pruneSelection, toggleAll } from '../lib/caseSelection';
+import { toLocalISODate } from '../lib/dates';
 import { subclassChip, subclassOptions, substreamsFor, NOT_CONFIRMED_LABEL } from '../lib/visaTypes';
 import { useVisaConfig } from '../contexts/VisaConfigContext';
 import { buildCasePhaseView, phaseProgressSegments, phaseRef } from '../lib/phaseGrouping';
@@ -32,6 +37,10 @@ interface CaseManagerProps {
   currentUserId?: string;
   onTasksConfirmed: (tasks: Task[], newCase: Case) => void;
   onAssignCase?: (caseId: string, newOwnerId: string, note?: string) => void;
+  /** Bulk assign from the multi-select bar. */
+  onAssignCases?: (caseIds: string[], newOwnerId: string, note?: string) => Promise<void>;
+  /** Deletes cases with their tasks and deadlines (owners/admins only in a firm). */
+  onDeleteCases?: (caseIds: string[]) => Promise<void>;
 }
 
 type GroupFilter = 'all' | CaseStageGroup;
@@ -113,6 +122,8 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   currentUserId,
   onTasksConfirmed,
   onAssignCase,
+  onAssignCases,
+  onDeleteCases,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -133,6 +144,17 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   // shows up in `teamMembers` (active only) — fall back to their name for
   // display so the row doesn't wrongly offer "Assign" on an already-owned case.
   const { memberNameFor, role } = useFirm();
+  // RLS is the real enforcement; this only hides Delete for a role the
+  // database would reject. Local mode (role null) is single-user: allowed.
+  const canDelete = !!onDeleteCases && canDeleteFirmData(role);
+
+  // ---- List management: row menu, multi-select, duplicate, delete ----
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const anchorIdRef = useRef<string | null>(null);
+  const [menuCaseId, setMenuCaseId] = useState<string | null>(null);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Step 1 · 1G.7 — "My cases / All cases" toggle, cloud mode only. Default:
   // All for owners/admins, Mine for plain Members; remembered for the
@@ -197,7 +219,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
         client?.email.toLowerCase().includes(searchLower)
       );
     });
-  }, [cases, clients, searchTerm]);
+  }, [scopedCases, clients, searchTerm]);
 
   const rows = useMemo(() => {
     return searchedCases.map(c => {
@@ -236,6 +258,54 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
     return list;
   }, [rows, groupFilter, atRiskOnly, visaFilter, phaseFilter]);
 
+  const visibleIds = useMemo(() => filteredRows.map(r => r.case.id), [filteredRows]);
+  // Never act on a case the user can't see: drop selected rows that a filter
+  // or a delete has hidden.
+  useEffect(() => {
+    setSelected(prev => pruneSelection(prev, visibleIds));
+  }, [visibleIds]);
+  const selecting = selected.size > 0;
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selected.has(id));
+
+  const handleToggleRow = (id: string, range: boolean) => {
+    setSelected(prev => toggleSelection(prev, visibleIds, id, anchorIdRef.current, range));
+    anchorIdRef.current = id;
+  };
+  const clearSelection = () => { setSelected(new Set()); anchorIdRef.current = null; };
+
+  // Esc clears the selection (when no dialog or menu is open).
+  useEffect(() => {
+    if (!selecting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !menuCaseId && !bulkAssignOpen && !deleteIds) clearSelection();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selecting, menuCaseId, bulkAssignOpen, deleteIds]);
+
+  const handleDuplicate = (caseId: string) => {
+    const source = cases.find(c => c.id === caseId);
+    if (!source) return;
+    const { newCase, newTasks } = duplicateCase(source, tasks, {
+      today: toLocalISODate(),
+      now: new Date().toISOString(),
+      newId: uuidv4,
+    });
+    onTasksConfirmed(newTasks, newCase);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteIds || !onDeleteCases) return;
+    setDeleting(true);
+    try {
+      await onDeleteCases(deleteIds);
+      setSelected(prev => new Set([...prev].filter(id => !deleteIds.includes(id))));
+    } finally {
+      setDeleting(false);
+      setDeleteIds(null);
+    }
+  };
+
   if (showIntake) {
     return (
       <NewCase
@@ -254,6 +324,9 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
       />
     );
   }
+
+  const selectedCases = cases.filter(c => selected.has(c.id));
+  const menuItemCls = 'w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper dark:hover:bg-plate transition-colors';
 
   return (
     <div className="p-4 pt-16 md:pt-8 md:p-8 lg:p-10 bg-paper dark:bg-plate min-h-screen transition-colors duration-200 page-enter">
@@ -387,7 +460,22 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
             <option value="">Any phase</option>
             {visibleCasePhases(casePhases).map(p => <option key={p.id} value={phaseRef(p)}>In {p.name}</option>)}
           </select>
-          <span className="ml-auto text-[12px] text-ink-faint dark:text-plate-ink-faint whitespace-nowrap">
+          <span className="ml-auto inline-flex items-center gap-2 text-[12px] text-ink-faint dark:text-plate-ink-faint whitespace-nowrap">
+            {filteredRows.length > 0 && (
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={allVisibleSelected ? 'true' : selecting ? 'mixed' : 'false'}
+                aria-label={allVisibleSelected ? 'Clear selection' : `Select all ${filteredRows.length} cases`}
+                title={allVisibleSelected ? 'Clear selection' : 'Select all'}
+                onClick={() => { setSelected(prev => toggleAll(prev, visibleIds)); anchorIdRef.current = null; }}
+                className={`focus-ring w-4 h-4 rounded-[5px] border flex items-center justify-center transition-colors ${
+                  selecting ? 'bg-edamame-500 border-edamame-500 text-white' : 'border-ink/25 dark:border-plate-ink/30 hover:border-edamame-500'
+                }`}
+              >
+                {allVisibleSelected ? <Check size={11} strokeWidth={3} /> : selecting ? <Minus size={11} strokeWidth={3} /> : null}
+              </button>
+            )}
             {filteredRows.length} {filteredRows.length === 1 ? 'case' : 'cases'}
             {searchTerm && <span className="ml-1 italic">matching "{searchTerm}"</span>}
           </span>
@@ -411,12 +499,21 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
               const groupStyle = GROUP_STYLES[r.group];
               const ref = `#${c.id.slice(0, 8).toUpperCase()}`;
               const stepperIndex = CASE_STAGE_STEPPER.indexOf(c.stage === 'info_requested' ? 'lodged' : c.stage);
+              const isSelected = selected.has(c.id);
 
               return (
                 <div
                   key={c.id}
-                  onClick={() => handleViewDetails(c.id)}
-                  className="table-row-hover hover:bg-paper-2 dark:hover:bg-plate/60 relative flex items-center gap-4 px-5 pl-6 py-[15px] border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0"
+                  onClick={(e) => {
+                    // While selecting, a click on the row toggles it (Gmail-style)
+                    // instead of opening the case; the chevron still opens it.
+                    if (selecting) handleToggleRow(c.id, e.shiftKey);
+                    else handleViewDetails(c.id);
+                  }}
+                  aria-selected={selecting ? isSelected : undefined}
+                  className={`group table-row-hover relative flex items-center gap-4 px-5 pl-6 py-[15px] border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0 ${
+                    isSelected ? 'bg-edamame-500/[0.07] dark:bg-edamame-500/10' : 'hover:bg-paper-2 dark:hover:bg-plate/60'
+                  }`}
                 >
                   {/* Left edge — red only for At Risk rows; otherwise transparent (the
                       stage itself is already shown by the stage chip's own dot+label
@@ -428,15 +525,34 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                     aria-hidden="true"
                   />
 
-                  {/* Avatar */}
-                  <div
-                    className="w-[34px] h-[34px] rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                    style={{
-                      background: `oklch(0.93 0.05 ${hue})`,
-                      color: `oklch(0.42 0.12 ${hue})`,
-                    }}
-                  >
-                    {initialsOf(client?.name || 'Unknown')}
+                  {/* Avatar; turns into a checkbox on hover/focus, and stays one while selecting */}
+                  <div className="relative w-[34px] h-[34px] flex-shrink-0">
+                    <div
+                      aria-hidden="true"
+                      className={`absolute inset-0 rounded-full flex items-center justify-center text-[11px] font-bold transition-opacity ${
+                        selecting ? 'opacity-0' : 'group-hover:opacity-0 group-focus-within:opacity-0'
+                      }`}
+                      style={{
+                        background: `oklch(0.93 0.05 ${hue})`,
+                        color: `oklch(0.42 0.12 ${hue})`,
+                      }}
+                    >
+                      {initialsOf(client?.name || 'Unknown')}
+                    </div>
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={isSelected}
+                      aria-label={`Select ${c.title}`}
+                      onClick={(e) => { e.stopPropagation(); handleToggleRow(c.id, e.shiftKey); }}
+                      className={`focus-ring absolute inset-0 m-auto w-[18px] h-[18px] rounded-[5px] border-[1.5px] flex items-center justify-center transition-opacity ${
+                        isSelected
+                          ? 'bg-edamame-500 border-edamame-500 text-white opacity-100'
+                          : `border-ink/30 dark:border-plate-ink/35 bg-paper-2 dark:bg-plate-card hover:border-edamame-500 ${selecting ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'}`
+                      }`}
+                    >
+                      {isSelected && <Check size={12} strokeWidth={3} />}
+                    </button>
                   </div>
 
                   {/* Case type + client info */}
@@ -617,13 +733,210 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                     )
                   )}
 
-                  <ChevronRight size={18} strokeWidth={1.8} className="text-ink-soft/40 dark:text-plate-ink-soft/40 flex-shrink-0" />
+                  {/* Row menu: Open, Assign, Duplicate, Delete */}
+                  <div className="relative flex-shrink-0">
+                    <button
+                      type="button"
+                      aria-label={`More actions for ${c.title}`}
+                      aria-haspopup="menu"
+                      aria-expanded={menuCaseId === c.id}
+                      onClick={(e) => { e.stopPropagation(); setMenuCaseId(id => (id === c.id ? null : c.id)); }}
+                      className={`focus-ring w-7 h-7 rounded-lg flex items-center justify-center text-ink-faint dark:text-plate-ink-faint hover:bg-ink/[0.06] dark:hover:bg-plate-ink/10 hover:text-ink dark:hover:text-plate-ink transition-opacity ${
+                        menuCaseId === c.id ? 'opacity-100 bg-ink/[0.06] dark:bg-plate-ink/10' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                      }`}
+                    >
+                      <MoreHorizontal size={16} />
+                    </button>
+                    {menuCaseId === c.id && (
+                      <>
+                        <div className="fixed inset-0 z-30" onClick={(e) => { e.stopPropagation(); setMenuCaseId(null); }} />
+                        <div
+                          role="menu"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => { if (e.key === 'Escape') setMenuCaseId(null); }}
+                          className="absolute right-0 top-full mt-1 z-40 w-48 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content"
+                        >
+                          <button role="menuitem" autoFocus onClick={() => { setMenuCaseId(null); handleViewDetails(c.id); }} className={menuItemCls}>
+                            <ArrowUpRight size={14} /> Open case
+                          </button>
+                          {onAssignCase && (
+                            <button role="menuitem" onClick={() => { setMenuCaseId(null); setAssignModalCaseId(c.id); }} className={menuItemCls}>
+                              <UserPlus size={14} /> Assign…
+                            </button>
+                          )}
+                          <button
+                            role="menuitem"
+                            title="New Draft case for the same client, with the same work plan and tasks (not started, dated from today)"
+                            onClick={() => { setMenuCaseId(null); handleDuplicate(c.id); }}
+                            className={menuItemCls}
+                          >
+                            <Copy size={14} /> Duplicate
+                          </button>
+                          {canDelete && (
+                            <>
+                              <div className="h-px bg-ink/10 dark:bg-plate-ink/15 my-1" />
+                              <button
+                                role="menuitem"
+                                onClick={() => { setMenuCaseId(null); setDeleteIds([c.id]); }}
+                                className="w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              >
+                                <Trash2 size={14} /> Delete…
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    aria-label={`Open ${c.title}`}
+                    tabIndex={-1}
+                    onClick={(e) => { e.stopPropagation(); handleViewDetails(c.id); }}
+                    className="flex-shrink-0 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-edamame-600"
+                  >
+                    <ChevronRight size={18} strokeWidth={1.8} />
+                  </button>
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Bulk action bar: floats at the bottom of the list while rows are selected */}
+      {selecting && (
+        <div className="sticky bottom-5 z-20 mt-4 flex justify-center pointer-events-none">
+          <div
+            role="toolbar"
+            aria-label={`${selected.size} selected`}
+            className="edie-tip-in pointer-events-auto flex items-center gap-1.5 pl-4 pr-2 py-2 rounded-full bg-ink dark:bg-plate-card text-plate-ink dark:text-plate-ink shadow-xl border border-plate-ink/10"
+          >
+            <span className="text-[12.5px] font-bold whitespace-nowrap pr-2">{selected.size} selected</span>
+            {!allVisibleSelected && (
+              <button
+                type="button"
+                onClick={() => setSelected(new Set(visibleIds))}
+                className="px-2.5 py-1.5 rounded-full text-[12px] font-semibold text-plate-ink/70 hover:text-plate-ink hover:bg-plate-ink/10 whitespace-nowrap transition-colors"
+              >
+                Select all {visibleIds.length}
+              </button>
+            )}
+            <span aria-hidden="true" className="w-px h-5 bg-plate-ink/15 mx-1" />
+            {onAssignCases && (
+              <button
+                type="button"
+                onClick={() => setBulkAssignOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold hover:bg-plate-ink/10 whitespace-nowrap transition-colors"
+              >
+                <UserPlus size={13} /> Assign
+              </button>
+            )}
+            {selected.size === 1 && (
+              <button
+                type="button"
+                onClick={() => { handleDuplicate([...selected][0]); clearSelection(); }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold hover:bg-plate-ink/10 whitespace-nowrap transition-colors"
+              >
+                <Copy size={13} /> Duplicate
+              </button>
+            )}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => setDeleteIds([...selected])}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold text-red-300 hover:bg-red-500/15 whitespace-nowrap transition-colors"
+              >
+                <Trash2 size={13} /> Delete
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={clearSelection}
+              aria-label="Clear selection (Esc)"
+              title="Clear selection (Esc)"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-plate-ink/70 hover:text-plate-ink hover:bg-plate-ink/10 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {bulkAssignOpen && onAssignCases && selectedCases.length > 0 && (
+        <AssignCaseDialog
+          caseItem={selectedCases[0]}
+          selection={selectedCases}
+          teamMembers={teamMembers}
+          cases={cases}
+          tasks={tasks}
+          currentUserId={currentUserId}
+          onClose={() => setBulkAssignOpen(false)}
+          onConfirm={(caseId, newOwnerId, note) => {
+            void onAssignCases([caseId], newOwnerId, note);
+            setBulkAssignOpen(false);
+            clearSelection();
+          }}
+          onConfirmBulk={(caseIds, newOwnerId, note) => {
+            void onAssignCases(caseIds, newOwnerId, note);
+            setBulkAssignOpen(false);
+            clearSelection();
+          }}
+        />
+      )}
+
+      {/* Delete confirmation (one case from the row menu, or the selection) */}
+      {deleteIds && (() => {
+        const doomed = cases.filter(c => deleteIds.includes(c.id));
+        const taskCount = tasks.filter(t => t.caseId && deleteIds.includes(t.caseId)).length;
+        return (
+          <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop" onClick={() => !deleting && setDeleteIds(null)}>
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="cm-delete-title"
+              onClick={e => e.stopPropagation()}
+              onKeyDown={e => { if (e.key === 'Escape' && !deleting) setDeleteIds(null); }}
+              className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl max-w-md w-full modal-content p-6"
+            >
+              <h2 id="cm-delete-title" className="text-lg font-bold text-ink dark:text-plate-ink">
+                {doomed.length === 1 ? 'Delete this case?' : `Delete ${doomed.length} cases?`}
+              </h2>
+              {doomed.length === 1 ? (
+                <p className="mt-1 text-[13px] font-semibold text-ink-soft dark:text-plate-ink-soft">{doomed[0].title}</p>
+              ) : (
+                <ul className="mt-2 max-h-32 overflow-y-auto custom-scrollbar text-[12.5px] text-ink-soft dark:text-plate-ink-soft space-y-0.5">
+                  {doomed.map(c => <li key={c.id} className="truncate">{c.title}</li>)}
+                </ul>
+              )}
+              <p className="mt-3 text-[13px] text-ink-soft dark:text-plate-ink-soft leading-relaxed">
+                {taskCount > 0 ? `${taskCount} ${taskCount === 1 ? 'task' : 'tasks'} and any deadlines on ${doomed.length === 1 ? 'it' : 'them'} are deleted too. ` : ''}
+                This can't be undone.
+              </p>
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  autoFocus
+                  disabled={deleting}
+                  onClick={() => setDeleteIds(null)}
+                  className="px-4 py-2 text-sm font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper dark:hover:bg-plate rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={confirmDelete}
+                  className="btn-press px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors"
+                >
+                  {deleting ? 'Deleting…' : doomed.length === 1 ? 'Delete case' : `Delete ${doomed.length} cases`}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {assignModalCaseId && onAssignCase && (() => {
         const assignCaseItem = cases.find(c => c.id === assignModalCaseId);

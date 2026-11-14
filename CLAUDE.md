@@ -512,6 +512,24 @@ actions** (Edit case, View eligibility assessment, Delete case only), document t
 `suggestQuickActions()` never suggests something with another one-click home (no "Update current
 task" — that's the Overview's **Open task**; no "Summarise case" — that's a skill).
 
+### Case Manager list management
+
+`pages/CaseManager.tsx` rows have a hover/focus **⋯** menu (Open case, Assign…, Duplicate, Delete…)
+and multi-select: the client-initials avatar becomes a checkbox on hover/focus and stays one while
+anything is selected; while selecting, a row click toggles it (the chevron still opens the case).
+Pure rules in `lib/caseSelection.ts` (unit-tested): `toggleSelection()` (shift-click range from the
+last click), `pruneSelection()` (selection is always pruned to the visible, filtered rows so a bulk
+action never touches a hidden case), `toggleAll()`. A sticky bottom bar offers Select all, Assign
+(bulk mode of `components/AssignCaseDialog.tsx` via `selection`/`onConfirmBulk`), Duplicate (single
+selection only), Delete (owners/admins via `canDeleteFirmData()`), and clear (✕/Esc).
+`lib/duplicateCase.ts`'s `duplicateCase()` (unit-tested) builds a new Draft case + not-started
+task copies shifted to start today (no deadlines/documents/notes/checklist/chats), persisted
+through the normal `handleTasksConfirmed` path. `App.tsx`'s `handleAssignCases()` (one toast per
+batch; `handleAssignCase` wraps it) and `handleDeleteCases()` (deletes each case's tasks and
+deadlines explicitly — local mode has no cascade — then the case, and updates app state) back
+both the list and Case Details' own Delete case, which previously wrote to the repository
+directly and left the deleted case in the list until a reload.
+
 ### Agentic Issue Filing (Edie chat)
 
 Edie's chat (`api/focus-chat.ts`, rendered by `components/edie/EdiePanel.tsx`, on a case or any other page) can recognize when a user's message describes a product defect or feature request and offer to file a GitHub issue — scoped only to this chat surface, per GitHub issue #15.
