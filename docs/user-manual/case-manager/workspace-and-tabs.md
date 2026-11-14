@@ -10,6 +10,13 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
   stage, next deadline (click it to jump to the Deadlines panel), and the date the case was opened.
   **Edit** opens the Edit case form, where you can change the title, description, **Visa Subclass**
   and **Substream** (or set the subclass to **Not Confirmed** while the visa is still undecided).
+  Changing the subclass to a real one — from blank, Not Confirmed, or a different subclass — opens
+  **Set up tasks for this visa**: pick a **Work Plan** (plans for that subclass are listed first;
+  required) and choose what happens to the current tasks: **Do nothing** (default), **Delete** (asks
+  you to confirm), or **Mark all as complete**. On **Confirm** the choice is applied, the plan's tasks
+  are added (dated from today, each in its phase) and the new subclass is saved; the plan becomes
+  the case's work plan. **Cancel** changes nothing. Changing the subclass back to blank or Not
+  Confirmed just saves, with no window.
   Change the stage from the **Stage** chip in the summary strip
   under the case title, as before.
 - **Progress** — the case's tasks grouped by **phase** (Consultation, Prerequisites, Preparing for

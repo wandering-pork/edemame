@@ -46,6 +46,7 @@ import { PendingInvitationsBanner } from './components/team/PendingInvitationsBa
 import { isSupabaseConfigured, supabase } from './lib/supabaseClient';
 import { shouldNotifyAssignment } from './lib/assignmentNotify';
 import { describePlanSource, buildTaskPlanSummary } from './lib/planActivity';
+import type { PlanChangeResult } from './lib/visaPlanChange';
 
 // ---------------------------------------------------------------------------
 // Inner app — has access to repositories and router
@@ -452,6 +453,36 @@ const AppShell: React.FC = () => {
       notifyAssignment('task', updatedTask.id);
     }
   }, [repos, tasks, deadlines, pushActivity, currentUserId, rescheduleCaseFromSnapshot, notifyAssignment]);
+
+  /**
+   * Applies a confirmed visa subclass / Work Plan change in one go (Work
+   * Plans step 4, see lib/visaPlanChange.ts): deletes or closes the case's
+   * current tasks, saves the case with its new subclass and plan, and adds
+   * the plan's tasks. Done as one batch with functional state updates —
+   * calling handleUpdateTask/handleDeleteTask in a loop would overwrite
+   * each other's state and toast once per task.
+   */
+  const handleChangeCasePlan = useCallback(async (change: PlanChangeResult) => {
+    await Promise.all(change.deleteIds.map(id => repos.tasks.delete(id)));
+    await Promise.all(change.closedTasks.map(t => repos.tasks.update(t)));
+    await repos.cases.update(change.updatedCase);
+    if (change.newTasks.length) await repos.tasks.createMany(change.newTasks);
+
+    const deleted = new Set(change.deleteIds);
+    const closed = new Map(change.closedTasks.map(t => [t.id, t]));
+    setTasks(prev => [...prev.filter(t => !deleted.has(t.id)).map(t => closed.get(t.id) ?? t), ...change.newTasks]);
+    setCases(prev => prev.map(c => (c.id === change.updatedCase.id ? change.updatedCase : c)));
+
+    const templateName = templates.find(t => t.id === change.updatedCase.templateId)?.title;
+    if (change.newTasks.length > 0) {
+      pushActivity({
+        type: 'tasks_planned',
+        actorId: currentUserId,
+        subjectId: change.updatedCase.id,
+        summary: buildTaskPlanSummary(change.newTasks.length, describePlanSource(change.newTasks), templateName),
+      });
+    }
+  }, [repos, templates, pushActivity, currentUserId]);
 
   const handleDeleteTask = useCallback(async (id: string) => {
     await repos.tasks.delete(id);
@@ -867,6 +898,7 @@ const AppShell: React.FC = () => {
                 onAddDeadline={handleAddDeadline}
                 onUpdateDeadline={handleUpdateDeadline}
                 onUpdateCase={handleUpdateCase}
+                onChangeCasePlan={handleChangeCasePlan}
               />
             } />
             <Route path="/templates" element={
@@ -919,6 +951,7 @@ interface CaseDetailsRouteProps {
   onAddDeadline: (deadline: Deadline) => void;
   onUpdateDeadline: (deadline: Deadline) => void;
   onUpdateCase: (caseItem: Case) => void;
+  onChangeCasePlan: (change: PlanChangeResult) => Promise<void>;
 }
 
 const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
@@ -953,6 +986,8 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       onAddDeadline={props.onAddDeadline}
       onUpdateDeadline={props.onUpdateDeadline}
       onUpdateCase={props.onUpdateCase}
+      onChangeCasePlan={props.onChangeCasePlan}
+      templates={props.templates}
       onBack={() => navigate('/cases')}
     />
   );

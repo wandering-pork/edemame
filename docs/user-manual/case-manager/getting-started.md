@@ -80,6 +80,26 @@ At Risk when any of the following is true:
 Use the **At Risk** chip on the Case Manager list to filter down to just those cases, alongside (not
 instead of) the Pre-lodgement/With Department/Closed board filters.
 
+### Stage and phase on each row
+
+Each case row shows two kinds of progress side by side:
+
+- the **stage** stepper (Draft → Closed) — the case's lifecycle, which you set yourself on the case;
+- underneath it, a **phase** bar — one segment per phase the case's tasks use, each filled by how
+  many of its tasks are done — with the current phase's name and the overall task count. Hover or
+  focus the bar to see each phase's count. Cases whose tasks have no phases just show the task count.
+
+If a case's tasks have reached **Lodged**, **Decision** or **Post-decision** but its stage is still
+before lodgement, the row shows **Phase is ahead of stage** — a reminder to update the stage. The
+stage is never changed for you.
+
+### Visa and phase filters
+
+Next to the board filters and **At Risk**, use **All visas** to show only one subclass (then
+optionally one substream), **Not Confirmed** cases, or cases with **No subclass**; and **Any phase**
+to show only cases currently in a given phase (e.g. "In Prerequisites"). They combine with every
+other filter and the search box.
+
 ### Next deadline
 
 The **Next deadline** chip shows the soonest open deadline on the case (including a client's

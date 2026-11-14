@@ -10,7 +10,12 @@ import { computeCaseRisk } from '../lib/risk';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useFirm } from '../contexts/FirmContext';
 import { AssignCaseDialog } from '../components/AssignCaseDialog';
-import { subclassChip } from '../lib/visaTypes';
+import { subclassChip, subclassOptions, substreamsFor, NOT_CONFIRMED_LABEL } from '../lib/visaTypes';
+import { useVisaConfig } from '../contexts/VisaConfigContext';
+import { buildCasePhaseView, phaseProgressSegments, phaseRef } from '../lib/phaseGrouping';
+import { visibleCasePhases } from '../lib/casePhases';
+import { NO_SUBCLASS_FILTER, effectiveSubclass, matchesVisaFilter, phaseAheadOfStage } from '../lib/caseListFilters';
+import { NOT_CONFIRMED_SUBCLASS } from '../types';
 import {
   CaseOwnerScope, filterCasesByOwnerScope, defaultCaseOwnerScope, loadCaseOwnerScope, saveCaseOwnerScope,
 } from '../lib/caseManagerScope';
@@ -116,6 +121,9 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   const [suggestedTemplateKeyword, setSuggestedTemplateKeyword] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
+  const [visaFilter, setVisaFilter] = useState<{ subclass: string; substream: string }>({ subclass: '', substream: '' });
+  const [phaseFilter, setPhaseFilter] = useState('');
+  const { visaTypes, casePhases } = useVisaConfig();
   const [atRiskOnly, setAtRiskOnly] = useState(false);
   const [assignModalCaseId, setAssignModalCaseId] = useState<string | null>(null);
   // At Risk rule 3 only applies to cases at ready_to_lodge — checklists are
@@ -205,9 +213,12 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
       const rowStatus = computeRowStatus(caseTasks);
       const group = caseStageGroup(c.stage);
       const risk = computeCaseRisk(c, tasks, deadlines, checklistsByCase[c.id], new Date(), template?.steps);
-      return { case: c, client, applicant, template, owner, ownerName, group, risk, ...rowStatus };
+      const subclass = effectiveSubclass(c, template?.visaSubclass);
+      const phaseView = buildCasePhaseView(caseTasks, casePhases, template?.steps, subclass);
+      const phaseAhead = phaseAheadOfStage(c.stage, phaseView.currentPhaseRef, phaseView.hasPhases);
+      return { case: c, client, applicant, template, owner, ownerName, group, risk, subclass, phaseView, phaseAhead, ...rowStatus };
     });
-  }, [searchedCases, clients, tasks, templates, teamMembers, deadlines, checklistsByCase, memberNameFor]);
+  }, [searchedCases, clients, tasks, templates, teamMembers, deadlines, checklistsByCase, memberNameFor, casePhases]);
 
   const filterCounts = useMemo(() => {
     const counts: Record<GroupFilter, number> = { all: rows.length, pre_lodgement: 0, with_department: 0, closed: 0 };
@@ -220,8 +231,10 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   const filteredRows = useMemo(() => {
     let list = groupFilter === 'all' ? rows : rows.filter(r => r.group === groupFilter);
     if (atRiskOnly) list = list.filter(r => r.risk.atRisk);
+    if (visaFilter.subclass) list = list.filter(r => matchesVisaFilter(r.subclass, r.case.visaSubstream, visaFilter));
+    if (phaseFilter) list = list.filter(r => r.phaseView.hasPhases && r.phaseView.currentTask && r.phaseView.currentPhaseRef === phaseFilter);
     return list;
-  }, [rows, groupFilter, atRiskOnly]);
+  }, [rows, groupFilter, atRiskOnly, visaFilter, phaseFilter]);
 
   if (showIntake) {
     return (
@@ -331,6 +344,49 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
             <AlertTriangle size={12} strokeWidth={2} />
             At Risk ({atRiskCount})
           </button>
+          {/* Visa type + Phase filters (Work Plans step 4) — overlay the group chips */}
+          <label htmlFor="cm-visa-filter" className="sr-only">Filter by visa type</label>
+          <select
+            id="cm-visa-filter"
+            value={visaFilter.subclass}
+            onChange={e => setVisaFilter({ subclass: e.target.value, substream: '' })}
+            className={`focus-ring px-3 py-1.5 rounded-full border text-[12px] font-semibold bg-paper dark:bg-plate-card outline-none ${
+              visaFilter.subclass ? 'border-edamame-500 text-edamame-700 dark:text-edamame-400' : 'border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft'
+            }`}
+          >
+            <option value="">All visas</option>
+            <option value={NOT_CONFIRMED_SUBCLASS}>{NOT_CONFIRMED_LABEL}</option>
+            <option value={NO_SUBCLASS_FILTER}>No subclass</option>
+            {subclassOptions(visaTypes).map(o => <option key={o.code} value={o.code}>{o.label}</option>)}
+          </select>
+          {substreamsFor(visaTypes, visaFilter.subclass).length > 0 && (
+            <>
+              <label htmlFor="cm-substream-filter" className="sr-only">Filter by substream</label>
+              <select
+                id="cm-substream-filter"
+                value={visaFilter.substream}
+                onChange={e => setVisaFilter({ ...visaFilter, substream: e.target.value })}
+                className={`focus-ring px-3 py-1.5 rounded-full border text-[12px] font-semibold bg-paper dark:bg-plate-card outline-none ${
+                  visaFilter.substream ? 'border-edamame-500 text-edamame-700 dark:text-edamame-400' : 'border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft'
+                }`}
+              >
+                <option value="">All substreams</option>
+                {substreamsFor(visaTypes, visaFilter.subclass).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </>
+          )}
+          <label htmlFor="cm-phase-filter" className="sr-only">Filter by current phase</label>
+          <select
+            id="cm-phase-filter"
+            value={phaseFilter}
+            onChange={e => setPhaseFilter(e.target.value)}
+            className={`focus-ring px-3 py-1.5 rounded-full border text-[12px] font-semibold bg-paper dark:bg-plate-card outline-none ${
+              phaseFilter ? 'border-edamame-500 text-edamame-700 dark:text-edamame-400' : 'border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft'
+            }`}
+          >
+            <option value="">Any phase</option>
+            {visibleCasePhases(casePhases).map(p => <option key={p.id} value={phaseRef(p)}>In {p.name}</option>)}
+          </select>
           <span className="ml-auto text-[12px] text-ink-faint dark:text-plate-ink-faint whitespace-nowrap">
             {filteredRows.length} {filteredRows.length === 1 ? 'case' : 'cases'}
             {searchTerm && <span className="ml-1 italic">matching "{searchTerm}"</span>}
@@ -389,12 +445,12 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                       <span className="text-sm font-bold tracking-[-0.015em] text-ink dark:text-plate-ink whitespace-nowrap overflow-hidden text-ellipsis">
                         {c.title}
                       </span>
-                      {(c.visaSubclass ?? r.template?.visaSubclass) && (
+                      {r.subclass && (
                         <span
                           title={c.visaSubstream || undefined}
                           className="font-mono text-[9.5px] font-medium px-[7px] py-0.5 rounded-md bg-edamame-500/10 text-edamame-700 dark:text-edamame-400 flex-shrink-0"
                         >
-                          {subclassChip((c.visaSubclass ?? r.template?.visaSubclass)!)}
+                          {subclassChip(r.subclass)}
                         </span>
                       )}
                     </div>
@@ -434,7 +490,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                       group and a per-dot title so hover/focus both explain it; the task
                       count below is explicitly prefixed "Tasks" so it never reads as
                       part of the stepper. */}
-                  <div className="hidden sm:flex flex-col gap-1.5 w-[132px] flex-shrink-0">
+                  <div className="hidden sm:flex flex-col gap-1.5 w-[150px] flex-shrink-0">
                     <div
                       className="flex items-center gap-[3px]"
                       role="img"
@@ -452,9 +508,45 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                         />
                       ))}
                     </div>
-                    <span className="text-[10px] text-ink-faint dark:text-plate-ink-faint font-mono">
-                      Tasks {r.completedTasks}/{r.totalTasks}
-                    </span>
+                    {r.phaseView.hasPhases && r.phaseView.groups.length > 0 ? (
+                      <>
+                        {/* Phase progress — one segment per non-empty phase, sized by its task count */}
+                        <div
+                          className="flex items-center gap-[2px]"
+                          role="img"
+                          tabIndex={0}
+                          aria-label={`Phases: ${phaseProgressSegments(r.phaseView).map(s => `${s.name} ${s.done} of ${s.total} done`).join(', ')}`}
+                          title={phaseProgressSegments(r.phaseView).map(s => `${s.name}: ${s.done}/${s.total}${s.current ? ' (current)' : ''}`).join('\n')}
+                        >
+                          {phaseProgressSegments(r.phaseView).map(s => (
+                            <span
+                              key={s.ref}
+                              style={{ flexGrow: s.total }}
+                              className={`relative h-1 basis-0 rounded-full overflow-hidden bg-ink/10 dark:bg-plate-ink/15 ${s.current ? 'ring-1 ring-edamame-500/50' : ''}`}
+                            >
+                              <span className="absolute inset-y-0 left-0 bg-edamame-500/80" style={{ width: `${s.total ? (s.done / s.total) * 100 : 0}%` }} />
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-ink-faint dark:text-plate-ink-faint truncate">
+                          <span className="font-semibold text-ink-soft dark:text-plate-ink-soft">{r.phaseView.currentPhaseName}</span>
+                          {' · '}<span className="font-mono">{r.completedTasks}/{r.totalTasks}</span>
+                        </span>
+                        {r.phaseAhead && (
+                          <span
+                            tabIndex={0}
+                            title="The tasks have reached a post-lodgement phase but the case stage is still before lodgement. Update the stage on the case if it has been lodged."
+                            className="focus-ring text-[9.5px] font-bold text-amber-700 dark:text-amber-400 rounded"
+                          >
+                            Phase is ahead of stage
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-ink-faint dark:text-plate-ink-faint font-mono">
+                        Tasks {r.completedTasks}/{r.totalTasks}
+                      </span>
+                    )}
                   </div>
 
                   {/* Stage chip — fixed-width slot so rows align regardless of label length */}

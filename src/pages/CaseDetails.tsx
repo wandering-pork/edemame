@@ -70,6 +70,8 @@ import { SubclassSubstreamFields } from '../components/SubclassSubstreamFields';
 import { useVisaConfig } from '../contexts/VisaConfigContext';
 import { buildCasePhaseView, phaseChoicesForCase, phaseName } from '../lib/phaseGrouping';
 import { PhaseTaskGroups } from '../components/case-details/PhaseTaskGroups';
+import { ChangeVisaPlanDialog } from '../components/case-details/ChangeVisaPlanDialog';
+import { buildPlanChange, needsPlanPrompt, type ExistingTasksChoice, type PlanChangeResult } from '../lib/visaPlanChange';
 
 interface CaseDetailsProps {
   caseItem: Case;
@@ -98,6 +100,10 @@ interface CaseDetailsProps {
   onAddDeadline: (deadline: Deadline) => void;
   onUpdateDeadline: (deadline: Deadline) => void;
   onUpdateCase: (caseItem: Case) => void;
+  /** Applies a confirmed subclass / Work Plan change in one batch (Work Plans step 4). */
+  onChangeCasePlan: (change: PlanChangeResult) => Promise<void>;
+  /** Every Work Plan — offered in the subclass-change window. */
+  templates: WorkflowTemplate[];
   onBack: () => void;
 }
 
@@ -172,6 +178,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   onAddDeadline,
   onUpdateDeadline,
   onUpdateCase,
+  onChangeCasePlan,
+  templates,
   onBack
 }) => {
   const repos = useRepositories();
@@ -617,18 +625,60 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const handleSaveCase = async () => {
     if (!caseEditForm.title.trim()) return;
     const subclass = caseEditForm.visaSubclass || undefined;
+    const substream = isConfirmedSubclass(subclass) && caseEditForm.visaSubstream ? caseEditForm.visaSubstream : undefined;
     const updated: Case = {
       ...currentCase,
       title: caseEditForm.title.trim(),
       description: caseEditForm.description.trim(),
       visaSubclass: subclass,
-      visaSubstream: isConfirmedSubclass(subclass) && caseEditForm.visaSubstream ? caseEditForm.visaSubstream : undefined,
+      visaSubstream: substream,
     };
+    // A change to a real subclass (from blank, Not Confirmed, or another
+    // subclass) asks for a Work Plan first — nothing is saved until Confirm.
+    if (needsPlanPrompt(currentCase.visaSubclass ?? visaSubclass, subclass)) {
+      setPendingPlanChange({ draft: updated, subclass: subclass!, substream });
+      return;
+    }
     // Through App's handler (not repos directly) so the case list, header and
     // the visaSubclass prop pick up the change straight away.
     await onUpdateCase(updated);
     setCurrentCase(updated);
     setIsEditingCase(false);
+  };
+
+  // ---- Subclass change → choose a Work Plan (Work Plans step 4) ----
+  const [pendingPlanChange, setPendingPlanChange] = useState<{ draft: Case; subclass: string; substream?: string } | null>(null);
+  const [applyingPlanChange, setApplyingPlanChange] = useState(false);
+
+  const handleConfirmPlanChange = async (planId: string, existing: ExistingTasksChoice) => {
+    const plan = templates.find(t => t.id === planId);
+    if (!pendingPlanChange || !plan) return;
+    setApplyingPlanChange(true);
+    try {
+      const change = buildPlanChange({
+        caseItem: pendingPlanChange.draft,
+        caseTasks,
+        plan,
+        subclass: pendingPlanChange.subclass,
+        substream: pendingPlanChange.substream,
+        existing,
+        startDate: toLocalISODate(new Date()),
+      });
+      await onChangeCasePlan(change);
+      setCurrentCase(change.updatedCase);
+      setPendingPlanChange(null);
+      setIsEditingCase(false);
+      toast.success(
+        change.newTasks.length
+          ? `Visa subclass saved — ${change.newTasks.length} task${change.newTasks.length === 1 ? '' : 's'} added from "${plan.title}"`
+          : 'Visa subclass saved',
+      );
+    } catch (err) {
+      console.error('Failed to apply the work plan change:', err);
+      toast.error('Couldn’t apply the work plan. Nothing else was changed — please try again.');
+    } finally {
+      setApplyingPlanChange(false);
+    }
   };
 
   const handleDeleteCase = async () => {
@@ -2294,6 +2344,19 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {pendingPlanChange && (
+        <ChangeVisaPlanDialog
+          subclass={pendingPlanChange.subclass}
+          substream={pendingPlanChange.substream}
+          templates={templates}
+          currentTaskCount={caseTasks.length}
+          openTaskCount={pendingTasks.length}
+          busy={applyingPlanChange}
+          onConfirm={handleConfirmPlanChange}
+          onCancel={() => setPendingPlanChange(null)}
+        />
       )}
 
       {/* Delete Confirmation Modal */}
