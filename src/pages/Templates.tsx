@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { WorkflowTemplate, WorkflowStep, StepAnchor, StepTiming, DeadlineKind } from '../types';
+import { WorkflowTemplate, WorkflowStep, StepAnchor, StepTiming, DeadlineKind, NOT_CONFIRMED_SUBCLASS } from '../types';
 import {
   Plus, Trash2, FileText, X, Sparkles, ChevronDown, ChevronUp, List,
   Flag, Pencil, Copy, ArrowUp, ArrowDown, AlertTriangle, Info, Scale,
@@ -8,6 +8,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { scheduleFromTemplate, typicalLength, ScheduleStep } from '../lib/scheduleFromTemplate';
 import { describeStepTiming, formatTypicalLength, DEADLINE_KIND_LABELS } from '../lib/describeTiming';
 import { toLocalISODate } from '../lib/dates';
+import { SubclassSubstreamFields } from '../components/SubclassSubstreamFields';
+import { displaySubclassCode, isConfirmedSubclass } from '../lib/visaTypes';
+import { useVisaConfig } from '../contexts/VisaConfigContext';
+import { orderStepsByPhase, phaseName, phaseRef, resolveStepPhases } from '../lib/phaseGrouping';
+import { CONSULTATION_PHASE_KEY, visibleCasePhases } from '../lib/casePhases';
 
 interface TemplatesProps {
   templates: WorkflowTemplate[];
@@ -85,6 +90,8 @@ interface StepDraft {
   durationMax: string;
   fixed: boolean;
   isGate: boolean;
+  /** Phase ref (`lib/phaseGrouping.ts`); always filled in by the editor. */
+  phase: string;
 }
 
 function stepToDraft(step: WorkflowStep): StepDraft {
@@ -114,10 +121,11 @@ function stepToDraft(step: WorkflowStep): StepDraft {
     durationMax: timing?.durationDays ? String(timing.durationDays.max) : '',
     fixed: timing?.fixed ?? false,
     isGate: step.isGate ?? false,
+    phase: step.phase ?? '',
   };
 }
 
-function newStepDraft(): StepDraft {
+function newStepDraft(phase = 'consultation'): StepDraft {
   return {
     draftId: uuidv4(),
     title: '',
@@ -130,6 +138,7 @@ function newStepDraft(): StepDraft {
     durationMax: '',
     fixed: false,
     isGate: false,
+    phase,
   };
 }
 
@@ -171,6 +180,7 @@ function draftToStep(draft: StepDraft): WorkflowStep {
     description: draft.description.trim(),
     timing,
     isGate: draft.isGate,
+    phase: draft.phase || undefined,
   };
 }
 
@@ -198,9 +208,16 @@ interface EditorState {
   title: string;
   description: string;
   visaSubclass: string;
+  visaSubstream: string;
   steps: StepDraft[];
   version: number;
   timingVerified: boolean;
+}
+
+/** Fills every draft's phase with its effective phase (inherited by position), so each step's picker shows a real value. */
+function withResolvedPhases(drafts: StepDraft[], visaSubclass?: string): StepDraft[] {
+  const resolved = resolveStepPhases(drafts.map(d => ({ phase: d.phase || undefined })), visaSubclass);
+  return drafts.map((d, i) => ({ ...d, phase: resolved[i] }));
 }
 
 function editorFromTemplate(mode: 'create' | 'edit', template: WorkflowTemplate, asCopy: boolean): EditorState {
@@ -210,7 +227,8 @@ function editorFromTemplate(mode: 'create' | 'edit', template: WorkflowTemplate,
     title: asCopy ? `${template.title} (copy)` : template.title,
     description: template.description,
     visaSubclass: template.visaSubclass ?? '',
-    steps: (template.steps ?? []).map(stepToDraft),
+    visaSubstream: template.visaSubstream ?? '',
+    steps: withResolvedPhases((template.steps ?? []).map(stepToDraft), template.visaSubclass),
     version: asCopy ? 1 : (template.version ?? 1),
     timingVerified: false,
   };
@@ -223,6 +241,7 @@ function blankEditor(): EditorState {
     title: '',
     description: '',
     visaSubclass: '',
+    visaSubstream: '',
     steps: [],
     version: 1,
     timingVerified: false,
@@ -230,7 +249,10 @@ function blankEditor(): EditorState {
 }
 
 export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, onAddTemplate, onUpdateTemplate, onDeleteTemplate }) => {
+  const { casePhases } = useVisaConfig();
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const phaseOptions = visibleCasePhases(casePhases).map(p => ({ ref: phaseRef(p), name: p.name }));
+  const editorNotConfirmed = editor?.visaSubclass === NOT_CONFIRMED_SUBCLASS;
   const [errors, setErrors] = useState<string[]>([]);
 
   const systemTemplates = templates.filter(t => t.userId === null || t.userId === undefined);
@@ -269,7 +291,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
   };
 
   const addStep = () => {
-    setEditor(prev => (prev ? { ...prev, steps: [...prev.steps, newStepDraft()] } : prev));
+    setEditor(prev => (prev ? { ...prev, steps: [...prev.steps, newStepDraft(prev.steps[prev.steps.length - 1]?.phase || CONSULTATION_PHASE_KEY)] } : prev));
   };
 
   const removeStep = (index: number) => {
@@ -290,7 +312,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
   const handleSave = () => {
     if (!editor) return;
     const fieldErrors: string[] = [];
-    if (!editor.title.trim()) fieldErrors.push('Template title is required.');
+    if (!editor.title.trim()) fieldErrors.push('Plan name is required.');
     if (!editor.description.trim()) fieldErrors.push('Process description is required.');
     editor.steps.forEach((s, i) => {
       if (!s.title.trim()) fieldErrors.push(`Step ${i + 1}: title is required.`);
@@ -307,7 +329,9 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
       }
     });
 
-    const steps: WorkflowStep[] = editor.steps.map(draftToStep);
+    // Grouped and ordered by phase on save (Work Plans step 3); `previous_step`
+    // anchors become explicit so a moved step keeps counting from the same step.
+    const steps: WorkflowStep[] = orderStepsByPhase(editor.steps.map(draftToStep), casePhases, editor.visaSubclass);
 
     if (steps.length > 0) {
       const result = scheduleFromTemplate(steps as ScheduleStep[], toLocalISODate(new Date()));
@@ -323,7 +347,8 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
       id: editor.templateId,
       title: editor.title.trim(),
       description: editor.description.trim(),
-      visaSubclass: editor.visaSubclass.trim() || undefined,
+      visaSubclass: editor.visaSubclass || undefined,
+      visaSubstream: isConfirmedSubclass(editor.visaSubclass) && editor.visaSubstream ? editor.visaSubstream : undefined,
       steps: steps.length > 0 ? steps : undefined,
       userId: currentUserId,
       version: editor.mode === 'edit' ? editor.version + 1 : 1,
@@ -374,15 +399,15 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                   <button
                     onClick={() => openEdit(template)}
                     className="p-1.5 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-edamame-600 dark:hover:text-edamame-400 hover:bg-edamame/10 rounded-lg transition-all"
-                    aria-label="Edit template"
-                    title="Edit template"
+                    aria-label="Edit plan"
+                    title="Edit plan"
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => onDeleteTemplate(template.id)}
                     className="p-1.5 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                    aria-label="Delete template"
+                    aria-label="Delete plan"
                   >
                     <Trash2 size={15} />
                   </button>
@@ -395,7 +420,10 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
           </h3>
           {template.visaSubclass && (
             <p className="text-[11px] font-semibold text-ink-faint dark:text-plate-ink-faint mt-0.5">
-              Subclass {template.visaSubclass}
+              {template.visaSubclass === NOT_CONFIRMED_SUBCLASS
+                ? 'Not Confirmed · consultation only'
+                : `Subclass ${displaySubclassCode(template.visaSubclass)}`}
+              {template.visaSubstream && ` · ${template.visaSubstream}`}
             </p>
           )}
           <p className="text-xs text-ink-soft dark:text-plate-ink-soft leading-relaxed mt-2 line-clamp-3">
@@ -512,10 +540,10 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-[26px] font-extrabold text-ink dark:text-plate-ink font-ibm-serif tracking-tight">
-              Workflow Templates
+              Work Plans
             </h1>
             <p className="text-sm text-ink-soft dark:text-plate-ink-soft mt-1">
-              Define standard procedures for different visa types.
+              Reusable task plans for each visa type.
             </p>
           </div>
           <div className="flex sm:justify-end">
@@ -524,7 +552,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
               className="btn-press flex items-center gap-2 bg-edamame hover:bg-edamame-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-edamame/25 text-sm whitespace-nowrap"
             >
               <Plus size={16} />
-              New Template
+              New Plan
             </button>
           </div>
         </div>
@@ -537,7 +565,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
             <Info size={14} strokeWidth={2} className="flex-shrink-0 mt-[1px]" />
             <p className="leading-relaxed">
               <span className="font-semibold">Timing not yet reviewed by a registered agent.</span>{' '}
-              Templates marked <span className="font-semibold">Not yet reviewed</span> below use estimated
+              Plans marked <span className="font-semibold">Not yet reviewed</span> below use estimated
               step timing — dates can always be changed on each task. A step's <span className="font-semibold">Set by law</span> chip
               means that step's window is fixed by regulation rather than estimated; steps with no chip use an
               estimate. A <span className="font-semibold">Gate</span> step has to be done before the case can move
@@ -555,7 +583,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                 <Sparkles size={16} />
               </div>
               <h3 className="text-base font-bold text-ink dark:text-plate-ink">
-                {editor.mode === 'edit' ? 'Edit Template' : 'Create New Template'}
+                {editor.mode === 'edit' ? 'Edit Plan' : 'New Plan'}
               </h3>
             </div>
             <button
@@ -569,7 +597,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wider mb-1.5">
-                Template Title
+                Plan Name
               </label>
               <input
                 type="text"
@@ -584,7 +612,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                 Process Description
               </label>
               <p className="text-xs text-ink-faint dark:text-plate-ink-faint mb-2">
-                Describe the steps — the AI reads this when suggesting extra tasks for a case using this template.
+                Describe the steps — the AI reads this when suggesting extra tasks for a case using this plan.
               </p>
               <textarea
                 value={editor.description}
@@ -595,16 +623,18 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wider mb-1.5">
-                Visa Subclass <span className="normal-case font-normal text-ink-faint dark:text-plate-ink-faint">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={editor.visaSubclass}
-                onChange={e => setEditor(prev => (prev ? { ...prev, visaSubclass: e.target.value } : prev))}
-                placeholder="e.g. 190"
-                className="w-full sm:w-40 px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl text-sm focus:border-edamame/50 dark:focus:border-edamame/30 text-ink dark:text-plate-ink outline-none transition-colors placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50"
+              <SubclassSubstreamFields
+                value={{ subclass: editor.visaSubclass, substream: editor.visaSubstream }}
+                onChange={v => setEditor(prev => (prev ? { ...prev, visaSubclass: v.subclass, visaSubstream: v.substream } : prev))}
+                subclassLabel="Visa Subclass (optional)"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:max-w-2xl"
+                labelClassName="block text-xs font-bold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wider mb-1.5"
+                selectClassName="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl text-sm focus:border-edamame/50 dark:focus:border-edamame/30 text-ink dark:text-plate-ink outline-none transition-colors disabled:opacity-50"
               />
+              <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1.5">
+                Choose <span className="font-semibold">Not Confirmed</span> for a consultation-only plan. Subclasses and
+                substreams come from Configuration → Visa Types.
+              </p>
             </div>
 
             {/* Step editor */}
@@ -621,6 +651,14 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                   <Plus size={13} /> Add step
                 </button>
               </div>
+
+              {editor.steps.length > 0 && (
+                <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mb-2">
+                  {editorNotConfirmed
+                    ? 'Not Confirmed plans only use the Consultation phase.'
+                    : 'Each step belongs to a phase. When you save, steps are grouped by phase in phase order (Configuration → Phases), keeping their order within each phase.'}
+                </p>
+              )}
 
               {editor.steps.length === 0 && (
                 <p className="text-xs text-ink-faint dark:text-plate-ink-faint py-3">
@@ -653,6 +691,24 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                               placeholder="Step description"
                               className="w-full px-3 py-2 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-sm text-ink dark:text-plate-ink outline-none focus:border-edamame/50"
                             />
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <label htmlFor={`step-phase-${step.draftId}`} className="text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft">
+                              Phase
+                            </label>
+                            <select
+                              id={`step-phase-${step.draftId}`}
+                              value={editorNotConfirmed ? CONSULTATION_PHASE_KEY : step.phase || CONSULTATION_PHASE_KEY}
+                              disabled={editorNotConfirmed}
+                              onChange={e => updateStep(i, { phase: e.target.value })}
+                              className="px-2.5 py-1.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-xs text-ink dark:text-plate-ink outline-none focus:border-edamame/50 disabled:opacity-60"
+                            >
+                              {phaseOptions.map(p => <option key={p.ref} value={p.ref}>{p.name}</option>)}
+                              {step.phase && !phaseOptions.some(p => p.ref === step.phase) && (
+                                <option value={step.phase}>{phaseName(casePhases, step.phase)}</option>
+                              )}
+                            </select>
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
@@ -800,7 +856,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                 onClick={handleSave}
                 className="btn-press px-5 py-2 text-sm font-semibold bg-edamame hover:bg-edamame-600 text-white rounded-xl shadow-sm shadow-edamame/20 transition-all"
               >
-                Save Template
+                Save
               </button>
             </div>
           </div>
@@ -813,7 +869,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
           <div className="flex items-center gap-2.5 mb-3">
             <span className="w-[22px] h-px bg-ink/20 dark:bg-plate-ink/20" />
             <span className="text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.12em]">
-              Built-in Templates
+              Built-in Plans
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -830,7 +886,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
           <div className="flex items-center gap-2.5 mb-3">
             <span className="w-[22px] h-px bg-ink/20 dark:bg-plate-ink/20" />
             <span className="text-[9.5px] font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-[0.12em]">
-              Custom Templates
+              Custom Plans
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -845,7 +901,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
           <div className="text-center py-20">
             <div className="flex flex-col items-center gap-3 text-ink-faint dark:text-plate-ink-faint">
               <FileText size={36} className="opacity-25" />
-              <p className="text-sm">No templates yet. Create your first template to get started.</p>
+              <p className="text-sm">No plans yet. Create your first plan to get started.</p>
             </div>
           </div>
         )}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Sun, Moon } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { GlobalSearch } from './GlobalSearch';
+import { EdieButton } from './edie/EdieButton';
 import type { Notification, Theme, Client, Case, Task, WorkflowTemplate, TeamMember } from '../types';
 
 interface HeaderProps {
@@ -60,6 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const navigate = useNavigate();
 
+
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 px-6 py-3 bg-paper/85 dark:bg-plate/85 backdrop-blur-sm border-b border-ink/10 dark:border-plate-ink/15">
       {/* Global search — available from every module. */}
@@ -106,6 +108,9 @@ export const Header: React.FC<HeaderProps> = ({
           {userName || userEmail}
         </span>
       </button>
+
+      {/* Edie, the AI assistant (Ctrl+J). On a case, the button is in the case header instead. */}
+      <EdieButton placement="topbar" />
     </header>
   );
 };

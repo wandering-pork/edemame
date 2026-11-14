@@ -294,6 +294,26 @@
         to { opacity: 1; }
       }
 
+      /* Edie side panel: one short slide in from the right */
+      .ed-edie { animation: edieSlideIn 0.2s ease-out; }
+      @keyframes edieSlideIn {
+        from { transform: translateX(24px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      /* Edie button's suggestion count: one short pop when it appears or changes */
+      .edie-count-in { animation: edieCountIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1); }
+      @keyframes edieCountIn {
+        from { transform: scale(0.4); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+      /* One-time "Ask Edie" tip: fades in just below its button */
+      .edie-tip-in { animation: edieTipIn 0.24s ease-out 0.4s both; }
+      @keyframes edieTipIn {
+        from { transform: translateY(-4px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) { .ed-edie, .edie-count-in, .edie-tip-in { animation: none; } }
+
       /* Badge pulse for notifications */
       @keyframes badgePulse {
         0%, 100% { transform: scale(1); }

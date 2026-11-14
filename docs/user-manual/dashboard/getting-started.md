@@ -80,9 +80,9 @@ above it already took effect the moment you clicked it.
 
 The **Recent activity** panel shows a feed of what's happened lately across your cases — new cases,
 task plans, deadline and stage changes, and so on. A new case's task plan entry says exactly how the
-plan was produced: "Created a 12-task plan from the *Subclass 189* template" for a template with
+plan was produced: "Created a 12-task plan from the *Subclass 189* work plan" for a work plan with
 timing set (no AI involved — see "How timing affects task generation" in
-[Templates](../templates/getting-started.md)), or "Generated a 12-task plan with AI" when Gemini
+[Work Plans](../work-plans/getting-started.md)), or "Generated a 12-task plan with AI" when Gemini
 actually wrote the plan, so the wording never implies AI did something it didn't.
 
 ## This week's task board
@@ -131,5 +131,7 @@ the task for viewing or editing.
 ## Creating a task from the Dashboard
 
 Click **New Task** in the top-right corner, fill in a title, description, and due date, link it to
-a case, and save. It starts out **Not started** and immediately appears on the week board and
+a case, and save. When you link a case you're also asked for the task's **Phase** — the phases that
+case uses, defaulting to its current phase (Consultation only for a Not Confirmed case). It starts
+out **Not started** and immediately appears on the week board and
 counts towards the stat cards and Needs Attention if it's overdue or due today.

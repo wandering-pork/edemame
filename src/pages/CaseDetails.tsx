@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Case, Client, Task, CaseStage, CaseOutcome, DocumentChecklistItem, ChecklistItemStatus, FocusChatMessage, FocusConversation, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind, TeamMember } from '../types';
+import { Case, Client, Task, CaseStage, CaseOutcome, DocumentChecklistItem, ChecklistItemStatus, CaseOpenTab, CaseTabKind, WorkflowTemplate, Deadline, DeadlineKind, TeamMember } from '../types';
 import { useRepositories } from '../contexts/RepositoryContext';
-import { useAuth } from '../contexts/AuthContext';
 import { useFirm } from '../contexts/FirmContext';
 import { canDeleteFirmData, firmJobTitleLabel } from '../lib/firmDirectory';
 import { PersonPicker } from '../components/PersonPicker';
@@ -12,10 +11,15 @@ import { DocumentList } from '../components/DocumentList';
 import { PdfPackager } from '../components/PdfPackager';
 import { BundleBuilder820 } from '../components/BundleBuilder820';
 import { DocumentCompressor } from '../components/DocumentCompressor';
-import { CaseRail, RailAlert, CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
+import { CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
 import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList';
-import { AgentPanel } from '../components/case-details/AgentPanel';
-import { Workspace, WorkspaceCatalogItem, MessageRecommendation } from '../components/case-details/Workspace';
+import { createPortal } from 'react-dom';
+import { EdiePanel, type EdieSkill, type EdieSuggestion } from '../components/edie/EdiePanel';
+import { useEdieChat } from '../components/edie/useEdieChat';
+import { useEdie } from '../contexts/EdieContext';
+import { EdieButton } from '../components/edie/EdieButton';
+import { CaseOverview } from '../components/case-details/CaseOverview';
+import { currentFocusTask, taskTimeline, checklistBreakdown, suggestQuickActions } from '../lib/caseOverview';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
 import { DocumentTypePicker, DocumentTypeBadge } from '../components/DocumentTypePicker';
 import { EligibilityAssessmentModal } from '../components/visa-advisor/EligibilityAssessmentModal';
@@ -54,15 +58,24 @@ import {
   MoreVertical,
   ArrowLeft,
   FileText,
-  Pin,
-  PinOff,
   RefreshCw,
   Columns2,
+  LayoutGrid,
   UserPlus,
+  Minimize2,
+  Package,
+  Layers,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { Document, EligibilityAssessment } from '../types';
+import { isConfirmedSubclass, subclassChip, subclassShortLabel } from '../lib/visaTypes';
+import { SubclassSubstreamFields } from '../components/SubclassSubstreamFields';
+import { useVisaConfig } from '../contexts/VisaConfigContext';
+import { buildCasePhaseView, phaseChoicesForCase, phaseName } from '../lib/phaseGrouping';
+import { PhaseTaskGroups } from '../components/case-details/PhaseTaskGroups';
+import { ChangeVisaPlanDialog } from '../components/case-details/ChangeVisaPlanDialog';
+import { buildPlanChange, needsPlanPrompt, type ExistingTasksChoice, type PlanChangeResult } from '../lib/visaPlanChange';
 
 interface CaseDetailsProps {
   caseItem: Case;
@@ -91,6 +104,12 @@ interface CaseDetailsProps {
   onAddDeadline: (deadline: Deadline) => void;
   onUpdateDeadline: (deadline: Deadline) => void;
   onUpdateCase: (caseItem: Case) => void;
+  /** Applies a confirmed subclass / Work Plan change in one batch (Work Plans step 4). */
+  onChangeCasePlan: (change: PlanChangeResult) => Promise<void>;
+  /** Deletes the case with its tasks and deadlines, and updates app state. */
+  onDeleteCase: (caseId: string) => Promise<void>;
+  /** Every Work Plan — offered in the subclass-change window. */
+  templates: WorkflowTemplate[];
   onBack: () => void;
 }
 
@@ -98,7 +117,6 @@ interface CaseDetailsProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const AGENT_CHIPS = ['Draft consultation checklist', 'Document request email', 'Summarise eligibility'];
 
 const TEAM_ROLE_LABEL: Record<TeamMember['role'], string> = {
   partner: 'Partner',
@@ -116,6 +134,15 @@ const TAB_LABELS: Record<Exclude<CaseTabKind, 'workspace'>, string> = {
   'bundle-builder-820': '820 Bundle Builder',
 };
 
+// Option D's fixed tab row (from option C). Tools (generator, compressor, bundle builder) open as modals, not tabs.
+const CASE_FIXED_TABS: { kind: CaseTabKind; label: string }[] = [
+  { kind: 'workspace', label: 'Overview' },
+  { kind: 'tasks', label: 'Tasks' },
+  { kind: 'documents', label: 'Case files' },
+  { kind: 'checklist', label: 'Checklist' },
+  { kind: 'notes', label: 'Notes' },
+];
+
 const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: string }> = {
   verified: { cls: 'bg-emerald-500/[0.13] text-emerald-700 dark:text-emerald-400', label: 'Verified' },
   linked: { cls: 'bg-blue-500/[0.13] text-blue-700 dark:text-blue-400', label: 'Linked' },
@@ -123,16 +150,6 @@ const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: s
   pending: { cls: 'bg-amber-500/[0.13] text-amber-700 dark:text-amber-400', label: 'Pending' },
 };
 
-// Keyword heuristics used to (a) rank AI-recommended Workspace items, and
-// (b) decide which items to surface as inline hyperlinks after a chat reply.
-const RECOMMEND_KEYWORDS: Array<[CaseTabKind, RegExp]> = [
-  ['checklist', /document|checklist|evidence|paperwork/i],
-  ['tasks', /task|deadline|due date|schedule|overdue/i],
-  ['notes', /note|summary|history|record/i],
-  ['checklist-generator', /generate|missing document|category|categories/i],
-  ['document-compressor', /crusher|compress|5\s*mb|packager|document compressor|auto-?packager/i],
-  ['bundle-builder-820', /820|bundle|submission/i],
-];
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -156,17 +173,19 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   onAddDeadline,
   onUpdateDeadline,
   onUpdateCase,
+  onChangeCasePlan,
+  onDeleteCase,
+  templates,
   onBack
 }) => {
   const repos = useRepositories();
   const navigate = useNavigate();
-  const { session } = useAuth();
   const { documentTypes, byCode: documentTypesByCode } = useDocumentTypes();
   // RLS is the real enforcement (firms migration's "firm rows delete" policy
   // on `cases` is owner/agent only) — this only hides the control for a role
   // that would be rejected server-side anyway. `role` is null in local mode,
   // where deletes stay allowed (single user, always their own data).
-  const { role: firmRole, allMembers } = useFirm();
+  const { role: firmRole, allMembers, memberNameFor } = useFirm();
   const canDeleteCase = canDeleteFirmData(firmRole);
 
   // ---- Task state ----
@@ -182,7 +201,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   }), [teamMembers, allMembers]);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [taskForm, setTaskForm] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd') });
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), phase: '' });
   // When a task row's status menu picks "Not applicable", a reason must be
   // entered and confirmed inline before the status change is applied.
   const [naReasonDraft, setNaReasonDraft] = useState<{ taskId: string; reason: string } | null>(null);
@@ -212,7 +231,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // ---- Case edit/delete state ----
   const [currentCase, setCurrentCase] = useState<Case>(caseItem);
   const [isEditingCase, setIsEditingCase] = useState(false);
-  const [caseEditForm, setCaseEditForm] = useState({ title: caseItem.title, description: caseItem.description });
+  const [caseEditForm, setCaseEditForm] = useState({
+    title: caseItem.title,
+    description: caseItem.description,
+    visaSubclass: caseItem.visaSubclass ?? visaSubclass ?? '',
+    visaSubstream: caseItem.visaSubstream ?? '',
+  });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [docRefreshKey, setDocRefreshKey] = useState(0);
 
@@ -233,9 +257,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   /** §4.4 — renders the Case Files tab's content beside the checklist for drag-to-link. */
   const [caseFilesSplit, setCaseFilesSplit] = useState(false);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
-  const [recommendedViewKinds, setRecommendedViewKinds] = useState<CaseTabKind[]>(['checklist', 'tasks', 'notes']);
-  const [recommendedToolKinds, setRecommendedToolKinds] = useState<CaseTabKind[]>(['checklist-generator', 'document-compressor', 'bundle-builder-820']);
-  const [messageRecommendations, setMessageRecommendations] = useState<Record<string, MessageRecommendation[]>>({});
 
   // ---- Top-bar menu state ----
   const [statusOpen, setStatusOpen] = useState(false);
@@ -249,8 +270,11 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [outcomePickerOpen, setOutcomePickerOpen] = useState(false);
   const [outcomeDraft, setOutcomeDraft] = useState<CaseOutcome | ''>('');
 
-  // ---- Agent panel state (closed by default per design) ----
-  const [agentOpen, setAgentOpen] = useState(false);
+  // ---- Edie (the panel itself is in the app shell; this case fills it) ----
+  const edie = useEdie();
+  const { claimPanel, setSuggestionCount } = edie;
+  useEffect(() => claimPanel(), [claimPanel]);
+  const edieInputRef = useRef<HTMLInputElement>(null);
 
   // ---- Document checklist state ----
   const [checklist, setChecklist] = useState<DocumentChecklistItem[]>([]);
@@ -276,14 +300,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [showEligibilityAssessment, setShowEligibilityAssessment] = useState(false);
 
   // ---- Chat state ----
-  const [conversations, setConversations] = useState<FocusConversation[]>([]);
-  const [activeConvId, setActiveConvId] = useState<string | null>(null);
-  const [chatInput, setChatInput] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [filingIssueMessageId, setFilingIssueMessageId] = useState<string | null>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  const activeConv = conversations.find(c => c.id === activeConvId);
 
   // ---- Derived values ----
   const caseTasks = useMemo(() => {
@@ -304,6 +320,18 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     return allDeadlines(relevant, [client]).sort((a, b) => daysLeft(a, new Date()) - daysLeft(b, new Date()));
   }, [deadlines, caseItem.id, client]);
 
+  // Tasks grouped by phase (Work Plans step 3) — drives Overview → Progress,
+  // the Tasks tab, the current task and the read-only Phase in Case info.
+  const { casePhases } = useVisaConfig();
+  const phaseView = useMemo(
+    () => buildCasePhaseView(caseTasks, casePhases, workflowTemplate?.steps, visaSubclass),
+    [caseTasks, casePhases, workflowTemplate, visaSubclass],
+  );
+  const phaseChoices = useMemo(
+    () => phaseChoicesForCase(caseTasks, casePhases, workflowTemplate?.steps, visaSubclass),
+    [caseTasks, casePhases, workflowTemplate, visaSubclass],
+  );
+
   const completedTasks = caseTasks.filter(isTaskClosed);
   const pendingTasks = caseTasks.filter(t => !isTaskClosed(t));
   const progress = caseTasks.length > 0 ? Math.round((completedTasks.length / caseTasks.length) * 100) : 0;
@@ -311,14 +339,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const hasOverdue = pendingTasks.some(t => !isWaiting(t) && new Date(t.date) < new Date());
   const uploadedCount = checklist.filter(c => c.status === 'linked' || c.status === 'verified').length;
   const overdueCount = pendingTasks.filter(t => new Date(t.date) < new Date()).length;
-  const outstandingDocs = checklist.length > 0 ? checklist.length - uploadedCount : 0;
-
-  // Rail alerts — just docs outstanding now; overdue tasks and passport expiry
-  // are covered by the case summary strip's At Risk chip and Next Deadline
-  // chip (which shows any open deadline's countdown, not just an urgent one),
-  // so showing them again here would just duplicate the strip.
-  const railAlerts: RailAlert[] = [];
-  if (outstandingDocs > 0) railAlerts.push({ color: 'amber', text: `${outstandingDocs} doc${outstandingDocs !== 1 ? 's' : ''} outstanding` });
 
   // ── Case summary strip: At Risk + next deadline (Step 1's case info at a glance) ──
   const caseRisk = useMemo(
@@ -403,10 +423,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     saveCaseTabsState(caseItem.id, { tabs: openTabs, activeTabId });
   }, [openTabs, activeTabId, tabsLoaded, caseItem.id]);
 
-  // Auto-scroll chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeConv?.messages]);
 
   // ---- Checklist handlers ----
   const [checklistStatusMenuId, setChecklistStatusMenuId] = useState<string | null>(null);
@@ -507,15 +523,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setActiveTabId(id);
   };
 
-  const closeTab = (id: string) => {
-    setOpenTabs(prev => prev.filter(t => t.id !== id));
-    setActiveTabId(current => (current === id ? 'workspace' : current));
-  };
-
-  const togglePinTab = (id: string) => {
-    setOpenTabs(prev => prev.map(t => t.id === id ? { ...t, pinned: !t.pinned } : t));
-  };
-
   const handleChecklistPreview = async (doc: Document) => {
     const blob = await repos.documents.getFileData(doc);
     if (!blob) return;
@@ -601,14 +608,65 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   const handleSaveCase = async () => {
     if (!caseEditForm.title.trim()) return;
-    const updated = { ...currentCase, title: caseEditForm.title.trim(), description: caseEditForm.description.trim() };
-    await repos.cases.update(updated);
+    const subclass = caseEditForm.visaSubclass || undefined;
+    const substream = isConfirmedSubclass(subclass) && caseEditForm.visaSubstream ? caseEditForm.visaSubstream : undefined;
+    const updated: Case = {
+      ...currentCase,
+      title: caseEditForm.title.trim(),
+      description: caseEditForm.description.trim(),
+      visaSubclass: subclass,
+      visaSubstream: substream,
+    };
+    // A change to a real subclass (from blank, Not Confirmed, or another
+    // subclass) asks for a Work Plan first — nothing is saved until Confirm.
+    if (needsPlanPrompt(currentCase.visaSubclass ?? visaSubclass, subclass)) {
+      setPendingPlanChange({ draft: updated, subclass: subclass!, substream });
+      return;
+    }
+    // Through App's handler (not repos directly) so the case list, header and
+    // the visaSubclass prop pick up the change straight away.
+    await onUpdateCase(updated);
     setCurrentCase(updated);
     setIsEditingCase(false);
   };
 
+  // ---- Subclass change → choose a Work Plan (Work Plans step 4) ----
+  const [pendingPlanChange, setPendingPlanChange] = useState<{ draft: Case; subclass: string; substream?: string } | null>(null);
+  const [applyingPlanChange, setApplyingPlanChange] = useState(false);
+
+  const handleConfirmPlanChange = async (planId: string, existing: ExistingTasksChoice) => {
+    const plan = templates.find(t => t.id === planId);
+    if (!pendingPlanChange || !plan) return;
+    setApplyingPlanChange(true);
+    try {
+      const change = buildPlanChange({
+        caseItem: pendingPlanChange.draft,
+        caseTasks,
+        plan,
+        subclass: pendingPlanChange.subclass,
+        substream: pendingPlanChange.substream,
+        existing,
+        startDate: toLocalISODate(new Date()),
+      });
+      await onChangeCasePlan(change);
+      setCurrentCase(change.updatedCase);
+      setPendingPlanChange(null);
+      setIsEditingCase(false);
+      toast.success(
+        change.newTasks.length
+          ? `Visa subclass saved — ${change.newTasks.length} task${change.newTasks.length === 1 ? '' : 's'} added from "${plan.title}"`
+          : 'Visa subclass saved',
+      );
+    } catch (err) {
+      console.error('Failed to apply the work plan change:', err);
+      toast.error('Couldn’t apply the work plan. Nothing else was changed — please try again.');
+    } finally {
+      setApplyingPlanChange(false);
+    }
+  };
+
   const handleDeleteCase = async () => {
-    await repos.cases.delete(currentCase.id);
+    await onDeleteCase(currentCase.id);
     onBack();
   };
 
@@ -704,10 +762,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const handleOpenTaskModal = (task?: Task) => {
     if (task) {
       setEditingTask(task);
-      setTaskForm({ title: task.title, description: task.description, date: task.date });
+      setTaskForm({ title: task.title, description: task.description, date: task.date, phase: phaseView.groups.find(g => g.tasks.some(t => t.id === task.id))?.ref ?? task.phase ?? phaseChoices.defaultRef });
     } else {
       setEditingTask(null);
-      setTaskForm({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd') });
+      setTaskForm({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), phase: phaseChoices.defaultRef });
     }
     setIsTaskModalOpen(true);
     setActiveDropdown(null);
@@ -721,7 +779,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         ...editingTask,
         title: taskForm.title,
         description: taskForm.description,
-        date: taskForm.date
+        date: taskForm.date,
+        phase: phaseView.hasPhases ? taskForm.phase || editingTask.phase : editingTask.phase,
       });
     } else {
       onAddTask({
@@ -733,7 +792,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         status: 'not_started',
         isCompleted: false,
         priorityOrder: 999,
-        generatedByAi: false
+        generatedByAi: false,
+        phase: taskForm.phase || phaseChoices.defaultRef,
+        assignedTo: caseItem.caseOwner,
       });
     }
     setIsTaskModalOpen(false);
@@ -747,7 +808,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setGeneratingPlan(true);
     try {
       const knownAnchors = knownAnchorsFromDeadlines(caseDeadlines);
-      const { drafts } = buildTemplateTaskDrafts(workflowTemplate.steps, caseItem.startDate, knownAnchors);
+      const { drafts } = buildTemplateTaskDrafts(workflowTemplate.steps, caseItem.startDate, knownAnchors, visaSubclass);
       const newTasks: Task[] = drafts.map((d, index) => ({
         id: uuidv4(),
         caseId: caseItem.id,
@@ -759,7 +820,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       if (workflowTemplate.version !== undefined) {
         onUpdateCase({ ...currentCase, templateVersion: workflowTemplate.version });
       }
-      toast.success(`${newTasks.length} task${newTasks.length === 1 ? '' : 's'} generated from the template`);
+      toast.success(`${newTasks.length} task${newTasks.length === 1 ? '' : 's'} generated from the work plan`);
     } finally {
       setGeneratingPlan(false);
     }
@@ -796,6 +857,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     if (!s) return;
     const anchorTask = s.anchorStepKey ? caseTasks.find(t => t.stepKey === s.anchorStepKey) : undefined;
     const baseDate = anchorTask?.date ?? caseItem.startDate;
+    const phase = anchorTask?.phase ?? phaseView.currentPhaseRef;
     onAddTask({
       id: uuidv4(),
       caseId: caseItem.id,
@@ -805,6 +867,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       status: 'not_started',
       isCompleted: false,
       priorityOrder: 999,
+      phase,
       generatedByAi: true,
       assignedTo: caseItem.caseOwner,
     });
@@ -822,273 +885,29 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     }
   };
 
-  // Load conversations for this case
-  useEffect(() => {
-    let cancelled = false;
-    repos.chat.getByCaseId(caseItem.id).then(convs => {
-      if (cancelled) return;
-      setConversations(convs);
-      setActiveConvId(convs[0]?.id ?? null);
-    });
-    return () => { cancelled = true; };
-  }, [caseItem.id, repos.chat]);
+  // ---- Edie's case chat (stored per case in repos.chat) ----
+  const chat = useEdieChat({
+    scopeKey: caseItem.id,
+    caseId: caseItem.id,
+    load: () => repos.chat.getByCaseId(caseItem.id),
+    save: convs => { repos.chat.setForCase(caseItem.id, convs); },
+    getCaseContext: () => [
+      `Case: ${caseItem.title}`,
+      `Client: ${client.name}`,
+      applicant && applicant.id !== client.id ? `Applicant: ${applicant.name}` : null,
+      visaSubclass ? `Visa Type: ${subclassShortLabel(visaSubclass, currentCase.visaSubstream)}` : null,
+      `Stage: ${CASE_STAGE_LABELS[caseItem.stage]}${caseItem.onHold ? ' (on hold)' : ''}`,
+      `Progress: ${completedTasks.length}/${caseTasks.length} tasks completed (${progress}%)`,
+      pendingTasks.length > 0 ? `Next task: ${pendingTasks[0]?.title}` : null,
+      checklist.length > 0 ? `Documents: ${uploadedCount}/${checklist.length} collected` : null,
+    ].filter(Boolean).join('\n'),
+  });
 
-  // ---- Chat handlers ----
-  const persistConvs = (convs: FocusConversation[]) => {
-    repos.chat.setForCase(caseItem.id, convs);
-  };
-
-  const createConversation = () => {
-    const conv: FocusConversation = {
-      id: uuidv4(),
-      caseId: caseItem.id,
-      title: `Chat ${conversations.length + 1}`,
-      messages: [],
-      createdAt: new Date().toISOString(),
-    };
-    const next = [conv, ...conversations];
-    setConversations(next);
-    persistConvs(next);
-    setActiveConvId(conv.id);
-  };
-
-  const sendMessage = useCallback(async () => {
-    if (!chatInput.trim() || isSending) return;
-
-    const convId = activeConvId || (() => {
-      const id = uuidv4();
-      const conv: FocusConversation = {
-        id,
-        caseId: caseItem.id,
-        title: chatInput.slice(0, 40),
-        messages: [],
-        createdAt: new Date().toISOString(),
-      };
-      const next = [conv, ...conversations];
-      setConversations(next);
-      persistConvs(next);
-      setActiveConvId(id);
-      return id;
-    })();
-
-    const userMsg: FocusChatMessage = {
-      id: uuidv4(),
-      role: 'user',
-      content: chatInput.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
-    setConversations(prev => {
-      const next = prev.map(c => {
-        if (c.id !== convId) return c;
-        const updated = { ...c, messages: [...c.messages, userMsg] };
-        if (c.messages.length === 0) updated.title = userMsg.content.slice(0, 40);
-        return updated;
-      });
-      persistConvs(next);
-      return next;
-    });
-    setChatInput('');
-    setIsSending(true);
-
-    try {
-      const caseContext = [
-        `Case: ${caseItem.title}`,
-        `Client: ${client.name}`,
-        applicant && applicant.id !== client.id ? `Applicant: ${applicant.name}` : null,
-        visaSubclass ? `Visa Type: Subclass ${visaSubclass}` : null,
-        `Stage: ${CASE_STAGE_LABELS[caseItem.stage]}${caseItem.onHold ? ' (on hold)' : ''}`,
-        `Progress: ${completedTasks.length}/${caseTasks.length} tasks completed (${progress}%)`,
-        pendingTasks.length > 0 ? `Next task: ${pendingTasks[0]?.title}` : null,
-        checklist.length > 0 ? `Documents: ${uploadedCount}/${checklist.length} collected` : null,
-      ].filter(Boolean).join('\n');
-
-      const currentConv = conversations.find(c => c.id === convId);
-      const historyMessages = [...(currentConv?.messages || []), userMsg];
-
-      // Per-session cap on agent-filed GitHub issues (see api/focus-chat.ts /
-      // api/file-github-issue.ts) — counted from this conversation's own
-      // history so it resets per Focus Mode chat thread.
-      const issuesFiledInSession = historyMessages.filter(m => m.kind === 'issue-filed').length;
-
-      const response = await fetch('/api/focus-chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
-          messages: historyMessages.map(m => ({ role: m.role, content: m.content })),
-          caseContext,
-          issuesFiledInSession,
-        }),
-      });
-
-      const data = await response.json();
-
-      const assistantMsg: FocusChatMessage =
-        data.kind === 'issue-draft' && data.draft
-          ? {
-              id: uuidv4(),
-              role: 'assistant',
-              content: "I think this is worth tracking — here's a drafted GitHub issue for your review.",
-              createdAt: new Date().toISOString(),
-              kind: 'issue-draft',
-              issueDraft: { title: data.draft.title, body: data.draft.body },
-            }
-          : {
-              id: uuidv4(),
-              role: 'assistant',
-              content: data.reply || 'Sorry, I could not generate a response.',
-              createdAt: new Date().toISOString(),
-              kind: 'text',
-            };
-
-      setConversations(prev => {
-        const next = prev.map(c => {
-          if (c.id !== convId) return c;
-          return { ...c, messages: [...c.messages, assistantMsg] };
-        });
-        persistConvs(next);
-        return next;
-      });
-
-      // Refresh Workspace View/Tools suggestions from the exchange, and record
-      // which items to render as inline hyperlinks under this assistant message.
-      const combinedText = `${userMsg.content}\n${assistantMsg.content}`;
-      const matchedKinds = RECOMMEND_KEYWORDS.filter(([, re]) => re.test(combinedText)).map(([kind]) => kind);
-      if (matchedKinds.length > 0) {
-        const matchedViews = matchedKinds.filter(k => k === 'tasks' || k === 'checklist' || k === 'notes');
-        const matchedTools = matchedKinds.filter(k => k === 'checklist-generator' || k === 'document-compressor' || k === 'bundle-builder-820');
-        if (matchedViews.length > 0) {
-          setRecommendedViewKinds(prev => [...matchedViews, ...prev.filter(k => !matchedViews.includes(k))]);
-        }
-        if (matchedTools.length > 0) {
-          setRecommendedToolKinds(prev => [...matchedTools, ...prev.filter(k => !matchedTools.includes(k))]);
-        }
-        setMessageRecommendations(prev => ({
-          ...prev,
-          [assistantMsg.id]: matchedKinds.map(kind => ({ kind, label: TAB_LABELS[kind as Exclude<CaseTabKind, 'workspace'>] })),
-        }));
-      }
-    } catch {
-      const errMsg: FocusChatMessage = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: 'Connection error. Please check your API key and try again.',
-        createdAt: new Date().toISOString(),
-      };
-      setConversations(prev => {
-        const next = prev.map(c => {
-          if (c.id !== convId) return c;
-          return { ...c, messages: [...c.messages, errMsg] };
-        });
-        persistConvs(next);
-        return next;
-      });
-    } finally {
-      setIsSending(false);
-    }
-  }, [chatInput, isSending, activeConvId, conversations, caseItem, client, applicant, visaSubclass, completedTasks, caseTasks, pendingTasks, checklist, progress, uploadedCount, session]);
-
+  /** Opens Edie and sends `msg` to the case chat straight away. */
   const handleSkillAction = (msg: string) => {
-    setChatInput(msg);
-    if (!agentOpen) setAgentOpen(true);
+    edie.setOpen(true);
+    void chat.sendText(msg);
   };
-
-  // ---- Agentic GitHub issue filing (GitHub issue #15) ----
-  // Confirm/Cancel are the only two ways a drafted issue is resolved — the
-  // draft itself is produced by /api/focus-chat's function-calling loop and
-  // is never filed automatically. Only Confirm hits /api/file-github-issue,
-  // the sole endpoint that performs the real POST /repos/.../issues call.
-  const updateMessageInActiveConv = useCallback(
-    (messageId: string, patch: Partial<FocusChatMessage>) => {
-      setConversations(prev => {
-        const next = prev.map(c => {
-          if (c.id !== activeConvId) return c;
-          return {
-            ...c,
-            messages: c.messages.map(m => (m.id === messageId ? { ...m, ...patch } : m)),
-          };
-        });
-        persistConvs(next);
-        return next;
-      });
-    },
-    [activeConvId]
-  );
-
-  const handleCancelIssueDraft = useCallback(
-    (messageId: string) => {
-      updateMessageInActiveConv(messageId, { issueDraftResolved: 'cancelled' });
-    },
-    [updateMessageInActiveConv]
-  );
-
-  const handleConfirmIssueDraft = useCallback(
-    async (messageId: string) => {
-      const conv = conversations.find(c => c.id === activeConvId);
-      const message = conv?.messages.find(m => m.id === messageId);
-      if (!message?.issueDraft || filingIssueMessageId) return;
-
-      const issuesFiledInSession = (conv?.messages || []).filter(m => m.kind === 'issue-filed').length;
-
-      setFilingIssueMessageId(messageId);
-      try {
-        const response = await fetch('/api/file-github-issue', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-          },
-          body: JSON.stringify({
-            title: message.issueDraft.title,
-            body: message.issueDraft.body,
-            issuesFiledInSession,
-          }),
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          updateMessageInActiveConv(messageId, { issueDraftResolved: 'cancelled' });
-          const errMsg: FocusChatMessage = {
-            id: uuidv4(),
-            role: 'assistant',
-            content: data.error || 'Failed to file the GitHub issue. Please try again or file it manually.',
-            createdAt: new Date().toISOString(),
-            kind: 'text',
-          };
-          setConversations(prev => {
-            const next = prev.map(c => (c.id === activeConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
-            persistConvs(next);
-            return next;
-          });
-          return;
-        }
-
-        updateMessageInActiveConv(messageId, { issueDraftResolved: 'filed' });
-        const filedMsg: FocusChatMessage = {
-          id: uuidv4(),
-          role: 'assistant',
-          content: `Done — filed [#${data.number}](${data.url}).`,
-          createdAt: new Date().toISOString(),
-          kind: 'issue-filed',
-          issueUrl: data.url,
-          issueNumber: data.number,
-        };
-        setConversations(prev => {
-          const next = prev.map(c => (c.id === activeConvId ? { ...c, messages: [...c.messages, filedMsg] } : c));
-          persistConvs(next);
-          return next;
-        });
-      } catch {
-        updateMessageInActiveConv(messageId, { issueDraftResolved: 'cancelled' });
-      } finally {
-        setFilingIssueMessageId(null);
-      }
-    },
-    [conversations, activeConvId, filingIssueMessageId, updateMessageInActiveConv, session]
-  );
 
   // ---- Top-bar action handlers ----
   const handleEligibility = () => {
@@ -1096,7 +915,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   const handleRunCrusher = () => {
-    setMoreOpen(false);
     if (SUPPORTED_SUBCLASSES.includes(visaSubclass || '')) setShowPackager(true);
   };
 
@@ -1123,7 +941,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // ---- Task row renderer (shared by pending + completed lists) ----
   const rowMenuCls = 'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
-  const renderTaskRow = (task: Task, closed: boolean) => {
+  const renderTaskRow = (task: Task, closed: boolean, isCurrent = false) => {
     const waiting = isWaiting(task);
     const overdue = !closed && !waiting && new Date(task.date) < new Date();
     const chip = statusChipFor(task.status);
@@ -1150,7 +968,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         {/* Title + description */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <div className={`text-[13.5px] font-semibold tracking-tight leading-snug ${closed ? 'line-through text-ink-faint dark:text-plate-ink-faint' : 'text-ink dark:text-plate-ink'}`}>
+            <div className={`text-[13.5px] ${isCurrent ? 'font-extrabold' : 'font-semibold'} tracking-tight leading-snug ${closed ? 'line-through text-ink-faint dark:text-plate-ink-faint' : 'text-ink dark:text-plate-ink'}`}>
               {task.title}
             </div>
             {chip && (
@@ -1330,42 +1148,96 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     );
   };
 
+  // ---- Overview + Workspace bar (design option D: C's overview and tabs, B's bottom bar) ----
+  const onOverview = activeTabId === 'workspace';
+  const focusTask = phaseView.hasPhases ? phaseView.currentTask : currentFocusTask(caseTasks);
+  const timeline = useMemo(() => taskTimeline(caseTasks), [caseTasks]);
+  const checklistRows = useMemo(() => checklistBreakdown(checklist, ADDITIONAL_DOCUMENTS_CATEGORY), [checklist]);
+  const ownerName = currentCase.caseOwner
+    ? teamMembers.find(m => m.id === currentCase.caseOwner)?.name ?? memberNameFor(currentCase.caseOwner) ?? undefined
+    : undefined;
+
+  const openEditCase = () => {
+    setCaseEditForm({
+      title: currentCase.title,
+      description: currentCase.description,
+      visaSubclass: currentCase.visaSubclass ?? visaSubclass ?? '',
+      visaSubstream: currentCase.visaSubstream ?? '',
+    });
+    setIsEditingCase(true);
+  };
+
+  const edieSuggestions: EdieSuggestion[] = suggestQuickActions({
+    currentTask: focusTask,
+    caseTasks,
+    checklist,
+    clientName: client.name,
+  }).map(action => ({
+    id: action.id,
+    label: action.label,
+    detail: action.detail,
+    onSelect: () => {
+      if (action.kind === 'agent') handleSkillAction(action.prompt);
+      else openOrFocusTab(action.target);
+    },
+  }));
+
+  // Badge on the top bar's Edie button.
+  const edieSuggestionCount = edieSuggestions.length;
+  useEffect(() => { setSuggestionCount(edieSuggestionCount); }, [edieSuggestionCount, setSuggestionCount]);
+
+  // Edie's fixed AI skills. Each has exactly one home: here.
+  const prefillTitle = 'Asks Edie in the chat';
+  const edieSkills: EdieSkill[] = [
+    { id: 'summarise', label: 'Summarise case', title: prefillTitle, onSelect: () => handleSkillAction('Summarise where this case is up to, what is outstanding, and what I should do next.') },
+    { id: 'cover-letter', label: 'Draft cover letter', title: prefillTitle, onSelect: () => handleSkillAction('Please help me draft a cover letter for this immigration case.') },
+    { id: 'consultation-checklist', label: 'Draft consultation checklist', title: prefillTitle, onSelect: () => handleSkillAction('Draft a consultation checklist for this case.') },
+    { id: 'eligibility-check', label: 'Re-check eligibility', title: 'Opens the Visa Advisor for this client', onSelect: handleEligibility },
+  ];
+
   // ---- Render ----
   const needsOutcomePrompt = currentCase.stage === 'closed' && !currentCase.outcome;
 
+  const tabToolBtnCls = 'inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors';
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
   return (
-    <div className="px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate min-h-full">
+    <div className={`flex-1 px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate`}>
 
       {/* ══════════════════════════════════════════
           TOP BAR
       ══════════════════════════════════════════ */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* One line from lg up: the title truncates and Case actions collapses to "⋯"
+          below xl, so the actions never wrap onto a second row on a laptop. */}
+      <div className="flex items-center gap-3 flex-wrap lg:flex-nowrap">
         <button
           onClick={onBack}
-          className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink transition-colors"
+          className="group flex-shrink-0 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink transition-colors"
         >
           <ArrowLeft size={15} strokeWidth={1.8} className="group-hover:-translate-x-0.5 transition-transform" />
           Cases
         </button>
-        <h1 className="text-[17px] font-bold text-ink dark:text-plate-ink tracking-tight min-w-0 truncate">
-          {currentCase.title}
-          <span className="text-ink-faint dark:text-plate-ink-faint font-semibold"> — {client.name}</span>
-        </h1>
-        <span className="font-mono text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{displayCaseNumber(currentCase)}</span>
-        {visaSubclass && (
-          <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400">SC-{visaSubclass}</span>
-        )}
+        <div className="flex-1 min-w-0 flex items-center gap-3">
+          <h1
+            title={`${currentCase.title}, ${client.name}`}
+            className="text-[17px] font-bold text-ink dark:text-plate-ink tracking-tight min-w-0 truncate"
+          >
+            {currentCase.title}
+            <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">, {client.name}</span>
+          </h1>
+          <span className="flex-shrink-0 font-mono text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{displayCaseNumber(currentCase)}</span>
+          {visaSubclass && (
+            <span className="flex-shrink-0 whitespace-nowrap text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400">{subclassChip(visaSubclass)}</span>
+          )}
+        </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* Add Task — the one primary action kept in the header. Everything
-              else that used to live here (Draft, Eligibility, Eligibility
-              assessment, Agent toggle, and the old ⋯ menu) moved into the
-              single Case actions menu below, named for what each does. */}
+        <div className="ml-auto flex-shrink-0 flex items-center gap-2">
+          {/* Add Task is the one primary action in the header. Case actions
+              holds case admin only; AI help is in Edie, navigation in the tab
+              row, and document tools on the Case files / Checklist tabs. */}
           <button
             onClick={() => handleOpenTaskModal()}
-            className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-xs transition-colors"
+            className="btn-press whitespace-nowrap inline-flex items-center gap-1.5 px-3 py-1.5 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-xs transition-colors"
           >
             <Plus size={13} strokeWidth={2.2} />
             Add Task
@@ -1376,30 +1248,23 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             <button
               onClick={() => setMoreOpen(o => !o)}
               title="Case actions"
+              aria-label="Case actions"
               aria-haspopup="true"
               aria-expanded={moreOpen}
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors text-xs font-bold"
             >
               <MoreHorizontal size={16} />
-              <span className="hidden md:inline">Case actions</span>
+              <span className="hidden xl:inline">Case actions</span>
             </button>
             {moreOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMoreOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-60 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content max-h-[80vh] overflow-y-auto">
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-56 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content max-h-[80vh] overflow-y-auto">
                   <button
-                    onClick={() => { handleSkillAction('Please help me draft a cover letter for this immigration case.'); setMoreOpen(false); }}
-                    title="Opens the Agent chat pre-filled with a cover-letter drafting prompt"
+                    onClick={() => { openEditCase(); setMoreOpen(false); }}
                     className={menuItemCls}
                   >
-                    Draft cover letter with Agent
-                  </button>
-                  <button
-                    onClick={() => { handleEligibility(); setMoreOpen(false); }}
-                    title="Open the Visa Advisor pre-filled with this client"
-                    className={menuItemCls}
-                  >
-                    Re-check eligibility
+                    Edit case
                   </button>
                   {eligibilityAssessment && (
                     <button
@@ -1410,28 +1275,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                       View eligibility assessment
                     </button>
                   )}
-
-                  <div className="h-px bg-paper dark:bg-plate my-1" />
-                  <button onClick={() => { setAgentOpen(o => !o); setMoreOpen(false); }} className={menuItemCls}>
-                    {agentOpen ? 'Close Agent panel' : 'Open Agent panel'}
-                  </button>
-
-                  <div className="h-px bg-paper dark:bg-plate my-1" />
-                  <button onClick={() => { openOrFocusTab('checklist'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
-                  <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Workspace</button>
-                  <button onClick={() => { setShowDocumentCompressor(true); setMoreOpen(false); }} className={menuItemCls}>Document Compressor</button>
-                  {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && (
-                    <button onClick={handleRunCrusher} className={menuItemCls}>Run Crusher</button>
-                  )}
-                  {visaSubclass === '820' && (
-                    <button onClick={() => { setShowBundleBuilder(true); setMoreOpen(false); }} className={menuItemCls}>820 bundle builder</button>
-                  )}
-                  <button
-                    onClick={() => { setCaseEditForm({ title: currentCase.title, description: currentCase.description }); setIsEditingCase(true); setMoreOpen(false); }}
-                    className={menuItemCls}
-                  >
-                    Edit case
-                  </button>
                   {canDeleteCase && (
                     <>
                       <div className="h-px bg-paper dark:bg-plate my-1" />
@@ -1447,6 +1290,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               </>
             )}
           </div>
+
+
+          {/* Edie: the case's one entry point to AI help (the top bar's button hides while a case is open). */}
+          <EdieButton placement="page" />
         </div>
       </div>
 
@@ -1489,117 +1336,84 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         </div>
       )}
 
-      {/* ══════════════════════════════════════════
-          3-COLUMN GRID
-      ══════════════════════════════════════════ */}
-      <div className={`mt-4 grid grid-cols-1 gap-3.5 items-start ${agentOpen ? 'xl:grid-cols-[220px_minmax(320px,1fr)_minmax(280px,330px)]' : 'xl:grid-cols-[220px_minmax(320px,1fr)]'}`}>
-
-        {/* ── LEFT RAIL ── */}
-        <CaseRail
-          client={client}
-          applicant={applicant}
-          progress={progress}
-          completedCount={completedTasks.length}
-          pendingCount={pendingTasks.length}
-          alerts={railAlerts}
-          documents={documents}
-          onOpenDocument={handleChecklistPreview}
-          caseId={currentCase.id}
-          visaSubclass={visaSubclass}
-          onDocumentUploaded={(doc) => {
-            setDocuments(prev => [...prev, doc]);
-            setDocRefreshKey(k => k + 1);
-          }}
-          onRequestCompress={handleRequestCompress}
-          onRemoveDocument={handleRemoveDocument}
-          onOpenCaseFilesTab={() => openOrFocusTab('documents')}
-        />
-
-        {/* ── CENTER COLUMN ── */}
-        <div className="min-w-0">
-          {/* Tabs — Workspace is always present; opening a View/Tool adds a closable, pinnable tab */}
-          <div className="flex items-center gap-0.5 border-b border-ink/10 dark:border-plate-ink/15 overflow-x-auto custom-scrollbar">
+      {/* Tabs (design option D, from C): a fixed, full-width row above the content. Switching tabs only
+          swaps the panel below — the frame (tabs, column widths) never moves. */}
+      <div role="tablist" aria-label="Case views" className="mt-4 flex items-center gap-0.5 border-b border-ink/10 dark:border-plate-ink/15 overflow-x-auto custom-scrollbar">
+        {CASE_FIXED_TABS.map(({ kind, label }) => {
+          const id = kind === 'workspace' ? 'workspace' : `tab:${kind}`;
+          const active = activeTabId === id;
+          const count = kind === 'tasks' ? caseTasks.length : kind === 'documents' ? documents.length : kind === 'checklist' ? checklist.length : 0;
+          return (
             <button
-              onClick={() => setActiveTabId('workspace')}
+              key={kind}
+              role="tab"
+              aria-selected={active}
+              onClick={() => openOrFocusTab(kind)}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors ${
-                activeTabId === 'workspace'
+                active
                   ? 'border-edamame text-ink dark:text-plate-ink'
                   : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
               }`}
             >
-              <Sparkles size={13} className={activeTabId === 'workspace' ? 'text-edamame' : ''} />
-              Workspace
+              {kind === 'workspace' && <LayoutGrid size={13} className={active ? 'text-edamame' : ''} />}
+              {label}
+              {count > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${active ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
+                  {count}
+                </span>
+              )}
             </button>
+          );
+        })}
+      </div>
 
-            {openTabs.map(tab => (
-              <div
-                key={tab.id}
-                className={`group flex items-center gap-1.5 pl-4 pr-2 py-2.5 text-[13px] font-semibold border-b-2 -mb-px whitespace-nowrap transition-colors cursor-pointer ${
-                  activeTabId === tab.id
-                    ? 'border-edamame text-ink dark:text-plate-ink'
-                    : 'border-transparent text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft'
-                }`}
-                onClick={() => setActiveTabId(tab.id)}
-              >
-                {tab.label}
-                {tab.kind === 'checklist' && checklist.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
-                    {checklist.length}
-                  </span>
-                )}
-                {tab.kind === 'tasks' && caseTasks.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
-                    {caseTasks.length}
-                  </span>
-                )}
-                {tab.kind === 'documents' && documents.length > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${activeTabId === tab.id ? 'bg-edamame/10 text-edamame-700 dark:text-edamame-400' : 'bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft'}`}>
-                    {documents.length}
-                  </span>
-                )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); togglePinTab(tab.id); }}
-                  title={tab.pinned ? 'Unpin tab' : 'Pin tab (persists across reloads)'}
-                  className={`p-0.5 rounded transition-colors ${tab.pinned ? 'text-edamame' : 'text-ink-soft/40 dark:text-plate-ink-soft/40 opacity-0 group-hover:opacity-100 hover:text-edamame'}`}
-                >
-                  {tab.pinned ? <Pin size={11} /> : <PinOff size={11} />}
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
-                  title="Close tab"
-                  className="p-0.5 rounded text-ink-soft/40 dark:text-plate-ink-soft/40 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-colors"
-                >
-                  <X size={11} />
-                </button>
-              </div>
-            ))}
-          </div>
+      {/* ══════════════════════════════════════════
+          CONTENT GRID (tab panel + optional Agent panel)
+      ══════════════════════════════════════════ */}
+      <div
+        className="grid grid-cols-1 gap-3.5 items-start"
+      >
 
-          {/* ── WORKSPACE ── */}
-          {activeTabId === 'workspace' && (
-            <Workspace
-              viewCatalog={[
-                { kind: 'tasks', label: 'Tasks', description: `${pendingTasks.length} pending · ${completedTasks.length} completed` },
-                { kind: 'checklist', label: 'Document Checklist', description: `${uploadedCount}/${checklist.length} documents linked` },
-                { kind: 'documents', label: 'Case Files', description: `${documents.length} file${documents.length === 1 ? '' : 's'} uploaded` },
-                { kind: 'notes', label: 'Notes', description: 'Case notes and history' },
-              ] as WorkspaceCatalogItem[]}
-              toolCatalog={[
-                { kind: 'checklist-generator', label: 'Document Checklist Generator', description: 'Pick categories to generate a checklist from the system default + workflow template' },
-                { kind: 'document-compressor', label: 'Document Compressor', description: 'Compress documents to meet DoHA\'s 5MB-per-attachment requirement' },
-                ...(visaSubclass === '820' ? [{ kind: 'bundle-builder-820', label: '820 Bundle Builder', description: 'Build the ImmiAccount submission bundle' }] as WorkspaceCatalogItem[] : []),
-              ]}
-              recommendedViewKinds={recommendedViewKinds}
-              recommendedToolKinds={recommendedToolKinds}
-              onOpen={(kind) => openOrFocusTab(kind)}
-              conversationMessages={activeConv?.messages || []}
-              chatInput={chatInput}
-              setChatInput={setChatInput}
-              isSending={isSending}
-              onSend={sendMessage}
-              onNewChat={createConversation}
-              messageRecommendations={messageRecommendations}
-              chatEndRef={chatEndRef}
+        {/* ── CENTER COLUMN ── */}
+        <div className="min-w-0">
+          {/* ── OVERVIEW ── */}
+          {onOverview && (
+            <CaseOverview
+              stage={currentCase.stage}
+              onHold={!!currentCase.onHold}
+              currentTask={focusTask}
+              openTaskCount={pendingTasks.length}
+              totalTaskCount={caseTasks.length}
+              onOpenTask={handleOpenTaskModal}
+              timeline={timeline.entries}
+              hiddenTaskCount={timeline.hiddenCount}
+              onViewAllTasks={() => openOrFocusTab('tasks')}
+              client={client}
+              applicant={applicant}
+              visaSubclass={visaSubclass}
+              visaSubstream={currentCase.visaSubstream}
+              phaseView={phaseView}
+              templateTitle={workflowTemplate?.title}
+              ownerName={ownerName}
+              openedAt={currentCase.startDate || currentCase.createdAt}
+              nextDeadline={nextDeadline}
+              description={currentCase.description}
+              onEditCase={openEditCase}
+              onOpenDeadlines={() => openOrFocusTab('tasks')}
+              checklistRows={checklistRows}
+              checklistTotal={checklist.length}
+              checklistDone={uploadedCount}
+              onOpenChecklist={() => openOrFocusTab('checklist')}
+              onGenerateChecklist={() => openOrFocusTab('checklist-generator')}
+              documents={documents}
+              caseId={currentCase.id}
+              onOpenDocument={handleChecklistPreview}
+              onViewAllFiles={() => openOrFocusTab('documents')}
+              onDocumentUploaded={(doc) => {
+                setDocuments(prev => [...prev, doc]);
+                setDocRefreshKey(k => k + 1);
+              }}
+              onRequestCompress={handleRequestCompress}
             />
           )}
 
@@ -1818,7 +1632,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     className="btn-press flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-edamame hover:bg-edamame-600 text-white text-[12px] font-bold transition-colors disabled:opacity-50"
                   >
                     <Sparkles size={14} />
-                    Generate plan from template
+                    Generate tasks from work plan
                   </button>
                 </section>
               )}
@@ -1867,6 +1681,26 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 </section>
               )}
 
+              {phaseView.hasPhases ? (
+              <section>
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">
+                    Tasks by phase <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {countLabel(pendingTasks.length, 'open task')}</span>
+                  </span>
+                  {overdueCount > 0 && (
+                    <span className="text-[10.5px] font-bold px-2.5 py-1 rounded-md bg-red-500/[0.13] text-red-700 dark:text-red-400">
+                      {overdueCount} overdue
+                    </span>
+                  )}
+                </div>
+                <PhaseTaskGroups
+                  view={phaseView}
+                  onOpenTask={handleOpenTaskModal}
+                  renderRow={(task, isCurrent) => renderTaskRow(task, isTaskClosed(task), isCurrent)}
+                />
+              </section>
+              ) : (
+              <>
               <section>
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">
@@ -1901,12 +1735,30 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   </div>
                 </section>
               )}
+              </>
+              )}
             </div>
           )}
 
           {/* ── CASE FILES — full-tab view (formerly rail-only), better visibility/actions for a large document set ── */}
           {activeTabId === 'tab:documents' && (
             <div className="mt-4 space-y-4">
+              {/* Document tools live on the tab whose files they work on. */}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button onClick={() => setShowDocumentCompressor(true)} className={tabToolBtnCls}>
+                  <Minimize2 size={12} /> Compress documents
+                </button>
+                {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && (
+                  <button onClick={handleRunCrusher} title="Package the case files into a lodgement-ready PDF" className={tabToolBtnCls}>
+                    <Package size={12} /> Run Crusher
+                  </button>
+                )}
+                {visaSubclass === '820' && (
+                  <button onClick={() => setShowBundleBuilder(true)} className={tabToolBtnCls}>
+                    <Layers size={12} /> 820 Bundle Builder
+                  </button>
+                )}
+              </div>
               <DocumentUpload
                 caseId={currentCase.id}
                 visaSubclass={visaSubclass}
@@ -2129,28 +1981,35 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           )}
         </div>
 
-        {/* ── AGENT PANEL ── */}
-        {agentOpen && (
-          <AgentPanel
-            conversations={conversations}
-            activeConv={activeConv}
-            activeConvId={activeConvId}
-            onSelectConversation={setActiveConvId}
-            onNewChat={createConversation}
-            chatInput={chatInput}
-            setChatInput={setChatInput}
-            isSending={isSending}
-            onSend={sendMessage}
-            onSuggested={handleSkillAction}
-            suggestedChips={AGENT_CHIPS}
-            chatEndRef={chatEndRef}
-            filingIssueMessageId={filingIssueMessageId}
-            onConfirmIssueDraft={handleConfirmIssueDraft}
-            onCancelIssueDraft={handleCancelIssueDraft}
-          />
-        )}
       </div>
 
+      {/* ── EDIE: this case's suggestions, skills and chat, inside the app shell's panel ── */}
+      {edie.open && edie.panelEl && createPortal(
+        <EdiePanel
+          onClose={() => edie.setOpen(false)}
+          subtitle="Case assistant"
+          helpHeading={focusTask ? `Suggested for “${focusTask.title}”` : 'Suggested next steps'}
+          suggestions={edieSuggestions}
+          skills={edieSkills}
+          emptyText="Ask Edie anything about this case. Edie already knows the client, the tasks and the checklist."
+          placeholder="Ask Edie about this case…"
+          conversations={chat.conversations}
+          activeConv={chat.activeConv}
+          activeConvId={chat.activeConvId}
+          onSelectConversation={chat.setActiveConvId}
+          onNewChat={chat.createConversation}
+          chatInput={chat.chatInput}
+          setChatInput={chat.setChatInput}
+          isSending={chat.isSending}
+          onSend={chat.sendMessage}
+          chatEndRef={chat.chatEndRef}
+          inputRef={edieInputRef}
+          filingIssueMessageId={chat.filingIssueMessageId}
+          onConfirmIssueDraft={chat.confirmIssueDraft}
+          onCancelIssueDraft={chat.cancelIssueDraft}
+        />,
+        edie.panelEl,
+      )}
 
       {/* ── MODALS ── */}
 
@@ -2183,6 +2042,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   rows={4}
                 />
               </div>
+              <SubclassSubstreamFields
+                value={{ subclass: caseEditForm.visaSubclass, substream: caseEditForm.visaSubstream }}
+                onChange={v => setCaseEditForm({ ...caseEditForm, visaSubclass: v.subclass, visaSubstream: v.substream })}
+                labelClassName="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1"
+                selectClassName="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink disabled:opacity-50"
+              />
             </div>
             <div className="p-6 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex justify-end gap-3">
               <button
@@ -2201,6 +2066,19 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {pendingPlanChange && (
+        <ChangeVisaPlanDialog
+          subclass={pendingPlanChange.subclass}
+          substream={pendingPlanChange.substream}
+          templates={templates}
+          currentTaskCount={caseTasks.length}
+          openTaskCount={pendingTasks.length}
+          busy={applyingPlanChange}
+          onConfirm={handleConfirmPlanChange}
+          onCancel={() => setPendingPlanChange(null)}
+        />
       )}
 
       {/* Delete Confirmation Modal */}
@@ -2265,6 +2143,26 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   placeholder="Add more details..."
                 />
               </div>
+              {(!editingTask || phaseView.hasPhases) && (
+                <div>
+                  <label htmlFor="task-phase" className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Phase</label>
+                  <select
+                    id="task-phase"
+                    value={taskForm.phase}
+                    disabled={phaseChoices.locked}
+                    onChange={(e) => setTaskForm({ ...taskForm, phase: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink disabled:opacity-60"
+                  >
+                    {phaseChoices.options.map(o => <option key={o.ref} value={o.ref}>{o.name}</option>)}
+                    {taskForm.phase && !phaseChoices.options.some(o => o.ref === taskForm.phase) && (
+                      <option value={taskForm.phase}>{phaseName(casePhases, taskForm.phase)}</option>
+                    )}
+                  </select>
+                  {phaseChoices.locked && (
+                    <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1">Not Confirmed cases only use the Consultation phase.</p>
+                  )}
+                </div>
+              )}
               {!(editingTask && isTaskClosed(editingTask)) && (
                 <div>
                   <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Planned Date</label>

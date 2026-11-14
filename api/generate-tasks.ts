@@ -175,7 +175,7 @@ VISA APPLICATION TYPE: ${visaLabel}
 CLIENT PROFILE & CASE NOTES:
 ${caseDescription}
 
-The case's task plan already has these steps scheduled from its workflow template — do NOT propose a task that duplicates or restates any of them:
+The case's task plan already has these steps scheduled from its work plan — do NOT propose a task that duplicates or restates any of them:
 ${scheduledSection}
 ${excludeSection}
 Case Start Date: ${startDate}
@@ -186,7 +186,7 @@ Suggest a small number (0–5) of ADDITIONAL tasks this specific case needs that
 For each suggestion, give:
 - title: a short, specific, actionable task title
 - description: what needs to be done and why
-- reason: one sentence on why this case in particular needs it (not on the template)
+- reason: one sentence on why this case in particular needs it (not on the work plan)
 - anchorStepKey: the "key" of the scheduled step above this should be timed relative to, if any (omit if it should be timed from the case start date instead)
 - offsetDays: days after the anchor step's due date (or after the case start date, if no anchorStepKey) this task should be due`;
 

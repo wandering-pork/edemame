@@ -1,0 +1,108 @@
+# Configuration: Document Types, Visa Types & Phases
+
+**Configuration** is the central place for settings used across modules, separate from the global
+**Settings** page (which covers your account, theme, and where your data is stored). Open it from
+**Configuration** in the sidebar, under **Workspace**. (It used to be a **Configurations** button
+inside the Case Manager; that button has moved here.)
+
+Settings are listed on the left, grouped by the module they belong to, and the selected setting
+opens on the right:
+
+- **Case Manager → Document Types** — the codes used to tag files and checklist items (below).
+- **Work Plans → Visa Types** — the subclasses and substreams offered on Work Plans and cases.
+- **Work Plans → Phases** — the ordered phases a case moves through.
+
+## What a Document Type is
+
+A Document Type is a short code plus a description — for example `PPT — Passport (all pages)` or
+`AFPCHK — AFP National Police Check`. It's the shared vocabulary your firm uses to say *what kind of
+document this is*, and it's what makes files and checklist items able to find each other:
+
+- Every file you upload to **Case Files** is tagged with a Document Type (this is required).
+- Every **Document Checklist** item can carry a Document Type too.
+- When both sides agree, and the type has **Auto-link** turned on, the file links itself to the
+  checklist item — no dragging required.
+
+## The list
+
+The list is long (roughly ninety types), so it's grouped by category — Identity, Civil Status,
+Sponsor & Employer, Skills & Qualifications, Health & Character, State Nomination & Points, the
+partner-visa evidence groups, Children & Dependants, Secondary Applicants, and Other. Type in the
+search box to filter by code, description, or category as you type; collapse a category header you
+don't need.
+
+Types shipped with Edamame show a **padlock**: they can't be renamed, recoded, or deleted, so a
+code always means the same thing across every case and every colleague. `OTH — Other` is the
+deliberate escape hatch for anything that doesn't fit a specific type.
+
+## Adding your own type
+
+Click **Add type**, then give it:
+
+- a **code** — up to 6 characters, uppercase letters and digits only, and unique within your firm;
+- a **description** — up to 100 characters;
+- a **category** to file it under.
+
+Firm-added types can be deleted later (the trash icon). Deleting one doesn't touch any file or
+checklist item already tagged with it — those keep showing the code, highlighted in amber to say
+it's no longer configured.
+
+## The Auto-link column
+
+Every row has an **Auto-link** checkbox on the right. Hovering the column header explains it:
+
+> When ticked, a Case File tagged with this Document Type will automatically link itself to any
+> matching Document Checklist item once uploaded.
+
+Auto-link is **off by default on every type**, including the ones shipped with Edamame — you decide
+which types are safe to link without a human looking first. A firm might happily auto-link `PSP`
+police checks while insisting on reviewing `PHOTO` submissions by hand.
+
+You can tick or untick Auto-link on any row, including the padlocked system types — the lock only
+protects the code and description, not this preference.
+
+### When a change takes effect
+
+Turning Auto-link on or off doesn't rewrite existing checklists there and then. It applies the next
+time someone opens (or presses **Refresh** on) a case's Document Checklist tab. Items already marked
+**Verified** or **Waived** are never changed by auto-link at all — those record a decision a person
+made, and a later upload or settings change must not quietly overwrite it.
+
+## Visa Types
+
+**Configuration → Work Plans → Visa Types** is your firm's list of visa subclasses and their
+substreams — for example **189 Skilled Independent** with the substreams **Points-tested** and
+**New Zealand**. It's what the **Visa Subclass** and **Substream** dropdowns offer when you set up a
+Work Plan, create a case, edit a case, or open a case from the Visa Advisor.
+
+Rows are grouped by subclass, one row per substream (a subclass with no substreams, like 190, has a
+single "No substream" row). Each row can carry a short **note**, e.g. the Student 500 sectors.
+
+- **Add visa type** — enter the subclass code, its name, and a substream (leave the substream blank
+  if there isn't one). Add one row per substream; rows with the same code are grouped together.
+- **Edit** (pencil) — change any row, including built-in ones. An edited built-in row shows
+  **Edited** and gets a **Reset** button that puts back the original values.
+- **Hide** (eye) — removes a row from the dropdowns without deleting it. Use **Show hidden** to see
+  and un-hide them. Plans and cases that already use a hidden subclass or substream keep it.
+- **Delete** — only for rows your firm added. Built-in rows can be hidden instead.
+
+**Not Confirmed** isn't in this list: it's always offered in the Subclass dropdown, can't be
+changed, and is meant for consultation-only plans and cases where the visa hasn't been decided yet.
+When the subclass is blank or Not Confirmed, the Substream dropdown is empty.
+
+Edamame ships ten subclasses (189, 190, 186, 482, 491, 500, 485, 600, 417, 820/801) with their
+substreams. New built-in rows added in a later release appear automatically and never undo your
+edits or bring back a row you hid.
+
+## Phases
+
+**Configuration → Work Plans → Phases** is the ordered list of phases a case moves through:
+Consultation, Prerequisites, Preparing for lodgement, Ready to lodge, Lodged, Decision,
+Post-decision. Work Plan tasks are grouped by phase.
+
+Phases are separate from a case's **stage** (Draft → Closed), which you still set on the case itself.
+
+- Use the up/down arrows to reorder phases, the pencil to rename one, and the eye to hide one.
+- **Add phase** adds a new phase at the end of the list; phases your firm added can be deleted.
+- **Consultation** is required: it's always first and can't be renamed, hidden or removed.
+- A renamed built-in phase shows **Edited** and gets a **Reset** button.

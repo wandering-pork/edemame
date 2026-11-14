@@ -1,4 +1,4 @@
-import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation, UsageEvent, EligibilityAssessment, Deadline } from '../types';
+import type { Task, Case, Client, WorkflowTemplate, CaseNote, Document, Notification, TeamMember, ActivityEvent, DocumentChecklistItem, DocumentType, FocusConversation, UsageEvent, EligibilityAssessment, Deadline, VisaType, CasePhase } from '../types';
 
 // Generic CRUD interface
 export interface IRepository<T> {
@@ -79,6 +79,19 @@ export interface IDocumentTypeRepository extends IRepository<DocumentType> {
   createMany(items: DocumentType[]): Promise<DocumentType[]>;
 }
 
+/**
+ * Firm-level Visa Types list (subclass + substream rows) and ordered Phases
+ * list. Seeded by `lib/visaTypes.ts` / `lib/casePhases.ts`; the repositories
+ * enforce no rules (see `contexts/VisaConfigContext.tsx`).
+ */
+export interface IVisaTypeRepository extends IRepository<VisaType> {
+  createMany(items: VisaType[]): Promise<VisaType[]>;
+}
+
+export interface ICasePhaseRepository extends IRepository<CasePhase> {
+  createMany(items: CasePhase[]): Promise<CasePhase[]>;
+}
+
 export interface IChatRepository {
   getByCaseId(caseId: string): Promise<FocusConversation[]>;
   setForCase(caseId: string, conversations: FocusConversation[]): Promise<void>;
@@ -120,6 +133,8 @@ export interface Repositories {
   usage: IUsageRepository;
   checklist: IChecklistRepository;
   documentTypes: IDocumentTypeRepository;
+  visaTypes: IVisaTypeRepository;
+  casePhases: ICasePhaseRepository;
   chat: IChatRepository;
   eligibility: IEligibilityRepository;
   deadlines: IDeadlineRepository;

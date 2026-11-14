@@ -385,7 +385,7 @@ export function generateChecklistForCategories(
 /**
  * Merge the system default checklist (for the selected categories) with items
  * derived from the user's workflow template steps (firm-level customisation).
- * Template steps are added under a "From Workflow Template" category, skipping
+ * Template steps are added under a "From Work Plan" category, skipping
  * any step whose title already matches a system-default label (case-insensitive).
  */
 export function mergeWithWorkflowTemplateSteps(
@@ -405,7 +405,7 @@ export function mergeWithWorkflowTemplateSteps(
       label: step.title,
       description: step.description,
       status: 'pending',
-      category: 'From Workflow Template',
+      category: 'From Work Plan',
     });
   }
   return [...systemItems, ...extra];

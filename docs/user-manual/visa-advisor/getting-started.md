@@ -47,11 +47,14 @@ review it and click **Confirm**. The panel shows:
   switch to "Create new client". If a client with the same name already exists but didn't match on
   DOB, quick-pick buttons for those candidates appear so you don't accidentally create a duplicate.
 - **Email / Phone** — optional contact details, shown only when a new client will be created.
-- **Workflow Template** — pre-selected when a template's subclass exactly matches the pathway's
-  subclass. If nothing matches, you must explicitly pick a template or choose **No template
+- **Work Plan** — pre-selected when a plan's subclass exactly matches the pathway's
+  subclass. If nothing matches, you must explicitly pick a plan or choose **No work plan
   (general case)** before you can confirm.
-- **Case Title** — prefilled from the template and client name; edit it freely, and it keeps
-  updating to match your client/template choice until you type in it yourself.
+- **Visa Subclass / Substream** — the subclass is fixed to the pathway you opened the case from;
+  pick a **Substream** if it has any (it defaults to the work plan's substream when the plan is for
+  the same subclass).
+- **Case Title** — prefilled from the work plan and client name; edit it freely, and it keeps
+  updating to match your client/work plan choice until you type in it yourself.
 - **Generate AI task plan** — on by default. Turn it off to create the case without an AI-drafted
   task schedule (you can still generate one later from the case page).
 - **Add a task for each gap (N)** — shown only when the pathway has gaps to address; off by

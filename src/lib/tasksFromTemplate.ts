@@ -1,5 +1,6 @@
 import type { Deadline, DeadlineKind, Task, WorkflowStep, WorkflowTemplate } from '../types';
 import { isTaskClosed } from './taskStatus';
+import { resolveStepPhases } from './phaseGrouping';
 import {
   KnownAnchors,
   RescheduleTask,
@@ -31,7 +32,7 @@ function toScheduleStep(step: WorkflowStep): ScheduleStep {
 /** A deterministically-generated task draft, shaped to slot into the existing `Partial<Task>[]`-based review flows (NewCase, openCaseFromAdvisor). */
 export type TemplateTaskDraft = Pick<
   Task,
-  'title' | 'description' | 'date' | 'stepKey' | 'datePending' | 'status' | 'isCompleted' | 'generatedByAi'
+  'title' | 'description' | 'date' | 'stepKey' | 'datePending' | 'status' | 'isCompleted' | 'generatedByAi' | 'phase'
 >;
 
 /**
@@ -45,14 +46,18 @@ export function buildTemplateTaskDrafts(
   steps: WorkflowStep[],
   caseStartDate: string,
   knownAnchors: KnownAnchors = {},
+  visaSubclass?: string,
 ): { drafts: TemplateTaskDraft[]; errors: ScheduleError[] } {
   const scheduleSteps = steps.map(toScheduleStep);
+  const resolved = resolveStepPhases(steps, visaSubclass);
+  const stepPhases = new Map(steps.map((s, i) => [s.key, resolved[i]]));
   const { items, errors } = scheduleFromTemplate(scheduleSteps, caseStartDate, knownAnchors);
   const drafts: TemplateTaskDraft[] = items.map(item => ({
     title: item.title,
     description: item.description,
     date: item.date,
     stepKey: item.stepKey,
+    phase: stepPhases.get(item.stepKey),
     datePending: item.datePending,
     status: 'not_started',
     isCompleted: false,

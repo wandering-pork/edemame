@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, FileText, Settings, LogOut, Users, Menu, X,
   BookTemplate, Sparkles, UsersRound, UserCog, PanelLeftClose, PanelLeftOpen,
-  Building2, Check, ChevronsUpDown,
+  Building2, Check, ChevronsUpDown, SlidersHorizontal,
 } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { SidebarLogoArea } from './SidebarLogoArea';
+import { BrandImage } from './BrandImage';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useStorageMode } from '../contexts/RepositoryContext';
@@ -25,7 +26,8 @@ const navGroups: NavGroup[] = [
       { to: '/cases', label: 'Case Manager', icon: FileText },
       { to: '/clients', label: 'Clients', icon: Users },
       { to: '/visa-advisor', label: 'Visa Advisor', icon: Sparkles },
-      { to: '/templates', label: 'Templates', icon: BookTemplate },
+      { to: '/templates', label: 'Work Plans', icon: BookTemplate },
+      { to: '/configuration', label: 'Configuration', icon: SlidersHorizontal },
     ],
   },
   {
@@ -277,16 +279,9 @@ export const Sidebar: React.FC = () => {
           }
         >
           {collapsed && !isDrawer ? (
-            /* Collapsed monogram */
+            /* Collapsed: the pod mark alone */
             <div className="flex items-center justify-center py-3 w-full">
-              <div className="w-9 h-9 rounded-xl bg-ink/8 dark:bg-plate-ink/10 flex items-center justify-center ring-1 ring-ink/10 dark:ring-plate-ink/15 shadow-inner">
-                <span
-                  className="text-edamame-700 dark:text-edamame-400 font-black text-base leading-none"
-                  style={{ fontFamily: "'Sniglet', cursive" }}
-                >
-                  E
-                </span>
-              </div>
+              <BrandImage variant="mark" alt="Edamame" className="w-10 h-auto" />
             </div>
           ) : (
             /* Full logo */
@@ -403,12 +398,6 @@ export const Sidebar: React.FC = () => {
           ${collapsed ? 'w-16' : 'w-[240px]'}
         `}
       >
-        {/* Subtle depth texture */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.035] text-ink dark:text-plate-ink"
-          style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 24px, currentColor 24px, currentColor 25px)',
-          }}
-        />
         <div className="relative z-10 flex flex-col h-full">
           {sidebarContent(false)}
         </div>

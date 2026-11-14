@@ -41,12 +41,12 @@ describe('describePlanSource', () => {
 describe('buildTaskPlanSummary', () => {
   it('names the template when known', () => {
     expect(buildTaskPlanSummary(12, 'template', 'Skilled Independent 189')).toBe(
-      'Created a 12-task plan from the Skilled Independent 189 template.'
+      'Created a 12-task plan from the Skilled Independent 189 work plan.'
     );
   });
 
   it('falls back to a generic template phrase when the name is unknown', () => {
-    expect(buildTaskPlanSummary(12, 'template')).toBe('Created a 12-task plan from the workflow template.');
+    expect(buildTaskPlanSummary(12, 'template')).toBe('Created a 12-task plan from a work plan.');
   });
 
   it('describes an AI-generated plan', () => {
@@ -55,7 +55,7 @@ describe('buildTaskPlanSummary', () => {
 
   it('describes a mixed plan', () => {
     expect(buildTaskPlanSummary(14, 'mixed')).toBe(
-      'Created a 14-task plan (template plan plus AI-suggested additions).'
+      'Created a 14-task plan (work plan plus AI-suggested additions).'
     );
   });
 

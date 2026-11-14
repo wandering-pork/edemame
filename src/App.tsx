@@ -7,6 +7,7 @@ import { Header } from './components/Header';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RepositoryProvider, useRepositories, useStorageMode } from './contexts/RepositoryContext';
 import { DocumentTypeProvider } from './contexts/DocumentTypeContext';
+import { VisaConfigProvider } from './contexts/VisaConfigContext';
 import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
 import { CaseDetails } from './pages/CaseDetails';
@@ -15,6 +16,7 @@ import { VisaAdvisor } from './pages/VisaAdvisor';
 import { openCaseFromAdvisor, OpenCaseParams, OpenCaseOutcome } from './lib/openCaseFromAdvisor';
 import { generateTasksFromCase } from './services/geminiService';
 import { Templates } from './pages/Templates';
+import Configuration from './pages/Configuration';
 import { Settings } from './pages/Settings';
 import { TeamDashboard } from './pages/TeamDashboard';
 import { TeamMembers } from './pages/TeamMembers';
@@ -31,6 +33,8 @@ import { knownAnchorsFromDeadlines, rescheduleCaseTasks } from './lib/tasksFromT
 import { buildDeadlineAlerts } from './lib/deadlineAlerts';
 import { initialsOfName } from './lib/firmDirectory';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
+import { EdieProvider, useEdie } from './contexts/EdieContext';
+import { EdieShell, EDIE_PUSH_PADDING_CLASS } from './components/edie/EdieShell';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProfileProvider, useProfile } from './contexts/ProfileContext';
 import { LocalFolderProvider, useLocalFolder } from './contexts/LocalFolderContext';
@@ -44,6 +48,7 @@ import { PendingInvitationsBanner } from './components/team/PendingInvitationsBa
 import { isSupabaseConfigured, supabase } from './lib/supabaseClient';
 import { shouldNotifyAssignment } from './lib/assignmentNotify';
 import { describePlanSource, buildTaskPlanSummary } from './lib/planActivity';
+import type { PlanChangeResult } from './lib/visaPlanChange';
 
 // ---------------------------------------------------------------------------
 // Inner app — has access to repositories and router
@@ -53,6 +58,7 @@ const AppShell: React.FC = () => {
   const repos = useRepositories();
   const storageMode = useStorageMode();
   const { collapsed } = useSidebar();
+  const { open: edieOpen } = useEdie();
   const { user } = useAuth();
   const { profile, updateProfile } = useProfile();
   const { firm, teamMembers: firmTeamMembers, lostAccessNotice, dismissLostAccessNotice } = useFirm();
@@ -451,6 +457,36 @@ const AppShell: React.FC = () => {
     }
   }, [repos, tasks, deadlines, pushActivity, currentUserId, rescheduleCaseFromSnapshot, notifyAssignment]);
 
+  /**
+   * Applies a confirmed visa subclass / Work Plan change in one go (Work
+   * Plans step 4, see lib/visaPlanChange.ts): deletes or closes the case's
+   * current tasks, saves the case with its new subclass and plan, and adds
+   * the plan's tasks. Done as one batch with functional state updates —
+   * calling handleUpdateTask/handleDeleteTask in a loop would overwrite
+   * each other's state and toast once per task.
+   */
+  const handleChangeCasePlan = useCallback(async (change: PlanChangeResult) => {
+    await Promise.all(change.deleteIds.map(id => repos.tasks.delete(id)));
+    await Promise.all(change.closedTasks.map(t => repos.tasks.update(t)));
+    await repos.cases.update(change.updatedCase);
+    if (change.newTasks.length) await repos.tasks.createMany(change.newTasks);
+
+    const deleted = new Set(change.deleteIds);
+    const closed = new Map(change.closedTasks.map(t => [t.id, t]));
+    setTasks(prev => [...prev.filter(t => !deleted.has(t.id)).map(t => closed.get(t.id) ?? t), ...change.newTasks]);
+    setCases(prev => prev.map(c => (c.id === change.updatedCase.id ? change.updatedCase : c)));
+
+    const templateName = templates.find(t => t.id === change.updatedCase.templateId)?.title;
+    if (change.newTasks.length > 0) {
+      pushActivity({
+        type: 'tasks_planned',
+        actorId: currentUserId,
+        subjectId: change.updatedCase.id,
+        summary: buildTaskPlanSummary(change.newTasks.length, describePlanSource(change.newTasks), templateName),
+      });
+    }
+  }, [repos, templates, pushActivity, currentUserId]);
+
   const handleDeleteTask = useCallback(async (id: string) => {
     await repos.tasks.delete(id);
     setTasks(prev => prev.filter(t => t.id !== id));
@@ -645,41 +681,87 @@ const AppShell: React.FC = () => {
     if (member) toast.info(`${member.name} removed`);
   }, [repos, teamMembers, cases, tasks]);
 
-  const handleAssignCase = useCallback(async (caseId: string, newOwnerId: string, note?: string) => {
-    const caseItem = cases.find(c => c.id === caseId);
-    if (!caseItem) return;
-    const event: CaseAssignmentEvent = {
-      id: uuidv4(),
-      caseId,
-      fromOwnerId: caseItem.caseOwner,
-      toOwnerId: newOwnerId,
-      changedAt: new Date().toISOString(),
-      changedBy: currentUserId,
-      note,
-    };
-    const updated: Case = {
-      ...caseItem,
-      caseOwner: newOwnerId,
-      assignmentHistory: [...(caseItem.assignmentHistory || []), event],
-    };
-    try {
-      await repos.cases.update(updated);
-    } catch {
+  /**
+   * Assigns one or more cases to `newOwnerId`, recording an assignment event
+   * on each. One toast for the whole batch; each case gets its own activity
+   * event and "assigned to you" notification.
+   */
+  const handleAssignCases = useCallback(async (caseIds: string[], newOwnerId: string, note?: string) => {
+    const now = new Date().toISOString();
+    const updates: { before: Case; after: Case }[] = [];
+    for (const caseId of caseIds) {
+      const caseItem = cases.find(c => c.id === caseId);
+      if (!caseItem || caseItem.caseOwner === newOwnerId) continue;
+      const event: CaseAssignmentEvent = {
+        id: uuidv4(),
+        caseId,
+        fromOwnerId: caseItem.caseOwner,
+        toOwnerId: newOwnerId,
+        changedAt: now,
+        changedBy: currentUserId,
+        note,
+      };
+      updates.push({
+        before: caseItem,
+        after: { ...caseItem, caseOwner: newOwnerId, assignmentHistory: [...(caseItem.assignmentHistory || []), event] },
+      });
+    }
+    if (updates.length === 0) return;
+    await Promise.all(updates.map(({ after }) => repos.cases.update(after).catch(() => {
       // Repository layer may not persist new optional fields — safe to ignore.
-    }
-    setCases(prev => prev.map(c => c.id === caseId ? updated : c));
+    })));
+    const byId = new Map(updates.map(u => [u.after.id, u.after]));
+    setCases(prev => prev.map(c => byId.get(c.id) ?? c));
     const newOwner = teamMembers.find(m => m.id === newOwnerId);
-    pushActivity({
-      type: 'case_assigned',
-      actorId: currentUserId,
-      subjectId: caseId,
-      summary: `${caseItem.title} assigned to ${newOwner?.name || 'team member'}.`,
-    });
-    toast.success(`Case assigned to ${newOwner?.name || 'team member'}`);
-    if (shouldNotifyAssignment(caseItem.caseOwner, newOwnerId, currentUserId)) {
-      notifyAssignment('case', caseId);
+    const ownerName = newOwner?.name || 'team member';
+    for (const { before } of updates) {
+      pushActivity({
+        type: 'case_assigned',
+        actorId: currentUserId,
+        subjectId: before.id,
+        summary: `${before.title} assigned to ${ownerName}.`,
+      });
+      if (shouldNotifyAssignment(before.caseOwner, newOwnerId, currentUserId)) {
+        notifyAssignment('case', before.id);
+      }
     }
+    toast.success(updates.length === 1 ? `Case assigned to ${ownerName}` : `${updates.length} cases assigned to ${ownerName}`);
   }, [cases, repos, teamMembers, pushActivity, currentUserId, notifyAssignment]);
+
+  const handleAssignCase = useCallback(
+    (caseId: string, newOwnerId: string, note?: string) => handleAssignCases([caseId], newOwnerId, note),
+    [handleAssignCases],
+  );
+
+  /**
+   * Deletes cases together with their tasks and deadlines. Cloud mode
+   * cascades these in the database already; local mode stores them as
+   * separate files, so they're removed explicitly rather than left orphaned.
+   */
+  const handleDeleteCases = useCallback(async (caseIds: string[]) => {
+    const ids = new Set(caseIds);
+    const doomedTasks = tasks.filter(t => t.caseId && ids.has(t.caseId));
+    const doomedDeadlines = deadlines.filter(d => d.caseId && ids.has(d.caseId));
+    const deleted = new Set<string>();
+    for (const caseId of ids) {
+      try {
+        await Promise.all([
+          ...doomedTasks.filter(t => t.caseId === caseId).map(t => repos.tasks.delete(t.id)),
+          ...doomedDeadlines.filter(d => d.caseId === caseId).map(d => repos.deadlines.delete(d.id)),
+        ]);
+        await repos.cases.delete(caseId);
+        deleted.add(caseId);
+      } catch (err) {
+        console.error('Could not delete case', caseId, err);
+      }
+    }
+    setCases(prev => prev.filter(c => !deleted.has(c.id)));
+    setTasks(prev => prev.filter(t => !(t.caseId && deleted.has(t.caseId))));
+    setDeadlines(prev => prev.filter(d => !(d.caseId && deleted.has(d.caseId))));
+    const failed = ids.size - deleted.size;
+    if (deleted.size > 0) toast.success(deleted.size === 1 ? 'Case deleted' : `${deleted.size} cases deleted`);
+    if (failed > 0) toast.error(failed === 1 ? "Couldn't delete 1 case. Please try again." : `Couldn't delete ${failed} cases. Please try again.`);
+  }, [tasks, deadlines, repos]);
 
   // --- Client Actions ---
   const handleAddClient = useCallback(async (client: Client) => {
@@ -725,7 +807,7 @@ const AppShell: React.FC = () => {
       <Toaster position="top-right" richColors theme={theme === 'dark' ? 'dark' : 'light'} />
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 font-sans text-gray-900 dark:text-gray-100 transition-colors duration-200">
         <Sidebar />
-        <div className={`${collapsed ? 'md:ml-16' : 'md:ml-[240px]'} min-w-0 transition-[margin-left] duration-300 ease-in-out`}>
+        <div className={`${collapsed ? 'md:ml-16' : 'md:ml-[240px]'} ${edieOpen ? EDIE_PUSH_PADDING_CLASS : ''} min-w-0 min-h-screen flex flex-col transition-[margin-left,padding] duration-300 ease-in-out`}>
           <Header
             theme={theme}
             onThemeChange={handleThemeChange}
@@ -768,7 +850,8 @@ const AppShell: React.FC = () => {
               </button>
             </div>
           )}
-          <main>
+          {/* flex-1 + flex-col so a page can fill the rest of the window (Case Details' paper background does). */}
+          <main className="flex-1 flex flex-col">
           <Routes>
             <Route path="/dashboard" element={
               <Dashboard
@@ -845,6 +928,8 @@ const AppShell: React.FC = () => {
                 currentUserId={currentUserId}
                 onTasksConfirmed={handleTasksConfirmed}
                 onAssignCase={handleAssignCase}
+                onAssignCases={handleAssignCases}
+                onDeleteCases={handleDeleteCases}
               />
             } />
             <Route path="/cases/:caseId" element={
@@ -864,6 +949,8 @@ const AppShell: React.FC = () => {
                 onAddDeadline={handleAddDeadline}
                 onUpdateDeadline={handleUpdateDeadline}
                 onUpdateCase={handleUpdateCase}
+                onChangeCasePlan={handleChangeCasePlan}
+                onDeleteCase={id => handleDeleteCases([id])}
               />
             } />
             <Route path="/templates" element={
@@ -875,6 +962,7 @@ const AppShell: React.FC = () => {
                 onDeleteTemplate={handleDeleteTemplate}
               />
             } />
+            <Route path="/configuration" element={<Configuration />} />
             <Route path="/settings" element={
               <Settings
                 currentTheme={theme}
@@ -885,6 +973,7 @@ const AppShell: React.FC = () => {
           </Routes>
           </main>
         </div>
+        <EdieShell />
       </div>
     </div>
   );
@@ -915,6 +1004,8 @@ interface CaseDetailsRouteProps {
   onAddDeadline: (deadline: Deadline) => void;
   onUpdateDeadline: (deadline: Deadline) => void;
   onUpdateCase: (caseItem: Case) => void;
+  onChangeCasePlan: (change: PlanChangeResult) => Promise<void>;
+  onDeleteCase: (caseId: string) => Promise<void>;
 }
 
 const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
@@ -949,6 +1040,9 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       onAddDeadline={props.onAddDeadline}
       onUpdateDeadline={props.onUpdateDeadline}
       onUpdateCase={props.onUpdateCase}
+      onChangeCasePlan={props.onChangeCasePlan}
+      onDeleteCase={props.onDeleteCase}
+      templates={props.templates}
       onBack={() => navigate('/cases')}
     />
   );
@@ -1114,9 +1208,13 @@ const StorageGate: React.FC = () => {
   return (
     <RepositoryProvider storageMode={profile.storageMode}>
       <DocumentTypeProvider>
+        <VisaConfigProvider>
         <SidebarProvider>
+        <EdieProvider>
           <AppShell />
+        </EdieProvider>
         </SidebarProvider>
+        </VisaConfigProvider>
       </DocumentTypeProvider>
     </RepositoryProvider>
   );
@@ -1138,9 +1236,13 @@ const CloudAppGate: React.FC = () => {
   return (
     <RepositoryProvider storageMode="cloud" firmId={firm.id}>
       <DocumentTypeProvider>
+        <VisaConfigProvider>
         <SidebarProvider>
+        <EdieProvider>
           <AppShell />
+        </EdieProvider>
         </SidebarProvider>
+        </VisaConfigProvider>
       </DocumentTypeProvider>
     </RepositoryProvider>
   );

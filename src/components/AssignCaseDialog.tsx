@@ -15,6 +15,13 @@ interface AssignCaseDialogProps {
   currentUserId?: string;
   onClose: () => void;
   onConfirm: (caseId: string, newOwnerId: string, note?: string) => void;
+  /**
+   * Bulk mode (Case Manager multi-select): every selected case. With more
+   * than one, the dialog assigns them all at once through `onConfirmBulk`
+   * and hides the single case's assignment history.
+   */
+  selection?: Case[];
+  onConfirmBulk?: (caseIds: string[], newOwnerId: string, note?: string) => void;
 }
 
 const ROLE_LABEL: Record<TeamMember['role'], string> = {
@@ -30,12 +37,13 @@ const ROLE_LABEL: Record<TeamMember['role'], string> = {
  * card list, so it stays usable at 20+ members.
  */
 export const AssignCaseDialog: React.FC<AssignCaseDialogProps> = ({
-  caseItem, teamMembers, cases, tasks, currentUserId, onClose, onConfirm,
+  caseItem, teamMembers, cases, tasks, currentUserId, onClose, onConfirm, selection, onConfirmBulk,
 }) => {
+  const bulk = !!selection && selection.length > 1 && !!onConfirmBulk;
   // useFirm() returns firm: null / empty directory in local mode — this
   // still works there, it just falls back to TeamMember's cosmetic role/name.
   const { allMembers, memberNameFor } = useFirm();
-  const [target, setTarget] = useState<string | undefined>(caseItem.caseOwner);
+  const [target, setTarget] = useState<string | undefined>(bulk ? undefined : caseItem.caseOwner);
   const [note, setNote] = useState('');
 
   const people: PersonPickerPerson[] = teamMembers.map(m => {
@@ -49,14 +57,19 @@ export const AssignCaseDialog: React.FC<AssignCaseDialogProps> = ({
     return memberNameFor(id) || teamMembers.find(m => m.id === id)?.name || null;
   };
 
-  const history = caseItem.assignmentHistory || [];
-  const canConfirm = !!target && target !== caseItem.caseOwner;
+  const history = bulk ? [] : caseItem.assignmentHistory || [];
+  const canConfirm = bulk ? !!target : !!target && target !== caseItem.caseOwner;
+  const confirm = () => {
+    if (!target) return;
+    if (bulk) onConfirmBulk!(selection!.map(c => c.id), target, note || undefined);
+    else onConfirm(caseItem.id, target, note || undefined);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4 z-50 modal-backdrop">
       <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl max-w-md w-full modal-content flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between p-6 border-b border-ink/15 dark:border-plate-ink/20 flex-shrink-0">
-          <h2 className="text-lg font-bold text-ink dark:text-plate-ink">Assign Case</h2>
+          <h2 className="text-lg font-bold text-ink dark:text-plate-ink">{bulk ? `Assign ${selection!.length} cases` : 'Assign Case'}</h2>
           <button
             onClick={onClose}
             className="p-1 text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate-card rounded-lg transition-colors"
@@ -81,14 +94,14 @@ export const AssignCaseDialog: React.FC<AssignCaseDialogProps> = ({
                 currentUserId={currentUserId}
                 autoFocus
                 onEscape={onClose}
-                aria-label="Assign case to"
+                aria-label={bulk ? 'Assign cases to' : 'Assign case to'}
               />
             )}
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-ink-soft dark:text-plate-ink-soft mb-2">
-              Note <span className="font-normal text-ink-faint dark:text-plate-ink-faint">(optional — added to the case's assignment history)</span>
+              Note <span className="font-normal text-ink-faint dark:text-plate-ink-faint">(optional, added to {bulk ? "each case's" : "the case's"} assignment history)</span>
             </label>
             <textarea
               value={note}
@@ -135,7 +148,7 @@ export const AssignCaseDialog: React.FC<AssignCaseDialogProps> = ({
             Cancel
           </button>
           <button
-            onClick={() => { if (!target) return; onConfirm(caseItem.id, target, note || undefined); }}
+            onClick={confirm}
             disabled={!canConfirm}
             className="btn-press ml-auto px-4 py-2 text-sm font-semibold text-white bg-edamame-500 hover:bg-edamame-600 disabled:bg-ink/20 dark:disabled:bg-plate-ink/20 disabled:cursor-not-allowed rounded-lg transition-colors"
           >

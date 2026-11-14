@@ -255,6 +255,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
         title: result.title,
         generateTasks: result.generateTasks,
         visaSubclass: visa.visaSubclass,
+        visaSubstream: result.visaSubstream,
         visaName: visa.visaName,
         caseDescription: buildEligibilitySummary(
           visa,

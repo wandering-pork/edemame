@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { X, Search, Settings2, Tags, Plus, Trash2, Lock, Info, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Plus, Trash2, Lock, Info, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { useDocumentTypes } from '@/contexts/DocumentTypeContext';
 import {
   DOCUMENT_TYPE_CODE_MAX,
@@ -10,96 +10,15 @@ import {
 } from '@/lib/documentTypes';
 
 /**
- * Case Manager → Configurations (GitHub issue #4 §3).
- *
- * Module-level settings, distinct from the account-level `pages/Settings.tsx`.
- * Built as a left-nav-of-setting-types + right-detail-pane shell so future
- * setting types (case-status workflows, category presets) drop into
- * SETTING_TYPES as siblings without restructuring the container (§3.2). This
- * round ships exactly one: Document Type.
+ * Configuration → Case Manager → Document Types (GitHub issue #4 §3).
+ * Rendered by `pages/Configuration.tsx`; previously lived inside the Case
+ * Manager's own Configurations modal.
  */
-
-type SettingTypeId = 'document-types';
-
-interface SettingTypeDef {
-  id: SettingTypeId;
-  label: string;
-  description: string;
-  icon: React.ElementType;
-}
-
-const SETTING_TYPES: SettingTypeDef[] = [
-  {
-    id: 'document-types',
-    label: 'Document Type',
-    description: 'The firm-wide list of document types, and which of them auto-link.',
-    icon: Tags,
-  },
-];
 
 const AUTO_LINK_HINT =
   'When ticked, a Case File tagged with this Document Type will automatically link itself to any matching Document Checklist item once uploaded.';
 
-export const ConfigurationsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [activeType, setActiveType] = useState<SettingTypeId>('document-types');
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-paper-2 dark:bg-plate-card rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden border border-ink/10 dark:border-plate-ink/15 animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="p-5 border-b border-ink/10 dark:border-plate-ink/15 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center">
-              <Settings2 size={15} className="text-edamame" />
-            </div>
-            <div>
-              <h3 className="text-[15px] font-bold text-ink dark:text-plate-ink leading-tight">Case Manager Configurations</h3>
-              <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
-                Settings that apply across every case in this account
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-ink-faint dark:text-plate-ink-faint hover:text-ink-soft dark:hover:text-plate-ink-soft rounded-lg hover:bg-paper-2 dark:hover:bg-plate-card transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Left nav of setting types + right detail pane */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[220px_1fr]">
-          <nav className="hidden sm:block border-r border-ink/10 dark:border-plate-ink/15 p-3 space-y-1 overflow-y-auto custom-scrollbar">
-            {SETTING_TYPES.map(t => {
-              const Icon = t.icon;
-              const isActive = t.id === activeType;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveType(t.id)}
-                  className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors ${
-                    isActive
-                      ? 'bg-edamame/[0.08] dark:bg-edamame/[0.12] text-edamame-700 dark:text-edamame-400'
-                      : 'text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate'
-                  }`}
-                >
-                  <Icon size={14} className="mt-0.5 flex-shrink-0" />
-                  <span className="text-[12.5px] font-bold leading-tight">{t.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="min-h-0 overflow-y-auto custom-scrollbar p-5">
-            {activeType === 'document-types' && <DocumentTypeSettings />}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const DocumentTypeSettings: React.FC = () => {
+export const DocumentTypeSettings: React.FC = () => {
   const { documentTypes, loading, addDocumentType, updateDocumentType, deleteDocumentType } = useDocumentTypes();
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -308,4 +227,5 @@ const DocumentTypeSettings: React.FC = () => {
   );
 };
 
-export default ConfigurationsPanel;
+
+export default DocumentTypeSettings;
