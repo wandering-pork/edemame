@@ -18,6 +18,8 @@ import type {
   UsageEvent,
   EligibilityAssessment,
   Deadline,
+  VisaType,
+  CasePhase,
 } from '@/types';
 import type {
   IClientRepository,
@@ -35,6 +37,8 @@ import type {
   IChatRepository,
   IEligibilityRepository,
   IDeadlineRepository,
+  IVisaTypeRepository,
+  ICasePhaseRepository,
   Repositories,
 } from '@/repositories/types';
 
@@ -440,6 +444,50 @@ class FsDocumentTypeRepository implements IDocumentTypeRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Visa Types / Phases — firm-level reference lists, one file per row
+// ---------------------------------------------------------------------------
+
+/** Plain one-file-per-row repository for small reference lists. */
+class FsReferenceListRepository<T extends { id: string }> {
+  constructor(private root: FileSystemDirectoryHandle, private dir: string) {}
+
+  async getAll(): Promise<T[]> {
+    return readAllInDir<T>(this.root, this.dir);
+  }
+
+  async getById(id: string): Promise<T | undefined> {
+    return (await readJson<T>(this.root, `${this.dir}/${id}.json`)) ?? undefined;
+  }
+
+  async create(item: T): Promise<T> {
+    await writeJson(this.root, `${this.dir}/${item.id}.json`, item);
+    return item;
+  }
+
+  async update(item: T): Promise<T> {
+    await writeJson(this.root, `${this.dir}/${item.id}.json`, item);
+    return item;
+  }
+
+  async delete(id: string): Promise<void> {
+    await deleteEntry(this.root, `${this.dir}/${id}.json`);
+  }
+
+  async createMany(items: T[]): Promise<T[]> {
+    await Promise.all(items.map(item => this.create(item)));
+    return items;
+  }
+}
+
+class FsVisaTypeRepository extends FsReferenceListRepository<VisaType> implements IVisaTypeRepository {
+  constructor(root: FileSystemDirectoryHandle) { super(root, 'visa-types'); }
+}
+
+class FsCasePhaseRepository extends FsReferenceListRepository<CasePhase> implements ICasePhaseRepository {
+  constructor(root: FileSystemDirectoryHandle) { super(root, 'case-phases'); }
+}
+
+// ---------------------------------------------------------------------------
 // Chat — one file per conversation, nested under the case
 // ---------------------------------------------------------------------------
 
@@ -560,6 +608,8 @@ export function createFilesystemRepositories(root: FileSystemDirectoryHandle): R
     usage: new FsUsageRepository(root),
     checklist: new FsChecklistRepository(root),
     documentTypes: new FsDocumentTypeRepository(root),
+    visaTypes: new FsVisaTypeRepository(root),
+    casePhases: new FsCasePhaseRepository(root),
     chat: new FsChatRepository(root),
     eligibility: new FsEligibilityRepository(root),
     deadlines: new FsDeadlineRepository(root),

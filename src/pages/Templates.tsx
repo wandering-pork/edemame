@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { WorkflowTemplate, WorkflowStep, StepAnchor, StepTiming, DeadlineKind } from '../types';
+import { WorkflowTemplate, WorkflowStep, StepAnchor, StepTiming, DeadlineKind, NOT_CONFIRMED_SUBCLASS } from '../types';
 import {
   Plus, Trash2, FileText, X, Sparkles, ChevronDown, ChevronUp, List,
   Flag, Pencil, Copy, ArrowUp, ArrowDown, AlertTriangle, Info, Scale,
@@ -8,6 +8,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { scheduleFromTemplate, typicalLength, ScheduleStep } from '../lib/scheduleFromTemplate';
 import { describeStepTiming, formatTypicalLength, DEADLINE_KIND_LABELS } from '../lib/describeTiming';
 import { toLocalISODate } from '../lib/dates';
+import { SubclassSubstreamFields } from '../components/SubclassSubstreamFields';
+import { displaySubclassCode, isConfirmedSubclass } from '../lib/visaTypes';
 
 interface TemplatesProps {
   templates: WorkflowTemplate[];
@@ -198,6 +200,7 @@ interface EditorState {
   title: string;
   description: string;
   visaSubclass: string;
+  visaSubstream: string;
   steps: StepDraft[];
   version: number;
   timingVerified: boolean;
@@ -210,6 +213,7 @@ function editorFromTemplate(mode: 'create' | 'edit', template: WorkflowTemplate,
     title: asCopy ? `${template.title} (copy)` : template.title,
     description: template.description,
     visaSubclass: template.visaSubclass ?? '',
+    visaSubstream: template.visaSubstream ?? '',
     steps: (template.steps ?? []).map(stepToDraft),
     version: asCopy ? 1 : (template.version ?? 1),
     timingVerified: false,
@@ -223,6 +227,7 @@ function blankEditor(): EditorState {
     title: '',
     description: '',
     visaSubclass: '',
+    visaSubstream: '',
     steps: [],
     version: 1,
     timingVerified: false,
@@ -323,7 +328,8 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
       id: editor.templateId,
       title: editor.title.trim(),
       description: editor.description.trim(),
-      visaSubclass: editor.visaSubclass.trim() || undefined,
+      visaSubclass: editor.visaSubclass || undefined,
+      visaSubstream: isConfirmedSubclass(editor.visaSubclass) && editor.visaSubstream ? editor.visaSubstream : undefined,
       steps: steps.length > 0 ? steps : undefined,
       userId: currentUserId,
       version: editor.mode === 'edit' ? editor.version + 1 : 1,
@@ -395,7 +401,10 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
           </h3>
           {template.visaSubclass && (
             <p className="text-[11px] font-semibold text-ink-faint dark:text-plate-ink-faint mt-0.5">
-              Subclass {template.visaSubclass}
+              {template.visaSubclass === NOT_CONFIRMED_SUBCLASS
+                ? 'Not Confirmed · consultation only'
+                : `Subclass ${displaySubclassCode(template.visaSubclass)}`}
+              {template.visaSubstream && ` · ${template.visaSubstream}`}
             </p>
           )}
           <p className="text-xs text-ink-soft dark:text-plate-ink-soft leading-relaxed mt-2 line-clamp-3">
@@ -595,16 +604,18 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wider mb-1.5">
-                Visa Subclass <span className="normal-case font-normal text-ink-faint dark:text-plate-ink-faint">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={editor.visaSubclass}
-                onChange={e => setEditor(prev => (prev ? { ...prev, visaSubclass: e.target.value } : prev))}
-                placeholder="e.g. 190"
-                className="w-full sm:w-40 px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl text-sm focus:border-edamame/50 dark:focus:border-edamame/30 text-ink dark:text-plate-ink outline-none transition-colors placeholder-ink-soft/50 dark:placeholder-plate-ink-soft/50"
+              <SubclassSubstreamFields
+                value={{ subclass: editor.visaSubclass, substream: editor.visaSubstream }}
+                onChange={v => setEditor(prev => (prev ? { ...prev, visaSubclass: v.subclass, visaSubstream: v.substream } : prev))}
+                subclassLabel="Visa Subclass (optional)"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:max-w-2xl"
+                labelClassName="block text-xs font-bold text-ink-soft dark:text-plate-ink-soft uppercase tracking-wider mb-1.5"
+                selectClassName="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl text-sm focus:border-edamame/50 dark:focus:border-edamame/30 text-ink dark:text-plate-ink outline-none transition-colors disabled:opacity-50"
               />
+              <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1.5">
+                Choose <span className="font-semibold">Not Confirmed</span> for a consultation-only plan. Subclasses and
+                substreams come from Configuration → Visa Types.
+              </p>
             </div>
 
             {/* Step editor */}

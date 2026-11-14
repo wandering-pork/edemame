@@ -32,6 +32,8 @@ export interface OpenCaseParams {
   /** When false, the 'plan' stage is skipped entirely and no tasks are generated. */
   generateTasks: boolean;
   visaSubclass: string;
+  /** Substream picked in the Open Case panel, if any. */
+  visaSubstream?: string;
   visaName: string;
   caseDescription: string;
   /** When true, one fixed (non-AI) task is created per entry in `gaps`. */
@@ -83,7 +85,7 @@ export interface OpenCaseResult extends OpenCaseOutcome {
  * toasts are the caller's job.
  */
 export async function openCaseFromAdvisor(params: OpenCaseParams, deps: OpenCaseDeps): Promise<OpenCaseResult> {
-  const { client: clientChoice, templateId, title, generateTasks, visaSubclass, caseDescription, gapTasks, gaps, onProgress } = params;
+  const { client: clientChoice, templateId, title, generateTasks, visaSubclass, visaSubstream, caseDescription, gapTasks, gaps, onProgress } = params;
   const makeId = deps.makeId ?? uuidv4;
   const template = templateId ? deps.templates.find((t) => t.id === templateId) : undefined;
 
@@ -162,6 +164,7 @@ export async function openCaseFromAdvisor(params: OpenCaseParams, deps: OpenCase
     startDate,
     createdAt: (deps.now ?? (() => new Date().toISOString()))(),
     visaSubclass,
+    visaSubstream: visaSubstream || undefined,
     templateVersion: generateTasks && usesTimedTemplate ? template!.version : undefined,
   };
 

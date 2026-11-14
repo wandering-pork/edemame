@@ -25,8 +25,10 @@ already-owned case.
 ## Creating a case
 
 1. From the sidebar, open **Cases** and click **New Case**.
-2. Select an existing client or create a new one, then choose a visa subclass and a work
-   plan (e.g. Student 500, Skilled 190, Partner 820/801).
+2. Select an existing client or create a new one, then choose a work
+   plan (e.g. Student 500, Skilled 190, Partner 820/801). The **Visa Subclass** and **Substream**
+   follow the plan you pick; change them before creating if this case is different (or set the
+   subclass to **Not Confirmed** for a consultation-only case).
 3. Set the application start date. This is used to calculate due dates for every generated task.
 
 Each new case is automatically given a **case number** in the form `EDM-2026-0001` (the year, plus

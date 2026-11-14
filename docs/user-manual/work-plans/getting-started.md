@@ -43,7 +43,9 @@ plan's step timing is correct for current legislation and processing times.
    your own plans to edit it).
 2. Give it a **Plan Name** (e.g. "190 Visa Application — Standard") and a **Process
    Description** — the AI reads this when suggesting extra tasks for a case using this plan.
-3. Optionally set a **Visa Subclass**.
+3. Optionally set a **Visa Subclass** and **Substream**. The lists come from Configuration → Visa
+   Types; the Substream list only shows the chosen subclass's substreams and clears when you change
+   the subclass. Choose **Not Confirmed** for a consultation-only plan (it has no substreams).
 4. Under **Steps & Timing**, click **Add step** for each step in the procedure. For each step, set:
    - **Title** and **Description**.
    - **Counts from** — what the step's date is measured against: case start, the previous step,

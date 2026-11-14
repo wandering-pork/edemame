@@ -6,9 +6,11 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
 
 - **You are here** — the current task (the earliest task that isn't done yet), how many of the
   case's tasks are done, its due date and status. Click **Open task** to edit it.
-- **Case info** — client (and applicant, if different), visa subclass and work plan, case owner,
+- **Case info** — client (and applicant, if different), visa subclass (with substream, if set) and work plan, case owner,
   stage, next deadline (click it to jump to the Deadlines panel), and the date the case was opened.
-  **Edit** opens the Edit case form. Change the stage from the **Stage** chip in the summary strip
+  **Edit** opens the Edit case form, where you can change the title, description, **Visa Subclass**
+  and **Substream** (or set the subclass to **Not Confirmed** while the visa is still undecided).
+  Change the stage from the **Stage** chip in the summary strip
   under the case title, as before.
 - **Progress** — the last couple of completed tasks, the current task, and the next few coming up.
   Click any task to open it, or **View all** to open the Tasks tab.

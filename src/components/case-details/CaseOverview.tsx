@@ -7,6 +7,7 @@ import { DEADLINE_KIND_LABELS, daysLeft } from '../../lib/deadlines';
 import { TASK_STATUS_LABELS, isWaiting } from '../../lib/taskStatus';
 import type { ChecklistCategorySummary, TimelineEntry } from '../../lib/caseOverview';
 import { DocumentUpload } from '../DocumentUpload';
+import { subclassShortLabel } from '../../lib/visaTypes';
 
 function fileIconFor(fileType: string) {
   if (fileType.startsWith('image/')) return ImageIcon;
@@ -104,6 +105,7 @@ interface CaseOverviewProps {
   client: Client;
   applicant?: Client;
   visaSubclass?: string;
+  visaSubstream?: string;
   templateTitle?: string;
   ownerName?: string;
   openedAt: string;
@@ -138,7 +140,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
     stage, onHold,
     currentTask, openTaskCount, totalTaskCount, onOpenTask,
     timeline, hiddenTaskCount, onViewAllTasks,
-    client, applicant, visaSubclass, templateTitle, ownerName, openedAt, nextDeadline, description, onEditCase, onOpenDeadlines,
+    client, applicant, visaSubclass, visaSubstream, templateTitle, ownerName, openedAt, nextDeadline, description, onEditCase, onOpenDeadlines,
     checklistRows, checklistTotal, checklistDone, onOpenChecklist, onGenerateChecklist,
     documents, caseId, onOpenDocument, onViewAllFiles, onDocumentUploaded, onRequestCompress,
   } = props;
@@ -213,7 +215,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
                 <>
                   <dt className="text-ink-faint dark:text-plate-ink-faint">Visa</dt>
                   <dd className="text-ink dark:text-plate-ink min-w-0">
-                    {visaSubclass ? `Subclass ${visaSubclass}` : templateTitle}
+                    {visaSubclass ? subclassShortLabel(visaSubclass, visaSubstream) : templateTitle}
                     {visaSubclass && templateTitle && <span className="text-ink-faint dark:text-plate-ink-faint"> · {templateTitle}</span>}
                   </dd>
                 </>

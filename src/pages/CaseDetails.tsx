@@ -65,6 +65,8 @@ import {
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { Document, EligibilityAssessment } from '../types';
+import { isConfirmedSubclass, subclassChip, subclassShortLabel } from '../lib/visaTypes';
+import { SubclassSubstreamFields } from '../components/SubclassSubstreamFields';
 
 interface CaseDetailsProps {
   caseItem: Case;
@@ -223,7 +225,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // ---- Case edit/delete state ----
   const [currentCase, setCurrentCase] = useState<Case>(caseItem);
   const [isEditingCase, setIsEditingCase] = useState(false);
-  const [caseEditForm, setCaseEditForm] = useState({ title: caseItem.title, description: caseItem.description });
+  const [caseEditForm, setCaseEditForm] = useState({
+    title: caseItem.title,
+    description: caseItem.description,
+    visaSubclass: caseItem.visaSubclass ?? visaSubclass ?? '',
+    visaSubstream: caseItem.visaSubstream ?? '',
+  });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [docRefreshKey, setDocRefreshKey] = useState(0);
 
@@ -594,8 +601,17 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   const handleSaveCase = async () => {
     if (!caseEditForm.title.trim()) return;
-    const updated = { ...currentCase, title: caseEditForm.title.trim(), description: caseEditForm.description.trim() };
-    await repos.cases.update(updated);
+    const subclass = caseEditForm.visaSubclass || undefined;
+    const updated: Case = {
+      ...currentCase,
+      title: caseEditForm.title.trim(),
+      description: caseEditForm.description.trim(),
+      visaSubclass: subclass,
+      visaSubstream: isConfirmedSubclass(subclass) && caseEditForm.visaSubstream ? caseEditForm.visaSubstream : undefined,
+    };
+    // Through App's handler (not repos directly) so the case list, header and
+    // the visaSubclass prop pick up the change straight away.
+    await onUpdateCase(updated);
     setCurrentCase(updated);
     setIsEditingCase(false);
   };
@@ -889,7 +905,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         `Case: ${caseItem.title}`,
         `Client: ${client.name}`,
         applicant && applicant.id !== client.id ? `Applicant: ${applicant.name}` : null,
-        visaSubclass ? `Visa Type: Subclass ${visaSubclass}` : null,
+        visaSubclass ? `Visa Type: ${subclassShortLabel(visaSubclass, currentCase.visaSubstream)}` : null,
         `Stage: ${CASE_STAGE_LABELS[caseItem.stage]}${caseItem.onHold ? ' (on hold)' : ''}`,
         `Progress: ${completedTasks.length}/${caseTasks.length} tasks completed (${progress}%)`,
         pendingTasks.length > 0 ? `Next task: ${pendingTasks[0]?.title}` : null,
@@ -1328,7 +1344,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     : undefined;
 
   const openEditCase = () => {
-    setCaseEditForm({ title: currentCase.title, description: currentCase.description });
+    setCaseEditForm({
+      title: currentCase.title,
+      description: currentCase.description,
+      visaSubclass: currentCase.visaSubclass ?? visaSubclass ?? '',
+      visaSubstream: currentCase.visaSubstream ?? '',
+    });
     setIsEditingCase(true);
   };
 
@@ -1404,7 +1425,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         </h1>
         <span className="font-mono text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{displayCaseNumber(currentCase)}</span>
         {visaSubclass && (
-          <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400">SC-{visaSubclass}</span>
+          <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400">{subclassChip(visaSubclass)}</span>
         )}
 
         <div className="ml-auto flex items-center gap-2">
@@ -1593,6 +1614,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               client={client}
               applicant={applicant}
               visaSubclass={visaSubclass}
+              visaSubstream={currentCase.visaSubstream}
               templateTitle={workflowTemplate?.title}
               ownerName={ownerName}
               openedAt={currentCase.startDate || currentCase.createdAt}
@@ -2205,6 +2227,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   rows={4}
                 />
               </div>
+              <SubclassSubstreamFields
+                value={{ subclass: caseEditForm.visaSubclass, substream: caseEditForm.visaSubstream }}
+                onChange={v => setCaseEditForm({ ...caseEditForm, visaSubclass: v.subclass, visaSubstream: v.substream })}
+                labelClassName="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1"
+                selectClassName="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink disabled:opacity-50"
+              />
             </div>
             <div className="p-6 bg-paper-2 dark:bg-plate-card/50 border-t border-ink/10 dark:border-plate-ink/15 flex justify-end gap-3">
               <button

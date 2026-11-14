@@ -214,7 +214,10 @@ export interface WorkflowTemplate {
   id: string;
   title: string;
   description: string;
+  /** Subclass code ("189", "820"), `NOT_CONFIRMED_SUBCLASS` for a consultation-only plan, or unset. */
   visaSubclass?: string;
+  /** Substream of `visaSubclass`, from the firm's Visa Types list. Unset when the subclass is blank or Not Confirmed. */
+  visaSubstream?: string;
   steps?: WorkflowStep[];
   userId?: string | null; // null = system default
   /** Provenance for system-default templates: the official page(s) content was checked against. */
@@ -344,6 +347,12 @@ export interface Case {
    * up the case's template's `visaSubclass` where both are available.
    */
   visaSubclass?: string;
+  /**
+   * Substream of `visaSubclass` (e.g. "Points-tested" for 189), from the
+   * firm's Visa Types list (Configuration → Work Plans → Visa Types).
+   * Optional; always unset when `visaSubclass` is blank or Not Confirmed.
+   */
+  visaSubstream?: string;
   /**
    * The `WorkflowTemplate.version` used the last time this case's tasks were
    * generated/rescheduled from a template (Step 1 · 1E). Unset for cases with
@@ -519,6 +528,55 @@ export interface DocumentType {
   isSystemDefault: boolean;
   /** Per-firm opt-in: tag a Case File with this code and it auto-links to matching checklist items. */
   autoLink: boolean;
+  userId?: string;
+}
+
+/**
+ * Visa subclass value for a plan or case whose visa hasn't been decided yet
+ * (consultation only). Hardcoded: always offered, never part of the firm's
+ * Visa Types list, can't be edited or removed.
+ */
+export const NOT_CONFIRMED_SUBCLASS = 'not_confirmed';
+
+/**
+ * One row of the firm's Visa Types list (Configuration → Work Plans → Visa
+ * Types): a subclass + substream pair. A subclass with no substreams has a
+ * single row with `substream: ''`. Firm-scoped in cloud mode, one JSON file
+ * per row locally. Seeded by `lib/visaTypes.ts`'s `ensureSystemVisaTypes()`.
+ */
+export interface VisaType {
+  id: string;
+  /** Subclass code as stored on cases/plans, e.g. "189", "820". */
+  subclass: string;
+  /** Subclass name, e.g. "Skilled Independent". */
+  name: string;
+  /** Substream name, or '' when the subclass has none. */
+  substream: string;
+  note: string;
+  isSystemDefault: boolean;
+  /** Stable id of the shipped default this row came from (seeding + Reset). Unset on firm-added rows. */
+  systemKey?: string;
+  /** Hidden rows stay stored (so seeding doesn't bring them back) but aren't offered in pickers. */
+  hidden: boolean;
+  userId?: string;
+}
+
+/**
+ * One phase of the firm's ordered phase list (Configuration → Work Plans →
+ * Phases), e.g. Consultation → Post-decision. Work Plan steps and tasks are
+ * grouped by phase (step 3). Separate from `Case.stage` (the draft→closed
+ * lifecycle). Seeded by `lib/casePhases.ts`'s `ensureSystemCasePhases()`.
+ */
+export interface CasePhase {
+  id: string;
+  name: string;
+  /** Sort order, ascending. */
+  position: number;
+  isSystemDefault: boolean;
+  systemKey?: string;
+  /** Consultation: can't be hidden, removed, renamed or moved from first place. */
+  required: boolean;
+  hidden: boolean;
   userId?: string;
 }
 

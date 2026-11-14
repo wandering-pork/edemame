@@ -10,6 +10,7 @@ import { computeCaseRisk } from '../lib/risk';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useFirm } from '../contexts/FirmContext';
 import { AssignCaseDialog } from '../components/AssignCaseDialog';
+import { subclassChip } from '../lib/visaTypes';
 import {
   CaseOwnerScope, filterCasesByOwnerScope, defaultCaseOwnerScope, loadCaseOwnerScope, saveCaseOwnerScope,
 } from '../lib/caseManagerScope';
@@ -388,9 +389,12 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                       <span className="text-sm font-bold tracking-[-0.015em] text-ink dark:text-plate-ink whitespace-nowrap overflow-hidden text-ellipsis">
                         {c.title}
                       </span>
-                      {r.template?.visaSubclass && (
-                        <span className="font-mono text-[9.5px] font-medium px-[7px] py-0.5 rounded-md bg-edamame-500/10 text-edamame-700 dark:text-edamame-400 flex-shrink-0">
-                          SC-{r.template.visaSubclass}
+                      {(c.visaSubclass ?? r.template?.visaSubclass) && (
+                        <span
+                          title={c.visaSubstream || undefined}
+                          className="font-mono text-[9.5px] font-medium px-[7px] py-0.5 rounded-md bg-edamame-500/10 text-edamame-700 dark:text-edamame-400 flex-shrink-0"
+                        >
+                          {subclassChip((c.visaSubclass ?? r.template?.visaSubclass)!)}
                         </span>
                       )}
                     </div>

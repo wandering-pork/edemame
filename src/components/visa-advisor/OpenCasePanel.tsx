@@ -8,6 +8,8 @@ import { matchTemplate } from '../../lib/matchTemplate';
 import { findOpenCaseForSubclass } from '../../lib/findOpenCaseForSubclass';
 import { displayCaseNumber } from '../../lib/caseNumber';
 import type { OpenCaseClientChoice, OpenCaseStage } from '../../lib/openCaseFromAdvisor';
+import { subclassChip } from '../../lib/visaTypes';
+import { SubclassSubstreamFields } from '../SubclassSubstreamFields';
 
 export interface OpenCasePanelResult {
   client: OpenCaseClientChoice;
@@ -16,6 +18,8 @@ export interface OpenCasePanelResult {
   generateTasks: boolean;
   /** Whether to create one fixed (non-AI) task per gap — see the "Add a task for each gap" checkbox below. */
   gapTasks: boolean;
+  /** Substream for the new case ('' or undefined = none). */
+  visaSubstream?: string;
 }
 
 // Sentinel used only inside the <select> to represent "create a new client" —
@@ -105,6 +109,13 @@ export const OpenCasePanel: React.FC<OpenCasePanelProps> = ({
     matchedTemplate ? matchedTemplate.id : undefined
   );
   const selectedTemplate = templateId ? templates.find((t) => t.id === templateId) : undefined;
+  // Substream for the new case. Subclass is fixed by the assessed pathway;
+  // default the substream from the chosen plan when it's for the same subclass.
+  const [visaSubstream, setVisaSubstream] = useState('');
+  useEffect(() => {
+    setVisaSubstream(selectedTemplate?.visaSubclass === visaSubclass ? selectedTemplate?.visaSubstream ?? '' : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTemplate?.id, visaSubclass]);
 
   const defaultTitle = (tpl: WorkflowTemplate | undefined, name: string) =>
     `${tpl?.title || `Subclass ${visaSubclass}`} - ${name}`;
@@ -158,6 +169,7 @@ export const OpenCasePanel: React.FC<OpenCasePanelProps> = ({
       title: title.trim(),
       generateTasks,
       gapTasks,
+      visaSubstream: visaSubstream || undefined,
     });
   };
 
@@ -331,11 +343,11 @@ export const OpenCasePanel: React.FC<OpenCasePanelProps> = ({
               disabled={isSubmitting}
               className={inputClass}
             >
-              {templateId === undefined && <option value="">-- Select a template --</option>}
+              {templateId === undefined && <option value="">-- Select a work plan --</option>}
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.title}
-                  {t.visaSubclass ? ` (SC-${t.visaSubclass})` : ''}
+                  {t.visaSubclass ? ` (${subclassChip(t.visaSubclass)})` : ''}
                 </option>
               ))}
               <option value={NO_TEMPLATE_OPTION}>No work plan (general case)</option>
@@ -346,6 +358,17 @@ export const OpenCasePanel: React.FC<OpenCasePanelProps> = ({
               </p>
             )}
           </div>
+
+          {/* Subclass (fixed by the pathway) + Substream */}
+          <SubclassSubstreamFields
+            value={{ subclass: visaSubclass, substream: visaSubstream }}
+            onChange={(v) => setVisaSubstream(v.substream)}
+            subclassLocked
+            allowBlank={false}
+            allowNotConfirmed={false}
+            labelClassName={labelClass}
+            selectClassName={`${inputClass} disabled:opacity-60`}
+          />
 
           {/* Title */}
           <div>

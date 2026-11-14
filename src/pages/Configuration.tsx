@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Tags } from 'lucide-react';
+import { Tags, Stamp, ListOrdered } from 'lucide-react';
 import { DocumentTypeSettings } from '../components/configuration/DocumentTypeSettings';
+import { VisaTypeSettings } from '../components/configuration/VisaTypeSettings';
+import { CasePhaseSettings } from '../components/configuration/CasePhaseSettings';
 
 /**
  * Configuration — one central place for module-level settings used across
@@ -34,6 +36,25 @@ const SETTING_GROUPS: SettingGroupDef[] = [
         description: 'The firm-wide list of document types, and which of them auto-link.',
         icon: Tags,
         Pane: DocumentTypeSettings,
+      },
+    ],
+  },
+  {
+    label: 'Work Plans',
+    items: [
+      {
+        id: 'visa-types',
+        label: 'Visa Types',
+        description: 'Subclasses and substreams offered on Work Plans and cases.',
+        icon: Stamp,
+        Pane: VisaTypeSettings,
+      },
+      {
+        id: 'phases',
+        label: 'Phases',
+        description: 'The ordered phases a case moves through; tasks are grouped by phase.',
+        icon: ListOrdered,
+        Pane: CasePhaseSettings,
       },
     ],
   },

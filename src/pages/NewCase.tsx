@@ -6,6 +6,8 @@ import { Sparkles, Calendar, Loader2, Save, User, ChevronDown, ChevronUp, List, 
 import { v4 as uuidv4 } from 'uuid';
 import { toLocalISODate } from '../lib/dates';
 import { buildTemplateTaskDrafts, templateHasTiming } from '../lib/tasksFromTemplate';
+import { SubclassSubstreamFields, type SubclassSubstreamValue } from '../components/SubclassSubstreamFields';
+import { isConfirmedSubclass } from '../lib/visaTypes';
 
 interface NewCaseProps {
   templates: WorkflowTemplate[];
@@ -163,6 +165,13 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
   const selectedClient = clients.find(c => c.id === clientId);
   const selectedApplicant = clients.find(c => c.id === applicantId);
   const selectedTemplate = templates.find(t => t.id === templateId);
+  // Visa Subclass + Substream for the new case: follow the chosen plan's by
+  // default, editable before creating.
+  const [visa, setVisa] = useState<SubclassSubstreamValue>({ subclass: '', substream: '' });
+  useEffect(() => {
+    setVisa({ subclass: selectedTemplate?.visaSubclass ?? '', substream: selectedTemplate?.visaSubstream ?? '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateId]);
   const guidedChips = getGuidedChips(selectedTemplate);
 
   // Reveals the already-fetched tasks into the UI one at a time, then
@@ -270,7 +279,8 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       stage: 'draft',
       startDate: startDate,
       createdAt: new Date().toISOString(),
-      visaSubclass: selectedTemplate?.visaSubclass,
+      visaSubclass: visa.subclass || undefined,
+      visaSubstream: isConfirmedSubclass(visa.subclass) && visa.substream ? visa.substream : undefined,
       templateVersion: usesTimedTemplate ? selectedTemplate?.version : undefined,
     };
 
@@ -492,11 +502,17 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                 onChange={(e) => setTemplateId(e.target.value)}
                 className="w-full px-3 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-ink dark:text-plate-ink outline-none"
               >
-                <option value="">— Choose a workflow —</option>
+                <option value="">— Choose a work plan —</option>
                 {templates.map(t => (
                   <option key={t.id} value={t.id}>{t.title}</option>
                 ))}
               </select>
+              <SubclassSubstreamFields
+                value={visa}
+                onChange={setVisa}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3"
+                selectClassName="w-full px-3 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-[13px] focus:ring-2 focus:ring-edamame-500 dark:focus:ring-edamame-600 focus:border-edamame-500 dark:focus:border-edamame-600 text-ink dark:text-plate-ink outline-none disabled:opacity-50"
+              />
               {/* Steps preview */}
               {selectedTemplate?.steps && selectedTemplate.steps.length > 0 && (
                 <div className="mt-2">
@@ -506,7 +522,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
                     className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-faint dark:text-plate-ink-faint hover:text-edamame-600 dark:hover:text-edamame-400 transition-colors"
                   >
                     <List size={13} />
-                    This template includes {selectedTemplate.steps.length} steps
+                    This plan includes {selectedTemplate.steps.length} steps
                     {stepsExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                   </button>
                   {stepsExpanded && (

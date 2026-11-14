@@ -50,6 +50,9 @@ review it and click **Confirm**. The panel shows:
 - **Work Plan** — pre-selected when a plan's subclass exactly matches the pathway's
   subclass. If nothing matches, you must explicitly pick a plan or choose **No work plan
   (general case)** before you can confirm.
+- **Visa Subclass / Substream** — the subclass is fixed to the pathway you opened the case from;
+  pick a **Substream** if it has any (it defaults to the work plan's substream when the plan is for
+  the same subclass).
 - **Case Title** — prefilled from the work plan and client name; edit it freely, and it keeps
   updating to match your client/work plan choice until you type in it yourself.
 - **Generate AI task plan** — on by default. Turn it off to create the case without an AI-drafted

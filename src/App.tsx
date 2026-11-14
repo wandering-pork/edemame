@@ -7,6 +7,7 @@ import { Header } from './components/Header';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RepositoryProvider, useRepositories, useStorageMode } from './contexts/RepositoryContext';
 import { DocumentTypeProvider } from './contexts/DocumentTypeContext';
+import { VisaConfigProvider } from './contexts/VisaConfigContext';
 import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
 import { CaseDetails } from './pages/CaseDetails';
@@ -1117,9 +1118,11 @@ const StorageGate: React.FC = () => {
   return (
     <RepositoryProvider storageMode={profile.storageMode}>
       <DocumentTypeProvider>
+        <VisaConfigProvider>
         <SidebarProvider>
           <AppShell />
         </SidebarProvider>
+        </VisaConfigProvider>
       </DocumentTypeProvider>
     </RepositoryProvider>
   );
@@ -1141,9 +1144,11 @@ const CloudAppGate: React.FC = () => {
   return (
     <RepositoryProvider storageMode="cloud" firmId={firm.id}>
       <DocumentTypeProvider>
+        <VisaConfigProvider>
         <SidebarProvider>
           <AppShell />
         </SidebarProvider>
+        </VisaConfigProvider>
       </DocumentTypeProvider>
     </RepositoryProvider>
   );

@@ -149,6 +149,16 @@ describe('openCaseFromAdvisor', () => {
     expect(deps.generateTasks).toHaveBeenCalledWith('summary', '', '2026-09-24', undefined, undefined, undefined, undefined);
   });
 
+  it('saves the chosen substream on the case, and none when left blank', async () => {
+    const withStream = makeDeps();
+    await openCaseFromAdvisor(makeParams({ visaSubclass: '482', visaSubstream: 'Core Skills' }), withStream.deps);
+    expect(withStream.deps.createCase.mock.calls[0][1].visaSubstream).toBe('Core Skills');
+
+    const blank = makeDeps();
+    await openCaseFromAdvisor(makeParams({ visaSubstream: '' }), blank.deps);
+    expect(blank.deps.createCase.mock.calls[0][1].visaSubstream).toBeUndefined();
+  });
+
   it('skips the plan stage entirely when AI generation is off', async () => {
     const onProgress = vi.fn();
     const { deps } = makeDeps();

@@ -20,6 +20,8 @@ import type {
   UsageEvent,
   EligibilityAssessment,
   Deadline,
+  VisaType,
+  CasePhase,
 } from '@/types';
 import type {
   IClientRepository,
@@ -37,6 +39,8 @@ import type {
   IChatRepository,
   IEligibilityRepository,
   IDeadlineRepository,
+  IVisaTypeRepository,
+  ICasePhaseRepository,
   Repositories,
 } from '@/repositories/types';
 
@@ -194,6 +198,7 @@ function caseToRow(userId: string, firmId: string, c: Case) {
     applicant_id: normalized.applicantId ?? null,
     case_number: normalized.caseNumber ?? null,
     visa_subclass: normalized.visaSubclass ?? null,
+    visa_substream: normalized.visaSubstream ?? null,
     // `template_version` column added by
     // `supabase/migrations/20260926000250_task_step_fields.sql` (not yet
     // applied to production — see CLAUDE.md's manual-apply migration list).
@@ -220,6 +225,7 @@ function rowToCase(row: any): Case {
     applicantId: row.applicant_id ?? undefined,
     caseNumber: row.case_number ?? undefined,
     visaSubclass: row.visa_subclass ?? undefined,
+    visaSubstream: row.visa_substream ?? undefined,
     templateVersion: row.template_version ?? undefined,
   });
 }
@@ -388,6 +394,7 @@ function templateToRow(userId: string, firmId: string, t: WorkflowTemplate) {
     title: t.title,
     description: t.description,
     visa_subclass: t.visaSubclass ?? null,
+    visa_substream: t.visaSubstream ?? null,
     steps: t.steps ?? null,
     version: t.version ?? null,
     timing_verified: t.timingVerified ?? null,
@@ -400,6 +407,7 @@ function rowToTemplate(row: any): WorkflowTemplate {
     title: row.title,
     description: row.description,
     visaSubclass: row.visa_subclass ?? undefined,
+    visaSubstream: row.visa_substream ?? undefined,
     steps: row.steps ?? undefined,
     userId: row.user_id,
     version: row.version ?? undefined,
@@ -979,6 +987,124 @@ class CloudDocumentTypeRepository implements IDocumentTypeRepository {
 }
 
 // ---------------------------------------------------------------------------
+// Visa Types / Phases — firm-level reference lists (no case_id). Columns from
+// supabase/migrations/20261114000000_visa_types_phases.sql.
+// ---------------------------------------------------------------------------
+
+function visaTypeToRow(userId: string, firmId: string, t: VisaType) {
+  return {
+    id: t.id,
+    user_id: userId,
+    firm_id: firmId,
+    subclass: t.subclass,
+    name: t.name,
+    substream: t.substream,
+    note: t.note,
+    is_system_default: t.isSystemDefault,
+    system_key: t.systemKey ?? null,
+    hidden: t.hidden,
+  };
+}
+
+function rowToVisaType(row: any): VisaType {
+  return {
+    id: row.id,
+    subclass: row.subclass,
+    name: row.name,
+    substream: row.substream ?? '',
+    note: row.note ?? '',
+    isSystemDefault: row.is_system_default,
+    systemKey: row.system_key ?? undefined,
+    hidden: row.hidden ?? false,
+    userId: row.user_id,
+  };
+}
+
+function casePhaseToRow(userId: string, firmId: string, p: CasePhase) {
+  return {
+    id: p.id,
+    user_id: userId,
+    firm_id: firmId,
+    name: p.name,
+    position: p.position,
+    is_system_default: p.isSystemDefault,
+    system_key: p.systemKey ?? null,
+    required: p.required,
+    hidden: p.hidden,
+  };
+}
+
+function rowToCasePhase(row: any): CasePhase {
+  return {
+    id: row.id,
+    name: row.name,
+    position: row.position,
+    isSystemDefault: row.is_system_default,
+    systemKey: row.system_key ?? undefined,
+    required: row.required ?? false,
+    hidden: row.hidden ?? false,
+    userId: row.user_id,
+  };
+}
+
+/** Firm-scoped reference-list table with a (firm_id, system_key) unique constraint for race-safe seeding. */
+class CloudReferenceListRepository<T extends { id: string }> {
+  constructor(
+    protected userId: string,
+    protected firmId: string,
+    private table: string,
+    private toRow: (userId: string, firmId: string, item: T) => Record<string, unknown>,
+    private fromRow: (row: any) => T,
+  ) {}
+
+  async getAll(): Promise<T[]> {
+    const rows = await fetchAllRows(this.table, q => q.eq('firm_id', this.firmId));
+    return rows.map(this.fromRow);
+  }
+
+  async getById(id: string): Promise<T | undefined> {
+    const { data, error } = await supabase.from(this.table).select('*').eq('firm_id', this.firmId).eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data ? this.fromRow(data) : undefined;
+  }
+
+  async create(item: T): Promise<T> {
+    const { error } = await supabase.from(this.table).upsert(this.toRow(this.userId, this.firmId, item), { onConflict: 'id' });
+    if (error) throw error;
+    return item;
+  }
+
+  async update(item: T): Promise<T> {
+    return this.create(item);
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from(this.table).delete().eq('firm_id', this.firmId).eq('id', id);
+    if (error) throw error;
+  }
+
+  async createMany(items: T[]): Promise<T[]> {
+    if (items.length === 0) return items;
+    // onConflict (firm_id, system_key): two tabs or two firm members seeding
+    // at once would otherwise both insert the same default under fresh ids.
+    // Firm-added rows have a null system_key, which never conflicts.
+    const { error } = await supabase
+      .from(this.table)
+      .upsert(items.map(i => this.toRow(this.userId, this.firmId, i)), { onConflict: 'firm_id,system_key', ignoreDuplicates: true });
+    if (error) throw error;
+    return items;
+  }
+}
+
+class CloudVisaTypeRepository extends CloudReferenceListRepository<VisaType> implements IVisaTypeRepository {
+  constructor(userId: string, firmId: string) { super(userId, firmId, 'visa_types', visaTypeToRow, rowToVisaType); }
+}
+
+class CloudCasePhaseRepository extends CloudReferenceListRepository<CasePhase> implements ICasePhaseRepository {
+  constructor(userId: string, firmId: string) { super(userId, firmId, 'case_phases', casePhaseToRow, rowToCasePhase); }
+}
+
+// ---------------------------------------------------------------------------
 // Chat
 // ---------------------------------------------------------------------------
 
@@ -1211,6 +1337,8 @@ export function createCloudRepositories(userId: string, firmId: string): Reposit
     usage: new CloudUsageRepository(userId, firmId),
     checklist: new CloudChecklistRepository(userId, firmId),
     documentTypes: new CloudDocumentTypeRepository(userId, firmId),
+    visaTypes: new CloudVisaTypeRepository(userId, firmId),
+    casePhases: new CloudCasePhaseRepository(userId, firmId),
     chat: new CloudChatRepository(userId, firmId),
     eligibility: new CloudEligibilityRepository(userId, firmId),
     deadlines: new CloudDeadlineRepository(userId, firmId),
