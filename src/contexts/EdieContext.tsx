@@ -16,6 +16,9 @@ interface EdieContextValue {
   /** Suggestion count for the Edie button's badge; set by the claiming page. */
   suggestionCount: number;
   setSuggestionCount: (n: number) => void;
+  /** False until the user dismisses the one-time "Ask Edie" tip (saved on the profile). */
+  hintSeen: boolean;
+  markHintSeen: () => void;
   /** General (non-case) chats. Kept for the browser session only. */
   generalConversations: FocusConversation[];
   setGeneralConversations: (convs: FocusConversation[]) => void;
@@ -41,6 +44,19 @@ export const EdieProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [claims, setClaims] = useState(0);
   const [suggestionCount, setSuggestionCount] = useState(0);
   const [generalConversations, setGeneralConversations] = useState<FocusConversation[]>([]);
+  // Treated as seen until the profile has loaded, so the tip never flashes.
+  const [hintSeen, setHintSeen] = useState<boolean>(profile?.edieHintSeen ?? true);
+  const profileHintSeen = profile?.edieHintSeen;
+  useEffect(() => {
+    if (profileHintSeen !== undefined) setHintSeen(profileHintSeen);
+  }, [profileHintSeen]);
+  const hintSeenRef = useRef(hintSeen);
+  hintSeenRef.current = hintSeen;
+  const markHintSeen = useCallback(() => {
+    if (hintSeenRef.current) return;
+    setHintSeen(true);
+    updateProfile({ edieHintSeen: true }).catch(err => console.error('Could not save Edie tip state', err));
+  }, [updateProfile]);
 
   // Follow the profile when it loads or changes on another device's write.
   const profileOpen = profile?.edieOpen;
@@ -54,7 +70,12 @@ export const EdieProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const value = typeof next === 'function' ? next(openRef.current) : next;
     if (value === openRef.current) return;
     setOpenState(value);
-    updateProfile({ edieOpen: value }).catch(err => console.error('Could not save Edie panel state', err));
+    // Opening Edie means the user has found it, so the one-time tip is no
+    // longer needed. Saved in the same write, so the two can't race.
+    const dismissTip = value && !hintSeenRef.current;
+    if (dismissTip) setHintSeen(true);
+    updateProfile({ edieOpen: value, ...(dismissTip ? { edieHintSeen: true } : {}) })
+      .catch(err => console.error('Could not save Edie panel state', err));
   }, [updateProfile]);
 
   useEffect(() => {
@@ -85,9 +106,11 @@ export const EdieProvider: React.FC<{ children: React.ReactNode }> = ({ children
     claimPanel,
     suggestionCount,
     setSuggestionCount,
+    hintSeen,
+    markHintSeen,
     generalConversations,
     setGeneralConversations,
-  }), [open, setOpen, panelEl, claims, claimPanel, suggestionCount, generalConversations]);
+  }), [open, setOpen, panelEl, claims, claimPanel, suggestionCount, hintSeen, markHintSeen, generalConversations]);
 
   return <EdieContext.Provider value={value}>{children}</EdieContext.Provider>;
 };

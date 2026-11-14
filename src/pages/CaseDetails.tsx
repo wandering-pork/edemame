@@ -1204,30 +1204,37 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       {/* ══════════════════════════════════════════
           TOP BAR
       ══════════════════════════════════════════ */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* One line from lg up: the title truncates and Case actions collapses to "⋯"
+          below xl, so the actions never wrap onto a second row on a laptop. */}
+      <div className="flex items-center gap-3 flex-wrap lg:flex-nowrap">
         <button
           onClick={onBack}
-          className="group inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink transition-colors"
+          className="group flex-shrink-0 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:text-ink dark:hover:text-plate-ink transition-colors"
         >
           <ArrowLeft size={15} strokeWidth={1.8} className="group-hover:-translate-x-0.5 transition-transform" />
           Cases
         </button>
-        <h1 className="text-[17px] font-bold text-ink dark:text-plate-ink tracking-tight min-w-0 truncate">
-          {currentCase.title}
-          <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">, {client.name}</span>
-        </h1>
-        <span className="font-mono text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{displayCaseNumber(currentCase)}</span>
-        {visaSubclass && (
-          <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400">{subclassChip(visaSubclass)}</span>
-        )}
+        <div className="flex-1 min-w-0 flex items-center gap-3">
+          <h1
+            title={`${currentCase.title}, ${client.name}`}
+            className="text-[17px] font-bold text-ink dark:text-plate-ink tracking-tight min-w-0 truncate"
+          >
+            {currentCase.title}
+            <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">, {client.name}</span>
+          </h1>
+          <span className="flex-shrink-0 font-mono text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{displayCaseNumber(currentCase)}</span>
+          {visaSubclass && (
+            <span className="flex-shrink-0 whitespace-nowrap text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400">{subclassChip(visaSubclass)}</span>
+          )}
+        </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex-shrink-0 flex items-center gap-2">
           {/* Add Task is the one primary action in the header. Case actions
               holds case admin only; AI help is in Edie, navigation in the tab
               row, and document tools on the Case files / Checklist tabs. */}
           <button
             onClick={() => handleOpenTaskModal()}
-            className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-xs transition-colors"
+            className="btn-press whitespace-nowrap inline-flex items-center gap-1.5 px-3 py-1.5 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-xs transition-colors"
           >
             <Plus size={13} strokeWidth={2.2} />
             Add Task
@@ -1238,12 +1245,13 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             <button
               onClick={() => setMoreOpen(o => !o)}
               title="Case actions"
+              aria-label="Case actions"
               aria-haspopup="true"
               aria-expanded={moreOpen}
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors text-xs font-bold"
             >
               <MoreHorizontal size={16} />
-              <span className="hidden md:inline">Case actions</span>
+              <span className="hidden xl:inline">Case actions</span>
             </button>
             {moreOpen && (
               <>

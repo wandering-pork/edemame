@@ -306,7 +306,13 @@
         from { transform: scale(0.4); opacity: 0; }
         to { transform: scale(1); opacity: 1; }
       }
-      @media (prefers-reduced-motion: reduce) { .ed-edie, .edie-count-in { animation: none; } }
+      /* One-time "Ask Edie" tip: fades in just below its button */
+      .edie-tip-in { animation: edieTipIn 0.24s ease-out 0.4s both; }
+      @keyframes edieTipIn {
+        from { transform: translateY(-4px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) { .ed-edie, .edie-count-in, .edie-tip-in { animation: none; } }
 
       /* Badge pulse for notifications */
       @keyframes badgePulse {

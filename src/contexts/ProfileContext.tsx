@@ -51,6 +51,7 @@ function readDevProfile(userId: string): Profile | null {
     linkedFolderName: profile.linkedFolderName ?? null,
     linkedAt: profile.linkedAt ?? null,
     edieOpen: profile.edieOpen ?? false,
+    edieHintSeen: profile.edieHintSeen ?? false,
     currentFirmId: null,
   };
 }
@@ -71,6 +72,7 @@ function defaultDevProfile(userId: string, storageMode: StorageMode): Profile {
     theme: 'classic',
     sidebarCollapsed: false,
     edieOpen: false,
+    edieHintSeen: false,
     linkedFolderName: null,
     linkedAt: null,
     currentFirmId: null,
@@ -124,6 +126,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         theme: update.theme !== undefined ? update.theme : current.theme,
         sidebarCollapsed: update.sidebarCollapsed !== undefined ? update.sidebarCollapsed : current.sidebarCollapsed,
         edieOpen: update.edieOpen !== undefined ? update.edieOpen : current.edieOpen,
+        edieHintSeen: update.edieHintSeen !== undefined ? update.edieHintSeen : current.edieHintSeen,
         linkedFolderName: update.linkedFolderName !== undefined ? update.linkedFolderName : current.linkedFolderName,
         linkedAt: update.linkedAt !== undefined ? update.linkedAt : current.linkedAt,
         currentFirmId: null,

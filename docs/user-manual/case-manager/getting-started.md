@@ -41,7 +41,9 @@ before case numbers were introduced show a reference derived from their internal
 Directly under the case title sits a row of four chips that answer "where is this case at" without
 opening anything: **Stage**, **Risk**, **Next deadline**, and **On hold**. The case header itself
 has one primary button, **Add Task**, a small **Case actions** menu (see below), and **Ask Edie**,
-which opens the AI assistant.
+which opens the AI assistant. On screens narrower than a large desktop, **Case actions** shows as a
+**⋯** button and a long case title is shortened (hover over it to see the full title), so the header
+stays on one line.
 
 ### Case stage, on hold, and At Risk
 

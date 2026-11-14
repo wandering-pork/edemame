@@ -13,6 +13,11 @@
 - Edie stays open or closed as you move between pages, and remembers your choice on your account,
   so it's the same on another computer.
 - When Edie is closed and the case has suggestions, the **Ask Edie** button shows how many.
+- The first time you open a case that has suggestions, a short tip under **Ask Edie** says how many
+  there are. **Show suggestions** opens Edie; **Got it** hides the tip. Either way it isn't shown
+  again, on any computer. Opening Edie any other way also counts.
+- The panel's header shows the shortcut (**Ctrl J**, or **⌘ J** on a Mac) next to the close
+  button.
 
 ## On a case
 

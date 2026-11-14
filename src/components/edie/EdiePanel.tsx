@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sparkles, Plus, Send, Github, Check, X, ChevronDown } from 'lucide-react';
 import { BrandImage } from '../BrandImage';
+import { shortcutLabel } from '../../lib/shortcutLabel';
 import { format } from 'date-fns';
 import type { FocusChatMessage, FocusConversation } from '../../types';
 
@@ -326,10 +327,16 @@ export const EdiePanel: React.FC<EdiePanelProps> = ({
           <Plus size={12} strokeWidth={2.2} />
           New chat
         </button>
+        <kbd
+          title="Open or close Edie from anywhere"
+          className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md border border-ink/15 dark:border-plate-ink/20 bg-paper dark:bg-plate font-sans text-[10.5px] font-semibold text-ink-faint dark:text-plate-ink-faint"
+        >
+          {shortcutLabel('j')}
+        </kbd>
         <button
           onClick={onClose}
           aria-label="Close Edie"
-          title="Close (Esc or Ctrl+J)"
+          title={`Close (Esc or ${shortcutLabel('j')})`}
           className="p-1.5 rounded-lg text-ink-faint dark:text-plate-ink-faint hover:text-ink dark:hover:text-plate-ink hover:bg-paper dark:hover:bg-plate transition-colors"
         >
           <X size={16} />
