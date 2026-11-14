@@ -300,7 +300,13 @@
         from { transform: translateX(24px); opacity: 0; }
         to { transform: translateX(0); opacity: 1; }
       }
-      @media (prefers-reduced-motion: reduce) { .ed-edie { animation: none; } }
+      /* Edie button's suggestion count: one short pop when it appears or changes */
+      .edie-count-in { animation: edieCountIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1); }
+      @keyframes edieCountIn {
+        from { transform: scale(0.4); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) { .ed-edie, .edie-count-in { animation: none; } }
 
       /* Badge pulse for notifications */
       @keyframes badgePulse {

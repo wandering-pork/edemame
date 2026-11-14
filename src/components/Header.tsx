@@ -109,8 +109,8 @@ export const Header: React.FC<HeaderProps> = ({
         </span>
       </button>
 
-      {/* Edie, the AI assistant (every page; Ctrl+J) */}
-      <EdieButton />
+      {/* Edie, the AI assistant (Ctrl+J). On a case, the button is in the case header instead. */}
+      <EdieButton placement="topbar" />
     </header>
   );
 };

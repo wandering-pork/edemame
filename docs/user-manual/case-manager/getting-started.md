@@ -40,8 +40,8 @@ before case numbers were introduced show a reference derived from their internal
 
 Directly under the case title sits a row of four chips that answer "where is this case at" without
 opening anything: **Stage**, **Risk**, **Next deadline**, and **On hold**. The case header itself
-has one primary button, **Add Task**, and a small **Case actions** menu (see below). **Edie**, the AI
-assistant, is the button at the top right of the top bar.
+has one primary button, **Add Task**, a small **Case actions** menu (see below), and **Ask Edie**,
+which opens the AI assistant.
 
 ### Case stage, on hold, and At Risk
 
@@ -129,8 +129,8 @@ Everything that used to be in this menu now has one home elsewhere:
 
 Every time you open a case, you land on the **Overview** tab: a "You are here" card with the
 current task across the top, then case info and the case's progress on the left and the document
-checklist (an overall donut plus a bar per category) and recent case files on the right. Click **Edie** at the top right
-of the top bar (or press **Ctrl+J**) for suggested next steps, AI skills and the case chat. See
+checklist (an overall donut plus a bar per category) and recent case files on the right. Click **Ask Edie** in the case
+header (or press **Ctrl+J**) for suggested next steps, AI skills and the case chat. See
 [Overview, Edie, and tabs](./workspace-and-tabs.md) for how the Overview, Edie and the case's tabs
 work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
@@ -217,7 +217,7 @@ pins it down:
 
 ## Chatting with Edie
 
-Open a case, then click **Edie** at the top right of the top bar (or press **Ctrl+J**) to chat about the case. Edie
+Open a case, then click **Ask Edie** in the case header (or press **Ctrl+J**) to chat about the case. Edie
 already knows the case's client, visa subclass, stage, task progress and document checklist, so you
 don't need to repeat that context.
 

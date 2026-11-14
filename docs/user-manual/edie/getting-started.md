@@ -4,15 +4,15 @@
 
 ## Opening and closing Edie
 
-- Click **Edie** (the pod icon) at the top right of the top bar, or press **Ctrl+J** (**Cmd+J** on a
-  Mac).
+- Click **Ask Edie** (the green button with the pod icon), or press **Ctrl+J** (**Cmd+J** on a Mac).
+  On a case, the button is in the case header next to **Case actions**. On every other page it's at
+  the right of the top bar.
 - The panel opens down the right-hand side. On a wide screen the page, top bar included, moves over
   to make room, so nothing is hidden. On a narrow screen the panel slides over the page.
 - Close it with the **✕**, **Esc**, or **Ctrl+J** again.
 - Edie stays open or closed as you move between pages, and remembers your choice on your account,
   so it's the same on another computer.
-- When Edie is closed and the page has suggestions (on a case), a small green number on the **Edie**
-  button shows how many.
+- When Edie is closed and the case has suggestions, the **Ask Edie** button shows how many.
 
 ## On a case
 

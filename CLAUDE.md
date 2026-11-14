@@ -481,8 +481,11 @@ Agent panel toggle are gone. AI help lives in **Edie**, on every page of the app
   `20261114000200_profiles_edie_open.sql`) — plus the global Ctrl/Cmd+J shortcut, the panel element,
   a claim counter, the button's suggestion-count badge, and the general chats (in memory only:
   `focus_conversations.case_id` is a required FK to `cases`, so non-case chats can't be stored there).
-- `components/edie/EdieButton.tsx` sits at the right of `components/Header.tsx` (pod mark from
-  `components/BrandImage.tsx`, `public/images/brand/edamame-mark-*.webp`).
+- `components/edie/EdieButton.tsx` is the one "Ask Edie" pill per page (soft green, pod mark from
+  `components/BrandImage.tsx` / `public/images/brand/edamame-mark-*.webp`, suggestion count inside
+  the pill with a one-shot `.edie-count-in` pop). `placement="topbar"` sits at the right of
+  `components/Header.tsx` and hides while a page has claimed Edie; Case Details renders
+  `placement="page"` in its own header next to Case actions, where the user is looking.
 - `components/edie/EdieShell.tsx` is the fixed, full-height 380px panel rendered once by
   `AppShell`; `AppShell`'s content column (top bar included) gets `xl:pr-[380px]` while it's open, so
   wide screens push and narrow ones overlay. With no page claiming it, it shows

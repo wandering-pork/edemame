@@ -43,8 +43,8 @@ Checklist tab.
 ## Edie, the case assistant
 
 **Edie** is Edamame's AI assistant; see [Edie](../edie/getting-started.md) for opening and closing it
-(the **Edie** button at the top right of the top bar, or **Ctrl+J**). On a case, Edie becomes that
-case's assistant.
+(**Ask Edie** in the case header, next to **Case actions**, or **Ctrl+J**). On a case, Edie becomes
+that case's assistant, and the button shows how many suggestions Edie has while it's closed.
 
 Edie only holds AI help. Everything else has one home on the page: the tab row for moving between
 views, **Case actions** for editing or deleting the case, and each document tool on its own tab.

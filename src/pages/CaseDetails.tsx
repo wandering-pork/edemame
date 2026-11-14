@@ -17,6 +17,7 @@ import { createPortal } from 'react-dom';
 import { EdiePanel, type EdieSkill, type EdieSuggestion } from '../components/edie/EdiePanel';
 import { useEdieChat } from '../components/edie/useEdieChat';
 import { useEdie } from '../contexts/EdieContext';
+import { EdieButton } from '../components/edie/EdieButton';
 import { CaseOverview } from '../components/case-details/CaseOverview';
 import { currentFocusTask, taskTimeline, checklistBreakdown, suggestQuickActions } from '../lib/caseOverview';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
@@ -1213,7 +1214,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         </button>
         <h1 className="text-[17px] font-bold text-ink dark:text-plate-ink tracking-tight min-w-0 truncate">
           {currentCase.title}
-          <span className="text-ink-faint dark:text-plate-ink-faint font-semibold"> — {client.name}</span>
+          <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">, {client.name}</span>
         </h1>
         <span className="font-mono text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{displayCaseNumber(currentCase)}</span>
         {visaSubclass && (
@@ -1279,6 +1280,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             )}
           </div>
 
+
+          {/* Edie: the case's one entry point to AI help (the top bar's button hides while a case is open). */}
+          <EdieButton placement="page" />
         </div>
       </div>
 

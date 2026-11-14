@@ -151,7 +151,7 @@ export function useEdieChat({ scopeKey, caseId, load, save, getCaseContext }: Us
           ? {
               id: uuidv4(),
               role: 'assistant',
-              content: "I think this is worth tracking — here's a drafted GitHub issue for your review.",
+              content: "I think this is worth tracking. Here's a drafted GitHub issue for you to review.",
               createdAt: new Date().toISOString(),
               kind: 'issue-draft',
               issueDraft: { title: data.draft.title, body: data.draft.body },
@@ -219,7 +219,7 @@ export function useEdieChat({ scopeKey, caseId, load, save, getCaseContext }: Us
       appendMessage(convId, {
         id: uuidv4(),
         role: 'assistant',
-        content: `Done — filed [#${data.number}](${data.url}).`,
+        content: `Done. Filed [#${data.number}](${data.url}).`,
         createdAt: new Date().toISOString(),
         kind: 'issue-filed',
         issueUrl: data.url,

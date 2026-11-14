@@ -140,7 +140,7 @@ const IssueDraftCard: React.FC<{
   if (message.issueDraftResolved === 'cancelled') {
     return (
       <div className="text-xs text-ink-faint dark:text-plate-ink-faint italic mt-2">
-        Draft discarded — no issue was filed.
+        Draft discarded. No issue was filed.
       </div>
     );
   }
@@ -163,8 +163,8 @@ const IssueDraftCard: React.FC<{
         <>
           <div className="px-3 pb-2 -mt-0.5 text-[10.5px] text-amber-700 dark:text-amber-400 leading-relaxed">
             Filing posts this title and body to the <strong>public</strong> GitHub repo{' '}
-            <span className="font-mono">wandering-pork/edemame</span> — visible to anyone on the internet.
-            Review it for client-identifying details before confirming.
+            <span className="font-mono">wandering-pork/edemame</span>, which anyone on the internet can see.
+            Check it for anything that identifies a client before confirming.
           </div>
           <div className="flex items-center gap-2 px-3 py-2 border-t border-ink/15 dark:border-plate-ink/20">
             <button
@@ -312,7 +312,7 @@ export const EdiePanel: React.FC<EdiePanelProps> = ({
     >
       {/* Header */}
       <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-ink/10 dark:border-plate-ink/15 flex-shrink-0">
-        <span className="w-9 h-9 rounded-xl bg-edamame/10 dark:bg-edamame/15 flex items-center justify-center flex-shrink-0">
+        <span className="w-9 h-9 rounded-full bg-edamame/10 dark:bg-edamame/15 border border-edamame/30 flex items-center justify-center flex-shrink-0">
           <BrandImage variant="mark" alt="" className="w-7 h-7 object-contain" />
         </span>
         <div className="min-w-0">
