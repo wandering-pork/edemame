@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { SidebarLogoArea } from './SidebarLogoArea';
+import { BrandImage } from './BrandImage';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useStorageMode } from '../contexts/RepositoryContext';
@@ -278,16 +279,9 @@ export const Sidebar: React.FC = () => {
           }
         >
           {collapsed && !isDrawer ? (
-            /* Collapsed monogram */
+            /* Collapsed: the pod mark alone */
             <div className="flex items-center justify-center py-3 w-full">
-              <div className="w-9 h-9 rounded-xl bg-ink/8 dark:bg-plate-ink/10 flex items-center justify-center ring-1 ring-ink/10 dark:ring-plate-ink/15 shadow-inner">
-                <span
-                  className="text-edamame-700 dark:text-edamame-400 font-black text-base leading-none"
-                  style={{ fontFamily: "'Sniglet', cursive" }}
-                >
-                  E
-                </span>
-              </div>
+              <BrandImage variant="mark" alt="Edamame" className="w-10 h-auto" />
             </div>
           ) : (
             /* Full logo */
