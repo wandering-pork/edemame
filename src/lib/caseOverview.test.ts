@@ -86,13 +86,26 @@ describe('suggestQuickActions', () => {
   it('suggests requesting pending docs and verifying linked ones, capped at the limit', () => {
     const checklist = [makeItem('1', 'pending'), makeItem('2', 'pending'), makeItem('3', 'linked')];
     const actions = suggestQuickActions({ ...base, currentTask: base.caseTasks[0], checklist });
-    expect(actions.map(a => a.id)).toEqual(['request-docs', 'verify-docs', 'open-current']);
+    expect(actions.map(a => a.id)).toEqual(['request-docs', 'verify-docs']);
     expect(actions[0].label).toBe('Request 2 missing documents');
     expect(actions[1].label).toBe('Verify 1 document');
   });
 
   it('suggests a task plan and checklist for an empty case', () => {
     const actions = suggestQuickActions({ caseTasks: [], checklist: [], clientName: 'X', currentTask: null });
-    expect(actions.map(a => a.id)).toEqual(['plan', 'gen-checklist', 'summarise']);
+    expect(actions.map(a => a.id)).toEqual(['plan', 'gen-checklist']);
+  });
+
+  it('never repeats actions that already have a home on the page', () => {
+    const checklist = [makeItem('1', 'pending')];
+    const ids = suggestQuickActions({ ...base, currentTask: base.caseTasks[0], checklist }, 10).map(a => a.id);
+    expect(ids).not.toContain('open-current');
+    expect(ids).not.toContain('summarise');
+  });
+
+  it('caps suggestions at the limit', () => {
+    const current = makeTask('w', '2026-10-01', 'waiting_client');
+    const checklist = [makeItem('1', 'pending'), makeItem('2', 'linked')];
+    expect(suggestQuickActions({ caseTasks: [], checklist, clientName: 'X', currentTask: current })).toHaveLength(3);
   });
 });

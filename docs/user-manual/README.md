@@ -1,6 +1,6 @@
 # Edamame User Manual
 
-This folder is the source of truth the **Case Manager Agent** (Focus Mode chat) reads from to
+This folder is the source of truth that **Edie**, the case assistant (the chat in a case's Edie panel), reads from to
 answer "how do I…" / training questions, and to judge whether the product is behaving as
 documented. Content here is maintained by the product/support team — no code changes are needed
 to update what the agent knows, just edit or add markdown files and redeploy.

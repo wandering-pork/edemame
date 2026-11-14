@@ -70,15 +70,17 @@ export function checklistBreakdown(items: DocumentChecklistItem[], fallbackCateg
 }
 
 /**
- * A suggested next step shown in the Workspace dock. `agent` pre-fills the
- * Agent chat with `prompt`; `open` opens a View/Tool tab; `task` opens the
- * current task's detail modal.
+ * A suggested next step shown in the Edie panel. `agent` pre-fills Edie's
+ * chat with `prompt`; `open` opens a tab or tool. `detail` is the card's
+ * second line.
+ *
+ * Only things with no other one-click home on the page belong here: opening
+ * the current task is the Overview's "Open task", and "Summarise case" is one
+ * of Edie's skills, so neither is suggested.
  */
-/** `detail` is a short second line for layouts that show suggestions as cards. */
 export type QuickAction =
   | { id: string; label: string; detail: string; kind: 'agent'; prompt: string }
-  | { id: string; label: string; detail: string; kind: 'open'; target: CaseTabKind }
-  | { id: string; label: string; detail: string; kind: 'task'; taskId: string };
+  | { id: string; label: string; detail: string; kind: 'open'; target: CaseTabKind };
 
 /**
  * Up to `limit` suggested next steps for the case, driven by its current
@@ -133,21 +135,11 @@ export function suggestQuickActions(
     });
   }
 
-  if (currentTask) {
-    actions.push({ id: 'open-current', label: 'Update current task', detail: 'Change its status, date or notes', kind: 'task', taskId: currentTask.id });
-  }
 
   if (checklist.length === 0) {
     actions.push({ id: 'gen-checklist', label: 'Generate checklist', detail: 'No checklist on this case yet', kind: 'open', target: 'checklist-generator' });
   }
 
-  actions.push({
-    id: 'summarise',
-    label: 'Summarise case',
-    detail: 'Ask the Agent where things are up to',
-    kind: 'agent',
-    prompt: 'Summarise where this case is up to, what is outstanding, and what I should do next.',
-  });
 
   return actions.slice(0, limit);
 }

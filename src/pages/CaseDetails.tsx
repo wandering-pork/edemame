@@ -14,10 +14,9 @@ import { BundleBuilder820 } from '../components/BundleBuilder820';
 import { DocumentCompressor } from '../components/DocumentCompressor';
 import { CASE_FILE_DRAG_MIME } from '../components/case-details/CaseRail';
 import { CaseFilesDragList } from '../components/case-details/CaseFilesDragList';
-import { AgentPanel } from '../components/case-details/AgentPanel';
+import { EdiePanel, EDIE_PUSH_PADDING_CLASS, type EdieSkill, type EdieSuggestion } from '../components/case-details/EdiePanel';
+import { loadEdieOpen, saveEdieOpen } from '../lib/ediePanelState';
 import { CaseOverview } from '../components/case-details/CaseOverview';
-import { WorkspaceDock } from '../components/case-details/WorkspaceDock';
-import type { WorkspaceMenuItem, WorkspaceQuickAction } from '../components/case-details/WorkspaceControls';
 import { currentFocusTask, taskTimeline, checklistBreakdown, suggestQuickActions } from '../lib/caseOverview';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
 import { DocumentTypePicker, DocumentTypeBadge } from '../components/DocumentTypePicker';
@@ -61,6 +60,9 @@ import {
   Columns2,
   LayoutGrid,
   UserPlus,
+  Minimize2,
+  Package,
+  Layers,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -111,7 +113,6 @@ interface CaseDetailsProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const AGENT_CHIPS = ['Draft consultation checklist', 'Document request email', 'Summarise eligibility'];
 
 const TEAM_ROLE_LABEL: Record<TeamMember['role'], string> = {
   partner: 'Partner',
@@ -145,16 +146,6 @@ const CHECKLIST_STATUS_META: Record<ChecklistItemStatus, { cls: string; label: s
   pending: { cls: 'bg-amber-500/[0.13] text-amber-700 dark:text-amber-400', label: 'Pending' },
 };
 
-// Keyword heuristics used to (a) rank AI-recommended Workspace items, and
-// (b) decide which items to surface as inline hyperlinks after a chat reply.
-const RECOMMEND_KEYWORDS: Array<[CaseTabKind, RegExp]> = [
-  ['checklist', /document|checklist|evidence|paperwork/i],
-  ['tasks', /task|deadline|due date|schedule|overdue/i],
-  ['notes', /note|summary|history|record/i],
-  ['checklist-generator', /generate|missing document|category|categories/i],
-  ['document-compressor', /crusher|compress|5\s*mb|packager|document compressor|auto-?packager/i],
-  ['bundle-builder-820', /820|bundle|submission/i],
-];
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -262,8 +253,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   /** §4.4 — renders the Case Files tab's content beside the checklist for drag-to-link. */
   const [caseFilesSplit, setCaseFilesSplit] = useState(false);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
-  const [recommendedViewKinds, setRecommendedViewKinds] = useState<CaseTabKind[]>([]);
-  const [recommendedToolKinds, setRecommendedToolKinds] = useState<CaseTabKind[]>([]);
 
   // ---- Top-bar menu state ----
   const [statusOpen, setStatusOpen] = useState(false);
@@ -277,8 +266,30 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [outcomePickerOpen, setOutcomePickerOpen] = useState(false);
   const [outcomeDraft, setOutcomeDraft] = useState<CaseOutcome | ''>('');
 
-  // ---- Agent panel state (closed by default per design) ----
-  const [agentOpen, setAgentOpen] = useState(false);
+  // ---- Edie panel state ----
+  // Remembered for the browser session so it stays open when moving between
+  // cases (a UI preference, not case data).
+  const [edieOpen, setEdieOpenState] = useState<boolean>(() => loadEdieOpen());
+  const setEdieOpen = useCallback((next: boolean | ((open: boolean) => boolean)) => {
+    setEdieOpenState(prev => {
+      const value = typeof next === 'function' ? next(prev) : next;
+      saveEdieOpen(value);
+      return value;
+    });
+  }, []);
+  const edieInputRef = useRef<HTMLInputElement>(null);
+
+  // Ctrl+J (Cmd+J on a Mac) toggles Edie from anywhere on the page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        setEdieOpen(o => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [setEdieOpen]);
 
   // ---- Document checklist state ----
   const [checklist, setChecklist] = useState<DocumentChecklistItem[]>([]);
@@ -1032,19 +1043,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         return next;
       });
 
-      // Refresh the Workspace dock's View/Tools "AI pick" ranking from the exchange.
-      const combinedText = `${userMsg.content}\n${assistantMsg.content}`;
-      const matchedKinds = RECOMMEND_KEYWORDS.filter(([, re]) => re.test(combinedText)).map(([kind]) => kind);
-      if (matchedKinds.length > 0) {
-        const matchedViews = matchedKinds.filter(k => k === 'tasks' || k === 'checklist' || k === 'notes');
-        const matchedTools = matchedKinds.filter(k => k === 'checklist-generator' || k === 'document-compressor' || k === 'bundle-builder-820');
-        if (matchedViews.length > 0) {
-          setRecommendedViewKinds(prev => [...matchedViews, ...prev.filter(k => !matchedViews.includes(k))]);
-        }
-        if (matchedTools.length > 0) {
-          setRecommendedToolKinds(prev => [...matchedTools, ...prev.filter(k => !matchedTools.includes(k))]);
-        }
-      }
     } catch {
       const errMsg: FocusChatMessage = {
         id: uuidv4(),
@@ -1065,9 +1063,11 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     }
   }, [chatInput, isSending, activeConvId, conversations, caseItem, client, applicant, visaSubclass, completedTasks, caseTasks, pendingTasks, checklist, progress, uploadedCount, session]);
 
+  /** Pre-fills Edie's chat with `msg` for the agent to review and send. */
   const handleSkillAction = (msg: string) => {
     setChatInput(msg);
-    if (!agentOpen) setAgentOpen(true);
+    setEdieOpen(true);
+    requestAnimationFrame(() => edieInputRef.current?.focus());
   };
 
   // ---- Agentic GitHub issue filing (GitHub issue #15) ----
@@ -1170,7 +1170,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   const handleRunCrusher = () => {
-    setMoreOpen(false);
     if (SUPPORTED_SUBCLASSES.includes(visaSubclass || '')) setShowPackager(true);
   };
 
@@ -1423,7 +1422,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setIsEditingCase(true);
   };
 
-  const workspaceQuickActions: WorkspaceQuickAction[] = suggestQuickActions({
+  const edieSuggestions: EdieSuggestion[] = suggestQuickActions({
     currentTask: focusTask,
     caseTasks,
     checklist,
@@ -1434,49 +1433,27 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     detail: action.detail,
     onSelect: () => {
       if (action.kind === 'agent') handleSkillAction(action.prompt);
-      else if (action.kind === 'open') openOrFocusTab(action.target);
-      else {
-        const task = caseTasks.find(t => t.id === action.taskId);
-        if (task) handleOpenTaskModal(task);
-      }
+      else openOrFocusTab(action.target);
     },
   }));
 
-  const workspaceViewItems: WorkspaceMenuItem[] = [
-    { id: 'overview', group: 'Case', label: 'Overview', onSelect: () => openOrFocusTab('workspace') },
-    { id: 'tasks', group: 'Case', label: 'Tasks & deadlines', hint: `${pendingTasks.length} open`, recommended: recommendedViewKinds.includes('tasks'), onSelect: () => openOrFocusTab('tasks') },
-    { id: 'notes', group: 'Case', label: 'Notes', recommended: recommendedViewKinds.includes('notes'), onSelect: () => openOrFocusTab('notes') },
-    { id: 'documents', group: 'Documents', label: 'Case files', hint: String(documents.length), onSelect: () => openOrFocusTab('documents') },
-    { id: 'checklist', group: 'Documents', label: 'Document checklist', hint: checklist.length > 0 ? `${uploadedCount}/${checklist.length}` : undefined, recommended: recommendedViewKinds.includes('checklist'), onSelect: () => openOrFocusTab('checklist') },
-    ...(eligibilityAssessment
-      ? [{ id: 'eligibility', group: 'Documents', label: 'Eligibility assessment', onSelect: () => setShowEligibilityAssessment(true) }]
-      : []),
-  ];
-
-  const workspaceToolItems: WorkspaceMenuItem[] = [
-    { id: 'add-task', group: 'Case', label: 'Add task', onSelect: () => handleOpenTaskModal() },
-    { id: 'add-deadline', group: 'Case', label: 'Add deadline', onSelect: () => { openOrFocusTab('tasks'); setShowAddDeadline(true); } },
-    { id: 'edit-case', group: 'Case', label: 'Edit case', onSelect: openEditCase },
-    { id: 'checklist-generator', group: 'Documents', label: 'Document Checklist Generator', recommended: recommendedToolKinds.includes('checklist-generator'), onSelect: () => openOrFocusTab('checklist-generator') },
-    { id: 'document-compressor', group: 'Documents', label: 'Document Compressor', recommended: recommendedToolKinds.includes('document-compressor'), onSelect: () => openOrFocusTab('document-compressor') },
-    ...(SUPPORTED_SUBCLASSES.includes(visaSubclass || '')
-      ? [{ id: 'crusher', group: 'Documents', label: 'Run Crusher', onSelect: handleRunCrusher }]
-      : []),
-    ...(visaSubclass === '820'
-      ? [{ id: 'bundle-builder-820', group: 'Documents', label: '820 Bundle Builder', recommended: recommendedToolKinds.includes('bundle-builder-820'), onSelect: () => openOrFocusTab('bundle-builder-820') }]
-      : []),
-    { id: 'agent', group: 'Agent', label: agentOpen ? 'Close Agent chat' : 'Chat with Edamame', onSelect: () => setAgentOpen(o => !o) },
-    { id: 'cover-letter', group: 'Agent', label: 'Draft cover letter', onSelect: () => handleSkillAction('Please help me draft a cover letter for this immigration case.') },
-    { id: 'eligibility-check', group: 'Agent', label: 'Re-check eligibility', onSelect: handleEligibility },
+  // Edie's fixed AI skills. Each has exactly one home: here.
+  const prefillTitle = 'Pre-fills the chat for you to review and send';
+  const edieSkills: EdieSkill[] = [
+    { id: 'summarise', label: 'Summarise case', title: prefillTitle, onSelect: () => handleSkillAction('Summarise where this case is up to, what is outstanding, and what I should do next.') },
+    { id: 'cover-letter', label: 'Draft cover letter', title: prefillTitle, onSelect: () => handleSkillAction('Please help me draft a cover letter for this immigration case.') },
+    { id: 'consultation-checklist', label: 'Draft consultation checklist', title: prefillTitle, onSelect: () => handleSkillAction('Draft a consultation checklist for this case.') },
+    { id: 'eligibility-check', label: 'Re-check eligibility', title: 'Opens the Visa Advisor for this client', onSelect: handleEligibility },
   ];
 
   // ---- Render ----
   const needsOutcomePrompt = currentCase.stage === 'closed' && !currentCase.outcome;
 
+  const tabToolBtnCls = 'inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors';
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
   return (
-    <div className={`flex-1 px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate`}>
+    <div className={`flex-1 px-5 py-5 lg:px-7 lg:py-6 bg-paper dark:bg-plate transition-[padding] duration-200 ${edieOpen ? EDIE_PUSH_PADDING_CLASS : ''}`}>
 
       {/* ══════════════════════════════════════════
           TOP BAR
@@ -1499,10 +1476,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          {/* Add Task — the one primary action kept in the header. Everything
-              else that used to live here (Draft, Eligibility, Eligibility
-              assessment, Agent toggle, and the old ⋯ menu) moved into the
-              single Case actions menu below, named for what each does. */}
+          {/* Add Task is the one primary action in the header. Case actions
+              holds case admin only; AI help is in Edie, navigation in the tab
+              row, and document tools on the Case files / Checklist tabs. */}
           <button
             onClick={() => handleOpenTaskModal()}
             className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-xs transition-colors"
@@ -1526,20 +1502,12 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             {moreOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMoreOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-40 w-60 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content max-h-[80vh] overflow-y-auto">
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-56 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content max-h-[80vh] overflow-y-auto">
                   <button
-                    onClick={() => { handleSkillAction('Please help me draft a cover letter for this immigration case.'); setMoreOpen(false); }}
-                    title="Opens the Agent chat pre-filled with a cover-letter drafting prompt"
+                    onClick={() => { openEditCase(); setMoreOpen(false); }}
                     className={menuItemCls}
                   >
-                    Draft cover letter with Agent
-                  </button>
-                  <button
-                    onClick={() => { handleEligibility(); setMoreOpen(false); }}
-                    title="Open the Visa Advisor pre-filled with this client"
-                    className={menuItemCls}
-                  >
-                    Re-check eligibility
+                    Edit case
                   </button>
                   {eligibilityAssessment && (
                     <button
@@ -1550,28 +1518,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                       View eligibility assessment
                     </button>
                   )}
-
-                  <div className="h-px bg-paper dark:bg-plate my-1" />
-                  <button onClick={() => { setAgentOpen(o => !o); setMoreOpen(false); }} className={menuItemCls}>
-                    {agentOpen ? 'Close Agent panel' : 'Open Agent panel'}
-                  </button>
-
-                  <div className="h-px bg-paper dark:bg-plate my-1" />
-                  <button onClick={() => { openOrFocusTab('checklist'); setMoreOpen(false); }} className={menuItemCls}>Document checklist</button>
-                  <button onClick={() => { openOrFocusTab('workspace'); setMoreOpen(false); }} className={menuItemCls}>Overview</button>
-                  <button onClick={() => { setShowDocumentCompressor(true); setMoreOpen(false); }} className={menuItemCls}>Document Compressor</button>
-                  {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && (
-                    <button onClick={handleRunCrusher} className={menuItemCls}>Run Crusher</button>
-                  )}
-                  {visaSubclass === '820' && (
-                    <button onClick={() => { setShowBundleBuilder(true); setMoreOpen(false); }} className={menuItemCls}>820 bundle builder</button>
-                  )}
-                  <button
-                    onClick={() => { openEditCase(); setMoreOpen(false); }}
-                    className={menuItemCls}
-                  >
-                    Edit case
-                  </button>
                   {canDeleteCase && (
                     <>
                       <div className="h-px bg-paper dark:bg-plate my-1" />
@@ -1587,6 +1533,27 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               </>
             )}
           </div>
+
+          {/* Edie toggle */}
+          <button
+            onClick={() => setEdieOpen(o => !o)}
+            aria-pressed={edieOpen}
+            aria-label={edieSuggestions.length > 0 ? `Edie, ${edieSuggestions.length} suggestions` : 'Edie'}
+            title="Edie, case assistant (Ctrl+J)"
+            className={`relative inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+              edieOpen
+                ? 'border-edamame bg-edamame/10 dark:bg-edamame/15 text-edamame-700 dark:text-edamame-400'
+                : 'border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame'
+            }`}
+          >
+            <Sparkles size={14} />
+            <span className="hidden md:inline">Edie</span>
+            {!edieOpen && edieSuggestions.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-edamame text-white text-[9.5px] font-bold flex items-center justify-center">
+                {edieSuggestions.length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -1664,7 +1631,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           CONTENT GRID (tab panel + optional Agent panel)
       ══════════════════════════════════════════ */}
       <div
-        className={`grid grid-cols-1 gap-3.5 items-start ${agentOpen ? 'xl:grid-cols-[minmax(320px,1fr)_minmax(280px,330px)]' : ''}`}
+        className="grid grid-cols-1 gap-3.5 items-start"
       >
 
         {/* ── CENTER COLUMN ── */}
@@ -2036,6 +2003,22 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           {/* ── CASE FILES — full-tab view (formerly rail-only), better visibility/actions for a large document set ── */}
           {activeTabId === 'tab:documents' && (
             <div className="mt-4 space-y-4">
+              {/* Document tools live on the tab whose files they work on. */}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button onClick={() => setShowDocumentCompressor(true)} className={tabToolBtnCls}>
+                  <Minimize2 size={12} /> Compress documents
+                </button>
+                {SUPPORTED_SUBCLASSES.includes(visaSubclass || '') && (
+                  <button onClick={handleRunCrusher} title="Package the case files into a lodgement-ready PDF" className={tabToolBtnCls}>
+                    <Package size={12} /> Run Crusher
+                  </button>
+                )}
+                {visaSubclass === '820' && (
+                  <button onClick={() => setShowBundleBuilder(true)} className={tabToolBtnCls}>
+                    <Layers size={12} /> 820 Bundle Builder
+                  </button>
+                )}
+              </div>
               <DocumentUpload
                 caseId={currentCase.id}
                 visaSubclass={visaSubclass}
@@ -2258,35 +2241,29 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
           )}
         </div>
 
-        {/* ── AGENT PANEL ── */}
-        {agentOpen && (
-          <AgentPanel
-            conversations={conversations}
-            activeConv={activeConv}
-            activeConvId={activeConvId}
-            onSelectConversation={setActiveConvId}
-            onNewChat={createConversation}
-            chatInput={chatInput}
-            setChatInput={setChatInput}
-            isSending={isSending}
-            onSend={sendMessage}
-            onSuggested={handleSkillAction}
-            suggestedChips={AGENT_CHIPS}
-            chatEndRef={chatEndRef}
-            filingIssueMessageId={filingIssueMessageId}
-            onConfirmIssueDraft={handleConfirmIssueDraft}
-            onCancelIssueDraft={handleCancelIssueDraft}
-          />
-        )}
       </div>
 
-
-      {/* ── WORKSPACE BAR (floating, every tab) ── */}
-      <WorkspaceDock
-        quickActions={workspaceQuickActions}
+      {/* ── EDIE (right-hand panel; pushes the page on wide screens) ── */}
+      <EdiePanel
+        open={edieOpen}
+        onClose={() => setEdieOpen(false)}
         currentTaskTitle={focusTask?.title}
-        viewItems={workspaceViewItems}
-        toolItems={workspaceToolItems}
+        suggestions={edieSuggestions}
+        skills={edieSkills}
+        conversations={conversations}
+        activeConv={activeConv}
+        activeConvId={activeConvId}
+        onSelectConversation={setActiveConvId}
+        onNewChat={createConversation}
+        chatInput={chatInput}
+        setChatInput={setChatInput}
+        isSending={isSending}
+        onSend={sendMessage}
+        chatEndRef={chatEndRef}
+        inputRef={edieInputRef}
+        filingIssueMessageId={filingIssueMessageId}
+        onConfirmIssueDraft={handleConfirmIssueDraft}
+        onCancelIssueDraft={handleCancelIssueDraft}
       />
 
       {/* ── MODALS ── */}

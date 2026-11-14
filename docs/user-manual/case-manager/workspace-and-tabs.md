@@ -1,4 +1,4 @@
-# Overview, the Workspace bar, and Tabs
+# Overview, Edie, and Tabs
 
 ## The Overview tab
 
@@ -40,34 +40,45 @@ The tabs and the layout around them stay the same on every tab; switching tabs o
 content below the tab row. To drag files onto checklist items, use the **Case Files** button on the
 Checklist tab.
 
-## The Workspace bar
+## Edie, the case assistant
 
-A dark **Workspace** bar floats at the bottom of every case tab. It has:
+**Edie** is Edamame's AI assistant. Click **Edie** at the top right of a case (next to **Case
+actions**), or press **Ctrl+J** (**Cmd+J** on a Mac), to open a panel down the right-hand side. On a
+wide screen the case moves over to make room, so nothing is hidden. On a narrow screen the panel
+slides over the case. Close it with the **✕**, **Esc**, or **Ctrl+J** again. It stays open as you
+move between cases until you close it. When Edie is closed and has suggestions, a small green number
+on the button shows how many.
 
-- **Suggested quick actions** for the current task — for example *Chase client* (when the current
-  task is waiting on the client), *Request N missing documents*, *Verify N documents*, *Update
-  current task*, *Create a task plan*, *Generate checklist*, or *Summarise case*. These are worked
-  out from the case's tasks and checklist (not an AI call). Actions that need writing — an email
-  to the client, a summary — open the **Agent** chat panel with a prompt already typed in; nothing
-  is sent until you press send.
-- **View** menu — Overview, Tasks & deadlines, Notes, Case files, Document checklist, and (when the
-  case has one) Eligibility assessment.
-- **Tools** menu — Add task, Add deadline, Edit case, Document Checklist Generator, Document
-  Compressor, Run Crusher (supported subclasses), 820 Bundle Builder (subclass 820 only), Chat with
-  Edamame, Draft cover letter, and Re-check eligibility.
+Edie only holds AI help. Everything else has one home on the page: the tab row for moving between
+views, **Case actions** for editing or deleting the case, and each document tool on its own tab.
 
-Both menus open upwards and have a search box — start typing to filter, use the arrow keys to move,
-**Enter** to open the highlighted item, and **Esc** to close. After you chat with the Agent, items
-related to what you discussed are marked **AI PICK** and listed first in their group.
+The panel has three parts:
+
+- **Suggested for "*current task*"**: up to three next steps worked out from the case's tasks and
+  checklist (not an AI call). For example: *Chase client* (when the current task is waiting on the
+  client), *Request N missing documents*, *Verify N documents*, *Create a task plan* or *Generate
+  checklist*. Steps that need writing, like an email to the client, put a prompt in Edie's chat box
+  for you to review. Nothing is sent until you press send. Once a chat has started, this section
+  folds into one row so the chat has room; click it to open it again.
+- **Skills**: *Summarise case*, *Draft cover letter* and *Draft consultation checklist* put a prompt
+  in the chat box. *Re-check eligibility* opens the Visa Advisor for this client.
+- **Chat**: ask Edie anything about the case. Edie already knows the client, the tasks and the
+  checklist, and can answer "how do I…" questions about Edamame. **New chat** starts a fresh
+  conversation; earlier chats on the case are listed above the messages.
 
 ## Tabs
 
 A row of tabs under the case header is always visible: **Overview**, **Tasks**, **Case files**,
 **Checklist**, and **Notes**. Tasks, Case files, and Checklist show a count. Click a tab to switch to
-it. Choosing a View from the Workspace bar switches to the matching tab.
+it.
 
-Tools (Document Checklist Generator, Document Compressor, 820 Bundle Builder) open in their own
-window over the case rather than as a tab. When you come back to a case, it reopens on the tab you
+Document tools sit on the tab whose documents they work on, and open in their own window over the
+case:
+
+- **Case files** tab: **Compress documents** (the Document Compressor), **Run Crusher** (supported
+  subclasses only) and **820 Bundle Builder** (subclass 820 only).
+- **Checklist** tab: **Generate** (the Document Checklist Generator).
+ When you come back to a case, it reopens on the tab you
 were last using.
 
 ## Tasks by phase

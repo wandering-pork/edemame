@@ -472,15 +472,36 @@ before this feature).
   `components/team/FirmTeamMembers.tsx`'s 1G.6 hand-over panel uses the picker in place of its old
   `<select>`, still offering "Leave unassigned".
 
+### Edie, the case assistant (Case Details)
+
+The old floating bottom "Workspace" bar (`WorkspaceDock`, with View/Tools menus) and the separate
+Agent panel toggle are gone. AI help lives in **Edie** (`components/case-details/EdiePanel.tsx`): an
+**Edie** button at the top right of `pages/CaseDetails.tsx`'s header (count badge = number of
+suggestions while closed), also toggled by Ctrl/Cmd+J, opens a fixed right-hand panel (380px) that
+starts below the app's sticky top bar (`components/Header.tsx` publishes its height as the
+`--app-header-h` CSS variable via a ResizeObserver) and pushes the page with `xl:pr-[380px]` on wide
+screens / overlays it on narrow ones. Open state is remembered per browser session
+(`lib/ediePanelState.ts`, sessionStorage, try/catch). The panel holds: suggestions for the current
+task (`lib/caseOverview.ts`'s rule-based `suggestQuickActions()`), fixed skills (Summarise case,
+Draft cover letter, Draft consultation checklist — each pre-fills the chat — and Re-check
+eligibility, which opens the Visa Advisor), and the case chat (`api/focus-chat.ts`, whose system
+prompt names the assistant Edie). **One home per action** is the rule: navigation is the tab row,
+case admin is **Case actions** (Edit case, View eligibility assessment, Delete case only), document
+tools sit on their tab (Compress documents / Run Crusher / 820 Bundle Builder on Case files;
+Generate on Checklist), and `suggestQuickActions()` deliberately never suggests something with
+another one-click home (no "Update current task" — that's the Overview's **Open task**; no
+"Summarise case" — that's a skill). Edie is case-only for now; the agreed next step is Edie on
+every page.
+
 ### Agentic Issue Filing (Case Manager Focus Mode chat only)
 
-Focus Mode chat (`api/focus-chat.ts`, rendered by `AgentPanel.tsx`) can recognize when a user's message describes a product defect or feature request and offer to file a GitHub issue — scoped only to this chat surface, per GitHub issue #15.
+Focus Mode chat (`api/focus-chat.ts`, rendered by `components/case-details/EdiePanel.tsx`) can recognize when a user's message describes a product defect or feature request and offer to file a GitHub issue — scoped only to this chat surface, per GitHub issue #15.
 
 1. On every turn, the Gemini system prompt asks the model to silently classify the message against the loaded User Manual context (`api/_lib/userManual.ts`) into Normal Question / Defect / Feature Request / None.
 2. For Defect or Feature Request, the model uses Gemini function-calling (`tools` on the `generateContent` request) to call `search_github_issues(query)`, which `api/focus-chat.ts` executes server-side via the GitHub Search API (`api/_lib/github.ts`, using `GITHUB_ISSUES_TOKEN`).
 3. If a likely duplicate is found, the model replies in plain text with a link to the existing issue instead of drafting a new one.
-4. If not, the model calls `draft_github_issue(title, body)`. The backend does **not** file anything at this point — it returns `{ kind: 'issue-draft', draft }` to the frontend, which `AgentPanel.tsx` renders as a message with `kind: 'issue-draft'` (see `FocusChatMessage` in `types.ts`) showing the drafted title/body plus **Confirm** and **Cancel** buttons.
-5. Only a user's Confirm click hits the separate `api/file-github-issue.ts` endpoint, which performs the actual `POST /repos/wandering-pork/edemame/issues` call, labeling the issue `agent-reported`. Cancel just marks the draft discarded client-side — no API call. The `IssueDraftCard` UI (`AgentPanel.tsx`) discloses that confirming posts to the **public** `wandering-pork/edemame` repo before the user clicks Confirm.
+4. If not, the model calls `draft_github_issue(title, body)`. The backend does **not** file anything at this point — it returns `{ kind: 'issue-draft', draft }` to the frontend, which `EdiePanel.tsx` renders as a message with `kind: 'issue-draft'` (see `FocusChatMessage` in `types.ts`) showing the drafted title/body plus **Confirm** and **Cancel** buttons.
+5. Only a user's Confirm click hits the separate `api/file-github-issue.ts` endpoint, which performs the actual `POST /repos/wandering-pork/edemame/issues` call, labeling the issue `agent-reported`. Cancel just marks the draft discarded client-side — no API call. The `IssueDraftCard` UI (`EdiePanel.tsx`) discloses that confirming posts to the **public** `wandering-pork/edemame` repo before the user clicks Confirm.
 6. **Auth**: both `api/focus-chat.ts` and `api/file-github-issue.ts` require a valid Supabase session — the frontend sends the user's access token as `Authorization: Bearer <token>`, verified server-side via `api/_lib/auth.ts`'s `verifySupabaseUser()`. It calls Supabase Auth's `GET /auth/v1/user` REST endpoint directly with plain `fetch` rather than adding `@supabase/supabase-js` as a dependency of the root-level `api/` functions (there's no root `package.json`/`node_modules` — only `src/` has one, per `vercel.json`'s `buildCommand`), matching the minimal-client convention already used by `api/_lib/github.ts`. Unauthenticated requests get a 401.
 7. **Rate limiting**: the "3 per conversation" the model steers itself by (`focus-chat.ts`'s `MAX_ISSUES_PER_SESSION`) and the `issuesFiledInSession` count the frontend sends are both client-influenced and are UX niceties only, not security controls. The real, server-enforced cap is in `file-github-issue.ts`: at most 5 filings per authenticated user per rolling 24h, backed by the `agent_issue_filings` table (`supabase/migrations/20260807000000_create_agent_issue_filings.sql`, RLS-scoped to `auth.uid()` like `profiles`). Known gap: the count-then-insert check isn't atomic, so a narrow race across concurrent requests from the same user isn't fully closed — acceptable for the single-user-abuse scenario this defends against, documented in a comment at the top of `file-github-issue.ts`.
 8. **PII scrub**: before calling the GitHub API, `file-github-issue.ts` runs the drafted title/body through `api/_lib/pii.ts`'s `scrubPii()` — a simple regex-based redaction of obvious email/phone/passport-number-like patterns — as a server-side backstop on top of the prompt instruction in `focus-chat.ts` telling the model not to include client-identifying details. It is not a full PII-detection system (documented false positive/negative examples in `pii.ts`).

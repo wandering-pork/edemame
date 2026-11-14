@@ -294,6 +294,14 @@
         to { opacity: 1; }
       }
 
+      /* Edie side panel: one short slide in from the right */
+      .ed-edie { animation: edieSlideIn 0.2s ease-out; }
+      @keyframes edieSlideIn {
+        from { transform: translateX(24px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) { .ed-edie { animation: none; } }
+
       /* Badge pulse for notifications */
       @keyframes badgePulse {
         0%, 100% { transform: scale(1); }

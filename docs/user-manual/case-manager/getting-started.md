@@ -40,8 +40,8 @@ before case numbers were introduced show a reference derived from their internal
 
 Directly under the case title sits a row of four chips that answer "where is this case at" without
 opening anything: **Stage**, **Risk**, **Next deadline**, and **On hold**. The case header itself
-now only keeps one primary button, **Add Task**, plus a single **Case actions** menu for everything
-else (see "The Case actions menu" below).
+has one primary button, **Add Task**, a small **Case actions** menu (see below), and **Edie**, the AI
+assistant.
 
 ### Case stage, on hold, and At Risk
 
@@ -111,38 +111,34 @@ instead.
 
 ### The Case actions menu
 
-Everything that isn't **Add Task** now lives in one **Case actions** menu, named for what each item
-actually does:
-- **Draft cover letter with Agent** (previously an unlabelled "Draft" button) — opens the Agent
-  chat panel with a cover-letter drafting prompt already typed in; nothing is sent until you do.
-- **Re-check eligibility** (previously "Eligibility") — opens the Visa Advisor pre-filled with this
-  client.
-- **View eligibility assessment** (previously "Eligibility assessment", still only shown when this
-  case has a saved assessment behind it — either opened directly from a Visa Advisor pathway, or
-  matched up after the fact) — opens a read-only view of the full report (inputs summary and every
-  assessed pathway with its verdict, reasons, and gaps) without leaving the case. See
+**Case actions** holds case admin only:
+- **Edit case**: change the title, description, visa subclass and substream.
+- **View eligibility assessment**: only shown when the case has a saved assessment behind it. That
+  happens when the case was opened from a Visa Advisor pathway, or matched up afterwards. It opens a
+  read-only view of the full report (inputs summary, and every assessed pathway with its verdict,
+  reasons and gaps) without leaving the case. See
   [Visa Eligibility Advisor](../visa-advisor/getting-started.md) for how that report is produced.
-- **Open/Close Agent panel** (previously a separate "Agent" toggle button) — shows or hides the
-  case-aware chat panel on the right.
-- **Document checklist**, **Overview**, **Document Compressor**, **Run Crusher** (supported subclasses
-  only), **820 bundle builder** (subclass 820 only), **Edit case**, and **Delete case** — unchanged
-  from the old **⋯** menu, just folded into the same menu as everything above.
+- **Delete case**: owners and admins only.
+
+Everything that used to be in this menu now has one home elsewhere:
+- **Draft cover letter** and **Re-check eligibility** are skills in **Edie**.
+- **Overview** and **Document checklist** are tabs.
+- **Document Compressor**, **Run Crusher** and **820 Bundle Builder** are on the **Case files** tab.
 
 ## Landing on the Overview tab
 
 Every time you open a case, you land on the **Overview** tab: a "You are here" card with the
 current task across the top, then case info and the case's progress on the left and the document
-checklist (an overall donut plus a bar per category) and recent case files on the right. A floating
-**Workspace** bar at the bottom of every case tab holds searchable **View** (Tasks, Document Checklist, Case Files, Notes) and **Tools** (Document
-Checklist Generator, Document Compressor, the 820 Bundle Builder where applicable, and more) menus
-plus suggested next steps for the current task. See
-[Overview, the Workspace bar, and tabs](./workspace-and-tabs.md) for how the Overview, the
-Workspace bar, and the case's tabs work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
+checklist (an overall donut plus a bar per category) and recent case files on the right. Click **Edie** at the top
+right (or press **Ctrl+J**) for suggested next steps, AI skills and the case chat. See
+[Overview, Edie, and tabs](./workspace-and-tabs.md) for how the Overview, Edie and the case's tabs
+work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
 
 Every file attached to the case is on the **Case files** tab, where you can upload, preview,
-download, and delete them (also reachable from the Workspace bar's **View** menu, or **View all
-files** on the Overview). To link files to checklist items, open the **Checklist** tab and click
+download, and delete them (also reachable from **View all files** on the Overview). The **Case files** tab also has the
+document tools: **Compress documents**, **Run Crusher** (supported subclasses) and **820 Bundle
+Builder** (subclass 820). To link files to checklist items, open the **Checklist** tab and click
 **Case Files** to show the files beside the checklist, then drag a file onto an item (see Document
 Checklist doc above).
 
@@ -215,11 +211,11 @@ pins it down:
   locked task is never recalculated again, even if its anchor later changes; you're always free to
   change it again yourself.
 
-## Using the case-aware chat (Focus Mode Agent)
+## Chatting with Edie
 
-Every case has a chat panel on the right-hand side of Case Details. This agent already knows the
-case's client, visa subclass, stage, task progress, and document checklist — you don't need to
-repeat that context.
+Open **Edie** from the top right of a case (or press **Ctrl+J**) to chat about the case. Edie
+already knows the case's client, visa subclass, stage, task progress and document checklist, so you
+don't need to repeat that context.
 
 You can ask it to:
 - Answer questions about visa requirements, processes, and timelines.
@@ -227,18 +223,18 @@ You can ask it to:
 - Summarise the case's eligibility position or flag risks.
 - Explain how to use any Edamame feature — it answers "how do I…" questions from this User Manual.
 
-Use **New** to start a fresh conversation thread for the case, and switch between existing threads
+Use **New chat** to start a fresh conversation thread for the case, and switch between existing threads
 using the tabs above the message list.
 
 ## Reporting a bug or requesting a feature from the chat
 
 If you describe something that doesn't match how Edamame is documented to work, or ask for a
-capability that doesn't exist yet, the agent will check whether it's already been reported. If it
+capability that doesn't exist yet, Edie will check whether it's already been reported. If it
 finds a match, it tells you and links the existing GitHub issue instead of creating a duplicate. If
 it's new, it drafts a GitHub issue and shows it in the chat with **Confirm** and **Cancel** buttons
 — nothing is filed until you click **Confirm**. Each conversation thread can file up to 3 issues
 this way (also capped at 5 per day per account, enforced server-side); after that, file further
-reports manually. This only happens in the Case Manager Focus Mode chat, not elsewhere in the app.
+reports manually. This only happens in Edie's chat on a case, not elsewhere in the app.
 
 **Filing an issue posts it to the public `wandering-pork/edemame` GitHub repository** — visible to
 anyone on the internet. The draft card says so before you confirm; review the title and body for
