@@ -152,6 +152,8 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const anchorIdRef = useRef<string | null>(null);
   const [menuCaseId, setMenuCaseId] = useState<string | null>(null);
+  // Opens upwards when the row is too close to the bottom of the window.
+  const [menuUp, setMenuUp] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -491,7 +493,9 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
             <p className="text-ink-soft dark:text-plate-ink-soft text-sm">Try adjusting your search or filters, or create a new case</p>
           </div>
         ) : (
-          <div className="bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl overflow-hidden mt-4">
+          /* No overflow-hidden here: it would clip each row's ⋯ menu and the At Risk
+             tooltip. The first/last rows round their own corners instead. */
+          <div className="bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl mt-4">
             {filteredRows.map((r) => {
               const c = r.case;
               const client = r.client;
@@ -511,7 +515,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                     else handleViewDetails(c.id);
                   }}
                   aria-selected={selecting ? isSelected : undefined}
-                  className={`group table-row-hover relative flex items-center gap-4 px-5 pl-6 py-[15px] border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0 ${
+                  className={`group table-row-hover relative flex items-center gap-4 px-5 pl-6 py-[15px] border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0 first:rounded-t-xl last:rounded-b-xl ${
                     isSelected ? 'bg-edamame-500/[0.07] dark:bg-edamame-500/10' : 'hover:bg-paper-2 dark:hover:bg-plate/60'
                   }`}
                 >
@@ -740,7 +744,12 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                       aria-label={`More actions for ${c.title}`}
                       aria-haspopup="menu"
                       aria-expanded={menuCaseId === c.id}
-                      onClick={(e) => { e.stopPropagation(); setMenuCaseId(id => (id === c.id ? null : c.id)); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setMenuUp(window.innerHeight - rect.bottom < 220);
+                        setMenuCaseId(id => (id === c.id ? null : c.id));
+                      }}
                       className={`focus-ring w-7 h-7 rounded-lg flex items-center justify-center text-ink-faint dark:text-plate-ink-faint hover:bg-ink/[0.06] dark:hover:bg-plate-ink/10 hover:text-ink dark:hover:text-plate-ink transition-opacity ${
                         menuCaseId === c.id ? 'opacity-100 bg-ink/[0.06] dark:bg-plate-ink/10' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
                       }`}
@@ -754,7 +763,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                           role="menu"
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => { if (e.key === 'Escape') setMenuCaseId(null); }}
-                          className="absolute right-0 top-full mt-1 z-40 w-48 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content"
+                          className={`absolute right-0 ${menuUp ? 'bottom-full mb-1' : 'top-full mt-1'} z-40 w-48 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content`}
                         >
                           <button role="menuitem" autoFocus onClick={() => { setMenuCaseId(null); handleViewDetails(c.id); }} className={menuItemCls}>
                             <ArrowUpRight size={14} /> Open case
