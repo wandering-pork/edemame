@@ -40,6 +40,13 @@ export interface Task {
    */
   stepKey?: string;
   /**
+   * Phase this task belongs to (same reference format as `WorkflowStep.phase`).
+   * Set when generated from a plan step or added to a case; unset on older
+   * tasks — `lib/phaseGrouping.ts` falls back to the step's phase, then the
+   * previous task's, then Consultation.
+   */
+  phase?: string;
+  /**
    * Set once a task's date has been edited by hand (any manual date change —
    * `TaskDetailModal`, `CaseDetails`' inline date edit/"set today", or a
    * Dashboard calendar drag). `reschedule()` never recalculates a locked
@@ -208,6 +215,13 @@ export interface WorkflowStep {
   timing?: StepTiming;
   /** Must be done before the case can advance (feeds the 1C At Risk rule "a gate task is overdue"). */
   isGate?: boolean;
+  /**
+   * Phase this step belongs to (Configuration → Phases): a built-in phase's
+   * `systemKey` ("consultation", "prerequisites"...) or a firm-added phase's
+   * `id`. Unset on older plans — `lib/phaseGrouping.ts` inherits from the
+   * previous step, else Consultation.
+   */
+  phase?: string;
 }
 
 export interface WorkflowTemplate {

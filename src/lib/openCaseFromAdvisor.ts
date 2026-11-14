@@ -104,7 +104,7 @@ export async function openCaseFromAdvisor(params: OpenCaseParams, deps: OpenCase
   if (generateTasks) {
     onProgress('plan');
     if (usesTimedTemplate) {
-      const { drafts } = buildTemplateTaskDrafts(template!.steps!, startDate);
+      const { drafts } = buildTemplateTaskDrafts(template!.steps!, startDate, {}, template?.visaSubclass);
       generatedTasks = drafts;
     } else {
       try {
@@ -181,6 +181,7 @@ export async function openCaseFromAdvisor(params: OpenCaseParams, deps: OpenCase
     generatedByAi: t.generatedByAi ?? true,
     caseId: newCaseId,
     stepKey: t.stepKey,
+    phase: t.phase,
     datePending: t.datePending,
   }));
 

@@ -131,5 +131,7 @@ the task for viewing or editing.
 ## Creating a task from the Dashboard
 
 Click **New Task** in the top-right corner, fill in a title, description, and due date, link it to
-a case, and save. It starts out **Not started** and immediately appears on the week board and
+a case, and save. When you link a case you're also asked for the task's **Phase** — the phases that
+case uses, defaulting to its current phase (Consultation only for a Not Confirmed case). It starts
+out **Not started** and immediately appears on the week board and
 counts towards the stat cards and Needs Attention if it's overdue or due today.

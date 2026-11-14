@@ -10,6 +10,9 @@ import { describeStepTiming, formatTypicalLength, DEADLINE_KIND_LABELS } from '.
 import { toLocalISODate } from '../lib/dates';
 import { SubclassSubstreamFields } from '../components/SubclassSubstreamFields';
 import { displaySubclassCode, isConfirmedSubclass } from '../lib/visaTypes';
+import { useVisaConfig } from '../contexts/VisaConfigContext';
+import { orderStepsByPhase, phaseName, phaseRef, resolveStepPhases } from '../lib/phaseGrouping';
+import { CONSULTATION_PHASE_KEY, visibleCasePhases } from '../lib/casePhases';
 
 interface TemplatesProps {
   templates: WorkflowTemplate[];
@@ -87,6 +90,8 @@ interface StepDraft {
   durationMax: string;
   fixed: boolean;
   isGate: boolean;
+  /** Phase ref (`lib/phaseGrouping.ts`); always filled in by the editor. */
+  phase: string;
 }
 
 function stepToDraft(step: WorkflowStep): StepDraft {
@@ -116,10 +121,11 @@ function stepToDraft(step: WorkflowStep): StepDraft {
     durationMax: timing?.durationDays ? String(timing.durationDays.max) : '',
     fixed: timing?.fixed ?? false,
     isGate: step.isGate ?? false,
+    phase: step.phase ?? '',
   };
 }
 
-function newStepDraft(): StepDraft {
+function newStepDraft(phase = 'consultation'): StepDraft {
   return {
     draftId: uuidv4(),
     title: '',
@@ -132,6 +138,7 @@ function newStepDraft(): StepDraft {
     durationMax: '',
     fixed: false,
     isGate: false,
+    phase,
   };
 }
 
@@ -173,6 +180,7 @@ function draftToStep(draft: StepDraft): WorkflowStep {
     description: draft.description.trim(),
     timing,
     isGate: draft.isGate,
+    phase: draft.phase || undefined,
   };
 }
 
@@ -206,6 +214,12 @@ interface EditorState {
   timingVerified: boolean;
 }
 
+/** Fills every draft's phase with its effective phase (inherited by position), so each step's picker shows a real value. */
+function withResolvedPhases(drafts: StepDraft[], visaSubclass?: string): StepDraft[] {
+  const resolved = resolveStepPhases(drafts.map(d => ({ phase: d.phase || undefined })), visaSubclass);
+  return drafts.map((d, i) => ({ ...d, phase: resolved[i] }));
+}
+
 function editorFromTemplate(mode: 'create' | 'edit', template: WorkflowTemplate, asCopy: boolean): EditorState {
   return {
     mode,
@@ -214,7 +228,7 @@ function editorFromTemplate(mode: 'create' | 'edit', template: WorkflowTemplate,
     description: template.description,
     visaSubclass: template.visaSubclass ?? '',
     visaSubstream: template.visaSubstream ?? '',
-    steps: (template.steps ?? []).map(stepToDraft),
+    steps: withResolvedPhases((template.steps ?? []).map(stepToDraft), template.visaSubclass),
     version: asCopy ? 1 : (template.version ?? 1),
     timingVerified: false,
   };
@@ -235,7 +249,10 @@ function blankEditor(): EditorState {
 }
 
 export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, onAddTemplate, onUpdateTemplate, onDeleteTemplate }) => {
+  const { casePhases } = useVisaConfig();
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const phaseOptions = visibleCasePhases(casePhases).map(p => ({ ref: phaseRef(p), name: p.name }));
+  const editorNotConfirmed = editor?.visaSubclass === NOT_CONFIRMED_SUBCLASS;
   const [errors, setErrors] = useState<string[]>([]);
 
   const systemTemplates = templates.filter(t => t.userId === null || t.userId === undefined);
@@ -274,7 +291,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
   };
 
   const addStep = () => {
-    setEditor(prev => (prev ? { ...prev, steps: [...prev.steps, newStepDraft()] } : prev));
+    setEditor(prev => (prev ? { ...prev, steps: [...prev.steps, newStepDraft(prev.steps[prev.steps.length - 1]?.phase || CONSULTATION_PHASE_KEY)] } : prev));
   };
 
   const removeStep = (index: number) => {
@@ -312,7 +329,9 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
       }
     });
 
-    const steps: WorkflowStep[] = editor.steps.map(draftToStep);
+    // Grouped and ordered by phase on save (Work Plans step 3); `previous_step`
+    // anchors become explicit so a moved step keeps counting from the same step.
+    const steps: WorkflowStep[] = orderStepsByPhase(editor.steps.map(draftToStep), casePhases, editor.visaSubclass);
 
     if (steps.length > 0) {
       const result = scheduleFromTemplate(steps as ScheduleStep[], toLocalISODate(new Date()));
@@ -633,6 +652,14 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                 </button>
               </div>
 
+              {editor.steps.length > 0 && (
+                <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mb-2">
+                  {editorNotConfirmed
+                    ? 'Not Confirmed plans only use the Consultation phase.'
+                    : 'Each step belongs to a phase. When you save, steps are grouped by phase in phase order (Configuration → Phases), keeping their order within each phase.'}
+                </p>
+              )}
+
               {editor.steps.length === 0 && (
                 <p className="text-xs text-ink-faint dark:text-plate-ink-faint py-3">
                   No steps yet. Add one, or save with just a title and description and let the AI suggest tasks.
@@ -664,6 +691,24 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
                               placeholder="Step description"
                               className="w-full px-3 py-2 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-sm text-ink dark:text-plate-ink outline-none focus:border-edamame/50"
                             />
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <label htmlFor={`step-phase-${step.draftId}`} className="text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft">
+                              Phase
+                            </label>
+                            <select
+                              id={`step-phase-${step.draftId}`}
+                              value={editorNotConfirmed ? CONSULTATION_PHASE_KEY : step.phase || CONSULTATION_PHASE_KEY}
+                              disabled={editorNotConfirmed}
+                              onChange={e => updateStep(i, { phase: e.target.value })}
+                              className="px-2.5 py-1.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-lg text-xs text-ink dark:text-plate-ink outline-none focus:border-edamame/50 disabled:opacity-60"
+                            >
+                              {phaseOptions.map(p => <option key={p.ref} value={p.ref}>{p.name}</option>)}
+                              {step.phase && !phaseOptions.some(p => p.ref === step.phase) && (
+                                <option value={step.phase}>{phaseName(casePhases, step.phase)}</option>
+                              )}
+                            </select>
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">

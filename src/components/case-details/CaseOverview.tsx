@@ -8,6 +8,8 @@ import { TASK_STATUS_LABELS, isWaiting } from '../../lib/taskStatus';
 import type { ChecklistCategorySummary, TimelineEntry } from '../../lib/caseOverview';
 import { DocumentUpload } from '../DocumentUpload';
 import { subclassShortLabel } from '../../lib/visaTypes';
+import type { CasePhaseView } from '../../lib/phaseGrouping';
+import { PhaseTaskGroups } from './PhaseTaskGroups';
 
 function fileIconFor(fileType: string) {
   if (fileType.startsWith('image/')) return ImageIcon;
@@ -101,6 +103,8 @@ interface CaseOverviewProps {
   timeline: TimelineEntry[];
   hiddenTaskCount: number;
   onViewAllTasks: () => void;
+  /** Tasks grouped by phase; when set and `hasPhases`, Progress shows phases instead of the flat timeline. */
+  phaseView?: CasePhaseView;
 
   client: Client;
   applicant?: Client;
@@ -139,7 +143,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
   const {
     stage, onHold,
     currentTask, openTaskCount, totalTaskCount, onOpenTask,
-    timeline, hiddenTaskCount, onViewAllTasks,
+    timeline, hiddenTaskCount, onViewAllTasks, phaseView,
     client, applicant, visaSubclass, visaSubstream, templateTitle, ownerName, openedAt, nextDeadline, description, onEditCase, onOpenDeadlines,
     checklistRows, checklistTotal, checklistDone, onOpenChecklist, onGenerateChecklist,
     documents, caseId, onOpenDocument, onViewAllFiles, onDocumentUploaded, onRequestCompress,
@@ -156,7 +160,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
             <>
               <div className="min-w-0">
                 <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
-                  You are here · {totalTaskCount - openTaskCount} of {totalTaskCount} tasks done
+                  You are here{phaseView?.hasPhases ? ` · ${phaseView.currentPhaseName}` : ''} · {totalTaskCount - openTaskCount} of {totalTaskCount} tasks done
                 </div>
                 <div className="text-[18px] font-bold text-ink dark:text-plate-ink tracking-tight truncate">{currentTask.title}</div>
                 <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft">
@@ -228,6 +232,19 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
                   {CASE_STAGE_LABELS[stage]}
                 </span>
               </dd>
+              {phaseView && (
+                <>
+                  <dt className="text-ink-faint dark:text-plate-ink-faint">Phase</dt>
+                  <dd>
+                    <span
+                      title="Read-only: the phase of the current task"
+                      className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md border border-dashed border-ink/20 dark:border-plate-ink/25 bg-paper dark:bg-plate text-ink-soft dark:text-plate-ink-soft"
+                    >
+                      {phaseView.currentPhaseName}
+                    </span>
+                  </dd>
+                </>
+              )}
               <dt className="text-ink-faint dark:text-plate-ink-faint">Next deadline</dt>
               <dd>
                 {nextDeadline && nextDeadlineDays !== null ? (
@@ -269,7 +286,9 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
             >
               Progress
             </CardTitle>
-            {timeline.length === 0 ? (
+            {phaseView?.hasPhases ? (
+              <PhaseTaskGroups view={phaseView} onOpenTask={onOpenTask} compact />
+            ) : timeline.length === 0 ? (
               <p className="text-[12px] text-ink-faint dark:text-plate-ink-faint">No tasks on this case yet.</p>
             ) : (
               <ol>

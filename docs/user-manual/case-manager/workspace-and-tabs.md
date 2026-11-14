@@ -12,8 +12,16 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
   and **Substream** (or set the subclass to **Not Confirmed** while the visa is still undecided).
   Change the stage from the **Stage** chip in the summary strip
   under the case title, as before.
-- **Progress** — the last couple of completed tasks, the current task, and the next few coming up.
-  Click any task to open it, or **View all** to open the Tasks tab.
+- **Progress** — the case's tasks grouped by **phase** (Consultation, Prerequisites, Preparing for
+  lodgement, …; see Configuration → Phases), in phase order. Only the **current phase** — the phase
+  of the current task — is open and highlighted: in it the current task is bold and finished tasks
+  are struck through. Finished phases are folded with a green tick and a struck-through name;
+  phases still to come are folded and grey. Click any phase to open or fold it, click a task to
+  open it, or **View all** to open the Tasks tab. Phases with no tasks are hidden. Older cases whose
+  tasks have no phase at all show the previous simple list (last done, current, next few).
+- **Phase** (in Case info) — read-only; shows the phase of the current task (Consultation if the
+  case has no tasks yet). It's not the same as the case's **Stage** (Draft → Closed), which you
+  still change yourself.
 - **Document checklist** — a donut showing how many of the case's documents are in overall, then
   one progress bar per checklist category showing how many items are verified, linked, pending, or
   waived. Click a category (or **Open**) to open the Document Checklist tab. If the case has no
@@ -54,3 +62,17 @@ it. Choosing a View from the Workspace bar switches to the matching tab.
 Tools (Document Checklist Generator, Document Compressor, 820 Bundle Builder) open in their own
 window over the case rather than as a tab. When you come back to a case, it reopens on the tab you
 were last using.
+
+## Tasks by phase
+
+When a case's tasks have phases, the **Tasks** tab groups them the same way as Overview → Progress:
+one section per phase in phase order, only the current phase open, the current task highlighted
+and bold, finished tasks struck through, finished phases ticked and folded. Every row keeps its
+usual actions (mark done, change status, edit the date, the **⋮** menu).
+
+Tasks get their phase from the Work Plan step they came from. When you add a task yourself (**Add
+task** in the case, or **New Task** on the Dashboard with a case linked) you're asked which
+**Phase** to put it in — the choices are the phases this case already uses, defaulting to its
+current phase. A **Not Confirmed** case only uses Consultation. You can change a task's phase later
+from its edit form. AI-suggested extra tasks go into the phase of the step they're anchored to, or
+the current phase.

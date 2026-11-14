@@ -311,6 +311,7 @@ function taskToRow(userId: string, firmId: string, t: Task) {
     // `supabase/migrations/20260926000250_task_step_fields.sql` (not yet
     // applied to production — see CLAUDE.md's manual-apply migration list).
     step_key: task.stepKey ?? null,
+    phase: task.phase ?? null,
     date_locked: task.dateLocked ?? null,
     date_pending: task.datePending ?? null,
   };
@@ -331,6 +332,7 @@ function rowToTask(row: any): Task {
     userId: row.user_id,
     assignedTo: row.assigned_to ?? undefined,
     stepKey: row.step_key ?? undefined,
+    phase: row.phase ?? undefined,
     dateLocked: row.date_locked ?? undefined,
     datePending: row.date_pending ?? undefined,
   });

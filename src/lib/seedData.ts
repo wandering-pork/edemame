@@ -83,8 +83,77 @@ import type { WorkflowTemplate } from '../types';
  * (an EOI invitation, a nomination approval, a nomination/sponsorship wait).
  * -------------------------------------------------------------------------
  */
+/**
+ * Phase for each system step, by step key (Work Plans spec, step 3). Refs are
+ * built-in phase `systemKey`s (`lib/casePhases.ts`). Chosen so every system
+ * plan's phases run in phase order in its existing step order — so grouping
+ * by phase never reorders a shipped plan or changes its timing. Health
+ * checks and police clearances sit in "Lodged" because these plans schedule
+ * them after the Visa Application (lodgement) step.
+ */
+const SYSTEM_STEP_PHASES: Record<string, string> = {
+  'initial-consultation': 'consultation',
+  'skills-assessment': 'prerequisites',
+  'english-language-test': 'prerequisites',
+  'points-test-documentation': 'prerequisites',
+  'eoi-submission': 'prerequisites',
+  'state-nomination-application': 'prerequisites',
+  'invitation-to-apply': 'prerequisites',
+  'employer-nomination': 'prerequisites',
+  'nomination-approval-wait': 'prerequisites',
+  'sponsor-approval': 'prerequisites',
+  'labour-market-testing': 'prerequisites',
+  'nomination-lodgement': 'prerequisites',
+  'state-or-family-nomination': 'prerequisites',
+  'confirmation-of-enrolment': 'prerequisites',
+  'qualification-evidence': 'prerequisites',
+  'passport-eligibility-check': 'prerequisites',
+  'genuine-student-statement': 'preparing',
+  'financial-capacity-evidence': 'preparing',
+  'oshc': 'preparing',
+  'health-insurance': 'preparing',
+  'travel-itinerary': 'preparing',
+  'ties-to-home-country': 'preparing',
+  'invitation-letter': 'preparing',
+  'funds-evidence': 'preparing',
+  'outbound-travel-evidence': 'preparing',
+  'relationship-evidence-collection': 'preparing',
+  'statutory-declarations': 'preparing',
+  'form-80-1221': 'preparing',
+  'sponsor-application': 'preparing',
+  'visa-application': 'ready_to_lodge',
+  'health-examinations': 'lodged',
+  'police-clearances': 'lodged',
+  'character-documents': 'lodged',
+  'application-follow-up': 'lodged',
+  'interview': 'lodged',
+  'grant-and-settlement': 'decision',
+  'grant-and-conditions': 'decision',
+  'grant-and-regional-obligations': 'decision',
+  'grant-and-work-rights': 'decision',
+  'grant-and-entry-window': 'decision',
+  'temporary-grant': 'decision',
+  'second-third-year-extension': 'post_decision',
+};
+
+/** Per-plan exceptions where a step sits later in that plan than the generic mapping assumes. */
+const SYSTEM_STEP_PHASE_OVERRIDES: Record<string, Record<string, string>> = {
+  'tpl-500': { 'english-language-test': 'preparing' },
+  'tpl-485': { 'english-language-test': 'preparing', 'skills-assessment': 'preparing' },
+};
+
+function withSystemPhases(templates: WorkflowTemplate[]): WorkflowTemplate[] {
+  return templates.map(t => ({
+    ...t,
+    steps: t.steps?.map(s => ({
+      ...s,
+      phase: s.phase ?? SYSTEM_STEP_PHASE_OVERRIDES[t.id]?.[s.key] ?? SYSTEM_STEP_PHASES[s.key],
+    })),
+  }));
+}
+
 export function seedDefaultTemplates(): WorkflowTemplate[] {
-  return [
+  return withSystemPhases([
     {
       id: 'tpl-189',
       title: 'Skilled Independent (Subclass 189)',
@@ -314,5 +383,5 @@ export function seedDefaultTemplates(): WorkflowTemplate[] {
         { key: 'temporary-grant', title: 'Temporary Grant (820)', description: '820 grant — advise on work rights and bridging visa. 801 eligibility in ~2 years.', timing: { anchor: { type: 'previous_step' }, offsetDays: 5, durationDays: { min: 180, max: 360 }, fixed: false } }, // partner visa processing sits at the long end of the 60–360 day range
       ],
     },
-  ];
+  ]);
 }

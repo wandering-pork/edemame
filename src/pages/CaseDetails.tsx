@@ -67,6 +67,9 @@ import { toast } from 'sonner';
 import type { Document, EligibilityAssessment } from '../types';
 import { isConfirmedSubclass, subclassChip, subclassShortLabel } from '../lib/visaTypes';
 import { SubclassSubstreamFields } from '../components/SubclassSubstreamFields';
+import { useVisaConfig } from '../contexts/VisaConfigContext';
+import { buildCasePhaseView, phaseChoicesForCase, phaseName } from '../lib/phaseGrouping';
+import { PhaseTaskGroups } from '../components/case-details/PhaseTaskGroups';
 
 interface CaseDetailsProps {
   caseItem: Case;
@@ -195,7 +198,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   }), [teamMembers, allMembers]);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [taskForm, setTaskForm] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd') });
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), phase: '' });
   // When a task row's status menu picks "Not applicable", a reason must be
   // entered and confirmed inline before the status change is applied.
   const [naReasonDraft, setNaReasonDraft] = useState<{ taskId: string; reason: string } | null>(null);
@@ -320,6 +323,18 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     );
     return allDeadlines(relevant, [client]).sort((a, b) => daysLeft(a, new Date()) - daysLeft(b, new Date()));
   }, [deadlines, caseItem.id, client]);
+
+  // Tasks grouped by phase (Work Plans step 3) — drives Overview → Progress,
+  // the Tasks tab, the current task and the read-only Phase in Case info.
+  const { casePhases } = useVisaConfig();
+  const phaseView = useMemo(
+    () => buildCasePhaseView(caseTasks, casePhases, workflowTemplate?.steps, visaSubclass),
+    [caseTasks, casePhases, workflowTemplate, visaSubclass],
+  );
+  const phaseChoices = useMemo(
+    () => phaseChoicesForCase(caseTasks, casePhases, workflowTemplate?.steps, visaSubclass),
+    [caseTasks, casePhases, workflowTemplate, visaSubclass],
+  );
 
   const completedTasks = caseTasks.filter(isTaskClosed);
   const pendingTasks = caseTasks.filter(t => !isTaskClosed(t));
@@ -713,10 +728,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const handleOpenTaskModal = (task?: Task) => {
     if (task) {
       setEditingTask(task);
-      setTaskForm({ title: task.title, description: task.description, date: task.date });
+      setTaskForm({ title: task.title, description: task.description, date: task.date, phase: phaseView.groups.find(g => g.tasks.some(t => t.id === task.id))?.ref ?? task.phase ?? phaseChoices.defaultRef });
     } else {
       setEditingTask(null);
-      setTaskForm({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd') });
+      setTaskForm({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), phase: phaseChoices.defaultRef });
     }
     setIsTaskModalOpen(true);
     setActiveDropdown(null);
@@ -730,7 +745,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         ...editingTask,
         title: taskForm.title,
         description: taskForm.description,
-        date: taskForm.date
+        date: taskForm.date,
+        phase: phaseView.hasPhases ? taskForm.phase || editingTask.phase : editingTask.phase,
       });
     } else {
       onAddTask({
@@ -742,7 +758,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         status: 'not_started',
         isCompleted: false,
         priorityOrder: 999,
-        generatedByAi: false
+        generatedByAi: false,
+        phase: taskForm.phase || phaseChoices.defaultRef,
+        assignedTo: caseItem.caseOwner,
       });
     }
     setIsTaskModalOpen(false);
@@ -756,7 +774,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     setGeneratingPlan(true);
     try {
       const knownAnchors = knownAnchorsFromDeadlines(caseDeadlines);
-      const { drafts } = buildTemplateTaskDrafts(workflowTemplate.steps, caseItem.startDate, knownAnchors);
+      const { drafts } = buildTemplateTaskDrafts(workflowTemplate.steps, caseItem.startDate, knownAnchors, visaSubclass);
       const newTasks: Task[] = drafts.map((d, index) => ({
         id: uuidv4(),
         caseId: caseItem.id,
@@ -805,6 +823,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     if (!s) return;
     const anchorTask = s.anchorStepKey ? caseTasks.find(t => t.stepKey === s.anchorStepKey) : undefined;
     const baseDate = anchorTask?.date ?? caseItem.startDate;
+    const phase = anchorTask?.phase ?? phaseView.currentPhaseRef;
     onAddTask({
       id: uuidv4(),
       caseId: caseItem.id,
@@ -814,6 +833,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       status: 'not_started',
       isCompleted: false,
       priorityOrder: 999,
+      phase,
       generatedByAi: true,
       assignedTo: caseItem.caseOwner,
     });
@@ -1127,7 +1147,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   // ---- Task row renderer (shared by pending + completed lists) ----
   const rowMenuCls = 'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
 
-  const renderTaskRow = (task: Task, closed: boolean) => {
+  const renderTaskRow = (task: Task, closed: boolean, isCurrent = false) => {
     const waiting = isWaiting(task);
     const overdue = !closed && !waiting && new Date(task.date) < new Date();
     const chip = statusChipFor(task.status);
@@ -1154,7 +1174,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         {/* Title + description */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <div className={`text-[13.5px] font-semibold tracking-tight leading-snug ${closed ? 'line-through text-ink-faint dark:text-plate-ink-faint' : 'text-ink dark:text-plate-ink'}`}>
+            <div className={`text-[13.5px] ${isCurrent ? 'font-extrabold' : 'font-semibold'} tracking-tight leading-snug ${closed ? 'line-through text-ink-faint dark:text-plate-ink-faint' : 'text-ink dark:text-plate-ink'}`}>
               {task.title}
             </div>
             {chip && (
@@ -1336,7 +1356,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- Overview + Workspace bar (design option D: C's overview and tabs, B's bottom bar) ----
   const onOverview = activeTabId === 'workspace';
-  const focusTask = useMemo(() => currentFocusTask(caseTasks), [caseTasks]);
+  const focusTask = phaseView.hasPhases ? phaseView.currentTask : currentFocusTask(caseTasks);
   const timeline = useMemo(() => taskTimeline(caseTasks), [caseTasks]);
   const checklistRows = useMemo(() => checklistBreakdown(checklist, ADDITIONAL_DOCUMENTS_CATEGORY), [checklist]);
   const ownerName = currentCase.caseOwner
@@ -1615,6 +1635,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               applicant={applicant}
               visaSubclass={visaSubclass}
               visaSubstream={currentCase.visaSubstream}
+              phaseView={phaseView}
               templateTitle={workflowTemplate?.title}
               ownerName={ownerName}
               openedAt={currentCase.startDate || currentCase.createdAt}
@@ -1903,6 +1924,26 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                 </section>
               )}
 
+              {phaseView.hasPhases ? (
+              <section>
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">
+                    Tasks by phase <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">· {countLabel(pendingTasks.length, 'open task')}</span>
+                  </span>
+                  {overdueCount > 0 && (
+                    <span className="text-[10.5px] font-bold px-2.5 py-1 rounded-md bg-red-500/[0.13] text-red-700 dark:text-red-400">
+                      {overdueCount} overdue
+                    </span>
+                  )}
+                </div>
+                <PhaseTaskGroups
+                  view={phaseView}
+                  onOpenTask={handleOpenTaskModal}
+                  renderRow={(task, isCurrent) => renderTaskRow(task, isTaskClosed(task), isCurrent)}
+                />
+              </section>
+              ) : (
+              <>
               <section>
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-[12.5px] font-bold text-ink dark:text-plate-ink">
@@ -1936,6 +1977,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     {completedTasks.map(task => renderTaskRow(task, true))}
                   </div>
                 </section>
+              )}
+              </>
               )}
             </div>
           )}
@@ -2315,6 +2358,26 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                   placeholder="Add more details..."
                 />
               </div>
+              {(!editingTask || phaseView.hasPhases) && (
+                <div>
+                  <label htmlFor="task-phase" className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Phase</label>
+                  <select
+                    id="task-phase"
+                    value={taskForm.phase}
+                    disabled={phaseChoices.locked}
+                    onChange={(e) => setTaskForm({ ...taskForm, phase: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl focus:ring-2 focus:ring-edamame outline-none text-ink dark:text-plate-ink disabled:opacity-60"
+                  >
+                    {phaseChoices.options.map(o => <option key={o.ref} value={o.ref}>{o.name}</option>)}
+                    {taskForm.phase && !phaseChoices.options.some(o => o.ref === taskForm.phase) && (
+                      <option value={taskForm.phase}>{phaseName(casePhases, taskForm.phase)}</option>
+                    )}
+                  </select>
+                  {phaseChoices.locked && (
+                    <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1">Not Confirmed cases only use the Consultation phase.</p>
+                  )}
+                </div>
+              )}
               {!(editingTask && isTaskClosed(editingTask)) && (
                 <div>
                   <label className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Planned Date</label>

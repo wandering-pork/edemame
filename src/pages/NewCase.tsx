@@ -212,7 +212,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
     // "Generation flow" in docs/plans/step-1-foundations.md. Extra
     // case-specific tasks can be suggested afterwards from the case page.
     if (templateHasTiming(selectedTemplate)) {
-      const { drafts } = buildTemplateTaskDrafts(selectedTemplate!.steps!, startDate);
+      const { drafts } = buildTemplateTaskDrafts(selectedTemplate!.steps!, startDate, {}, selectedTemplate?.visaSubclass);
       setGeneratedTasks(drafts);
       streamInTasks(drafts);
       return;
@@ -295,6 +295,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       generatedByAi: t.generatedByAi ?? true,
       caseId: newCaseId,
       stepKey: t.stepKey,
+      phase: t.phase,
       datePending: t.datePending,
     }));
 

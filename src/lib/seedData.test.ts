@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { seedDefaultTemplates } from './seedData';
 import { scheduleFromTemplate } from './scheduleFromTemplate';
+import { SYSTEM_CASE_PHASES } from './casePhases';
 
 describe('seedDefaultTemplates timing (1E)', () => {
   const templates = seedDefaultTemplates();
@@ -54,5 +55,16 @@ describe('seedDefaultTemplates timing (1E)', () => {
     const template = templates.find(t => t.id === 'tpl-490')!;
     expect(template.visaSubclass).toBe('491');
     expect(template.title).toContain('491');
+  });
+});
+
+describe('seedDefaultTemplates phases (Work Plans step 3)', () => {
+  const order = SYSTEM_CASE_PHASES.map(p => p.systemKey);
+
+  it.each(seedDefaultTemplates().map(t => [t.id, t] as const))('%s: every step has a built-in phase, in phase order', (_id, template) => {
+    const ranks = template.steps!.map(s => order.indexOf(s.phase ?? ''));
+    ranks.forEach(r => expect(r).toBeGreaterThanOrEqual(0));
+    expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
+    expect(template.steps![0].phase).toBe('consultation');
   });
 });

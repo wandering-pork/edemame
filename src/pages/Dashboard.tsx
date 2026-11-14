@@ -21,6 +21,8 @@ import { describePlanSource, buildTaskPlanSummary } from '../lib/planActivity';
 import { isCaseClosed } from '../lib/caseStage';
 import { countOutstandingChecklistItems } from '../lib/docsOutstanding';
 import { TaskDetailModal } from '../components/TaskDetailModal';
+import { useVisaConfig } from '../contexts/VisaConfigContext';
+import { phaseChoicesForCase } from '../lib/phaseGrouping';
 
 interface DashboardProps {
   tasks: Task[];
@@ -147,7 +149,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // would be a no-op — default straight to 'all' and hide the toggle.
   const [attentionScope, setAttentionScope] = useState<AttentionScope>(storageMode === 'cloud' ? 'mine' : 'all');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [newTask, setNewTask] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), caseId: '' });
+  const [newTask, setNewTask] = useState({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), caseId: '', phase: '' });
   const [caseSearchTerm, setCaseSearchTerm] = useState('');
   const [isCaseDropdownOpen, setIsCaseDropdownOpen] = useState(false);
   /**
@@ -186,14 +188,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
     [cases, caseSearchTerm]
   );
 
+  // Phase question for a task linked to a case (Work Plans step 3): the
+  // phases that case uses, defaulting to its current phase; Consultation
+  // only for a Not Confirmed case.
+  const { casePhases } = useVisaConfig();
+  const phaseChoicesFor = (caseId: string) => {
+    const c = getCase(caseId);
+    const tpl = c ? templates.find(t => t.id === c.templateId) : undefined;
+    return phaseChoicesForCase(
+      tasks.filter(t => t.caseId === caseId),
+      casePhases,
+      tpl?.steps,
+      c?.visaSubclass ?? tpl?.visaSubclass,
+    );
+  };
+  const newTaskPhaseChoices = newTask.caseId ? phaseChoicesFor(newTask.caseId) : null;
+
   const handleOpenTaskModal = () => {
-    setNewTask({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), caseId: '' });
+    setNewTask({ title: '', description: '', date: format(new Date(), 'yyyy-MM-dd'), caseId: '', phase: '' });
     setCaseSearchTerm('');
     setIsTaskModalOpen(true);
   };
 
   const handleSelectCase = (c: Case) => {
-    setNewTask({ ...newTask, caseId: c.id });
+    setNewTask({ ...newTask, caseId: c.id, phase: phaseChoicesFor(c.id).defaultRef });
     setCaseSearchTerm(`${c.title} - ${getClientName(c.clientId)}`);
     setIsCaseDropdownOpen(false);
   };
@@ -206,6 +224,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       description: newTask.description,
       date: newTask.date,
       caseId: newTask.caseId || undefined,
+      phase: newTask.caseId ? newTask.phase || phaseChoicesFor(newTask.caseId).defaultRef : undefined,
       status: 'not_started',
       isCompleted: false,
       priorityOrder: 99999,
@@ -844,7 +863,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         setCaseSearchTerm(e.target.value);
                         setIsCaseDropdownOpen(true);
                         if (newTask.caseId && !e.target.value) {
-                          setNewTask({ ...newTask, caseId: '' });
+                          setNewTask({ ...newTask, caseId: '', phase: '' });
                         }
                       }}
                       onFocus={() => setIsCaseDropdownOpen(true)}
@@ -875,6 +894,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   )}
                 </div>
               </div>
+
+              {newTaskPhaseChoices && (
+                <div>
+                  <label htmlFor="new-task-phase" className="block text-[12.5px] font-semibold text-ink dark:text-plate-ink-soft mb-1">
+                    Phase
+                  </label>
+                  <select
+                    id="new-task-phase"
+                    value={newTask.phase || newTaskPhaseChoices.defaultRef}
+                    disabled={newTaskPhaseChoices.locked}
+                    onChange={e => setNewTask({ ...newTask, phase: e.target.value })}
+                    className="w-full px-3 py-2 bg-paper dark:bg-plate border border-ink/15 dark:border-plate-ink/20 rounded-lg focus:ring-2 focus:ring-edamame-500 focus:border-edamame-500 text-ink dark:text-plate-ink outline-none text-[13.5px] disabled:opacity-60"
+                  >
+                    {newTaskPhaseChoices.options.map(o => <option key={o.ref} value={o.ref}>{o.name}</option>)}
+                  </select>
+                  <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1">
+                    {newTaskPhaseChoices.locked
+                      ? 'Not Confirmed cases only use the Consultation phase.'
+                      : 'Defaults to the case’s current phase.'}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[12.5px] font-semibold text-ink dark:text-plate-ink-soft mb-1">

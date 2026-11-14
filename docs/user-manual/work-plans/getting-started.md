@@ -59,8 +59,12 @@ plan's step timing is correct for current legislation and processing times.
      to move it).
    - **Gate** — check this if the step must be done before the case can be considered ready to
      advance.
+   - **Phase** — which phase the step belongs to (Configuration → Phases). New steps start in the
+     same phase as the step above. A **Not Confirmed** plan only uses Consultation.
    - Use the up/down arrows to reorder steps, or the trash icon to remove one.
-5. Click **Save**. Saving validates the steps — a step counting from another step in a
+5. Click **Save**. Steps are grouped by phase in phase order, keeping their order within each
+   phase (a step that counted from "the previous step" keeps counting from the same step even if
+   it moves). Saving also validates the steps — a step counting from another step in a
    loop, or from a step that no longer exists, is flagged inline and blocks saving until fixed.
 
 Your new plan then appears under **Custom Plans** and is selectable from **New Case** the
