@@ -202,7 +202,7 @@ export interface EdieSuggestion {
 export interface EdieSkill {
   id: string;
   label: string;
-  /** Tooltip saying what the skill does — e.g. that it pre-fills the chat. */
+  /** Tooltip saying what the skill does — e.g. that it asks Edie in the chat. */
   title?: string;
   onSelect: () => void;
 }
@@ -229,7 +229,7 @@ interface EdiePanelProps {
   isSending: boolean;
   onSend: () => void;
   chatEndRef: React.RefObject<HTMLDivElement>;
-  /** Focused when the panel opens or a skill pre-fills it. */
+  /** Focused when the panel opens. */
   inputRef: React.RefObject<HTMLInputElement>;
   /** Message id of a drafted issue currently being filed (Confirm clicked, awaiting response). */
   filingIssueMessageId?: string | null;

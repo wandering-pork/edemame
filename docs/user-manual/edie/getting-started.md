@@ -26,8 +26,9 @@ on a case are saved with the case. See
 
 Everywhere else, ask Edie how to do something in Edamame (answered from this user manual) or a
 general immigration question. The quick buttons are **How do I start a case?**, **How do Work Plans
-work?**, **Check eligibility** (opens the Visa Advisor) and **Report a problem**. Buttons that start
-a question put it in the chat box for you to finish and send; nothing is sent until you press send.
+work?**, **Check eligibility** (opens the Visa Advisor) and **Report a problem**. The two "How
+do…" buttons ask Edie straight away. **Report a problem** starts a message in the chat box for you to
+finish and send.
 
 These general chats aren't tied to a case, so they're kept only until you close or refresh the
 browser tab. To keep a conversation, have it on the case it's about.

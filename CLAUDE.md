@@ -491,7 +491,7 @@ Agent panel toggle are gone. AI help lives in **Edie**, on every page of the app
   `components/edie/EdiePanel.tsx` (the shared content component: header, suggestions + skills,
   chat) into `panelEl`, with the case's suggestions (`lib/caseOverview.ts`'s rule-based
   `suggestQuickActions()`), skills (Summarise case, Draft cover letter, Draft consultation checklist —
-  each pre-fills the chat — and Re-check eligibility) and case chat.
+  each sends its prompt to the chat straight away via `useEdieChat`'s `sendText()` — and Re-check eligibility) and case chat. General Edie's "How do…" chips also send straight away; only **Report a problem** pre-fills the chat box, since the user must finish the sentence.
 - `components/edie/useEdieChat.ts` is the shared chat hook (conversations, `/api/focus-chat`, and
   the agentic issue flow) used by both; `api/focus-chat.ts`'s prompt names the assistant Edie and
   omits case context outside a case.

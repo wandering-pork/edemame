@@ -24,7 +24,10 @@ export interface EdieChat {
   setChatInput: (value: string) => void;
   isSending: boolean;
   createConversation: () => void;
+  /** Sends what's in the chat box. */
   sendMessage: () => Promise<void>;
+  /** Sends `text` straight away (Edie's suggestion and skill buttons), leaving the chat box alone. */
+  sendText: (text: string) => Promise<void>;
   filingIssueMessageId: string | null;
   confirmIssueDraft: (messageId: string) => Promise<void>;
   cancelIssueDraft: (messageId: string) => void;
@@ -106,8 +109,8 @@ export function useEdieChat({ scopeKey, caseId, load, save, getCaseContext }: Us
     ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
   }), [session]);
 
-  const sendMessage = useCallback(async () => {
-    const text = chatInput.trim();
+  const send = useCallback(async (raw: string, fromInput: boolean) => {
+    const text = raw.trim();
     if (!text || isSending) return;
 
     let convId = activeConvId;
@@ -126,7 +129,7 @@ export function useEdieChat({ scopeKey, caseId, load, save, getCaseContext }: Us
       if (c.id !== targetId) return c;
       return { ...c, title: c.messages.length === 0 ? text.slice(0, 40) : c.title, messages: [...c.messages, userMsg] };
     }));
-    setChatInput('');
+    if (fromInput) setChatInput('');
     setIsSending(true);
 
     try {
@@ -171,7 +174,10 @@ export function useEdieChat({ scopeKey, caseId, load, save, getCaseContext }: Us
     } finally {
       setIsSending(false);
     }
-  }, [chatInput, isSending, activeConvId, conversations, caseId, updateConvs, appendMessage, authHeaders]);
+  }, [isSending, activeConvId, conversations, caseId, updateConvs, appendMessage, authHeaders]);
+
+  const sendMessage = useCallback(() => send(chatInput, true), [send, chatInput]);
+  const sendText = useCallback((text: string) => send(text, false), [send]);
 
   const patchMessage = useCallback((convId: string, messageId: string, patch: Partial<FocusChatMessage>) => {
     updateConvs(prev => prev.map(c => (
@@ -236,6 +242,7 @@ export function useEdieChat({ scopeKey, caseId, load, save, getCaseContext }: Us
     isSending,
     createConversation,
     sendMessage,
+    sendText,
     filingIssueMessageId,
     confirmIssueDraft,
     cancelIssueDraft,

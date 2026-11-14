@@ -70,8 +70,8 @@ export function checklistBreakdown(items: DocumentChecklistItem[], fallbackCateg
 }
 
 /**
- * A suggested next step shown in the Edie panel. `agent` pre-fills Edie's
- * chat with `prompt`; `open` opens a tab or tool. `detail` is the card's
+ * A suggested next step shown in the Edie panel. `agent` sends `prompt` to
+ * Edie's chat straight away; `open` opens a tab or tool. `detail` is the card's
  * second line.
  *
  * Only things with no other one-click home on the page belong here: opening

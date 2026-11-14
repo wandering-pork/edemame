@@ -54,11 +54,12 @@ The panel has three parts:
 - **Suggested for "*current task*"**: up to three next steps worked out from the case's tasks and
   checklist (not an AI call). For example: *Chase client* (when the current task is waiting on the
   client), *Request N missing documents*, *Verify N documents*, *Create a task plan* or *Generate
-  checklist*. Steps that need writing, like an email to the client, put a prompt in Edie's chat box
-  for you to review. Nothing is sent until you press send. Once a chat has started, this section
+  checklist*. Steps that need writing, like an email to the client, ask Edie straight away and the
+  draft appears in the chat. Nothing is sent to the client: Edie only writes the draft for you to
+  copy. Once a chat has started, this section
   folds into one row so the chat has room; click it to open it again.
-- **Skills**: *Summarise case*, *Draft cover letter* and *Draft consultation checklist* put a prompt
-  in the chat box. *Re-check eligibility* opens the Visa Advisor for this client.
+- **Skills**: *Summarise case*, *Draft cover letter* and *Draft consultation checklist* ask Edie
+  straight away and the answer appears in the chat. *Re-check eligibility* opens the Visa Advisor for this client.
 - **Chat**: ask Edie anything about the case. Edie already knows the client, the tasks and the
   checklist, and can answer "how do I…" questions about Edamame. **New chat** starts a fresh
   conversation; earlier chats on the case are listed above the messages.

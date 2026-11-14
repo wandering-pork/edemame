@@ -899,11 +899,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     ].filter(Boolean).join('\n'),
   });
 
-  /** Pre-fills Edie's chat with `msg` for the agent to review and send. */
+  /** Opens Edie and sends `msg` to the case chat straight away. */
   const handleSkillAction = (msg: string) => {
-    chat.setChatInput(msg);
     edie.setOpen(true);
-    requestAnimationFrame(() => edieInputRef.current?.focus());
+    void chat.sendText(msg);
   };
 
   // ---- Top-bar action handlers ----
@@ -1184,7 +1183,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   useEffect(() => { setSuggestionCount(edieSuggestionCount); }, [edieSuggestionCount, setSuggestionCount]);
 
   // Edie's fixed AI skills. Each has exactly one home: here.
-  const prefillTitle = 'Pre-fills the chat for you to review and send';
+  const prefillTitle = 'Asks Edie in the chat';
   const edieSkills: EdieSkill[] = [
     { id: 'summarise', label: 'Summarise case', title: prefillTitle, onSelect: () => handleSkillAction('Summarise where this case is up to, what is outstanding, and what I should do next.') },
     { id: 'cover-letter', label: 'Draft cover letter', title: prefillTitle, onSelect: () => handleSkillAction('Please help me draft a cover letter for this immigration case.') },
