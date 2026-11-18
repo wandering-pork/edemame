@@ -4,7 +4,7 @@
 
 ## Opening and closing Edie
 
-- Click **Ask Edie** (the green button with the pod icon), or press **Ctrl+J** (**Cmd+J** on a Mac).
+- Click **Ask Edie** (the green button with the smiling bean), or press **Ctrl+J** (**Cmd+J** on a Mac).
   On a case, the button is in the case header next to **Case actions**. On every other page it's at
   the right of the top bar.
 - The panel opens down the right-hand side. On a wide screen the page, top bar included, moves over
