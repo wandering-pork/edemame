@@ -100,7 +100,7 @@ edits or bring back a row you hid.
 Consultation, Prerequisites, Preparing for lodgement, Ready to lodge, Lodged, Decision,
 Post-decision. Work Plan tasks are grouped by phase.
 
-Phases are separate from a case's **stage** (Draft → Closed), which you still set on the case itself.
+A case's **Stage** is the phase of its current task, so these phases are also the stages shown on Case Details and the Case Manager. Nobody sets a stage by hand; it follows the tasks. A phase your firm adds counts as part of the built-in phase just above it for the Case Manager's Pre-lodgement / With Department boards.
 
 - Use the up/down arrows to reorder phases, the pencil to rename one, and the eye to hide one.
 - **Add phase** adds a new phase at the end of the list; phases your firm added can be deleted.

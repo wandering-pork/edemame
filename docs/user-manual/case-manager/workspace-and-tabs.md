@@ -17,8 +17,8 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
   are added (dated from today, each in its phase) and the new subclass is saved; the plan becomes
   the case's work plan. **Cancel** changes nothing. Changing the subclass back to blank or Not
   Confirmed just saves, with no window.
-  Change the stage from the **Stage** chip in the summary strip
-  under the case title, as before.
+  The **Stage** here is read-only: it's the phase of the current task (see below), the same as the
+  Stage chip in the summary strip under the case title. To close or reopen a case, use **Case actions**.
 - **Progress** — the case's tasks grouped by **phase** (Consultation, Prerequisites, Preparing for
   lodgement, …; see Configuration → Phases), in phase order. Only the **current phase** — the phase
   of the current task — is open and highlighted: in it the current task is bold and finished tasks
@@ -26,9 +26,9 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
   phases still to come are folded and grey. Click any phase to open or fold it, click a task to
   open it, or **View all** to open the Tasks tab. Phases with no tasks are hidden. Older cases whose
   tasks have no phase at all show the previous simple list (last done, current, next few).
-- **Phase** (in Case info) — read-only; shows the phase of the current task (Consultation if the
-  case has no tasks yet). It's not the same as the case's **Stage** (Draft → Closed), which you
-  still change yourself.
+- **Stage** (in Case info) — read-only; the phase of the current task, so it always matches the
+  groups on the Tasks tab and the Stage chip in the summary strip. It moves on its own as tasks are
+  done. A closed case shows **Closed**.
 - **Document checklist** — a donut showing how many of the case's documents are in overall, then
   one progress bar per checklist category showing how many items are verified, linked, pending, or
   waived. Click a category (or **Open**) to open the Document Checklist tab. If the case has no

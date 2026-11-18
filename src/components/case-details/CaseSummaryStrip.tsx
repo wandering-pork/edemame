@@ -1,17 +1,8 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, ChevronDown, Calendar, Pause, Play } from 'lucide-react';
-import type { Case, CaseOutcome, CaseStage, Deadline } from '../../types';
-import {
-  CASE_STAGE_LABELS,
-  CASE_STAGE_ORDER,
-  STAGE_META,
-  OUTCOME_LABELS,
-  caseStageGroup,
-  CASE_STAGE_GROUP_LABELS,
-  CaseStageGroup,
-} from '../../lib/caseStage';
+import { AlertTriangle, CheckCircle2, Calendar, Pause, Play } from 'lucide-react';
+import type { CaseOutcome, CaseStage, Deadline } from '../../types';
+import { CASE_STAGE_LABELS, STAGE_META, OUTCOME_LABELS } from '../../lib/caseStage';
 import { DEADLINE_KIND_LABELS, daysLeft, urgency, DeadlineUrgency } from '../../lib/deadlines';
-import { stagePositionLabel } from '../../lib/caseSummary';
 import type { CaseRisk } from '../../lib/risk';
 
 const URGENCY_CHIP: Record<DeadlineUrgency, string> = {
@@ -28,10 +19,11 @@ function countdownLabel(days: number): string {
   return `${days}d left`;
 }
 
-const STAGE_GROUP_ORDER: CaseStageGroup[] = ['pre_lodgement', 'with_department', 'closed'];
-
 interface CaseSummaryStripProps {
+  /** The case's stored stage — only used for its colour and for Closed. */
   stage: CaseStage;
+  /** Read-only label for the task-based stage, e.g. "Stage 2 of 4 · Prerequisites". */
+  stageLabel: string;
   outcome?: CaseOutcome;
   onHold: boolean;
   onToggleOnHold: () => void;
@@ -39,15 +31,8 @@ interface CaseSummaryStripProps {
   nextDeadline: Deadline | null;
   onOpenDeadlines: () => void;
 
-  // Stage-picker dropdown state — owned by the parent so `evaluateTransition()`'s
-  // backward-move confirm / outcome picker logic stays in one place.
-  statusOpen: boolean;
-  onToggleStatusOpen: () => void;
-  onCloseStatusOpen: () => void;
-  onStageSelect: (stage: CaseStage) => void;
-  backwardConfirmStage: CaseStage | null;
-  onCancelBackward: () => void;
-  onConfirmBackward: () => void;
+  // Outcome picker for closing a case — opened from Case actions → Close case…
+  // (or the "no recorded outcome" banner), anchored under the Stage chip.
   outcomePickerOpen: boolean;
   outcomeDraft: CaseOutcome | '';
   onSetOutcomeDraft: (outcome: CaseOutcome) => void;
@@ -56,28 +41,22 @@ interface CaseSummaryStripProps {
 }
 
 /**
- * "Case information at a glance" strip shown directly under the case title —
- * see the UX review this addresses (root `CLAUDE.md`'s doc history has no
- * entry for this yet; it's step 1's case-summary work). Four pieces:
- * Stage (grouped picker), At Risk / On track (reasons always visible, not
- * just on hover), Next deadline (countdown, opens the Tasks tab's Deadlines
- * panel), and an On hold toggle labelled for the action it takes.
+ * "Case information at a glance" strip shown directly under the case title.
+ * Four pieces: Stage (read-only — it follows the tasks, the same phases as
+ * the Tasks tab; see lib/caseStageSync.ts), At Risk / On track (reasons
+ * always visible, not just on hover), Next deadline (countdown, opens the
+ * Tasks tab's Deadlines panel), and an On hold toggle labelled for the
+ * action it takes.
  */
 export const CaseSummaryStrip: React.FC<CaseSummaryStripProps> = ({
   stage,
+  stageLabel,
   outcome,
   onHold,
   onToggleOnHold,
   risk,
   nextDeadline,
   onOpenDeadlines,
-  statusOpen,
-  onToggleStatusOpen,
-  onCloseStatusOpen,
-  onStageSelect,
-  backwardConfirmStage,
-  onCancelBackward,
-  onConfirmBackward,
   outcomePickerOpen,
   outcomeDraft,
   onSetOutcomeDraft,
@@ -89,77 +68,21 @@ export const CaseSummaryStrip: React.FC<CaseSummaryStripProps> = ({
   const deadlineDays = nextDeadline ? daysLeft(nextDeadline, today) : null;
   const deadlineUrgency = nextDeadline ? urgency(nextDeadline, today) : 'none';
 
-  const stagesByGroup = STAGE_GROUP_ORDER.map(group => ({
-    group,
-    stages: CASE_STAGE_ORDER.filter(s => caseStageGroup(s) === group),
-  }));
-
   return (
     <div className="mt-3 flex flex-wrap items-stretch gap-2">
-      {/* ── Stage ── */}
+      {/* ── Stage (read-only: follows the tasks) ── */}
       <div className="relative">
-        <button
-          onClick={onToggleStatusOpen}
-          aria-haspopup="true"
-          aria-expanded={statusOpen}
-          className={`h-full inline-flex flex-col items-start gap-0.5 px-3 py-1.5 rounded-xl border transition-colors focus-ring ${stageMeta.chip} border-transparent hover:opacity-90`}
+        <div
+          title={stage === 'closed' ? 'This case is closed. Reopen it from Case actions.' : 'Follows the tasks: the stage of the current task, as grouped on the Tasks tab'}
+          className={`h-full inline-flex flex-col items-start gap-0.5 px-3 py-1.5 rounded-xl border border-transparent ${stageMeta.chip}`}
         >
           <span className="text-[9.5px] font-bold uppercase tracking-wide opacity-70">Stage</span>
           <span className="inline-flex items-center gap-1.5 text-[12.5px] font-bold">
             <span className={`w-1.5 h-1.5 rounded-full ${stageMeta.dot}`} />
-            {stagePositionLabel(stage)}
+            {stage === 'closed' ? CASE_STAGE_LABELS.closed : stageLabel}
             {stage === 'closed' && outcome && <span className="opacity-70">· {OUTCOME_LABELS[outcome]}</span>}
-            <ChevronDown size={12} />
           </span>
-        </button>
-
-        {statusOpen && (
-          <>
-            <div className="fixed inset-0 z-30" onClick={onCloseStatusOpen} />
-            <div className="absolute left-0 top-full mt-1.5 z-40 w-64 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-1 modal-content max-h-96 overflow-y-auto">
-              {stagesByGroup.map(({ group, stages }) => (
-                <div key={group} className="mb-1 last:mb-0">
-                  <div className="px-3 pt-1.5 pb-1 text-[9.5px] font-bold uppercase tracking-wide text-ink-soft/60 dark:text-plate-ink-soft/60">
-                    {CASE_STAGE_GROUP_LABELS[group]}
-                  </div>
-                  {stages.map(s => (
-                    <button
-                      key={s}
-                      onClick={() => onStageSelect(s)}
-                      aria-current={stage === s ? 'true' : undefined}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold hover:bg-paper dark:hover:bg-plate transition-colors ${stage === s ? 'text-ink dark:text-plate-ink' : 'text-ink-soft dark:text-plate-ink-soft'}`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${STAGE_META[s].dot}`} />
-                      {CASE_STAGE_LABELS[s]}
-                      {stage === s && <span className="ml-auto text-[10px] text-edamame font-bold">Current</span>}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Backward-move confirm — inline, never window.confirm */}
-        {backwardConfirmStage && (
-          <>
-            <div className="fixed inset-0 z-30" onClick={onCancelBackward} />
-            <div className="absolute left-0 top-full mt-1.5 z-40 w-64 bg-paper-2 dark:bg-plate-card rounded-xl shadow-xl border border-ink/10 dark:border-plate-ink/15 p-3 modal-content">
-              <p className="text-[12px] text-ink dark:text-plate-ink font-semibold mb-1">Move stage backward?</p>
-              <p className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft mb-3">
-                This moves the case from {CASE_STAGE_LABELS[stage]} back to {CASE_STAGE_LABELS[backwardConfirmStage]}.
-              </p>
-              <div className="flex items-center gap-2 justify-end">
-                <button onClick={onCancelBackward} className="px-3 py-1.5 text-[11.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-ink/8 dark:hover:bg-plate-ink/10 rounded-lg transition-colors">
-                  Cancel
-                </button>
-                <button onClick={onConfirmBackward} className="px-3 py-1.5 text-[11.5px] font-semibold text-white bg-edamame-500 hover:bg-edamame-600 rounded-lg transition-colors">
-                  Confirm
-                </button>
-              </div>
-            </div>
-          </>
-        )}
+        </div>
 
         {/* Outcome picker — required before a move to Closed applies */}
         {outcomePickerOpen && (

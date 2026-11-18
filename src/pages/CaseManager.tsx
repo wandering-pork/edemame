@@ -19,7 +19,7 @@ import { subclassChip, subclassOptions, substreamsFor, NOT_CONFIRMED_LABEL } fro
 import { useVisaConfig } from '../contexts/VisaConfigContext';
 import { buildCasePhaseView, phaseProgressSegments, phaseRef } from '../lib/phaseGrouping';
 import { visibleCasePhases } from '../lib/casePhases';
-import { NO_SUBCLASS_FILTER, effectiveSubclass, matchesVisaFilter, phaseAheadOfStage } from '../lib/caseListFilters';
+import { NO_SUBCLASS_FILTER, effectiveSubclass, matchesVisaFilter } from '../lib/caseListFilters';
 import { NOT_CONFIRMED_SUBCLASS } from '../types';
 import {
   CaseOwnerScope, filterCasesByOwnerScope, defaultCaseOwnerScope, loadCaseOwnerScope, saveCaseOwnerScope,
@@ -239,8 +239,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
       const risk = computeCaseRisk(c, tasks, deadlines, checklistsByCase[c.id], new Date(), template?.steps);
       const subclass = effectiveSubclass(c, template?.visaSubclass);
       const phaseView = buildCasePhaseView(caseTasks, casePhases, template?.steps, subclass);
-      const phaseAhead = phaseAheadOfStage(c.stage, phaseView.currentPhaseRef, phaseView.hasPhases);
-      return { case: c, client, applicant, template, owner, ownerName, group, risk, subclass, phaseView, phaseAhead, ...rowStatus };
+      return { case: c, client, applicant, template, owner, ownerName, group, risk, subclass, phaseView, ...rowStatus };
     });
   }, [searchedCases, clients, tasks, templates, teamMembers, deadlines, checklistsByCase, memberNameFor, casePhases]);
 
@@ -652,15 +651,6 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                           <span className="font-semibold text-ink-soft dark:text-plate-ink-soft">{r.phaseView.currentPhaseName}</span>
                           {' · '}<span className="font-mono">{r.completedTasks}/{r.totalTasks}</span>
                         </span>
-                        {r.phaseAhead && (
-                          <span
-                            tabIndex={0}
-                            title="The tasks have reached a post-lodgement phase but the case stage is still before lodgement. Update the stage on the case if it has been lodged."
-                            className="focus-ring text-[9.5px] font-bold text-amber-700 dark:text-amber-400 rounded"
-                          >
-                            Phase is ahead of stage
-                          </span>
-                        )}
                       </>
                     ) : (
                       <span className="text-[10px] text-ink-faint dark:text-plate-ink-faint font-mono">

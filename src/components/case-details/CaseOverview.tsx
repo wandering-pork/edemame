@@ -226,25 +226,17 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
               )}
               <dt className="text-ink-faint dark:text-plate-ink-faint">Case owner</dt>
               <dd className="text-ink dark:text-plate-ink">{ownerName ?? <span className="text-ink-faint dark:text-plate-ink-faint">Unassigned</span>}</dd>
+              {/* One Stage, read-only: it follows the tasks (the phase of the current task, as
+                  grouped on the Tasks tab). Older cases with no phase info show the stored stage. */}
               <dt className="text-ink-faint dark:text-plate-ink-faint">Stage</dt>
               <dd>
-                <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-full ${STAGE_META[stage].chip}`}>
-                  {CASE_STAGE_LABELS[stage]}
+                <span
+                  title={stage === 'closed' ? undefined : 'Follows the tasks: the stage of the current task'}
+                  className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-full ${STAGE_META[stage].chip}`}
+                >
+                  {stage !== 'closed' && phaseView?.hasPhases ? phaseView.currentPhaseName : CASE_STAGE_LABELS[stage]}
                 </span>
               </dd>
-              {phaseView && (
-                <>
-                  <dt className="text-ink-faint dark:text-plate-ink-faint">Phase</dt>
-                  <dd>
-                    <span
-                      title="Read-only: the phase of the current task"
-                      className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md border border-dashed border-ink/20 dark:border-plate-ink/25 bg-paper dark:bg-plate text-ink-soft dark:text-plate-ink-soft"
-                    >
-                      {phaseView.currentPhaseName}
-                    </span>
-                  </dd>
-                </>
-              )}
               <dt className="text-ink-faint dark:text-plate-ink-faint">Next deadline</dt>
               <dd>
                 {nextDeadline && nextDeadlineDays !== null ? (
