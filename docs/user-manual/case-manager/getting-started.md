@@ -91,7 +91,7 @@ cases whose tasks have no phases at all keep showing the stage they were already
 
 On the Case Manager list, stages are grouped into three boards: **Pre-lodgement** (Consultation
 through Ready to lodge), **With Department** (Lodged, Decision, Post-decision) and **Closed**. The
-list's stage stepper and filters follow the tasks the same way.
+list shows the same stage name on each row, and its filters follow the tasks the same way.
 
 To close a case, open **Case actions → Close case…** and pick an **outcome**: Granted, Refused,
 Withdrawn or Lapsed. A closed case shows **Closed · outcome** as its stage; **Case actions → Reopen
@@ -118,20 +118,23 @@ At Risk when any of the following is true:
 Use the **At Risk** chip on the Case Manager list to filter down to just those cases, alongside (not
 instead of) the Pre-lodgement/With Department/Closed board filters.
 
-### Stage and phase on each row
+### Stage on each row
 
-Each case row shows two kinds of progress side by side:
+Each case row shows its **Stage** the same way Case Details does:
 
-- the **stage** stepper (Draft → Closed) — the case's lifecycle, which follows its tasks (see above);
-- underneath it, a **phase** bar — one segment per phase the case's tasks use, each filled by how
-  many of its tasks are done — with the current phase's name and the overall task count. Hover or
-  focus the bar to see each phase's count. Cases whose tasks have no phases just show the task count.
+- the **Stage** chip — the case's current stage name (e.g. "Prerequisites"), coloured by its board
+  (Pre-lodgement, With Department, Closed). A closed case shows **Closed**; an older case whose tasks
+  have no stages shows the stage it was already at.
+- a **progress bar** — one segment per stage the case has tasks in (the same groups as the case's
+  Tasks tab), each filled by how many of its tasks are done, with the current stage ringed. Under it,
+  "Stage 2 of 4 · 5/12 tasks". Hover or focus the bar to see each stage's count. Cases whose tasks
+  have no stages just show the task count.
 
-### Visa and phase filters
+### Visa and stage filters
 
 Next to the board filters and **At Risk**, use **All visas** to show only one subclass (then
-optionally one substream), **Not Confirmed** cases, or cases with **No subclass**; and **Any phase**
-to show only cases currently in a given phase (e.g. "In Prerequisites"). They combine with every
+optionally one substream), **Not Confirmed** cases, or cases with **No subclass**; and **Any stage**
+to show only cases currently at a given stage (e.g. "In Prerequisites"). They combine with every
 other filter and the search box.
 
 ### Next deadline

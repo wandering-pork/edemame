@@ -6,7 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 import { NewCase } from './NewCase';
 import { isTaskClosed } from '../lib/taskStatus';
-import { CASE_STAGE_LABELS, CASE_STAGE_STEPPER, CASE_STAGE_GROUP_LABELS, caseStageGroup, CaseStageGroup } from '../lib/caseStage';
+import { CASE_STAGE_GROUP_LABELS, caseStageGroup, CaseStageGroup } from '../lib/caseStage';
+import { caseStageName } from '../lib/caseStageSync';
 import { computeCaseRisk } from '../lib/risk';
 import { useRepositories } from '../contexts/RepositoryContext';
 import { useFirm } from '../contexts/FirmContext';
@@ -449,7 +450,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
               </select>
             </>
           )}
-          <label htmlFor="cm-phase-filter" className="sr-only">Filter by current phase</label>
+          <label htmlFor="cm-phase-filter" className="sr-only">Filter by current stage</label>
           <select
             id="cm-phase-filter"
             value={phaseFilter}
@@ -458,7 +459,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
               phaseFilter ? 'border-edamame-500 text-edamame-700 dark:text-edamame-400' : 'border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft'
             }`}
           >
-            <option value="">Any phase</option>
+            <option value="">Any stage</option>
             {visibleCasePhases(casePhases).map(p => <option key={p.id} value={phaseRef(p)}>In {p.name}</option>)}
           </select>
           <span className="ml-auto inline-flex items-center gap-2 text-[12px] text-ink-faint dark:text-plate-ink-faint whitespace-nowrap">
@@ -501,7 +502,12 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
               const hue = hueFromId(client?.id || c.clientId || c.id);
               const groupStyle = GROUP_STYLES[r.group];
               const ref = `#${c.id.slice(0, 8).toUpperCase()}`;
-              const stepperIndex = CASE_STAGE_STEPPER.indexOf(c.stage === 'info_requested' ? 'lodged' : c.stage);
+              // The case's Stage follows its tasks (lib/caseStageSync.ts): the
+              // current task's phase, same as Case Details. Cases with no phase
+              // info, and closed cases, show the stored stage instead.
+              const stageName = caseStageName(c.stage, r.phaseView);
+              const stageGroups = r.phaseView.groups;
+              const stageIndex = stageGroups.findIndex(g => g.ref === r.phaseView.currentPhaseRef);
               const isSelected = selected.has(c.id);
 
               return (
@@ -604,52 +610,32 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                     )}
                   </div>
 
-                  {/* Stage stepper — compact dots along CASE_STAGE_STEPPER. Labelled as
-                      the case's stage (not task progress) via role/aria-label on the
-                      group and a per-dot title so hover/focus both explain it; the task
-                      count below is explicitly prefixed "Tasks" so it never reads as
-                      part of the stepper. */}
+                  {/* Stage progress — one segment per stage this case has tasks in (the
+                      same groups as Case Details' Tasks tab), sized by task count and
+                      filled by how many are done; the current stage is ringed. */}
                   <div className="hidden sm:flex flex-col gap-1.5 w-[150px] flex-shrink-0">
-                    <div
-                      className="flex items-center gap-[3px]"
-                      role="img"
-                      tabIndex={0}
-                      aria-label={`Stage: ${CASE_STAGE_LABELS[c.stage]} — step ${stepperIndex + 1} of ${CASE_STAGE_STEPPER.length}`}
-                      title={`Stage: ${CASE_STAGE_LABELS[c.stage]} — step ${stepperIndex + 1} of ${CASE_STAGE_STEPPER.length}`}
-                    >
-                      {CASE_STAGE_STEPPER.map((s, i) => (
-                        <span
-                          key={s}
-                          title={`${CASE_STAGE_LABELS[s]} — step ${i + 1} of ${CASE_STAGE_STEPPER.length}`}
-                          className={`h-1.5 flex-1 rounded-full ${
-                            i < stepperIndex ? 'bg-edamame-500' : i === stepperIndex ? 'bg-edamame-500' : 'bg-paper-2 dark:bg-plate'
-                          } ${i === stepperIndex ? 'ring-2 ring-edamame-500/30' : ''}`}
-                        />
-                      ))}
-                    </div>
-                    {r.phaseView.hasPhases && r.phaseView.groups.length > 0 ? (
+                    {r.phaseView.hasPhases && stageGroups.length > 0 ? (
                       <>
-                        {/* Phase progress — one segment per non-empty phase, sized by its task count */}
                         <div
                           className="flex items-center gap-[2px]"
                           role="img"
                           tabIndex={0}
-                          aria-label={`Phases: ${phaseProgressSegments(r.phaseView).map(s => `${s.name} ${s.done} of ${s.total} done`).join(', ')}`}
+                          aria-label={`Stages: ${phaseProgressSegments(r.phaseView).map(s => `${s.name} ${s.done} of ${s.total} tasks done`).join(', ')}`}
                           title={phaseProgressSegments(r.phaseView).map(s => `${s.name}: ${s.done}/${s.total}${s.current ? ' (current)' : ''}`).join('\n')}
                         >
                           {phaseProgressSegments(r.phaseView).map(s => (
                             <span
                               key={s.ref}
                               style={{ flexGrow: s.total }}
-                              className={`relative h-1 basis-0 rounded-full overflow-hidden bg-ink/10 dark:bg-plate-ink/15 ${s.current ? 'ring-1 ring-edamame-500/50' : ''}`}
+                              className={`relative h-1.5 basis-0 rounded-full overflow-hidden bg-ink/10 dark:bg-plate-ink/15 ${s.current ? 'ring-2 ring-edamame-500/30' : ''}`}
                             >
-                              <span className="absolute inset-y-0 left-0 bg-edamame-500/80" style={{ width: `${s.total ? (s.done / s.total) * 100 : 0}%` }} />
+                              <span className="absolute inset-y-0 left-0 bg-edamame-500" style={{ width: `${s.total ? (s.done / s.total) * 100 : 0}%` }} />
                             </span>
                           ))}
                         </div>
                         <span className="text-[10px] text-ink-faint dark:text-plate-ink-faint truncate">
-                          <span className="font-semibold text-ink-soft dark:text-plate-ink-soft">{r.phaseView.currentPhaseName}</span>
-                          {' · '}<span className="font-mono">{r.completedTasks}/{r.totalTasks}</span>
+                          {stageIndex >= 0 && <>Stage {stageIndex + 1} of {stageGroups.length} · </>}
+                          <span className="font-mono">{r.completedTasks}/{r.totalTasks}</span> tasks
                         </span>
                       </>
                     ) : (
@@ -668,7 +654,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                         className="badge-pulse w-1.5 h-1.5 rounded-full flex-shrink-0"
                         style={{ background: groupStyle.dot }}
                       />
-                      <span className="whitespace-nowrap overflow-hidden text-ellipsis">{CASE_STAGE_LABELS[c.stage]}</span>
+                      <span title={stageName} className="whitespace-nowrap overflow-hidden text-ellipsis">{stageName}</span>
                     </span>
                   </div>
 

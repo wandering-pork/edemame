@@ -1,4 +1,5 @@
 import type { CasePhase, CaseStage } from '../types';
+import { CASE_STAGE_LABELS } from './caseStage';
 import { CONSULTATION_PHASE_KEY, sortCasePhases } from './casePhases';
 import { phaseRef, type CasePhaseView } from './phaseGrouping';
 
@@ -78,4 +79,13 @@ export function phaseStagePositionLabel(view: CasePhaseView): string {
   const index = view.groups.findIndex(g => g.ref === view.currentPhaseRef);
   if (total === 0 || index === -1) return view.currentPhaseName;
   return `Stage ${index + 1} of ${total} · ${view.currentPhaseName}`;
+}
+
+/**
+ * The case's Stage as shown everywhere (Case Details, Case Manager, Team
+ * Dashboard): the current task's phase name, or the stored stage's label for
+ * a closed case or one whose tasks have no phase information.
+ */
+export function caseStageName(stage: CaseStage, view: CasePhaseView | null | undefined): string {
+  return stage !== 'closed' && view?.hasPhases ? view.currentPhaseName : CASE_STAGE_LABELS[stage];
 }

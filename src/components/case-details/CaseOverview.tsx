@@ -2,7 +2,8 @@ import React from 'react';
 import { Check, FileText, Image as ImageIcon, File as FileIcon, ArrowRight, Pause } from 'lucide-react';
 import { format } from 'date-fns';
 import type { CaseStage, Client, Deadline, Document, Task } from '../../types';
-import { CASE_STAGE_LABELS, STAGE_META } from '../../lib/caseStage';
+import { STAGE_META } from '../../lib/caseStage';
+import { caseStageName } from '../../lib/caseStageSync';
 import { DEADLINE_KIND_LABELS, daysLeft } from '../../lib/deadlines';
 import { TASK_STATUS_LABELS, isWaiting } from '../../lib/taskStatus';
 import type { ChecklistCategorySummary, TimelineEntry } from '../../lib/caseOverview';
@@ -234,7 +235,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
                   title={stage === 'closed' ? undefined : 'Follows the tasks: the stage of the current task'}
                   className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-full ${STAGE_META[stage].chip}`}
                 >
-                  {stage !== 'closed' && phaseView?.hasPhases ? phaseView.currentPhaseName : CASE_STAGE_LABELS[stage]}
+                  {caseStageName(stage, phaseView)}
                 </span>
               </dd>
               <dt className="text-ink-faint dark:text-plate-ink-faint">Next deadline</dt>

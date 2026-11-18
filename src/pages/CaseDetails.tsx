@@ -30,7 +30,7 @@ import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib
 import { displayCaseNumber } from '../lib/caseNumber';
 import { isTaskClosed, isWaiting, withStatus, statusChipFor, TASK_STATUS_LABELS, TASK_STATUS_ORDER } from '../lib/taskStatus';
 import { CASE_STAGE_LABELS } from '../lib/caseStage';
-import { phaseStagePositionLabel, reopenStage } from '../lib/caseStageSync';
+import { caseStageName, phaseStagePositionLabel, reopenStage } from '../lib/caseStageSync';
 import { allDeadlines, daysLeft, urgency, DEADLINE_KIND_LABELS, DEADLINE_KIND_ORDER } from '../lib/deadlines';
 import { computeCaseRisk } from '../lib/risk';
 import { nextDeadlineFor, stagePositionLabel } from '../lib/caseSummary';
@@ -868,7 +868,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       `Client: ${client.name}`,
       applicant && applicant.id !== client.id ? `Applicant: ${applicant.name}` : null,
       visaSubclass ? `Visa Type: ${subclassShortLabel(visaSubclass, currentCase.visaSubstream)}` : null,
-      `Stage: ${currentCase.stage === 'closed' ? CASE_STAGE_LABELS.closed : phaseView.hasPhases ? phaseView.currentPhaseName : CASE_STAGE_LABELS[currentCase.stage]}${currentCase.onHold ? ' (on hold)' : ''}`,
+      `Stage: ${caseStageName(currentCase.stage, phaseView)}${currentCase.onHold ? ' (on hold)' : ''}`,
       `Progress: ${completedTasks.length}/${caseTasks.length} tasks completed (${progress}%)`,
       pendingTasks.length > 0 ? `Next task: ${pendingTasks[0]?.title}` : null,
       checklist.length > 0 ? `Documents: ${uploadedCount}/${checklist.length} collected` : null,

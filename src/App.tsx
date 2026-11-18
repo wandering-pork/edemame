@@ -924,6 +924,7 @@ const AppShell: React.FC = () => {
                 cases={cases}
                 clients={clients}
                 tasks={tasks}
+                templates={templates}
                 activity={activity}
                 currentUserId={currentUserId}
                 onAssignCase={handleAssignCase}

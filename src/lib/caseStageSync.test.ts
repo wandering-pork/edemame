@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { CasePhase, Task } from '../types';
 import { ensureSystemCasePhases } from './casePhases';
 import { buildCasePhaseView } from './phaseGrouping';
-import { builtInPhaseFor, phaseStagePositionLabel, reopenStage, stageForPhase, syncedCaseStage } from './caseStageSync';
+import { builtInPhaseFor, caseStageName, phaseStagePositionLabel, reopenStage, stageForPhase, syncedCaseStage } from './caseStageSync';
 
 const systemPhases = async (): Promise<CasePhase[]> => {
   let rows: CasePhase[] = [];
@@ -100,5 +100,16 @@ describe('phaseStagePositionLabel', () => {
     const p = await systemPhases();
     const view = buildCasePhaseView([task('consultation', true), task('decision', true)], p);
     expect(phaseStagePositionLabel(view)).toBe('Stage 2 of 2 · Decision');
+  });
+});
+
+describe('caseStageName', () => {
+  it('uses the task-based stage, except for closed cases and cases with no phase info', async () => {
+    const p = await systemPhases();
+    const view = buildCasePhaseView([task('prerequisites')], p);
+    expect(caseStageName('draft', view)).toBe('Prerequisites');
+    expect(caseStageName('closed', view)).toBe('Closed');
+    expect(caseStageName('preparing', buildCasePhaseView([], p))).toBe('Preparing');
+    expect(caseStageName('lodged', null)).toBe('Lodged');
   });
 });
