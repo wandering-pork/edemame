@@ -51,8 +51,8 @@ const SETTING_GROUPS: SettingGroupDef[] = [
       },
       {
         id: 'phases',
-        label: 'Phases',
-        description: 'The ordered phases a case moves through; tasks are grouped by phase.',
+        label: 'Stages',
+        description: 'The ordered stages a case moves through; tasks are grouped by stage.',
         icon: ListOrdered,
         Pane: CasePhaseSettings,
       },

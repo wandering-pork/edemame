@@ -2128,7 +2128,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               </div>
               {(!editingTask || phaseView.hasPhases) && (
                 <div>
-                  <label htmlFor="task-phase" className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Phase</label>
+                  <label htmlFor="task-phase" className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Stage</label>
                   <select
                     id="task-phase"
                     value={taskForm.phase}
@@ -2142,7 +2142,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     )}
                   </select>
                   {phaseChoices.locked && (
-                    <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1">Not Confirmed cases only use the Consultation phase.</p>
+                    <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1">Not Confirmed cases only use the Consultation stage.</p>
                   )}
                 </div>
               )}

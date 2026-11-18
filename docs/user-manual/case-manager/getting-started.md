@@ -30,7 +30,7 @@ the row) with:
 - **Assign…**: opens **Assign Case** for that row, even if it already has an owner.
 - **Duplicate**: creates a new **Draft** case for the same client with the same title (plus
   "(copy)"), description, visa subclass and substream, work plan and owner. Its tasks are copied as
-  not started, in the same order and phases, with every date moved so the plan starts today.
+  not started, in the same order and stages, with every date moved so the plan starts today.
   Deadlines, documents, notes, the checklist and chats aren't copied, because they belong to the
   original case.
 - **Delete…**: owners and admins only. Asks you to confirm first, and also deletes the case's tasks
@@ -80,14 +80,14 @@ stays on one line.
 
 ### Case stage, on hold, and At Risk
 
-A case's **Stage** follows its tasks — you don't set it by hand. It's the phase of the case's
-current task (the first task that isn't done yet), the same phases the **Tasks** tab groups tasks
+A case's **Stage** follows its tasks — you don't set it by hand. It's the stage of the case's
+current task (the first task that isn't done yet), the same stages the **Tasks** tab groups tasks
 into (Consultation, Prerequisites, Preparing for lodgement, Ready to lodge, Lodged, Decision,
-Post-decision, plus any your firm added — see Configuration → Phases). The summary strip shows it as
-"Stage N of M · Name", where M counts only the phases this case has tasks in, and Case info on the
+Post-decision, plus any your firm added — see Configuration → Stages). The summary strip shows it as
+"Stage N of M · Name", where M counts only the stages this case has tasks in, and Case info on the
 Overview shows the same name. Completing tasks moves the stage forward; reopening an earlier task
 moves it back. Once every task is done the case stays at its last stage until you close it. Older
-cases whose tasks have no phases at all keep showing the stage they were already at.
+cases whose tasks have no stages at all keep showing the stage they were already at.
 
 On the Case Manager list, stages are grouped into three boards: **Pre-lodgement** (Consultation
 through Ready to lodge), **With Department** (Lodged, Decision, Post-decision) and **Closed**. The

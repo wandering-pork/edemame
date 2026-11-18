@@ -49,10 +49,10 @@ export const CasePhaseSettings: React.FC = () => {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-[15px] font-bold text-ink dark:text-plate-ink">Phases</h2>
+        <h2 className="text-[15px] font-bold text-ink dark:text-plate-ink">Stages</h2>
         <p className="text-[12px] text-ink-soft dark:text-plate-ink-soft mt-0.5 leading-relaxed">
-          The phases a case moves through, in order. Each Work Plan task belongs to a phase, and a case's tasks are
-          grouped by phase. This is separate from a case's stage (Draft → Closed), which you still set on the case.
+          The stages a case moves through, in order. Each Work Plan task belongs to a stage, and a case's tasks are
+          grouped by stage. A case's Stage is the stage of its current task, so it moves on its own as tasks are done.
         </p>
       </div>
 
@@ -63,7 +63,7 @@ export const CasePhaseSettings: React.FC = () => {
       )}
 
       {loading ? (
-        <div className="py-10 text-center text-[12px] text-ink-faint dark:text-plate-ink-faint">Loading phases…</div>
+        <div className="py-10 text-center text-[12px] text-ink-faint dark:text-plate-ink-faint">Loading stages…</div>
       ) : (
         <ol className="rounded-xl border border-ink/15 dark:border-plate-ink/20 overflow-hidden">
           {phases.map((p, i) => {
@@ -73,7 +73,7 @@ export const CasePhaseSettings: React.FC = () => {
                 <span className="w-6 text-[11px] font-bold text-ink-faint dark:text-plate-ink-faint tabular-nums flex-shrink-0">{i + 1}</span>
                 {editingId === p.id ? (
                   <div className="flex-1 flex gap-2 min-w-0">
-                    <label className="sr-only" htmlFor={`phase-${p.id}`}>Phase name</label>
+                    <label className="sr-only" htmlFor={`phase-${p.id}`}>Stage name</label>
                     <input
                       id={`phase-${p.id}`}
                       value={editName}
@@ -143,19 +143,19 @@ export const CasePhaseSettings: React.FC = () => {
       )}
 
       <div className="flex gap-2">
-        <label className="sr-only" htmlFor="new-phase">New phase name</label>
+        <label className="sr-only" htmlFor="new-phase">New stage name</label>
         <input
           id="new-phase"
           value={newName}
           maxLength={PHASE_NAME_MAX}
           onChange={e => setNewName(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          placeholder="New phase name — added at the end"
+          placeholder="New stage name — added at the end"
           className={`${inputClass} flex-1 min-w-0`}
         />
         <button onClick={add} disabled={!newName.trim()}
           className="inline-flex items-center gap-1.5 px-3 py-2 bg-edamame hover:bg-edamame-600 disabled:opacity-40 text-white font-bold rounded-lg text-[12px] transition-colors">
-          <Plus size={13} /> Add phase
+          <Plus size={13} /> Add stage
         </button>
       </div>
     </div>

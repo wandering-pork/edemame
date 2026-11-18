@@ -76,7 +76,7 @@ export const PhaseTaskGroups: React.FC<Props> = ({ view, onOpenTask, renderTaskA
                 </span>
               )}
               <span className={`min-w-0 truncate ${g.state === 'done' ? 'line-through' : ''}`}>{g.name}</span>
-              {g.state === 'current' && <span className="sr-only">(current phase)</span>}
+              {g.state === 'current' && <span className="sr-only">(current stage)</span>}
               {g.state === 'done' && <span className="sr-only">(complete)</span>}
               <span className="ml-auto flex items-center gap-2 flex-shrink-0">
                 <span className="w-14 h-1.5 rounded-full bg-ink/10 dark:bg-plate-ink/15 overflow-hidden" aria-hidden>

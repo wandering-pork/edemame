@@ -31,7 +31,7 @@ export const EdieGeneral: React.FC = () => {
   const askTitle = 'Asks Edie in the chat';
   const skills: EdieSkill[] = [
     { id: 'how-new-case', label: 'How do I start a case?', title: askTitle, onSelect: () => void chat.sendText('How do I start a new case?') },
-    { id: 'how-work-plans', label: 'How do Work Plans work?', title: askTitle, onSelect: () => void chat.sendText('How do Work Plans and phases work?') },
+    { id: 'how-work-plans', label: 'How do Work Plans work?', title: askTitle, onSelect: () => void chat.sendText('How do Work Plans and stages work?') },
     { id: 'check-eligibility', label: 'Check eligibility', title: 'Opens the Visa Advisor', onSelect: () => navigate('/visa-advisor') },
     { id: 'report-problem', label: 'Report a problem', title: 'Starts a message for you to finish and send', onSelect: () => prefill('I think something in Edamame is not working as it should: ') },
   ];

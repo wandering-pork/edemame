@@ -655,8 +655,8 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
               {editor.steps.length > 0 && (
                 <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mb-2">
                   {editorNotConfirmed
-                    ? 'Not Confirmed plans only use the Consultation phase.'
-                    : 'Each step belongs to a phase. When you save, steps are grouped by phase in phase order (Configuration → Phases), keeping their order within each phase.'}
+                    ? 'Not Confirmed plans only use the Consultation stage.'
+                    : 'Each step belongs to a stage. When you save, steps are grouped by stage in stage order (Configuration → Stages), keeping their order within each stage.'}
                 </p>
               )}
 
@@ -695,7 +695,7 @@ export const Templates: React.FC<TemplatesProps> = ({ templates, currentUserId, 
 
                           <div className="flex items-center gap-2">
                             <label htmlFor={`step-phase-${step.draftId}`} className="text-[11px] font-semibold text-ink-soft dark:text-plate-ink-soft">
-                              Phase
+                              Stage
                             </label>
                             <select
                               id={`step-phase-${step.draftId}`}

@@ -69,7 +69,7 @@ export function VisaConfigProvider({ children }: { children: React.ReactNode }) 
         return [] as VisaType[];
       }),
       ensureSystemCasePhases(repos.casePhases).catch(err => {
-        console.error('Failed to load Phases:', err);
+        console.error('Failed to load Stages:', err);
         return [] as CasePhase[];
       }),
     ])
@@ -149,7 +149,7 @@ export function VisaConfigProvider({ children }: { children: React.ReactNode }) 
   const findPhase = useCallback(
     (id: string) => {
       const p = casePhases.find(x => x.id === id);
-      if (!p) throw new Error('That phase no longer exists.');
+      if (!p) throw new Error('That stage no longer exists.');
       return p;
     },
     [casePhases],
@@ -206,7 +206,7 @@ export function VisaConfigProvider({ children }: { children: React.ReactNode }) 
   const deleteCasePhase = useCallback(
     async (id: string) => {
       const p = findPhase(id);
-      if (p.isSystemDefault) throw new Error('Built-in phases can be hidden, but not deleted.');
+      if (p.isSystemDefault) throw new Error('Built-in stages can be hidden, but not deleted.');
       await repos.casePhases.delete(id);
       setCasePhases(prev => prev.filter(x => x.id !== id));
     },

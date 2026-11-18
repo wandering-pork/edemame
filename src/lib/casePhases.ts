@@ -73,10 +73,10 @@ export const isEditedPhase = (p: CasePhase): boolean => {
 
 export function validatePhaseName(name: string, all: CasePhase[], ignoreId?: string): string | null {
   const n = name.trim();
-  if (!n) return 'Phase name is required.';
-  if (n.length > PHASE_NAME_MAX) return `Keep phase names to ${PHASE_NAME_MAX} characters or fewer.`;
+  if (!n) return 'Stage name is required.';
+  if (n.length > PHASE_NAME_MAX) return `Keep stage names to ${PHASE_NAME_MAX} characters or fewer.`;
   if (all.some(p => p.id !== ignoreId && p.name.trim().toLowerCase() === n.toLowerCase())) {
-    return 'There is already a phase with that name.';
+    return 'There is already a stage with that name.';
   }
   return null;
 }

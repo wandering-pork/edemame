@@ -568,6 +568,7 @@ A firm/account-level **Document Type** reference list is the shared vocabulary b
 
 ### Key Conventions
 
+- **"Stage" is the user-facing name for case phases** (renamed from "Phase", so a case has one stage concept everywhere). Only user-visible text says Stage / Stages — Configuration → Work Plans → **Stages**, the **Stage** field on Add task / Work Plan steps, error messages from `lib/casePhases.ts`'s `validatePhaseName()` and `contexts/VisaConfigContext.tsx`, and `docs/user-manual/`. Code, files, types (`CasePhase`, `Task.phase`, `WorkflowStep.phase`), the Configuration setting id (`phases`), repositories and DB tables (`case_phases`, `tasks.phase`) keep the phase naming, and so does the internal `Case.stage` (`CaseStage`, draft→closed), which is now synced from the phase (see "Stage follows the tasks"). Never show the word "phase" in new UI copy.
 - **"Work Plans" is the user-facing name for workflow templates** (renamed from "Templates"). Only user-visible text says Work Plan / Plan — code, files, types (`WorkflowTemplate`), routes (`/templates`), repositories and DB tables (`workflow_templates`) keep the template naming. Use "Work Plan" in any new UI copy, toasts, activity wording, AI prompt text and `docs/user-manual/` (`work-plans/`).
 
 - `src/components/` — reusable brand/layout pieces (Logo, Sidebar, PassportScanner, ProtectedRoute)
