@@ -7,7 +7,7 @@ import { Header } from './components/Header';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RepositoryProvider, useRepositories, useStorageMode } from './contexts/RepositoryContext';
 import { DocumentTypeProvider } from './contexts/DocumentTypeContext';
-import { VisaConfigProvider } from './contexts/VisaConfigContext';
+import { VisaConfigProvider, useVisaConfig } from './contexts/VisaConfigContext';
 import { Dashboard } from './pages/Dashboard';
 import { CaseManager } from './pages/CaseManager';
 import { CaseDetails } from './pages/CaseDetails';
@@ -49,6 +49,8 @@ import { isSupabaseConfigured, supabase } from './lib/supabaseClient';
 import { shouldNotifyAssignment } from './lib/assignmentNotify';
 import { describePlanSource, buildTaskPlanSummary } from './lib/planActivity';
 import type { PlanChangeResult } from './lib/visaPlanChange';
+import { buildCasePhaseView } from './lib/phaseGrouping';
+import { syncedCaseStage } from './lib/caseStageSync';
 
 // ---------------------------------------------------------------------------
 // Inner app — has access to repositories and router
@@ -409,6 +411,50 @@ const AppShell: React.FC = () => {
       notifyAssignment('case', updated.id);
     }
   }, [repos, cases, pushActivity, currentUserId, notifyAssignment]);
+
+  // --- Stage follows the tasks ---
+  // Case Details shows one read-only Stage taken from the current task's
+  // phase. `Case.stage` is kept in step with it here (see
+  // lib/caseStageSync.ts) because the Case Manager's stage filters/chip and
+  // the "ready to lodge" At Risk rule still read it. Runs whenever cases,
+  // tasks, plans or phases change. The first pass after load (cases that
+  // drifted before this existed) is silent; later moves are logged.
+  const { casePhases, loading: visaConfigLoading } = useVisaConfig();
+  const stageSyncInFlight = useRef(new Set<string>());
+  const stageSyncInitialPassDone = useRef(false);
+  useEffect(() => {
+    if (loading || visaConfigLoading || casePhases.length === 0) return;
+    const logActivity = stageSyncInitialPassDone.current;
+    stageSyncInitialPassDone.current = true;
+    for (const c of cases) {
+      if (stageSyncInFlight.current.has(c.id)) continue;
+      const template = templates.find(t => t.id === c.templateId);
+      const view = buildCasePhaseView(
+        tasks.filter(t => t.caseId === c.id),
+        casePhases,
+        template?.steps,
+        c.visaSubclass ?? template?.visaSubclass,
+      );
+      const next = syncedCaseStage(c.stage, view, casePhases);
+      if (!next) continue;
+      const updated: Case = { ...c, stage: next };
+      stageSyncInFlight.current.add(c.id);
+      repos.cases.update(updated)
+        .then(() => {
+          setCases(prev => prev.map(x => (x.id === c.id ? { ...x, stage: next } : x)));
+          if (logActivity) {
+            pushActivity({
+              type: 'case_stage_changed',
+              actorId: currentUserId,
+              subjectId: c.id,
+              summary: `Case "${c.title}" moved from ${CASE_STAGE_LABELS[c.stage]} to ${CASE_STAGE_LABELS[next]} as its tasks progressed.`,
+            });
+          }
+        })
+        .catch(err => console.error('Failed to sync case stage', err))
+        .finally(() => stageSyncInFlight.current.delete(c.id));
+    }
+  }, [loading, visaConfigLoading, casePhases, cases, tasks, templates, repos, pushActivity, currentUserId]);
 
   // --- Task Actions ---
   const handleAddTask = useCallback(async (task: Task) => {
@@ -878,6 +924,7 @@ const AppShell: React.FC = () => {
                 cases={cases}
                 clients={clients}
                 tasks={tasks}
+                templates={templates}
                 activity={activity}
                 currentUserId={currentUserId}
                 onAssignCase={handleAssignCase}

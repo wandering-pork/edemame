@@ -1,4 +1,4 @@
-# Configuration: Document Types, Visa Types & Phases
+# Configuration: Document Types, Visa Types & Stages
 
 **Configuration** is the central place for settings used across modules, separate from the global
 **Settings** page (which covers your account, theme, and where your data is stored). Open it from
@@ -10,7 +10,7 @@ opens on the right:
 
 - **Case Manager → Document Types** — the codes used to tag files and checklist items (below).
 - **Work Plans → Visa Types** — the subclasses and substreams offered on Work Plans and cases.
-- **Work Plans → Phases** — the ordered phases a case moves through.
+- **Work Plans → Stages** — the ordered stages a case moves through.
 
 ## What a Document Type is
 
@@ -94,15 +94,15 @@ Edamame ships ten subclasses (189, 190, 186, 482, 491, 500, 485, 600, 417, 820/8
 substreams. New built-in rows added in a later release appear automatically and never undo your
 edits or bring back a row you hid.
 
-## Phases
+## Stages
 
-**Configuration → Work Plans → Phases** is the ordered list of phases a case moves through:
+**Configuration → Work Plans → Stages** is the ordered list of stages a case moves through:
 Consultation, Prerequisites, Preparing for lodgement, Ready to lodge, Lodged, Decision,
-Post-decision. Work Plan tasks are grouped by phase.
+Post-decision. Work Plan tasks are grouped by stage.
 
-Phases are separate from a case's **stage** (Draft → Closed), which you still set on the case itself.
+A case's **Stage** is the stage of its current task, shown on Case Details, the Case Manager and the Team Dashboard. Nobody sets a case's stage by hand; it follows the tasks. A stage your firm adds counts as part of the built-in stage just above it for the Case Manager's Pre-lodgement / With Department boards.
 
-- Use the up/down arrows to reorder phases, the pencil to rename one, and the eye to hide one.
-- **Add phase** adds a new phase at the end of the list; phases your firm added can be deleted.
+- Use the up/down arrows to reorder stages, the pencil to rename one, and the eye to hide one.
+- **Add stage** adds a new stage at the end of the list; stages your firm added can be deleted.
 - **Consultation** is required: it's always first and can't be renamed, hidden or removed.
-- A renamed built-in phase shows **Edited** and gets a **Reset** button.
+- A renamed built-in stage shows **Edited** and gets a **Reset** button.

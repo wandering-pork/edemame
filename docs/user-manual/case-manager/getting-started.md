@@ -30,7 +30,7 @@ the row) with:
 - **Assign…**: opens **Assign Case** for that row, even if it already has an owner.
 - **Duplicate**: creates a new **Draft** case for the same client with the same title (plus
   "(copy)"), description, visa subclass and substream, work plan and owner. Its tasks are copied as
-  not started, in the same order and phases, with every date moved so the plan starts today.
+  not started, in the same order and stages, with every date moved so the plan starts today.
   Deadlines, documents, notes, the checklist and chats aren't copied, because they belong to the
   original case.
 - **Delete…**: owners and admins only. Asks you to confirm first, and also deletes the case's tasks
@@ -80,21 +80,24 @@ stays on one line.
 
 ### Case stage, on hold, and At Risk
 
-Every case moves through a **stage**, shown in the summary strip as "Stage N of 8 · Label" and
-grouped on the Case Manager list into three boards: **Pre-lodgement** (Draft → Assessment → Engaged
-→ Preparing → Ready to lodge), **With Department** (Lodged, Info requested, Decision), and
-**Closed**. A new case always starts at **Draft**.
+A case's **Stage** follows its tasks — you don't set it by hand. It's the stage of the case's
+current task (the first task that isn't done yet), the same stages the **Tasks** tab groups tasks
+into (Consultation, Prerequisites, Preparing for lodgement, Ready to lodge, Lodged, Decision,
+Post-decision, plus any your firm added — see Configuration → Stages). The summary strip shows it as
+"Stage N of M · Name", where M counts only the stages this case has tasks in, and Case info on the
+Overview shows the same name. Completing tasks moves the stage forward; reopening an earlier task
+moves it back. Once every task is done the case stays at its last stage until you close it. Older
+cases whose tasks have no stages at all keep showing the stage they were already at.
 
-Click the Stage chip to open a picker grouped the same way — Pre-lodgement / With Department /
-Closed — with the current stage marked. There's no fixed one-way path, since a real case can go
-backward (a decision gets reopened, a lodgement is withdrawn and re-prepared); moving a case to an
-earlier stage asks for a quick confirm first. **Lodged** and **Info requested** are treated as the
-same step, since a case toggles between the two rather than progressing through both — no confirm
-is needed either way, and they share one position in "Stage N of 8".
+On the Case Manager list, stages are grouped into three boards: **Pre-lodgement** (Consultation
+through Ready to lodge), **With Department** (Lodged, Decision, Post-decision) and **Closed**. The
+list shows the same stage name on each row, and its filters follow the tasks the same way.
 
-Moving a case to **Closed** requires picking an **outcome** first: Granted, Refused, Withdrawn, or
-Lapsed. If a case is already closed with no outcome on file (this can happen to cases closed before
-outcomes existed), an amber banner appears at the top of the case asking you to set one.
+To close a case, open **Case actions → Close case…** and pick an **outcome**: Granted, Refused,
+Withdrawn or Lapsed. A closed case shows **Closed · outcome** as its stage; **Case actions → Reopen
+case** reopens it at the stage its tasks are at. If a case is already closed with no outcome on file
+(this can happen to cases closed before outcomes existed), an amber banner appears at the top of the
+case asking you to set one.
 
 **On hold** is its own chip in the strip, labelled for the action it takes — **Put on hold** when
 the case is active, or **On hold · Resume** once it is. A case can be on hold at any pre-lodgement
@@ -115,24 +118,23 @@ At Risk when any of the following is true:
 Use the **At Risk** chip on the Case Manager list to filter down to just those cases, alongside (not
 instead of) the Pre-lodgement/With Department/Closed board filters.
 
-### Stage and phase on each row
+### Stage on each row
 
-Each case row shows two kinds of progress side by side:
+Each case row shows its **Stage** the same way Case Details does:
 
-- the **stage** stepper (Draft → Closed) — the case's lifecycle, which you set yourself on the case;
-- underneath it, a **phase** bar — one segment per phase the case's tasks use, each filled by how
-  many of its tasks are done — with the current phase's name and the overall task count. Hover or
-  focus the bar to see each phase's count. Cases whose tasks have no phases just show the task count.
+- the **Stage** chip — the case's current stage name (e.g. "Prerequisites"), coloured by its board
+  (Pre-lodgement, With Department, Closed). A closed case shows **Closed**; an older case whose tasks
+  have no stages shows the stage it was already at.
+- a **progress bar** — one segment per stage the case has tasks in (the same groups as the case's
+  Tasks tab), each filled by how many of its tasks are done, with the current stage ringed. Under it,
+  "Stage 2 of 4 · 5/12 tasks". Hover or focus the bar to see each stage's count. Cases whose tasks
+  have no stages just show the task count.
 
-If a case's tasks have reached **Lodged**, **Decision** or **Post-decision** but its stage is still
-before lodgement, the row shows **Phase is ahead of stage** — a reminder to update the stage. The
-stage is never changed for you.
-
-### Visa and phase filters
+### Visa and stage filters
 
 Next to the board filters and **At Risk**, use **All visas** to show only one subclass (then
-optionally one substream), **Not Confirmed** cases, or cases with **No subclass**; and **Any phase**
-to show only cases currently in a given phase (e.g. "In Prerequisites"). They combine with every
+optionally one substream), **Not Confirmed** cases, or cases with **No subclass**; and **Any stage**
+to show only cases currently at a given stage (e.g. "In Prerequisites"). They combine with every
 other filter and the search box.
 
 ### Next deadline
@@ -153,6 +155,8 @@ instead.
   read-only view of the full report (inputs summary, and every assessed pathway with its verdict,
   reasons and gaps) without leaving the case. See
   [Visa Eligibility Advisor](../visa-advisor/getting-started.md) for how that report is produced.
+- **Close case…** (or **Reopen case** once it's closed): close the case with an outcome, or reopen
+  it at the stage its tasks are at.
 - **Delete case**: owners and admins only.
 
 Everything that used to be in this menu now has one home elsewhere:

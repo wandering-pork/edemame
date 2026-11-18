@@ -14,21 +14,21 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
   **Set up tasks for this visa**: pick a **Work Plan** (plans for that subclass are listed first;
   required) and choose what happens to the current tasks: **Do nothing** (default), **Delete** (asks
   you to confirm), or **Mark all as complete**. On **Confirm** the choice is applied, the plan's tasks
-  are added (dated from today, each in its phase) and the new subclass is saved; the plan becomes
+  are added (dated from today, each in its stage) and the new subclass is saved; the plan becomes
   the case's work plan. **Cancel** changes nothing. Changing the subclass back to blank or Not
   Confirmed just saves, with no window.
-  Change the stage from the **Stage** chip in the summary strip
-  under the case title, as before.
-- **Progress** — the case's tasks grouped by **phase** (Consultation, Prerequisites, Preparing for
-  lodgement, …; see Configuration → Phases), in phase order. Only the **current phase** — the phase
+  The **Stage** here is read-only: it's the stage of the current task (see below), the same as the
+  Stage chip in the summary strip under the case title. To close or reopen a case, use **Case actions**.
+- **Progress** — the case's tasks grouped by **stage** (Consultation, Prerequisites, Preparing for
+  lodgement, …; see Configuration → Stages), in stage order. Only the **current stage** — the stage
   of the current task — is open and highlighted: in it the current task is bold and finished tasks
-  are struck through. Finished phases are folded with a green tick and a struck-through name;
-  phases still to come are folded and grey. Click any phase to open or fold it, click a task to
-  open it, or **View all** to open the Tasks tab. Phases with no tasks are hidden. Older cases whose
-  tasks have no phase at all show the previous simple list (last done, current, next few).
-- **Phase** (in Case info) — read-only; shows the phase of the current task (Consultation if the
-  case has no tasks yet). It's not the same as the case's **Stage** (Draft → Closed), which you
-  still change yourself.
+  are struck through. Finished stages are folded with a green tick and a struck-through name;
+  stages still to come are folded and grey. Click any stage to open or fold it, click a task to
+  open it, or **View all** to open the Tasks tab. Stages with no tasks are hidden. Older cases whose
+  tasks have no stage at all show the previous simple list (last done, current, next few).
+- **Stage** (in Case info) — read-only; the stage of the current task, so it always matches the
+  groups on the Tasks tab and the Stage chip in the summary strip. It moves on its own as tasks are
+  done. A closed case shows **Closed**.
 - **Document checklist** — a donut showing how many of the case's documents are in overall, then
   one progress bar per checklist category showing how many items are verified, linked, pending, or
   waived. Click a category (or **Open**) to open the Document Checklist tab. If the case has no
@@ -79,16 +79,16 @@ case:
  When you come back to a case, it reopens on the tab you
 were last using.
 
-## Tasks by phase
+## Tasks by stage
 
-When a case's tasks have phases, the **Tasks** tab groups them the same way as Overview → Progress:
-one section per phase in phase order, only the current phase open, the current task highlighted
-and bold, finished tasks struck through, finished phases ticked and folded. Every row keeps its
+When a case's tasks have stages, the **Tasks** tab groups them the same way as Overview → Progress:
+one section per stage in stage order, only the current stage open, the current task highlighted
+and bold, finished tasks struck through, finished stages ticked and folded. Every row keeps its
 usual actions (mark done, change status, edit the date, the **⋮** menu).
 
-Tasks get their phase from the Work Plan step they came from. When you add a task yourself (**Add
+Tasks get their stage from the Work Plan step they came from. When you add a task yourself (**Add
 task** in the case, or **New Task** on the Dashboard with a case linked) you're asked which
-**Phase** to put it in — the choices are the phases this case already uses, defaulting to its
-current phase. A **Not Confirmed** case only uses Consultation. You can change a task's phase later
-from its edit form. AI-suggested extra tasks go into the phase of the step they're anchored to, or
-the current phase.
+**Stage** to put it in — the choices are the stages this case already uses, defaulting to its
+current stage. A **Not Confirmed** case only uses Consultation. You can change a task's stage later
+from its edit form. AI-suggested extra tasks go into the stage of the step they're anchored to, or
+the current stage.

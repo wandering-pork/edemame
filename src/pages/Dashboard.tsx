@@ -898,7 +898,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {newTaskPhaseChoices && (
                 <div>
                   <label htmlFor="new-task-phase" className="block text-[12.5px] font-semibold text-ink dark:text-plate-ink-soft mb-1">
-                    Phase
+                    Stage
                   </label>
                   <select
                     id="new-task-phase"
@@ -911,8 +911,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </select>
                   <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1">
                     {newTaskPhaseChoices.locked
-                      ? 'Not Confirmed cases only use the Consultation phase.'
-                      : 'Defaults to the case’s current phase.'}
+                      ? 'Not Confirmed cases only use the Consultation stage.'
+                      : 'Defaults to the case’s current stage.'}
                   </p>
                 </div>
               )}

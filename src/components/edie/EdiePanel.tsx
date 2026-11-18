@@ -314,7 +314,7 @@ export const EdiePanel: React.FC<EdiePanelProps> = ({
       {/* Header */}
       <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-ink/10 dark:border-plate-ink/15 flex-shrink-0">
         <span className="w-9 h-9 rounded-full bg-edamame/10 dark:bg-edamame/15 border border-edamame/30 flex items-center justify-center flex-shrink-0">
-          <BrandImage variant="mark" alt="" className="w-7 h-7 object-contain" />
+          <BrandImage variant="edie" alt="" className="w-7 h-7 object-contain" />
         </span>
         <div className="min-w-0">
           <div className="text-[14px] font-bold text-ink dark:text-plate-ink leading-tight">Edie</div>

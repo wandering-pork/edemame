@@ -86,7 +86,7 @@ export const ChangeVisaPlanDialog: React.FC<Props> = ({
             <p className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint mt-1.5">
               {plan
                 ? stepCount > 0
-                  ? `${stepCount} task${stepCount === 1 ? '' : 's'}${phaseCount ? ` across ${phaseCount} phase${phaseCount === 1 ? '' : 's'}` : ''} will be added, dated from today.`
+                  ? `${stepCount} task${stepCount === 1 ? '' : 's'}${phaseCount ? ` across ${phaseCount} stage${phaseCount === 1 ? '' : 's'}` : ''} will be added, dated from today.`
                   : 'This plan has no steps, so no tasks will be added — you can generate them with AI from the case afterwards.'
                 : matching.length === 0
                   ? 'No plan matches this visa yet — pick another plan.'

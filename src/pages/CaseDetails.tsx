@@ -29,7 +29,8 @@ import { generateChecklist, SUPPORTED_SUBCLASSES } from '../lib/checklistTemplat
 import { loadCaseTabsState, saveCaseTabsState, restoreTabsOnEntry } from '../lib/caseTabsStore';
 import { displayCaseNumber } from '../lib/caseNumber';
 import { isTaskClosed, isWaiting, withStatus, statusChipFor, TASK_STATUS_LABELS, TASK_STATUS_ORDER } from '../lib/taskStatus';
-import { CASE_STAGE_LABELS, evaluateTransition, outcomeRequired } from '../lib/caseStage';
+import { CASE_STAGE_LABELS } from '../lib/caseStage';
+import { caseStageName, phaseStagePositionLabel, reopenStage } from '../lib/caseStageSync';
 import { allDeadlines, daysLeft, urgency, DEADLINE_KIND_LABELS, DEADLINE_KIND_ORDER } from '../lib/deadlines';
 import { computeCaseRisk } from '../lib/risk';
 import { nextDeadlineFor, stagePositionLabel } from '../lib/caseSummary';
@@ -259,14 +260,11 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
 
   // ---- Top-bar menu state ----
-  const [statusOpen, setStatusOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // ---- Stage control state ----
-  // A backward move (e.g. lodged -> preparing) needs an inline confirm before
-  // it's applied; moving to `closed` needs an outcome picked first. Both are
-  // staged here rather than applied immediately from the stage menu.
-  const [backwardConfirmStage, setBackwardConfirmStage] = useState<CaseStage | null>(null);
+  // ---- Closing a case ----
+  // The Stage itself is read-only (it follows the tasks — lib/caseStageSync.ts);
+  // closing needs an outcome picked first, from Case actions → Close case….
   const [outcomePickerOpen, setOutcomePickerOpen] = useState(false);
   const [outcomeDraft, setOutcomeDraft] = useState<CaseOutcome | ''>('');
 
@@ -558,46 +556,20 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   };
 
   // ---- Case handlers ----
-  const applyStageChange = (newStage: CaseStage, outcome?: CaseOutcome) => {
-    const updated: Case = { ...currentCase, stage: newStage, outcome: newStage === 'closed' ? outcome : undefined };
-    setCurrentCase(updated);
-    onUpdateCase(updated);
-  };
-
-  /**
-   * Every stage move is allowed — see `lib/caseStage.ts`'s `evaluateTransition()`
-   * — but a backward move or a move to `closed` needs an inline confirm/pick
-   * before it's applied, rather than `window.confirm`/`window.prompt`.
-   */
-  const handleStageSelect = (newStage: CaseStage) => {
-    setStatusOpen(false);
-    if (newStage === currentCase.stage) return;
-    const transition = evaluateTransition(currentCase.stage, newStage);
-    if (transition.requiresOutcome) {
-      setBackwardConfirmStage(null);
-      setOutcomeDraft('');
-      setOutcomePickerOpen(true);
-      return;
-    }
-    if (transition.isBackward) {
-      setOutcomePickerOpen(false);
-      setBackwardConfirmStage(newStage);
-      return;
-    }
-    applyStageChange(newStage);
-  };
-
-  const confirmBackwardMove = () => {
-    if (!backwardConfirmStage) return;
-    applyStageChange(backwardConfirmStage);
-    setBackwardConfirmStage(null);
-  };
-
   const confirmOutcome = () => {
     if (!outcomeDraft) return;
-    applyStageChange('closed', outcomeDraft);
+    const updated: Case = { ...currentCase, stage: 'closed', outcome: outcomeDraft };
+    setCurrentCase(updated);
+    onUpdateCase(updated);
     setOutcomePickerOpen(false);
     setOutcomeDraft('');
+  };
+
+  /** Reopens a closed case at the stage its tasks are at (Preparing if it has no phase information). */
+  const handleReopenCase = () => {
+    const updated: Case = { ...currentCase, stage: reopenStage(phaseView, casePhases), outcome: undefined };
+    setCurrentCase(updated);
+    onUpdateCase(updated);
   };
 
   const handleToggleOnHold = () => {
@@ -896,7 +868,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       `Client: ${client.name}`,
       applicant && applicant.id !== client.id ? `Applicant: ${applicant.name}` : null,
       visaSubclass ? `Visa Type: ${subclassShortLabel(visaSubclass, currentCase.visaSubstream)}` : null,
-      `Stage: ${CASE_STAGE_LABELS[caseItem.stage]}${caseItem.onHold ? ' (on hold)' : ''}`,
+      `Stage: ${caseStageName(currentCase.stage, phaseView)}${currentCase.onHold ? ' (on hold)' : ''}`,
       `Progress: ${completedTasks.length}/${caseTasks.length} tasks completed (${progress}%)`,
       pendingTasks.length > 0 ? `Next task: ${pendingTasks[0]?.title}` : null,
       checklist.length > 0 ? `Documents: ${uploadedCount}/${checklist.length} collected` : null,
@@ -1275,6 +1247,23 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                       View eligibility assessment
                     </button>
                   )}
+                  {currentCase.stage === 'closed' ? (
+                    <button
+                      onClick={() => { handleReopenCase(); setMoreOpen(false); }}
+                      title="Reopen the case at the stage its tasks are at"
+                      className={menuItemCls}
+                    >
+                      Reopen case
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setOutcomeDraft(''); setOutcomePickerOpen(true); setMoreOpen(false); }}
+                      title="Close the case and record its outcome"
+                      className={menuItemCls}
+                    >
+                      Close case…
+                    </button>
+                  )}
                   {canDeleteCase && (
                     <>
                       <div className="h-px bg-paper dark:bg-plate my-1" />
@@ -1300,19 +1289,13 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       {/* ── Case summary strip: stage, at-risk, next deadline, on hold ── */}
       <CaseSummaryStrip
         stage={currentCase.stage}
+        stageLabel={phaseView.hasPhases ? phaseStagePositionLabel(phaseView) : stagePositionLabel(currentCase.stage)}
         outcome={currentCase.outcome}
         onHold={!!currentCase.onHold}
         onToggleOnHold={handleToggleOnHold}
         risk={caseRisk}
         nextDeadline={nextDeadline}
         onOpenDeadlines={() => openOrFocusTab('tasks')}
-        statusOpen={statusOpen}
-        onToggleStatusOpen={() => setStatusOpen(o => !o)}
-        onCloseStatusOpen={() => setStatusOpen(false)}
-        onStageSelect={handleStageSelect}
-        backwardConfirmStage={backwardConfirmStage}
-        onCancelBackward={() => setBackwardConfirmStage(null)}
-        onConfirmBackward={confirmBackwardMove}
         outcomePickerOpen={outcomePickerOpen}
         outcomeDraft={outcomeDraft}
         onSetOutcomeDraft={setOutcomeDraft}
@@ -2145,7 +2128,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               </div>
               {(!editingTask || phaseView.hasPhases) && (
                 <div>
-                  <label htmlFor="task-phase" className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Phase</label>
+                  <label htmlFor="task-phase" className="block text-xs font-bold text-ink-faint dark:text-plate-ink-faint uppercase tracking-wider mb-1">Stage</label>
                   <select
                     id="task-phase"
                     value={taskForm.phase}
@@ -2159,7 +2142,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
                     )}
                   </select>
                   {phaseChoices.locked && (
-                    <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1">Not Confirmed cases only use the Consultation phase.</p>
+                    <p className="text-[11px] text-ink-faint dark:text-plate-ink-faint mt-1">Not Confirmed cases only use the Consultation stage.</p>
                   )}
                 </div>
               )}

@@ -11,7 +11,8 @@ import { isTaskClosed } from './taskStatus';
  * (`lib/seedData.ts`) can name phases without knowing any firm's ids, and a
  * renamed built-in phase keeps all its steps and tasks.
  *
- * Phases are separate from `Case.stage` (draft→closed), which is unchanged.
+ * `Case.stage` (draft→closed) follows the current phase automatically — see
+ * lib/caseStageSync.ts. Case Details shows the phase as the case's Stage.
  */
 
 export const phaseRef = (p: CasePhase): string => p.systemKey ?? p.id;

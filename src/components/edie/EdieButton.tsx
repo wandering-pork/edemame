@@ -46,7 +46,7 @@ export const EdieButton: React.FC<EdieButtonProps> = ({ placement }) => {
         }`}
       >
         <span className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${open ? 'bg-white/90' : 'bg-paper-2 dark:bg-plate-card'}`}>
-          <BrandImage variant="mark" alt="" className="w-5 h-5 object-contain" />
+          <BrandImage variant="edie" alt="" className="w-5 h-5 object-contain" />
         </span>
         Ask Edie
         {showCount && (
