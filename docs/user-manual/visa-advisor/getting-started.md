@@ -9,7 +9,10 @@ new case for them with one confirmation step in between.
 1. From the sidebar, open **Visa Advisor**, or click **Visa Check** on a client's row in **Clients**
    to pre-fill their name, date of birth, and nationality.
 2. **Step 1 — Prospect**: full name (required), date of birth, country of citizenship, and whether
-   they're currently in Australia (and on what visa, if so).
+   they're currently in Australia (and on what visa, if so). **Country of Citizenship** is a
+   searchable list: start typing a country name, a passport code ("IND") or a nationality
+   ("Indian") and pick from the matches with the mouse or the arrow keys and Enter. A nationality
+   pre-filled from the client's profile shows as the country.
 3. **Step 2 — Intent**: primary purpose (work, study, family, permanent residence, visit) and
    intended duration of stay, plus a handful of purpose-specific questions (occupation, course
    level, relationship type, points score, etc.) that appear once you pick a purpose.

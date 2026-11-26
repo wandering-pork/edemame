@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { CountryCombobox } from '../components/CountryCombobox';
+import { normalizeCountry } from '../lib/countries';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -120,7 +122,8 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
     clientInfo: {
       fullName: prefilledClient?.name || '',
       dob: prefilledClient?.dob || '',
-      nationality: prefilledClient?.nationality || '',
+      // A client's stored nationality may be a passport code ("IND") or demonym ("Indian"); show it as the country.
+      nationality: normalizeCountry(prefilledClient?.nationality),
       inAustralia: false,
       currentVisaStatus: '',
     },
@@ -416,18 +419,17 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                   </div>
 
                   <div>
-                    <label className={labelClass}>Country of Citizenship</label>
-                    <input
-                      type="text"
+                    <label htmlFor="advisor-citizenship" className={labelClass}>Country of Citizenship</label>
+                    <CountryCombobox
+                      id="advisor-citizenship"
                       value={wizardState.clientInfo.nationality}
-                      onChange={(e) =>
+                      onChange={(nationality) =>
                         setWizardState((prev) => ({
                           ...prev,
-                          clientInfo: { ...prev.clientInfo, nationality: e.target.value },
+                          clientInfo: { ...prev.clientInfo, nationality },
                         }))
                       }
-                      className={inputClass}
-                      placeholder="e.g. Indian, British"
+                      inputClassName={inputClass}
                     />
                   </div>
 
