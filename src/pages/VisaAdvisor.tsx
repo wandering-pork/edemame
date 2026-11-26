@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { CountryCombobox } from '../components/CountryCombobox';
 import { normalizeCountry } from '../lib/countries';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -18,6 +17,7 @@ import {
 import { OpenCasePanel, OpenCasePanelResult } from '../components/visa-advisor/OpenCasePanel';
 import type { OpenCaseParams, OpenCaseOutcome, OpenCaseStage } from '../lib/openCaseFromAdvisor';
 import { PathwayCard } from '../components/visa-advisor/PathwayCard';
+import { EligibilityWizardFields, isWizardStepValid, purposeLabels, type WizardStep } from '../components/visa-advisor/EligibilityWizardFields';
 import { verdictColors, verdictLabels, verdictRank, verdictIcon } from '../components/visa-advisor/verdictStyles';
 import { buildEligibilitySummary } from '../lib/eligibilitySummary';
 import { aiErrorMessage, throwForAiResponse } from '../lib/aiErrors';
@@ -72,14 +72,6 @@ interface VisaAdvisorProps {
   onEligibilityChecked?: (usage: EligibilityUsage) => void;
 }
 
-const purposeLabels: Record<string, string> = {
-  work: 'Work / Employment',
-  study: 'Study',
-  family: 'Family Reunification',
-  pr: 'Permanent Residence',
-  visit: 'Visit / Tourism',
-};
-
 const stepLabels = ['Prospect', 'Intent', 'Background'];
 const stepHeadings = ['Who are we assessing?', 'What do they want?', 'What are they bringing?'];
 const stepSubheadings = [
@@ -87,20 +79,6 @@ const stepSubheadings = [
   'Purpose drives which pathways are even relevant',
   'English, qualifications and any final considerations',
 ];
-
-// Shared chip styling for single-select pill groups (brand fill when active).
-const chipClass = (active: boolean) =>
-  `px-3.5 py-1.5 rounded-full border text-xs font-semibold transition-all btn-press ${
-    active
-      ? 'bg-edamame-500 border-edamame-500 text-white'
-      : 'bg-paper-2 dark:bg-plate-card border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame-400 dark:hover:border-edamame-500'
-  }`;
-
-const inputClass =
-  'w-full px-3.5 py-2.5 border border-ink/15 dark:border-plate-ink/20 rounded-lg bg-paper-2 dark:bg-plate-card/60 text-[13.5px] text-ink dark:text-plate-ink outline-none focus:border-edamame-500 focus:ring-2 focus:ring-edamame-500/20 transition-all';
-
-const labelClass =
-  'block text-[10px] font-bold uppercase tracking-[0.11em] text-ink-soft dark:text-plate-ink-soft mb-2';
 
 export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   clients,
@@ -160,7 +138,15 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
     );
   }, [report]);
 
-  const isStep1Valid = wizardState.clientInfo.fullName.trim().length > 0;
+  const isStep1Valid = isWizardStepValid(
+    {
+      clientInfo: wizardState.clientInfo,
+      goals: wizardState.goals,
+      details: wizardState.details,
+      supportingFactors: wizardState.supportingFactors,
+    },
+    1,
+  );
 
   const handleNext = () => {
     if (wizardState.currentStep === 1 && !isStep1Valid) return;
@@ -379,471 +365,24 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                 </p>
               </div>
 
-              {/* Step 1: Who are we assessing? */}
-              {wizardState.currentStep === 1 && (
-                <div className="space-y-4">
-                  <div>
-                    <label className={labelClass}>Full Name</label>
-                    <input
-                      type="text"
-                      value={wizardState.clientInfo.fullName}
-                      onChange={(e) =>
-                        setWizardState((prev) => ({
-                          ...prev,
-                          clientInfo: { ...prev.clientInfo, fullName: e.target.value },
-                        }))
-                      }
-                      className={inputClass}
-                      placeholder="e.g. John Doe"
-                    />
-                    {!isStep1Valid && (
-                      <p className="text-[11px] text-red-500 dark:text-red-400 mt-1.5">
-                        A name is required to continue.
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>Date of Birth</label>
-                    <input
-                      type="date"
-                      value={wizardState.clientInfo.dob}
-                      onChange={(e) =>
-                        setWizardState((prev) => ({
-                          ...prev,
-                          clientInfo: { ...prev.clientInfo, dob: e.target.value },
-                        }))
-                      }
-                      className={inputClass}
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="advisor-citizenship" className={labelClass}>Country of Citizenship</label>
-                    <CountryCombobox
-                      id="advisor-citizenship"
-                      value={wizardState.clientInfo.nationality}
-                      onChange={(nationality) =>
-                        setWizardState((prev) => ({
-                          ...prev,
-                          clientInfo: { ...prev.clientInfo, nationality },
-                        }))
-                      }
-                      inputClassName={inputClass}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>Currently in Australia?</label>
-                    <div className="flex flex-wrap gap-2">
-                      {['Yes', 'No'].map((opt) => (
-                        <button
-                          key={opt}
-                          onClick={() =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              clientInfo: {
-                                ...prev.clientInfo,
-                                inAustralia: opt === 'Yes',
-                              },
-                            }))
-                          }
-                          className={chipClass(
-                            (opt === 'Yes' && wizardState.clientInfo.inAustralia) ||
-                              (opt === 'No' && !wizardState.clientInfo.inAustralia)
-                          )}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {wizardState.clientInfo.inAustralia && (
-                    <div>
-                      <label className={labelClass}>Current Visa/Status in Australia</label>
-                      <select
-                        value={wizardState.clientInfo.currentVisaStatus}
-                        onChange={(e) =>
-                          setWizardState((prev) => ({
-                            ...prev,
-                            clientInfo: {
-                              ...prev.clientInfo,
-                              currentVisaStatus: e.target.value,
-                            },
-                          }))
-                        }
-                        className={inputClass}
-                      >
-                        <option value="">-- Select --</option>
-                        <option value="tourist">Tourist/Visitor Visa</option>
-                        <option value="student">Student Visa</option>
-                        <option value="work">Work Visa</option>
-                        <option value="pr">Permanent Resident</option>
-                        <option value="citizen">Australian Citizen</option>
-                        <option value="overstay">Overstaying</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Step 2: What do they want? (purpose + duration + purpose-specific details) */}
-              {wizardState.currentStep === 2 && (
-                <div className="space-y-5">
-                  <div>
-                    <label className={labelClass}>Primary Purpose</label>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { val: 'work', label: 'Work / Employment' },
-                        { val: 'study', label: 'Study' },
-                        { val: 'family', label: 'Family Reunification' },
-                        { val: 'pr', label: 'Permanent Residence' },
-                        { val: 'visit', label: 'Visit / Tourism' },
-                      ].map(({ val, label }) => (
-                        <button
-                          key={val}
-                          onClick={() =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              goals: { ...prev.goals, primaryPurpose: val as any },
-                              details: {}, // Reset conditional details
-                            }))
-                          }
-                          className={chipClass(wizardState.goals.primaryPurpose === val)}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>Intended Duration of Stay</label>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { val: 'short', label: '< 3 months' },
-                        { val: 'medium', label: '3–12 months' },
-                        { val: 'years', label: '1–4 years' },
-                        { val: 'permanent', label: 'Permanently' },
-                      ].map(({ val, label }) => (
-                        <button
-                          key={val}
-                          onClick={() =>
-                            setWizardState((prev) => ({
-                              ...prev,
-                              goals: { ...prev.goals, intendedDuration: val },
-                            }))
-                          }
-                          className={chipClass(wizardState.goals.intendedDuration === val)}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {wizardState.goals.primaryPurpose && (
-                    <div className="pt-1 border-t border-ink/10 dark:border-plate-ink/15/60 space-y-4">
-                      <p className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-ink-soft dark:text-plate-ink-soft pt-4">
-                        Specifics for this pathway
-                      </p>
-
-                      {wizardState.goals.primaryPurpose === 'work' && (
-                        <>
-                          <div>
-                            <label className={labelClass}>Occupation</label>
-                            <input
-                              type="text"
-                              value={wizardState.details.occupation || ''}
-                              onChange={(e) =>
-                                setWizardState((prev) => ({
-                                  ...prev,
-                                  details: { ...prev.details, occupation: e.target.value },
-                                }))
-                              }
-                              placeholder="e.g. Software Engineer"
-                              className={inputClass}
-                            />
-                          </div>
-                          <div>
-                            <label className={labelClass}>Years of Experience</label>
-                            <input
-                              type="number"
-                              value={wizardState.details.yearsExperience || ''}
-                              onChange={(e) =>
-                                setWizardState((prev) => ({
-                                  ...prev,
-                                  details: {
-                                    ...prev.details,
-                                    yearsExperience: parseInt(e.target.value) || 0,
-                                  },
-                                }))
-                              }
-                              min="0"
-                              className={inputClass}
-                            />
-                          </div>
-                          <div>
-                            <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={wizardState.details.skillsAssessment || false}
-                                onChange={(e) =>
-                                  setWizardState((prev) => ({
-                                    ...prev,
-                                    details: {
-                                      ...prev.details,
-                                      skillsAssessment: e.target.checked,
-                                    },
-                                  }))
-                                }
-                                className="w-4 h-4 rounded accent-edamame-500"
-                              />
-                              Skills assessment completed?
-                            </label>
-                          </div>
-                        </>
-                      )}
-
-                      {wizardState.goals.primaryPurpose === 'study' && (
-                        <>
-                          <div>
-                            <label className={labelClass}>Course Level</label>
-                            <select
-                              value={wizardState.details.courseLevel || ''}
-                              onChange={(e) =>
-                                setWizardState((prev) => ({
-                                  ...prev,
-                                  details: { ...prev.details, courseLevel: e.target.value },
-                                }))
-                              }
-                              className={inputClass}
-                            >
-                              <option value="">-- Select --</option>
-                              <option value="secondary">Secondary/Foundation</option>
-                              <option value="vocation">Vocational (VET)</option>
-                              <option value="bachelor">Bachelor Degree</option>
-                              <option value="master">Master Degree</option>
-                              <option value="phd">PhD/Research</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={wizardState.details.financialSupport || false}
-                                onChange={(e) =>
-                                  setWizardState((prev) => ({
-                                    ...prev,
-                                    details: {
-                                      ...prev.details,
-                                      financialSupport: e.target.checked,
-                                    },
-                                  }))
-                                }
-                                className="w-4 h-4 rounded accent-edamame-500"
-                              />
-                              Financial support confirmed?
-                            </label>
-                          </div>
-                        </>
-                      )}
-
-                      {wizardState.goals.primaryPurpose === 'family' && (
-                        <>
-                          <div>
-                            <label className={labelClass}>Relationship Type</label>
-                            <select
-                              value={wizardState.details.relationshipType || ''}
-                              onChange={(e) =>
-                                setWizardState((prev) => ({
-                                  ...prev,
-                                  details: { ...prev.details, relationshipType: e.target.value },
-                                }))
-                              }
-                              className={inputClass}
-                            >
-                              <option value="">-- Select --</option>
-                              <option value="spouse">Spouse / Partner</option>
-                              <option value="child">Dependent Child</option>
-                              <option value="parent">Parent</option>
-                              <option value="sibling">Sibling</option>
-                              <option value="other">Other Family Member</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className={labelClass}>Sponsor's AU Status</label>
-                            <select
-                              value={wizardState.details.sponsorStatus || ''}
-                              onChange={(e) =>
-                                setWizardState((prev) => ({
-                                  ...prev,
-                                  details: { ...prev.details, sponsorStatus: e.target.value },
-                                }))
-                              }
-                              className={inputClass}
-                            >
-                              <option value="">-- Select --</option>
-                              <option value="citizen">Australian Citizen</option>
-                              <option value="pr">Permanent Resident</option>
-                              <option value="none">None / Not Available</option>
-                            </select>
-                          </div>
-                        </>
-                      )}
-
-                      {wizardState.goals.primaryPurpose === 'pr' && (
-                        <>
-                          <div>
-                            <label className={labelClass}>Self-Assessed Points Score</label>
-                            <select
-                              value={wizardState.details.pointsScore || ''}
-                              onChange={(e) =>
-                                setWizardState((prev) => ({
-                                  ...prev,
-                                  details: { ...prev.details, pointsScore: e.target.value },
-                                }))
-                              }
-                              className={inputClass}
-                            >
-                              <option value="">-- Select --</option>
-                              <option value="under65">Under 65 points</option>
-                              <option value="65-79">65–79 points</option>
-                              <option value="80-95">80–95 points</option>
-                              <option value="95plus">95+ points</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className={labelClass}>Preferred State</label>
-                            <input
-                              type="text"
-                              value={wizardState.details.statePreference || ''}
-                              onChange={(e) =>
-                                setWizardState((prev) => ({
-                                  ...prev,
-                                  details: { ...prev.details, statePreference: e.target.value },
-                                }))
-                              }
-                              placeholder="e.g. NSW, VIC"
-                              className={inputClass}
-                            />
-                          </div>
-                        </>
-                      )}
-
-                      {wizardState.goals.primaryPurpose === 'visit' && (
-                        <>
-                          <div>
-                            <label className={labelClass}>Trip Duration</label>
-                            <input
-                              type="text"
-                              value={wizardState.details.tripDuration || ''}
-                              onChange={(e) =>
-                                setWizardState((prev) => ({
-                                  ...prev,
-                                  details: { ...prev.details, tripDuration: e.target.value },
-                                }))
-                              }
-                              placeholder="e.g. 2 weeks, 3 months"
-                              className={inputClass}
-                            />
-                          </div>
-                          <div>
-                            <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={wizardState.details.strongTies || false}
-                                onChange={(e) =>
-                                  setWizardState((prev) => ({
-                                    ...prev,
-                                    details: {
-                                      ...prev.details,
-                                      strongTies: e.target.checked,
-                                    },
-                                  }))
-                                }
-                                className="w-4 h-4 rounded accent-edamame-500"
-                              />
-                              Strong ties to home country (property, job, family)?
-                            </label>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Step 3: What are they bringing? */}
-              {wizardState.currentStep === 3 && (
-                <div className="space-y-4">
-                  <div>
-                    <label className={labelClass}>English Proficiency</label>
-                    <select
-                      value={wizardState.supportingFactors.englishProficiency}
-                      onChange={(e) =>
-                        setWizardState((prev) => ({
-                          ...prev,
-                          supportingFactors: {
-                            ...prev.supportingFactors,
-                            englishProficiency: e.target.value,
-                          },
-                        }))
-                      }
-                      className={inputClass}
-                    >
-                      <option value="">-- Select --</option>
-                      <option value="none">No English proficiency</option>
-                      <option value="basic">Basic (IELTS 5.0–5.5)</option>
-                      <option value="intermediate">Intermediate (IELTS 6.0–6.5)</option>
-                      <option value="proficient">Proficient (IELTS 7.0–8.0)</option>
-                      <option value="fluent">Fluent (IELTS 8.5+) / Native</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={wizardState.supportingFactors.healthConcerns}
-                        onChange={(e) =>
-                          setWizardState((prev) => ({
-                            ...prev,
-                            supportingFactors: {
-                              ...prev.supportingFactors,
-                              healthConcerns: e.target.checked,
-                            },
-                          }))
-                        }
-                        className="w-4 h-4 rounded accent-edamame-500"
-                      />
-                      Any significant health conditions requiring medical clearance?
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft dark:text-plate-ink-soft cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={wizardState.supportingFactors.criminalHistory}
-                        onChange={(e) =>
-                          setWizardState((prev) => ({
-                            ...prev,
-                            supportingFactors: {
-                              ...prev.supportingFactors,
-                              criminalHistory: e.target.checked,
-                            },
-                          }))
-                        }
-                        className="w-4 h-4 rounded accent-edamame-500"
-                      />
-                      Any criminal history or prior visa refusals?
-                    </label>
-                  </div>
-                </div>
-              )}
+              <EligibilityWizardFields
+                step={wizardState.currentStep as WizardStep}
+                value={{
+                  clientInfo: wizardState.clientInfo,
+                  goals: wizardState.goals,
+                  details: wizardState.details,
+                  supportingFactors: wizardState.supportingFactors,
+                }}
+                onChange={(next) =>
+                  setWizardState((prev) => ({
+                    ...prev,
+                    clientInfo: next.clientInfo,
+                    goals: next.goals as WizardState['goals'],
+                    details: next.details,
+                    supportingFactors: next.supportingFactors,
+                  }))
+                }
+              />
             </div>
 
             {/* Footer with buttons */}

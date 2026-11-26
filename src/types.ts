@@ -397,6 +397,8 @@ export interface EligibilityAssessmentInputs {
   clientInfo: {
     fullName: string;
     dob: string;
+    /** Age in whole years, entered directly where no date of birth is asked (the homepage trial). */
+    age?: number | null;
     nationality: string;
     inAustralia: boolean;
     currentVisaStatus: string;

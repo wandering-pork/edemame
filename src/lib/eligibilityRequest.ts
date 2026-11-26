@@ -20,7 +20,8 @@ export function buildEligibilityRequest(inputs: EligibilityAssessmentInputs, tod
   const { clientInfo, goals, details, supportingFactors } = inputs;
   return {
     clientInfo: {
-      age: ageFromDob(clientInfo.dob, today),
+      // An age entered directly (the homepage trial asks for age, not a date of birth) wins.
+      age: clientInfo.age ?? ageFromDob(clientInfo.dob, today),
       nationality: clientInfo.nationality,
       inAustralia: clientInfo.inAustralia,
       currentVisaStatus: clientInfo.currentVisaStatus,
