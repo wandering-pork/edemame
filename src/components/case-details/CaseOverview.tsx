@@ -1,5 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
+import { Link } from 'react-router-dom';
 import type { CaseOutcome, CaseStage, Client, Task } from '../../types';
 import type { ChecklistCategorySummary, TimelineEntry } from '../../lib/caseOverview';
 import { subclassShortLabel } from '../../lib/visaTypes';
@@ -29,6 +30,18 @@ const LinkButton: React.FC<{ onClick: () => void; children: React.ReactNode }> =
   >
     {children}
   </button>
+);
+
+/** A person's name that opens them on the Clients page (expanded, scrolled to). */
+const ClientLink: React.FC<{ client: Client }> = ({ client }) => (
+  <Link
+    to="/clients"
+    state={{ focusClientId: client.id }}
+    title={`Open ${client.name} in Clients`}
+    className="hover:text-edamame-700 dark:hover:text-edamame-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-edamame-700 rounded-sm"
+  >
+    {client.name}
+  </Link>
 );
 
 // ---------------------------------------------------------------------------
@@ -112,11 +125,15 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
           <CardTitle action={<LinkButton onClick={onEditCase}>Edit</LinkButton>}>Case info</CardTitle>
           <dl className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-1.5 text-[12.5px]">
             <dt className="text-ink-faint dark:text-plate-ink-faint">Client</dt>
-            <dd className="text-ink dark:text-plate-ink font-semibold min-w-0 truncate">{client.name}</dd>
+            <dd className="text-ink dark:text-plate-ink font-semibold min-w-0 truncate">
+              <ClientLink client={client} />
+            </dd>
             {applicant && applicant.id !== client.id && (
               <>
                 <dt className="text-ink-faint dark:text-plate-ink-faint">Applicant</dt>
-                <dd className="text-ink dark:text-plate-ink min-w-0 truncate">{applicant.name}</dd>
+                <dd className="text-ink dark:text-plate-ink min-w-0 truncate">
+                  <ClientLink client={applicant} />
+                </dd>
               </>
             )}
             {(visaSubclass || templateTitle) && (

@@ -32,7 +32,8 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
   Older cases whose tasks have no stage at all show the case lifecycle stages instead (display only)
   with the case's task list underneath.
 - **Case info** (top right) — client (and applicant, if different), visa subclass (with substream,
-  if set), case owner, and the date the case was opened. The stage and the next deadline aren't
+  if set), case owner, and the date the case was opened. Click the client's (or applicant's) name
+  to open them on the **Clients** page. The stage and the next deadline aren't
   repeated here; they're in the summary strip under the case title.
   **Edit** opens the Edit case form, where you can change the title, description, **Visa Subclass**
   and **Substream** (or set the subclass to **Not Confirmed** while the visa is still undecided).
