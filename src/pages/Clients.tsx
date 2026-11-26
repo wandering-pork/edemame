@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Client, Case, Task } from '../types';
 import { isTaskClosed } from '../lib/taskStatus';
 import { isCaseClosed } from '../lib/caseStage';
-import { Search, Plus, User, Users, Phone, Mail, MapPin, ChevronDown, ChevronUp, Briefcase, Upload, Globe, FileText, Scan, Check } from 'lucide-react';
+import { Search, Plus, User, Users, Phone, Mail, MapPin, ChevronDown, ChevronUp, ChevronRight, Briefcase, Upload, Globe, FileText, Scan, Check } from 'lucide-react';
 import { CsvImport } from '../components/CsvImport';
 import { PassportScanner } from '../components/PassportScanner';
 import { v4 as uuidv4 } from 'uuid';
@@ -281,7 +281,16 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
                     </div>
 
                     <div className="col-span-2 hidden md:block text-xs text-ink-soft dark:text-plate-ink-soft truncate">
-                      {activeCase ? activeCase.title : '—'}
+                      {activeCase ? (
+                        <Link
+                          to={`/cases/${activeCase.id}`}
+                          onClick={e => e.stopPropagation()}
+                          title={`Open ${activeCase.title}`}
+                          className="block truncate hover:text-edamame-700 dark:hover:text-edamame-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-edamame-700 rounded-sm"
+                        >
+                          {activeCase.title}
+                        </Link>
+                      ) : '—'}
                     </div>
 
                     <div className="col-span-1 hidden md:block text-xs text-ink-faint dark:text-plate-ink-faint">
@@ -324,14 +333,19 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
                               const progress = getCaseProgress(c.id);
                               const roles = getClientRolesForCase(c, client.id);
                               return (
-                                <div key={c.id} className="bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl p-3.5 card-lift">
+                                <Link
+                                  key={c.id}
+                                  to={`/cases/${c.id}`}
+                                  aria-label={`Open case ${c.title}`}
+                                  className="group block bg-paper-2 dark:bg-plate-card border border-ink/15 dark:border-plate-ink/20 rounded-xl p-3.5 card-lift hover:border-edamame-700/50 dark:hover:border-edamame-400/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-edamame-700 transition-colors"
+                                >
                                   <div className="flex justify-between items-start mb-2.5 gap-3">
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                                         <span className="text-[10px] font-mono bg-paper-2 dark:bg-plate-card text-ink-soft dark:text-plate-ink-soft px-1.5 py-0.5 rounded">
                                           #{c.id.substring(0, 8)}
                                         </span>
-                                        <span className="font-semibold text-ink dark:text-plate-ink text-sm truncate">{c.title}</span>
+                                        <span className="font-semibold text-ink dark:text-plate-ink text-sm truncate group-hover:text-edamame-700 dark:group-hover:text-edamame-400">{c.title}</span>
                                         {roles.map(role => (
                                           <span
                                             key={role}
@@ -363,10 +377,13 @@ export const Clients: React.FC<ClientsProps> = ({ clients, cases, tasks, onAddCl
                                       style={{ width: `${progress.percent}%` }}
                                     />
                                   </div>
-                                  <div className="mt-1.5 text-[10px] text-ink-faint dark:text-plate-ink-faint text-right">
-                                    Started {format(new Date(c.startDate), 'MMM d, yyyy')}
+                                  <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] text-ink-faint dark:text-plate-ink-faint">
+                                    <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-edamame-700 dark:text-edamame-400 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">
+                                      Open case <ChevronRight size={12} strokeWidth={2} aria-hidden />
+                                    </span>
+                                    <span>Started {format(new Date(c.startDate), 'MMM d, yyyy')}</span>
                                   </div>
-                                </div>
+                                </Link>
                               );
                             })}
                           </div>

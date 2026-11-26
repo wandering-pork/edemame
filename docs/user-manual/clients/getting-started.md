@@ -26,7 +26,8 @@ so the list doesn't show a VEVO or visa-verified badge.
 ## Case history
 
 Click a client's row to expand it and see **Case History** — every case linked to that client,
-with its current progress. Click **Visa Check** on a client's row to jump straight to the Visa
+with its current progress. Click a case to open it. The **Active case** in the client's row is also
+a link straight to that case. Click **Visa Check** on a client's row to jump straight to the Visa
 Advisor pre-filled for that client, or **Edit** to update their profile.
 
 ## Importing clients (CSV)
