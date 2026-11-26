@@ -33,6 +33,13 @@ describe('buildEligibilityRequest', () => {
     expect(wire).not.toContain('1998');
   });
 
+  it('uses an age entered directly (the homepage trial) over the date of birth', () => {
+    const trial = { ...inputs, clientInfo: { ...inputs.clientInfo, fullName: '', dob: '', age: 31 } };
+    expect(buildEligibilityRequest(trial, today).clientInfo.age).toBe(31);
+    const blank = { ...inputs, clientInfo: { ...inputs.clientInfo, dob: '', age: null } };
+    expect(buildEligibilityRequest(blank, today).clientInfo.age).toBeNull();
+  });
+
   it('passes server-side validation as-is', () => {
     expect(validateEligibilityInput(buildEligibilityRequest(inputs, today)).ok).toBe(true);
   });

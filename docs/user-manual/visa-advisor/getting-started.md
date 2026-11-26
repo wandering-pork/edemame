@@ -83,3 +83,18 @@ to **View eligibility assessment** in the case's **Case actions** menu — see
 
 This assessment is general information about visa pathways, not immigration advice — eligibility is
 ultimately assessed by the Department of Home Affairs at lodgement.
+
+## Coming from the free trial on the homepage
+
+The homepage has a free **Try out our Visa Advisor** check (in its Visa Advisor section, or at
+`/try/visa-advisor`). It asks the same questions without a name or date of birth (an age instead),
+and shows only a teaser: for an agent checking a client, the best-fit visa and its verdict; for
+someone checking for themselves, their top matches and a link to the government's register of
+migration agents. There are 3 free checks a day.
+
+If you create an account (or log in) from the trial, the answers come with you. Open **Visa
+Advisor** and you'll see "Your scenario from the homepage is filled in": add the client's name on
+step 1, check the other steps, and click **Get Assessment** for the full report. **Start fresh
+instead** clears the trial answers. If you land somewhere else first (for example after confirming
+your email), a banner offers **Continue in the Visa Advisor**. The trial answers are kept on that
+device for 24 hours and are cleared when you sign out.

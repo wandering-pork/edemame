@@ -103,7 +103,7 @@ export interface ActivityEvent {
   createdAt: string; // ISO
 }
 
-export type UsageEventType = 'eligibility_check' | 'case_created' | 'client_created' | 'team_member_added';
+export type UsageEventType = 'eligibility_check' | 'case_created' | 'client_created' | 'team_member_added' | 'trial_converted';
 
 export interface UsageEvent {
   id: string;
@@ -118,6 +118,7 @@ export interface UsageEvent {
     candidatesTokens?: number;   // eligibility_check
     totalTokens?: number;        // eligibility_check
     estimatedCostUsd?: number;   // eligibility_check (placeholder pricing, see api/_lib/aiPricing.ts)
+    trialAudience?: 'client' | 'self'; // trial_converted: who the homepage trial was for (VA.3)
   };
   createdAt: string; // ISO
 }
@@ -397,6 +398,8 @@ export interface EligibilityAssessmentInputs {
   clientInfo: {
     fullName: string;
     dob: string;
+    /** Age in whole years, entered directly where no date of birth is asked (the homepage trial). */
+    age?: number | null;
     nationality: string;
     inAustralia: boolean;
     currentVisaStatus: string;

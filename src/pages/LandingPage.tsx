@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { validateNewPassword } from '@/lib/passwordValidation';
+import { TryAdvisorSheet } from '@/components/landing/TryAdvisorSheet';
 
 /**
  * Edamame landing page — take four, "edamame-folio".
@@ -145,6 +146,9 @@ const START_CHAPTER: Chapter = { id: 'start', numeral: 'VI', short: 'Start', tit
 
 const NAME_MAX_LENGTH = 100;
 
+/** The homepage's free Visa Advisor trial (VA.2b). Off until the owner turns it on, with the endpoint's TRY_ADVISOR_ENABLED. */
+const TRY_ADVISOR_ENABLED = import.meta.env.VITE_TRY_ADVISOR_ENABLED === 'true';
+
 /* ------------------------------------------------------------------ hooks */
 
 function useMediaQuery(query: string) {
@@ -221,6 +225,30 @@ export default function LandingPage() {
     sheetOpenerRef.current = null;
   }, []);
 
+  /* --------------------------------------------- the Visa Advisor trial */
+  const [tryOpen, setTryOpen] = useState(false);
+  const tryOpenerRef = useRef<HTMLElement | null>(null);
+
+  const openTry = useCallback(
+    (e?: React.MouseEvent<HTMLElement>) => {
+      // Signed in already: the full Visa Advisor, not the teaser.
+      if (user) {
+        navigate('/visa-advisor');
+        return;
+      }
+      tryOpenerRef.current = (e?.currentTarget as HTMLElement) ?? null;
+      setTryOpen(true);
+    },
+    [user, navigate],
+  );
+
+  const closeTry = useCallback(() => {
+    setTryOpen(false);
+    tryOpenerRef.current?.focus();
+    tryOpenerRef.current = null;
+    if (location.pathname === '/try/visa-advisor') navigate('/', { replace: true });
+  }, [location.pathname, navigate]);
+
   const handleLogIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setInError(null);
@@ -287,7 +315,10 @@ export default function LandingPage() {
   /* --- /login and /register keep working as deep links into this page --- */
   useEffect(() => {
     if (user) return;
-    if (location.pathname === '/login') {
+    if (location.pathname === '/try/visa-advisor' && TRY_ADVISOR_ENABLED) {
+      tryOpenerRef.current = null;
+      setTryOpen(true);
+    } else if (location.pathname === '/login') {
       sheetOpenerRef.current = null;
       setSheetOpen(true);
     } else if (location.pathname === '/register') {
@@ -1249,6 +1280,13 @@ export default function LandingPage() {
           .fl-sheet, .fl-sheet__panel { animation: none; }
         }
 
+        /* ------------------------------------- the Visa Advisor trial entry */
+        .fl-try-entry {
+          display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+          margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--rule-soft); max-width: 46ch;
+        }
+        .fl-try-entry__note { font-size: 14px; line-height: 1.55; color: var(--ink-soft); }
+
         /* ------------------------------------------------------- colophon */
         .fl-colophon {
           background: var(--paper-2); padding: clamp(70px, 10vh, 120px) clamp(24px, 5vw, 84px) clamp(46px, 6vh, 70px);
@@ -1434,21 +1472,32 @@ export default function LandingPage() {
                     answers per pathway rather than with a single score.
                   </p>
                   <p className="fl-p">
-                    A four-step intake collects the personal details, the immigration
-                    goal, the conditional specifics that goal implies, and the
-                    supporting factors. Then it assesses.
+                    A three-step intake covers who the person is, what they want (with
+                    the specifics that goal implies), and what they bring. Then it
+                    assesses.
                   </p>
+                  {TRY_ADVISOR_ENABLED && (
+                    <div className="fl-try-entry">
+                      <button type="button" className="fl-btn" onClick={openTry}>
+                        Try out our Visa Advisor
+                      </button>
+                      <span className="fl-try-entry__note">
+                        Free, no account needed. For agents checking a client, or for anyone
+                        weighing up a visa for Australia.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
                   <h3 className="fl-h2" style={{ fontSize: 'clamp(1.4rem, 2.3vw, 1.9rem)' }}>
-                    Nine subclasses, assessed at once
+                    Ten subclasses, assessed at once
                   </h3>
                   <p className="fl-p">
-                    Skilled Independent 189, Skilled Nominated 190, Temporary Skill
-                    Shortage 482, Employer Nomination 186, Student 500, Partner
-                    820/801, Temporary Graduate 485, Visitor 600, and Working
-                    Holiday 417.
+                    Skilled Independent 189, Skilled Nominated 190, Skills in Demand
+                    482, Employer Nomination 186, Student 500, Partner 820/801,
+                    Temporary Graduate 485, Visitor 600, Working Holiday 417, and
+                    Skilled Work Regional 491.
                   </p>
                 </div>
 
@@ -1478,7 +1527,7 @@ export default function LandingPage() {
 
                 <p className="fl-cap" style={{ marginTop: 8, maxWidth: '46ch' }}>
                   Built for registered migration agents and immigration lawyers.
-                  It is not a substitute for professional migration advice —
+                  The free trial gives general information, not immigration advice:
                   AU and NZ immigration advice is regulated.
                 </p>
               </div>
@@ -2004,6 +2053,9 @@ export default function LandingPage() {
           </div>
         </footer>
       </div>
+
+      {/* ------------------------------------------ the Visa Advisor trial */}
+      {TRY_ADVISOR_ENABLED && <TryAdvisorSheet open={tryOpen && !user} onClose={closeTry} />}
 
       {/* --------------------------------------------------- the login sheet */}
       {sheetOpen && !user && (

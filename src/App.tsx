@@ -45,6 +45,7 @@ import { InviteAccept } from './pages/InviteAccept';
 import { ResetPassword } from './pages/ResetPassword';
 import { LinkFolderGate } from './components/LinkFolderGate';
 import { PendingInvitationsBanner } from './components/team/PendingInvitationsBanner';
+import { TrialScenarioBanner } from './components/TrialScenarioBanner';
 import { isSupabaseConfigured, supabase } from './lib/supabaseClient';
 import { shouldNotifyAssignment } from './lib/assignmentNotify';
 import { describePlanSource, buildTaskPlanSummary } from './lib/planActivity';
@@ -850,6 +851,10 @@ const AppShell: React.FC = () => {
     });
   }, [pushUsageEvent]);
 
+  const handleTrialConverted = useCallback((audience: 'client' | 'self') => {
+    pushUsageEvent({ type: 'trial_converted', metadata: { trialAudience: audience } });
+  }, [pushUsageEvent]);
+
   const handleUpdateClient = useCallback(async (updatedClient: Client) => {
     await repos.clients.update(updatedClient);
     setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
@@ -896,6 +901,7 @@ const AppShell: React.FC = () => {
             onMoveTaskDate={handleMoveTaskDate}
           />
           <PendingInvitationsBanner />
+          <TrialScenarioBanner />
           {lostAccessNotice && (
             <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-ink/15 bg-paper-2 px-4 py-3 text-sm text-ink-soft dark:border-plate-ink/20 dark:bg-plate-card dark:text-plate-ink-soft">
               <span>{lostAccessNotice}</span>
@@ -980,6 +986,7 @@ const AppShell: React.FC = () => {
                 templates={templates}
                 cases={cases}
                 onEligibilityChecked={handleEligibilityChecked}
+                onTrialConverted={handleTrialConverted}
                 onAddClient={handleAddClient}
                 onDeleteClient={handleDeleteClient}
                 onTasksConfirmed={handleTasksConfirmed}
@@ -1126,6 +1133,7 @@ interface VisaAdvisorRouteProps {
   templates: WorkflowTemplate[];
   cases: Case[];
   onEligibilityChecked: (usage: { promptTokens: number; candidatesTokens: number; totalTokens: number; estimatedCostUsd: number }) => void;
+  onTrialConverted: (audience: 'client' | 'self') => void;
   onAddClient: (client: Client) => Promise<void>;
   onDeleteClient: (id: string) => Promise<void>;
   onTasksConfirmed: (tasks: Task[], newCase: Case) => Promise<void>;
@@ -1179,6 +1187,7 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
       cases={props.cases}
       onOpenNewCase={handleOpenNewCase}
       onEligibilityChecked={props.onEligibilityChecked}
+      onTrialConverted={props.onTrialConverted}
     />
   );
 };
@@ -1328,6 +1337,8 @@ const AppRoutes: React.FC = () => {
           redirects (ProtectedRoute, sign-out) and shared links still work. */}
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
       <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+      {/* The homepage's free Visa Advisor trial, opened in its sheet (VA.2b); signed in, the full advisor. */}
+      <Route path="/try/visa-advisor" element={user ? <Navigate to="/visa-advisor" replace /> : <LandingPage />} />
       {/* Fully public, and deliberately outside ProtectedRoute/ProfileProvider: the
           Supabase recovery link signs the visitor in via a short-lived recovery
           session (see pages/ResetPassword.tsx), which would otherwise get bounced
