@@ -4,11 +4,14 @@
 
 Opening a case lands you on the **Overview** tab — a one-screen summary of where the case is up to:
 
-- **Task progress** and **Document checklist** — two rings across the top. Task progress shows how
-  many of the case's tasks are done, the current stage (for example "Stage 2 of 6") and the next
-  task, with **Open Tasks**. Document checklist shows how many documents are in, how many are still
-  to collect, and how many are verified, linked or pending, with **Open Document Checklist** (or
-  **Generate checklist** if the case has none yet).
+- **Top row: two rings and Case info.** The **Task progress** ring shows how many of the case's
+  tasks are done. Next to it is **Next up**, the case's next task, with its stage (for example
+  "Ready to lodge, stage 3 of 5", counted the same way as the Stage chip under the case title) and
+  its date, and **Open task**. With no open tasks it says so and links to the Tasks tab instead.
+  The **Document checklist** ring shows how many documents are in and how many are still to
+  collect, and once any are in, how many are verified and how many are linked but not yet verified.
+  **Open Document Checklist** opens the Document Checklist tab (or **Generate checklist** if the
+  case has none yet).
 - **Progress path** — under the rings, one chevron per **stage** of the case's journey
   (Consultation, Prerequisites, Preparing for lodgement, …; see Configuration → Stages), in stage
   order. Finished stages are pale green with a tick, the **current stage** (the stage of the current
@@ -16,20 +19,21 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
   still shown, so you can see the whole journey. Each chevron shows how many of its tasks are done.
   A case on hold shows a pause sign on the current stage; a closed case shows its outcome (Granted,
   Refused, …) at the end.
-  **Click a stage to see its tasks** in the panel underneath: the stage name, how many tasks are
-  done and their date range, then the tasks themselves (finished ones struck through, waiting ones
-  in amber). Clicking a stage never changes anything. Use the left and right arrow keys to move
+  **Click a stage to see its tasks** in the panel underneath: the stage name and its date range
+  ("(estimated)" if the dates are estimates), then the tasks themselves (finished ones struck
+  through, waiting ones in amber). Clicking a stage never changes anything. Use the left and right arrow keys to move
   between stages. On a narrow window the chevrons become a **Stage** picker.
-  For the current stage the panel also shows **Next up** — the current task, with **Open task** —
-  and a **Mark stage complete** button. It asks you to confirm first, listing the open tasks it will
+  For the current stage the next task is highlighted in the list, and the panel has a
+  **Mark stage complete** button. It asks you to confirm first, listing the open tasks it will
   mark done. Tasks waiting on the client or a third party stay open unless you tick **Mark these
   done too**; tasks already done or not applicable aren't touched. After **Mark N tasks done**, the
   next stage becomes current and any estimated dates after it are recalculated. **Undo** on the
   confirmation message (for about 10 seconds) puts the tasks back as they were.
   Older cases whose tasks have no stage at all show the case lifecycle stages instead (display only)
   with the case's task list underneath.
-- **Case info** — client (and applicant, if different), visa subclass (with substream, if set) and work plan, case owner,
-  stage, next deadline (click it to jump to the Deadlines panel), and the date the case was opened.
+- **Case info** (top right) — client (and applicant, if different), visa subclass (with substream,
+  if set), case owner, and the date the case was opened. The stage and the next deadline aren't
+  repeated here; they're in the summary strip under the case title.
   **Edit** opens the Edit case form, where you can change the title, description, **Visa Subclass**
   and **Substream** (or set the subclass to **Not Confirmed** while the visa is still undecided).
   Changing the subclass to a real one — from blank, Not Confirmed, or a different subclass — opens
@@ -39,14 +43,11 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
   are added (dated from today, each in its stage) and the new subclass is saved; the plan becomes
   the case's work plan. **Cancel** changes nothing. Changing the subclass back to blank or Not
   Confirmed just saves, with no window.
-  The **Stage** here is read-only: it's the stage of the current task (see below), the same as the
-  Stage chip in the summary strip under the case title. To close or reopen a case, use **Case actions**.
-- **Stage** (in Case info) — read-only; the stage of the current task, so it always matches the
-  progress path, the groups on the Tasks tab and the Stage chip in the summary strip. It moves on its own as tasks are
-  done. A closed case shows **Closed**.
-- **Checklist by category** — one bar per checklist category showing how many items are verified
-  (dark green), linked (lighter green), pending, or waived. Click a category (or **Open**) to open the
-  Document Checklist tab. If the case has no checklist yet, use **Generate one**.
+  To close or reopen a case, use **Case actions**.
+- **Checklist by category** — across the bottom, one bar per checklist category showing how many
+  items are verified (dark green), linked (lighter green), pending, or waived (grey). The counts
+  under a bar appear once something in that category is in. Click a category to open the Document
+  Checklist tab. This card only appears once the case has a checklist.
 
 Case files aren't listed on the Overview; they're all on the **Case files** tab.
 

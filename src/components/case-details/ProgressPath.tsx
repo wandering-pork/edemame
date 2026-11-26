@@ -8,6 +8,7 @@ import type { TimelineEntry } from '../../lib/caseOverview';
 import {
   applyStageCompletion,
   stageCompletionPlan,
+  stagePosition,
   taskCountLabel,
   type PathStage,
   type PathStageState,
@@ -32,6 +33,7 @@ function dateRange(stage: PathStage): string | null {
   const range = stage.startDate === stage.endDate
     ? fmtDate(stage.startDate)
     : `${fmtDate(stage.startDate)} to ${fmtDate(stage.endDate)}`;
+  if (stage.allEstimated) return `${range} (estimated)`;
   return stage.estimated ? `${range} (some estimated)` : range;
 }
 
@@ -271,7 +273,7 @@ const StagePath: React.FC<ProgressPathProps & { stages: PathStage[] }> = ({
   const canComplete = !closed && selected.state === 'current' && plan.toClose.length + plan.waiting.length > 0;
   const showCurrentTask = selected.state === 'current' && currentTask && selected.tasks.some(t => t.id === currentTask.id);
   const range = dateRange(selected);
-  const position = stages.indexOf(selected) + 1;
+  const position = stagePosition(stages, selected);
   const outcomeLabel = closed && outcome ? OUTCOME_LABELS[outcome] : null;
 
   return (
@@ -338,7 +340,7 @@ const StagePath: React.FC<ProgressPathProps & { stages: PathStage[] }> = ({
       {/* ── Narrow screens: a stage picker instead of chevrons ── */}
       <div className="md:hidden px-4 pt-4">
         <label htmlFor="stage-picker" className="block text-[11.5px] text-ink-faint dark:text-plate-ink-faint mb-1">
-          Stage {position} of {stages.length}{outcomeLabel ? ` · ${outcomeLabel}` : ''}
+          {position ? `Stage ${position.n} of ${position.of}` : 'Stage'}{outcomeLabel ? ` · ${outcomeLabel}` : ''}
         </label>
         <select
           id="stage-picker"
@@ -362,7 +364,7 @@ const StagePath: React.FC<ProgressPathProps & { stages: PathStage[] }> = ({
             <p className="text-[12px] text-ink-faint dark:text-plate-ink-faint">
               {selected.total === 0
                 ? 'No tasks in this stage yet.'
-                : `${selected.done} of ${taskCountLabel(selected.total)} done${range ? ` · ${range}` : ''}`}
+                : range ?? taskCountLabel(selected.total)}
               {selected.state === 'current' && onHold && (
                 <span className="ml-2 inline-flex items-center gap-1 font-bold text-amber-700 dark:text-amber-300">
                   <Pause size={11} aria-hidden /> Case on hold
@@ -392,33 +394,11 @@ const StagePath: React.FC<ProgressPathProps & { stages: PathStage[] }> = ({
           />
         )}
 
-        {showCurrentTask && currentTask && (
-          <div className="mt-3 flex items-center gap-4 flex-wrap rounded-lg border-l-4 border-l-edamame-700 bg-paper dark:bg-plate px-3.5 py-3">
-            <div className="min-w-0">
-              <div className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint">Next up</div>
-              <div className="text-[16px] font-bold text-ink dark:text-plate-ink tracking-tight truncate">{currentTask.title}</div>
-              <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft">
-                {currentTask.datePending ? 'Estimated' : 'Due'} {fmtDate(currentTask.date)}
-                {currentTask.status !== 'not_started' && ` · ${TASK_STATUS_LABELS[currentTask.status]}`}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onOpenTask(currentTask)}
-              className="btn-press ml-auto px-3.5 py-1.5 bg-edamame-700 hover:bg-edamame-800 text-white font-bold rounded-lg text-xs transition-colors"
-            >
-              Open task
-            </button>
-          </div>
-        )}
-
         {selected.tasks.length > 0 ? (
           <ul className="mt-2 -mx-3">
-            {selected.tasks
-              .filter(t => !(showCurrentTask && currentTask && t.id === currentTask.id))
-              .map(t => (
-                <TaskRow key={t.id} task={t} isCurrent={false} onOpen={onOpenTask} />
-              ))}
+            {selected.tasks.map(t => (
+              <TaskRow key={t.id} task={t} isCurrent={!!showCurrentTask && t.id === currentTask?.id} onOpen={onOpenTask} />
+            ))}
           </ul>
         ) : (
           <p className="mt-2 text-[12.5px] text-ink-soft dark:text-plate-ink-soft">

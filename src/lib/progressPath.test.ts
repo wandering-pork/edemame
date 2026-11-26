@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { NOT_CONFIRMED_SUBCLASS, type CasePhase, type Task } from '../types';
 import { ensureSystemCasePhases } from './casePhases';
 import { buildCasePhaseView } from './phaseGrouping';
-import { applyStageCompletion, pathStages, stageCompletionPlan } from './progressPath';
+import { applyStageCompletion, pathStages, stageCompletionPlan, stagePosition } from './progressPath';
 
 const phases = async (): Promise<CasePhase[]> => {
   let rows: CasePhase[] = [];
@@ -39,6 +39,22 @@ describe('pathStages', () => {
     const prereq = stages[1];
     expect(prereq).toMatchObject({ done: 0, total: 2, startDate: '2026-11-02', endDate: '2026-11-20', estimated: true });
     expect(stages[2]).toMatchObject({ total: 0, startDate: null, estimated: false });
+    expect(prereq.allEstimated).toBe(false);
+  });
+
+  it('counts stage position among stages with tasks only, like the header chip', async () => {
+    const ps = await phases();
+    const tasks = [
+      task({ phase: 'consultation', status: 'done', isCompleted: true, date: '2026-10-01' }),
+      task({ phase: 'ready_to_lodge', date: '2026-11-02', datePending: true }),
+      task({ phase: 'lodged', date: '2027-01-10' }),
+    ];
+    const stages = pathStages(buildCasePhaseView(tasks, ps), ps)!;
+    const current = stages.find(s => s.state === 'current')!;
+    expect(current.ref).toBe('ready_to_lodge');
+    expect(stagePosition(stages, current)).toEqual({ n: 2, of: 3 });
+    expect(current.allEstimated).toBe(true);
+    expect(stagePosition(stages, stages.find(s => s.state === 'empty')!)).toBeNull();
   });
 
   it('leaves out hidden stages unless the case has tasks in them', async () => {

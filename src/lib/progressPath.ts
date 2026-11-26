@@ -24,6 +24,19 @@ export interface PathStage {
   endDate: string | null;
   /** True when any open task in the stage has an estimated (`datePending`) date. */
   estimated: boolean;
+  /** True when every task in the stage has an estimated date (so "(estimated)", not "(some estimated)"). */
+  allEstimated: boolean;
+}
+
+/**
+ * "Stage 3 of 5": the position among stages that have tasks, the same count as
+ * the header's Stage chip (lib/caseStageSync.ts's phaseStagePositionLabel), so
+ * the two never disagree. Null for a stage with no tasks.
+ */
+export function stagePosition(stages: PathStage[], stage: PathStage): { n: number; of: number } | null {
+  const withTasks = stages.filter(s => s.total > 0);
+  const i = withTasks.indexOf(stage);
+  return i === -1 ? null : { n: i + 1, of: withTasks.length };
 }
 
 /**
@@ -65,6 +78,7 @@ export function pathStages(
       startDate: dates[0] ?? null,
       endDate: dates[dates.length - 1] ?? null,
       estimated: tasks.some(t => !isTaskClosed(t) && !!t.datePending),
+      allEstimated: tasks.length > 0 && tasks.every(t => !!t.datePending),
     };
   });
 }

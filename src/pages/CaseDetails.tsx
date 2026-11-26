@@ -1178,6 +1178,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- Render ----
   const needsOutcomePrompt = currentCase.stage === 'closed' && !currentCase.outcome;
+  // Most titles already end in the client's name ("... - brad bird"); don't repeat it after the comma.
+  const titleNamesClient = !!client.name.trim() && currentCase.title.toLowerCase().includes(client.name.trim().toLowerCase());
 
   const tabToolBtnCls = 'inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors';
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
@@ -1200,11 +1202,13 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         </button>
         <div className="flex-1 min-w-0 flex items-center gap-3">
           <h1
-            title={`${currentCase.title}, ${client.name}`}
+            title={titleNamesClient ? currentCase.title : `${currentCase.title}, ${client.name}`}
             className="text-[17px] font-bold text-ink dark:text-plate-ink tracking-tight min-w-0 truncate"
           >
             {currentCase.title}
-            <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">, {client.name}</span>
+            {!titleNamesClient && (
+              <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">, {client.name}</span>
+            )}
           </h1>
           <span className="flex-shrink-0 font-mono text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{displayCaseNumber(currentCase)}</span>
           {visaSubclass && (
@@ -1384,7 +1388,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               applicant={applicant}
               visaSubclass={visaSubclass}
               visaSubstream={currentCase.visaSubstream}
-              phaseView={phaseView}
               pathStages={progressStages}
               closed={currentCase.stage === 'closed'}
               outcome={currentCase.outcome}
@@ -1392,13 +1395,9 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               templateTitle={workflowTemplate?.title}
               ownerName={ownerName}
               openedAt={currentCase.startDate || currentCase.createdAt}
-              nextDeadline={nextDeadline}
               description={currentCase.description}
               onEditCase={openEditCase}
-              onOpenDeadlines={() => openOrFocusTab('tasks')}
               checklistRows={checklistRows}
-              checklistTotal={checklist.length}
-              checklistDone={uploadedCount}
               onOpenChecklist={() => openOrFocusTab('checklist')}
               onGenerateChecklist={() => openOrFocusTab('checklist-generator')}
             />

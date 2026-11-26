@@ -1,7 +1,8 @@
 import React from 'react';
 import type { Task } from '../../types';
 import type { ChecklistCategorySummary } from '../../lib/caseOverview';
-import type { PathStage } from '../../lib/progressPath';
+import { format } from 'date-fns';
+import { stagePosition, type PathStage } from '../../lib/progressPath';
 
 /**
  * The two headline figures at the top of the Overview: task progress and the
@@ -64,6 +65,7 @@ interface ProgressRingsProps {
   currentTask: Task | null;
   closed: boolean;
   onOpenTasks: () => void;
+  onOpenTask: (task: Task) => void;
 
   checklistRows: ChecklistCategorySummary[];
   onOpenChecklist: () => void;
@@ -71,39 +73,52 @@ interface ProgressRingsProps {
 }
 
 export const ProgressRings: React.FC<ProgressRingsProps> = ({
-  tasksDone, tasksTotal, stages, currentTask, closed, onOpenTasks,
+  tasksDone, tasksTotal, stages, currentTask, closed, onOpenTasks, onOpenTask,
   checklistRows, onOpenChecklist, onGenerateChecklist,
 }) => {
   const sum = (key: 'verified' | 'linked' | 'pending' | 'waived' | 'total') => checklistRows.reduce((n, r) => n + r[key], 0);
   const verified = sum('verified');
   const linked = sum('linked');
-  const pending = sum('pending');
   const needed = sum('total') - sum('waived');
   const docsIn = verified + linked;
 
   const current = stages?.find(s => s.state === 'current');
-  const position = current && stages ? stages.indexOf(current) + 1 : null;
+  const position = current && stages ? stagePosition(stages, current) : null;
 
+  // The headline is the next task; the stage name lives on the path and in
+  // the header's Stage chip, so here it is only context underneath.
+  let taskLabel = 'Task progress';
   let taskHeadline: string;
-  let taskSub: string | null;
+  let taskSub: string | null = null;
   if (tasksTotal === 0) { taskHeadline = 'No tasks yet'; taskSub = 'Plan tasks to track progress here.'; }
   else if (closed) { taskHeadline = 'Case closed'; taskSub = `${tasksDone} of ${tasksTotal} tasks done`; }
-  else if (!currentTask) { taskHeadline = 'All tasks done'; taskSub = null; }
-  else if (current && position) { taskHeadline = current.name; taskSub = `Stage ${position} of ${stages!.length} · next up ${currentTask.title}`; }
-  else { taskHeadline = currentTask.title; taskSub = 'Next up'; }
+  else if (!currentTask) { taskHeadline = 'All tasks done'; }
+  else {
+    taskLabel = 'Next up';
+    taskHeadline = currentTask.title;
+    const d = new Date(currentTask.date);
+    const when = Number.isNaN(d.getTime()) ? null : `${currentTask.datePending ? 'Est.' : 'Due'} ${format(d, 'd MMM')}`;
+    const where = current && position ? `${current.name}, stage ${position.n} of ${position.of}` : null;
+    taskSub = [where, when].filter(Boolean).join(' · ') || null;
+  }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+    // Two grid cells: the parent (CaseOverview) owns the grid, so case info can sit in the same row.
+    <>
       <section className={cardCls} aria-label="Task progress">
         <Ring primary={tasksDone} total={tasksTotal}><Fraction n={tasksDone} of={tasksTotal} /></Ring>
         <div className="min-w-0">
-          <div className={labelCls}>Task progress</div>
+          <div className={labelCls}>{taskLabel}</div>
           <div className={headlineCls}>{taskHeadline}</div>
           {taskSub && <div className={`${subCls} truncate`}>{taskSub}</div>}
           <span className="sr-only">{tasksDone} of {tasksTotal} tasks done.</span>
-          <button type="button" onClick={onOpenTasks} className={linkCls}>
-            {tasksTotal === 0 ? 'Plan tasks' : 'Open Tasks'}
-          </button>
+          {currentTask && !closed ? (
+            <button type="button" onClick={() => onOpenTask(currentTask)} className={linkCls}>Open task</button>
+          ) : (
+            <button type="button" onClick={onOpenTasks} className={linkCls}>
+              {tasksTotal === 0 ? 'Plan tasks' : 'Open Tasks'}
+            </button>
+          )}
         </div>
       </section>
 
@@ -123,20 +138,29 @@ export const ProgressRings: React.FC<ProgressRingsProps> = ({
                 {needed - docsIn === 0 ? 'All documents in' : `${needed - docsIn} document${needed - docsIn === 1 ? '' : 's'} to collect`}
               </div>
               <div className={`${subCls} flex items-center gap-x-3 gap-y-0.5 flex-wrap`}>
-                <span className="inline-flex items-center gap-1.5">
-                  <i aria-hidden className="w-2.5 h-2.5 rounded-full bg-edamame-800 dark:bg-edamame-400" />{verified} verified
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <i aria-hidden className="w-2.5 h-2.5 rounded-full bg-edamame-500 dark:bg-edamame-800" />{linked} linked
-                </span>
-                <span>{pending} pending</span>
+                {docsIn === 0 ? (
+                  <span>None in yet</span>
+                ) : (
+                  <>
+                    {verified > 0 && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <i aria-hidden className="w-2.5 h-2.5 rounded-full bg-edamame-800 dark:bg-edamame-400" />{verified} verified
+                      </span>
+                    )}
+                    {linked > 0 && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <i aria-hidden className="w-2.5 h-2.5 rounded-full bg-edamame-500 dark:bg-edamame-800" />{linked} linked, not yet verified
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
               <button type="button" onClick={onOpenChecklist} className={linkCls}>Open Document Checklist</button>
             </>
           )}
         </div>
       </section>
-    </div>
+    </>
   );
 };
 

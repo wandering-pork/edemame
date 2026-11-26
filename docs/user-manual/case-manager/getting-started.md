@@ -84,8 +84,8 @@ A case's **Stage** follows its tasks — you don't set it by hand. It's the stag
 current task (the first task that isn't done yet), the same stages the **Tasks** tab groups tasks
 into (Consultation, Prerequisites, Preparing for lodgement, Ready to lodge, Lodged, Decision,
 Post-decision, plus any your firm added — see Configuration → Stages). The summary strip shows it as
-"Stage N of M · Name", where M counts only the stages this case has tasks in, and Case info on the
-Overview shows the same name. Completing tasks moves the stage forward; reopening an earlier task
+"Stage N of M · Name", where M counts only the stages this case has tasks in; the Overview's
+progress path and Next up line use the same name and count. Completing tasks moves the stage forward; reopening an earlier task
 moves it back. Once every task is done the case stays at its last stage until you close it. Older
 cases whose tasks have no stages at all keep showing the stage they were already at.
 
@@ -166,10 +166,10 @@ Everything that used to be in this menu now has one home elsewhere:
 
 ## Landing on the Overview tab
 
-Every time you open a case, you land on the **Overview** tab: two rings across the top (**Task
-progress** and **Document checklist**), then the progress path (every stage of the case, with the
-selected stage's tasks and **Mark stage complete** for the current one underneath), then case info
-and the checklist by category. Click **Ask Edie** in the case
+Every time you open a case, you land on the **Overview** tab: two rings (**Task progress** with the
+next task, and **Document checklist**) and case info across the top, then the progress path (every
+stage of the case, with the selected stage's tasks and **Mark stage complete** for the current one
+underneath), then the checklist by category. Click **Ask Edie** in the case
 header (or press **Ctrl+J**) for suggested next steps, AI skills and the case chat. See
 [Overview, Edie, and tabs](./workspace-and-tabs.md) for how the Overview, Edie and the case's tabs
 work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
