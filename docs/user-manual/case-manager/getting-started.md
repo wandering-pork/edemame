@@ -166,19 +166,19 @@ Everything that used to be in this menu now has one home elsewhere:
 
 ## Landing on the Overview tab
 
-Every time you open a case, you land on the **Overview** tab: the progress path across the top
-(every stage of the case, with the selected stage's tasks and **Mark stage complete** for the
-current one underneath), then case info and recent case files on the left and the document
-checklist (an overall donut plus a bar per category) on the right. Click **Ask Edie** in the case
+Every time you open a case, you land on the **Overview** tab: two rings across the top (**Task
+progress** and **Document checklist**), then the progress path (every stage of the case, with the
+selected stage's tasks and **Mark stage complete** for the current one underneath), then case info
+and the checklist by category. Click **Ask Edie** in the case
 header (or press **Ctrl+J**) for suggested next steps, AI skills and the case chat. See
 [Overview, Edie, and tabs](./workspace-and-tabs.md) for how the Overview, Edie and the case's tabs
 work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
 
 Every file attached to the case is on the **Case files** tab, where you can upload, preview,
-download, and delete them (also reachable from **View all files** on the Overview). The **Case files** tab also has the
+download, and delete them (the tab after **Tasks**). The **Case files** tab also has the
 document tools: **Compress documents**, **Run Crusher** (supported subclasses) and **820 Bundle
-Builder** (subclass 820). To link files to checklist items, open the **Checklist** tab and click
+Builder** (subclass 820). To link files to checklist items, open the **Document Checklist** tab and click
 **Case Files** to show the files beside the checklist, then drag a file onto an item (see Document
 Checklist doc above).
 

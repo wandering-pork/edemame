@@ -275,7 +275,7 @@ const StagePath: React.FC<ProgressPathProps & { stages: PathStage[] }> = ({
   const outcomeLabel = closed && outcome ? OUTCOME_LABELS[outcome] : null;
 
   return (
-    <section aria-label="Case progress" className="rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card shadow-sm">
+    <section aria-label="Task progress" className="rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card shadow-sm">
       {/* ── Wide screens: the chevron row ── */}
       <div className="hidden md:block px-[18px] pt-[18px]">
         <div className="flex items-stretch gap-3">
@@ -445,7 +445,7 @@ const LifecyclePath: React.FC<ProgressPathProps> = ({
   const currentIndex = CASE_STAGE_STEPPER.indexOf(stage);
   const outcomeLabel = closed && outcome ? OUTCOME_LABELS[outcome] : null;
   return (
-    <section aria-label="Case progress" className="rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card shadow-sm p-[18px]">
+    <section aria-label="Task progress" className="rounded-xl border border-ink/15 dark:border-plate-ink/20 bg-paper-2 dark:bg-plate-card shadow-sm p-[18px]">
       <ol className="hidden md:grid" style={{ gridTemplateColumns: `repeat(${CASE_STAGE_STEPPER.length}, minmax(0, 1fr))` }}>
         {CASE_STAGE_STEPPER.map((s, i) => {
           const state: PathStageState = closed || i < currentIndex ? 'done' : i === currentIndex ? 'current' : 'upcoming';

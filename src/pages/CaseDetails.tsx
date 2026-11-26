@@ -144,7 +144,7 @@ const CASE_FIXED_TABS: { kind: CaseTabKind; label: string }[] = [
   { kind: 'workspace', label: 'Overview' },
   { kind: 'tasks', label: 'Tasks' },
   { kind: 'documents', label: 'Case files' },
-  { kind: 'checklist', label: 'Checklist' },
+  { kind: 'checklist', label: 'Document Checklist' },
   { kind: 'notes', label: 'Notes' },
 ];
 
@@ -1401,15 +1401,6 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               checklistDone={uploadedCount}
               onOpenChecklist={() => openOrFocusTab('checklist')}
               onGenerateChecklist={() => openOrFocusTab('checklist-generator')}
-              documents={documents}
-              caseId={currentCase.id}
-              onOpenDocument={handleChecklistPreview}
-              onViewAllFiles={() => openOrFocusTab('documents')}
-              onDocumentUploaded={(doc) => {
-                setDocuments(prev => [...prev, doc]);
-                setDocRefreshKey(k => k + 1);
-              }}
-              onRequestCompress={handleRequestCompress}
             />
           )}
 

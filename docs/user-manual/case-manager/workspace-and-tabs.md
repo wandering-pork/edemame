@@ -4,7 +4,12 @@
 
 Opening a case lands you on the **Overview** tab — a one-screen summary of where the case is up to:
 
-- **Progress path** — across the top, one chevron per **stage** of the case's journey
+- **Task progress** and **Document checklist** — two rings across the top. Task progress shows how
+  many of the case's tasks are done, the current stage (for example "Stage 2 of 6") and the next
+  task, with **Open Tasks**. Document checklist shows how many documents are in, how many are still
+  to collect, and how many are verified, linked or pending, with **Open Document Checklist** (or
+  **Generate checklist** if the case has none yet).
+- **Progress path** — under the rings, one chevron per **stage** of the case's journey
   (Consultation, Prerequisites, Preparing for lodgement, …; see Configuration → Stages), in stage
   order. Finished stages are pale green with a tick, the **current stage** (the stage of the current
   task) is solid green, stages still to come are grey, and stages with no tasks yet are faded but
@@ -39,12 +44,11 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
 - **Stage** (in Case info) — read-only; the stage of the current task, so it always matches the
   progress path, the groups on the Tasks tab and the Stage chip in the summary strip. It moves on its own as tasks are
   done. A closed case shows **Closed**.
-- **Document checklist** — a donut showing how many of the case's documents are in overall, then
-  one progress bar per checklist category showing how many items are verified, linked, pending, or
-  waived. Click a category (or **Open**) to open the Document Checklist tab. If the case has no
-  checklist yet, use **Generate one**.
-- **Recent case files** — the five most recently uploaded files, plus an upload area. Click a file
-  to preview it, or **View all files** to open the Case Files tab.
+- **Checklist by category** — one bar per checklist category showing how many items are verified
+  (dark green), linked (lighter green), pending, or waived. Click a category (or **Open**) to open the
+  Document Checklist tab. If the case has no checklist yet, use **Generate one**.
+
+Case files aren't listed on the Overview; they're all on the **Case files** tab.
 
 The tabs and the layout around them stay the same on every tab; switching tabs only changes the
 content below the tab row. To drag files onto checklist items, use the **Case Files** button on the
@@ -77,7 +81,7 @@ The panel has three parts:
 ## Tabs
 
 A row of tabs under the case header is always visible: **Overview**, **Tasks**, **Case files**,
-**Checklist**, and **Notes**. Tasks, Case files, and Checklist show a count. Click a tab to switch to
+**Document Checklist**, and **Notes**. Tasks, Case files, and Document Checklist show a count. Click a tab to switch to
 it.
 
 Document tools sit on the tab whose documents they work on, and open in their own window over the
@@ -85,7 +89,7 @@ case:
 
 - **Case files** tab: **Compress documents** (the Document Compressor), **Run Crusher** (supported
   subclasses only) and **820 Bundle Builder** (subclass 820 only).
-- **Checklist** tab: **Generate** (the Document Checklist Generator).
+- **Document Checklist** tab: **Generate** (the Document Checklist Generator).
  When you come back to a case, it reopens on the tab you
 were last using.
 

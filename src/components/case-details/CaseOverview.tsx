@@ -1,22 +1,16 @@
 import React from 'react';
-import { FileText, Image as ImageIcon, File as FileIcon, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
-import type { CaseOutcome, CaseStage, Client, Deadline, Document, Task } from '../../types';
+import type { CaseOutcome, CaseStage, Client, Deadline, Task } from '../../types';
 import { STAGE_META } from '../../lib/caseStage';
 import { caseStageName } from '../../lib/caseStageSync';
 import { DEADLINE_KIND_LABELS, daysLeft } from '../../lib/deadlines';
 import type { ChecklistCategorySummary, TimelineEntry } from '../../lib/caseOverview';
-import { DocumentUpload } from '../DocumentUpload';
 import { subclassShortLabel } from '../../lib/visaTypes';
 import type { CasePhaseView } from '../../lib/phaseGrouping';
 import type { PathStage } from '../../lib/progressPath';
 import { ProgressPath } from './ProgressPath';
-
-function fileIconFor(fileType: string) {
-  if (fileType.startsWith('image/')) return ImageIcon;
-  if (fileType === 'application/pdf' || fileType.includes('wordprocessing')) return FileText;
-  return FileIcon;
-}
+import { ProgressRings } from './ProgressRings';
 
 function fmtDate(iso: string, pattern = 'd MMM'): string {
   const d = new Date(iso);
@@ -49,44 +43,6 @@ const LinkButton: React.FC<{ onClick: () => void; children: React.ReactNode }> =
     {children}
   </button>
 );
-
-// ---------------------------------------------------------------------------
-// Checklist donut
-// ---------------------------------------------------------------------------
-
-const ChecklistDonut: React.FC<{ rows: ChecklistCategorySummary[] }> = ({ rows }) => {
-  const sum = (key: 'verified' | 'linked' | 'pending' | 'waived') => rows.reduce((n, r) => n + r[key], 0);
-  const total = rows.reduce((n, r) => n + r.total, 0);
-  const verified = sum('verified');
-  const linked = sum('linked');
-  const pending = sum('pending');
-  const waived = sum('waived');
-  const pct = (n: number) => (total ? (n / total) * 100 : 0);
-  // Verified → linked → waived → (pending as the empty track), matching the category bars.
-  const v = pct(verified);
-  const l = v + pct(linked);
-  const w = l + pct(waived);
-  const needed = total - waived;
-  return (
-    <div className="flex items-center gap-4 mb-4">
-      <div
-        aria-hidden
-        className="w-[84px] h-[84px] rounded-full flex items-center justify-center flex-shrink-0"
-        style={{
-          background: `conic-gradient(#29B767 0 ${v}%, #3b82f6 ${v}% ${l}%, #94a3b8 ${l}% ${w}%, rgba(127,127,127,0.15) ${w}% 100%)`,
-        }}
-      >
-        <div className="w-[58px] h-[58px] rounded-full bg-paper-2 dark:bg-plate-card flex items-center justify-center text-[13px] font-bold text-ink dark:text-plate-ink">
-          {verified + linked}/{needed}
-        </div>
-      </div>
-      <div className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint leading-relaxed">
-        <span className="block text-ink dark:text-plate-ink font-semibold">{verified + linked} of {needed} documents in</span>
-        {verified} verified · {linked} linked · {pending} pending{waived > 0 ? ` · ${waived} waived` : ''}
-      </div>
-    </div>
-  );
-};
 
 // ---------------------------------------------------------------------------
 // Overview
@@ -130,20 +86,14 @@ interface CaseOverviewProps {
   onOpenChecklist: () => void;
   onGenerateChecklist: () => void;
 
-  documents: Document[];
-  caseId: string;
-  onOpenDocument: (doc: Document) => void;
-  onViewAllFiles: () => void;
-  onDocumentUploaded: (doc: Document) => void;
-  onRequestCompress: (files: File[]) => void;
 }
 
 /**
- * Case Details landing view: the progress path across the top (every stage of
- * the case, the selected stage's tasks underneath, and "Mark stage complete"
- * for the current one; see ProgressPath.tsx), then case info + recent case
- * files on the left and the document checklist (overall donut + per-category
- * bars) on the right. The floating Workspace bar is rendered separately by
+ * Case Details landing view: task progress and document checklist rings
+ * (ProgressRings.tsx), then the progress path (every stage of the case, the
+ * selected stage's tasks underneath, and "Mark stage complete" for the current
+ * one; see ProgressPath.tsx), then case info and the checklist's per-category
+ * bars side by side. Files live on the Case files tab. The floating Workspace bar is rendered separately by
  * `CaseDetails.tsx` (see `WorkspaceDock.tsx`).
  */
 export const CaseOverview: React.FC<CaseOverviewProps> = props => {
@@ -153,14 +103,24 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
     timeline, hiddenTaskCount, onViewAllTasks, phaseView, pathStages, closed, outcome, onCompleteStage,
     client, applicant, visaSubclass, visaSubstream, templateTitle, ownerName, openedAt, nextDeadline, description, onEditCase, onOpenDeadlines,
     checklistRows, checklistTotal, checklistDone, onOpenChecklist, onGenerateChecklist,
-    documents, caseId, onOpenDocument, onViewAllFiles, onDocumentUploaded, onRequestCompress,
   } = props;
 
-  const recentDocs = [...documents].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 5);
   const nextDeadlineDays = nextDeadline ? daysLeft(nextDeadline, new Date()) : null;
 
   return (
     <div className="mt-4 space-y-3.5">
+      <ProgressRings
+        tasksDone={totalTaskCount - openTaskCount}
+        tasksTotal={totalTaskCount}
+        stages={pathStages}
+        currentTask={currentTask}
+        closed={closed}
+        onOpenTasks={onViewAllTasks}
+        checklistRows={checklistRows}
+        onOpenChecklist={onOpenChecklist}
+        onGenerateChecklist={onGenerateChecklist}
+      />
+
       <ProgressPath
         stages={pathStages}
         currentTask={currentTask}
@@ -178,7 +138,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
-        {/* ── Left: case info + recent files ── */}
+        {/* ── Left: case info ── */}
         <div className="space-y-3.5 min-w-0">
           <section className={cardCls}>
             <CardTitle action={<LinkButton onClick={onEditCase}>Edit</LinkButton>}>Case info</CardTitle>
@@ -244,49 +204,9 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
           </section>
 
 
-          <section className={cardCls}>
-            <CardTitle
-              badge={documents.length > 0 ? (
-                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-paper dark:bg-plate text-ink-soft dark:text-plate-ink-soft">
-                  {documents.length} total
-                </span>
-              ) : undefined}
-              action={documents.length > 0 ? <LinkButton onClick={onViewAllFiles}>View all files <ArrowRight size={11} /></LinkButton> : undefined}
-            >
-              Recent case files
-            </CardTitle>
-            <DocumentUpload caseId={caseId} visaSubclass={visaSubclass} onUpload={onDocumentUploaded} onRequestCompress={onRequestCompress} compact />
-            {recentDocs.length === 0 ? (
-              <p className="mt-2 text-[12px] text-ink-faint dark:text-plate-ink-faint">No files in this case yet.</p>
-            ) : (
-              <ul className="mt-2 divide-y divide-ink/10 dark:divide-plate-ink/15">
-                {recentDocs.map(doc => {
-                  const Icon = fileIconFor(doc.fileType);
-                  return (
-                    <li key={doc.id}>
-                      <button type="button" onClick={() => onOpenDocument(doc)} className="w-full flex items-center gap-2.5 py-2 text-left group">
-                        <span className="w-8 h-8 rounded-lg bg-paper dark:bg-plate flex items-center justify-center flex-shrink-0">
-                          <Icon size={14} className="text-ink-soft dark:text-plate-ink-soft" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[12.5px] text-ink dark:text-plate-ink truncate group-hover:text-edamame">{doc.fileName}</span>
-                          <span className="block text-[11px] text-ink-faint dark:text-plate-ink-faint">{fmtDate(doc.uploadedAt, 'd MMM yyyy')}</span>
-                        </span>
-                        {doc.documentTypeCode && (
-                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-paper dark:bg-plate text-ink-soft dark:text-plate-ink-soft flex-shrink-0">
-                            {doc.documentTypeCode}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
         </div>
 
-        {/* ── Right: document checklist ── */}
+        {/* ── Right: document checklist by category ── */}
         <div className="space-y-3.5 min-w-0">
           <section className={cardCls}>
             <CardTitle
@@ -297,7 +217,7 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
               ) : undefined}
               action={checklistTotal > 0 ? <LinkButton onClick={onOpenChecklist}>Open <ArrowRight size={11} /></LinkButton> : undefined}
             >
-              Document checklist
+              Checklist by category
             </CardTitle>
             {checklistRows.length === 0 ? (
               <div className="text-[12px] text-ink-faint dark:text-plate-ink-faint">
@@ -306,7 +226,6 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
               </div>
             ) : (
               <>
-                <ChecklistDonut rows={checklistRows} />
                 <div className="space-y-3">
                   {checklistRows.map(row => {
                     const pct = (n: number) => `${(n / row.total) * 100}%`;
@@ -319,11 +238,11 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
                           </span>
                         </div>
                         <div
-                          className="flex h-2 rounded-full overflow-hidden bg-ink/[0.07] dark:bg-plate-ink/10"
+                          className="flex gap-[2px] h-2 rounded-full overflow-hidden bg-ink/[0.07] dark:bg-plate-ink/10"
                           title={`${row.verified} verified, ${row.linked} linked, ${row.pending} pending, ${row.waived} waived`}
                         >
-                          <span className="bg-edamame" style={{ width: pct(row.verified) }} />
-                          <span className="bg-blue-500" style={{ width: pct(row.linked) }} />
+                          <span className="bg-edamame-800 dark:bg-edamame-400" style={{ width: pct(row.verified) }} />
+                          <span className="bg-edamame-500 dark:bg-edamame-800" style={{ width: pct(row.linked) }} />
                           <span className="bg-slate-400" style={{ width: pct(row.waived) }} />
                         </div>
                         <div className="text-[10.5px] text-ink-faint dark:text-plate-ink-faint mt-1">
@@ -334,8 +253,8 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
                   })}
                 </div>
                 <div className="flex flex-wrap gap-3.5 mt-3.5 text-[11px] text-ink-faint dark:text-plate-ink-faint">
-                  <span className="inline-flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-edamame" />Verified</span>
-                  <span className="inline-flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-blue-500" />Linked</span>
+                  <span className="inline-flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-edamame-800 dark:bg-edamame-400" />Verified</span>
+                  <span className="inline-flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-edamame-500 dark:bg-edamame-800" />Linked</span>
                   <span className="inline-flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-ink/[0.07] dark:bg-plate-ink/10 border border-ink/10" />Pending</span>
                   <span className="inline-flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-slate-400" />Waived</span>
                 </div>
