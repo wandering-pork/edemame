@@ -525,6 +525,61 @@ const AppShell: React.FC = () => {
     }
   }, [repos, tasks, deadlines, pushActivity, currentUserId, rescheduleCaseFromSnapshot, notifyAssignment]);
 
+  // Latest tasks, for callbacks that run later (an Undo toast) and must not
+  // act on the tasks captured when they were created.
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+
+  /**
+   * Overview → "Mark stage complete" (docs/plans/case-overview-progress-path.md,
+   * OV.2): saves several of one case's tasks in one go, then reschedules the
+   * case's plan once and writes one activity event, instead of one per task
+   * (which `handleUpdateTask` in a loop would do, overwriting its own state).
+   * The toast's Undo restores the tasks as they were, through this same path.
+   */
+  const handleCompleteStage = useCallback(async (
+    caseId: string,
+    stageName: string,
+    updates: Task[],
+    mode: 'complete' | 'undo' = 'complete',
+  ) => {
+    if (updates.length === 0) return;
+    const before = updates
+      .map(u => tasksRef.current.find(t => t.id === u.id))
+      .filter((t): t is Task => !!t);
+    try {
+      await Promise.all(updates.map(t => repos.tasks.update(t)));
+    } catch (err) {
+      console.error('Failed to update stage tasks', err);
+      toast.error(mode === 'complete' ? `Couldn't complete ${stageName}. Try again.` : `Couldn't undo. Try again.`);
+      return;
+    }
+    const byId = new Map(updates.map(t => [t.id, t]));
+    const nextTasks = tasksRef.current.map(t => byId.get(t.id) ?? t);
+    tasksRef.current = nextTasks;
+    setTasks(prev => prev.map(t => byId.get(t.id) ?? t));
+
+    const n = updates.length;
+    const counted = `${n} task${n === 1 ? '' : 's'}`;
+    pushActivity({
+      type: 'stage_completed',
+      actorId: currentUserId,
+      subjectId: caseId,
+      summary: mode === 'complete'
+        ? `Marked ${stageName} complete: ${counted} done.`
+        : `Undid completing ${stageName}: ${counted} reopened.`,
+    });
+    if (updates.some(t => t.stepKey)) rescheduleCaseFromSnapshot(caseId, nextTasks, deadlines);
+
+    if (mode === 'complete') {
+      toast.success(`${stageName} complete`, {
+        description: `${counted} marked done.`,
+        duration: 10000,
+        action: { label: 'Undo', onClick: () => { handleCompleteStage(caseId, stageName, before, 'undo'); } },
+      });
+    }
+  }, [repos, pushActivity, currentUserId, rescheduleCaseFromSnapshot, deadlines]);
+
   /**
    * Applies a confirmed visa subclass / Work Plan change in one go (Work
    * Plans step 4, see lib/visaPlanChange.ts): deletes or closes the case's
@@ -1019,6 +1074,7 @@ const AppShell: React.FC = () => {
                 onUpdateDeadline={handleUpdateDeadline}
                 onUpdateCase={handleUpdateCase}
                 onChangeCasePlan={handleChangeCasePlan}
+                onCompleteStage={handleCompleteStage}
                 onDeleteCase={id => handleDeleteCases([id])}
               />
             } />
@@ -1074,6 +1130,7 @@ interface CaseDetailsRouteProps {
   onUpdateDeadline: (deadline: Deadline) => void;
   onUpdateCase: (caseItem: Case) => void;
   onChangeCasePlan: (change: PlanChangeResult) => Promise<void>;
+  onCompleteStage: (caseId: string, stageName: string, updates: Task[]) => Promise<void>;
   onDeleteCase: (caseId: string) => Promise<void>;
 }
 
@@ -1110,6 +1167,7 @@ const CaseDetailsRoute: React.FC<CaseDetailsRouteProps> = (props) => {
       onUpdateDeadline={props.onUpdateDeadline}
       onUpdateCase={props.onUpdateCase}
       onChangeCasePlan={props.onChangeCasePlan}
+      onCompleteStage={props.onCompleteStage}
       onDeleteCase={props.onDeleteCase}
       templates={props.templates}
       onBack={() => navigate('/cases')}

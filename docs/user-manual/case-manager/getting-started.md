@@ -24,6 +24,23 @@ already-owned case, and so does **Assign…** in a row's **⋯** menu (see below
 
 ## Managing cases from the list
 
+The list has one heading row (**Case**, **Next task**, **Progress**, **Stage**, **Owner**). Each
+row shows:
+- the case title, with the client's name and the case number (for example EDM-2026-0004)
+  underneath. When the title already ends with the client's name, or already names the subclass,
+  the row doesn't repeat it (the full title shows when you hover over it);
+- the **next task**: the same task the case's Overview shows as Next up (the first open task in
+  stage order), with its date. "Est." marks an estimated date; a missed firm date shows in red
+  with "overdue". A case with no tasks says **No tasks yet**; one with every task done says
+  **All tasks done**;
+- **progress**, the stage bar described below, with "N of M tasks done";
+- the **Stage** chip and, if the case is at risk, an **At Risk** badge (the row also has a red
+  edge);
+- the case owner, the **⋯** menu, and an arrow to open the case.
+
+On a phone the row shows just the title, client and case number, with the stage and At Risk
+underneath, plus the owner and the **⋯** menu.
+
 Click the client's name under a case's title to open that client on the **Clients** page (their
 row expanded, showing their details and case history). Clicking anywhere else on the row opens the
 case.
@@ -81,7 +98,8 @@ has one primary button, **Add Task**, a small **Case actions** menu (see below),
 which opens the AI assistant. On screens narrower than a large desktop, **Case actions** shows as a
 **⋯** button and a long case title is shortened (hover over it to see the full title), so the header
 stays on one line.
-The client's name after the case title is a link to that client on the **Clients** page.
+The client's name after the case title is a link to that client on the **Clients** page (when
+the title already ends with the client's name, the name isn't repeated; use Case info instead).
 
 ### Case stage, on hold, and At Risk
 
@@ -89,8 +107,8 @@ A case's **Stage** follows its tasks — you don't set it by hand. It's the stag
 current task (the first task that isn't done yet), the same stages the **Tasks** tab groups tasks
 into (Consultation, Prerequisites, Preparing for lodgement, Ready to lodge, Lodged, Decision,
 Post-decision, plus any your firm added — see Configuration → Stages). The summary strip shows it as
-"Stage N of M · Name", where M counts only the stages this case has tasks in, and Case info on the
-Overview shows the same name. Completing tasks moves the stage forward; reopening an earlier task
+"Stage N of M · Name", where M counts only the stages this case has tasks in; the Overview's
+progress path and Next up line use the same name and count. Completing tasks moves the stage forward; reopening an earlier task
 moves it back. Once every task is done the case stays at its last stage until you close it. Older
 cases whose tasks have no stages at all keep showing the stage they were already at.
 
@@ -127,13 +145,14 @@ instead of) the Pre-lodgement/With Department/Closed board filters.
 
 Each case row shows its **Stage** the same way Case Details does:
 
-- the **Stage** chip — the case's current stage name (e.g. "Prerequisites"), coloured by its board
-  (Pre-lodgement, With Department, Closed). A closed case shows **Closed**; an older case whose tasks
-  have no stages shows the stage it was already at.
+- the **Stage** chip — the case's current stage name (e.g. "Prerequisites"). Pre-lodgement stages
+  are grey, stages with the Department are green, and closed cases are plain text with their
+  outcome (for example **Closed · Granted**). Red is used only for **At Risk**. An older case whose
+  tasks have no stages shows the stage it was already at.
 - a **progress bar** — one segment per stage the case has tasks in (the same groups as the case's
   Tasks tab), each filled by how many of its tasks are done, with the current stage ringed. Under it,
-  "Stage 2 of 4 · 5/12 tasks". Hover or focus the bar to see each stage's count. Cases whose tasks
-  have no stages just show the task count.
+  "5 of 12 tasks done". Hover or focus the bar to see each stage's count. Cases whose tasks have no
+  stages just show the task count.
 
 ### Visa and stage filters
 
@@ -171,18 +190,19 @@ Everything that used to be in this menu now has one home elsewhere:
 
 ## Landing on the Overview tab
 
-Every time you open a case, you land on the **Overview** tab: a "You are here" card with the
-current task across the top, then case info and the case's progress on the left and the document
-checklist (an overall donut plus a bar per category) and recent case files on the right. Click **Ask Edie** in the case
+Every time you open a case, you land on the **Overview** tab: two rings (**Task progress** with the
+next task, and **Document checklist**) and case info across the top, then the progress path (every
+stage of the case, with the selected stage's tasks and **Mark stage complete** for the current one
+underneath), then the checklist by category. Click **Ask Edie** in the case
 header (or press **Ctrl+J**) for suggested next steps, AI skills and the case chat. See
 [Overview, Edie, and tabs](./workspace-and-tabs.md) for how the Overview, Edie and the case's tabs
 work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded
 Documents tab and the Document Checklist Generator tool.
 
 Every file attached to the case is on the **Case files** tab, where you can upload, preview,
-download, and delete them (also reachable from **View all files** on the Overview). The **Case files** tab also has the
+download, and delete them (the tab after **Tasks**). The **Case files** tab also has the
 document tools: **Compress documents**, **Run Crusher** (supported subclasses) and **820 Bundle
-Builder** (subclass 820). To link files to checklist items, open the **Checklist** tab and click
+Builder** (subclass 820). To link files to checklist items, open the **Document Checklist** tab and click
 **Case Files** to show the files beside the checklist, then drag a file onto an item (see Document
 Checklist doc above).
 

@@ -19,6 +19,7 @@ import { useEdieChat } from '../components/edie/useEdieChat';
 import { useEdie } from '../contexts/EdieContext';
 import { EdieButton } from '../components/edie/EdieButton';
 import { CaseOverview } from '../components/case-details/CaseOverview';
+import { pathStages } from '../lib/progressPath';
 import { currentFocusTask, taskTimeline, checklistBreakdown, suggestQuickActions } from '../lib/caseOverview';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
 import { DocumentTypePicker, DocumentTypeBadge } from '../components/DocumentTypePicker';
@@ -108,6 +109,8 @@ interface CaseDetailsProps {
   onUpdateCase: (caseItem: Case) => void;
   /** Applies a confirmed subclass / Work Plan change in one batch (Work Plans step 4). */
   onChangeCasePlan: (change: PlanChangeResult) => Promise<void>;
+  /** Overview → Mark stage complete: saves the stage's tasks in one batch. */
+  onCompleteStage: (caseId: string, stageName: string, updates: Task[]) => Promise<void>;
   /** Deletes the case with its tasks and deadlines, and updates app state. */
   onDeleteCase: (caseId: string) => Promise<void>;
   /** Every Work Plan — offered in the subclass-change window. */
@@ -141,7 +144,7 @@ const CASE_FIXED_TABS: { kind: CaseTabKind; label: string }[] = [
   { kind: 'workspace', label: 'Overview' },
   { kind: 'tasks', label: 'Tasks' },
   { kind: 'documents', label: 'Case files' },
-  { kind: 'checklist', label: 'Checklist' },
+  { kind: 'checklist', label: 'Document Checklist' },
   { kind: 'notes', label: 'Notes' },
 ];
 
@@ -176,6 +179,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   onUpdateDeadline,
   onUpdateCase,
   onChangeCasePlan,
+  onCompleteStage,
   onDeleteCase,
   templates,
   onBack
@@ -319,12 +323,16 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     return allDeadlines(relevant, [client]).sort((a, b) => daysLeft(a, new Date()) - daysLeft(b, new Date()));
   }, [deadlines, caseItem.id, client]);
 
-  // Tasks grouped by phase (Work Plans step 3) — drives Overview → Progress,
+  // Tasks grouped by phase (Work Plans step 3) — drives the Overview progress path,
   // the Tasks tab, the current task and the read-only Phase in Case info.
   const { casePhases } = useVisaConfig();
   const phaseView = useMemo(
     () => buildCasePhaseView(caseTasks, casePhases, workflowTemplate?.steps, visaSubclass),
     [caseTasks, casePhases, workflowTemplate, visaSubclass],
+  );
+  const progressStages = useMemo(
+    () => pathStages(phaseView, casePhases, { visaSubclass, closed: currentCase.stage === 'closed' }),
+    [phaseView, casePhases, visaSubclass, currentCase.stage],
   );
   const phaseChoices = useMemo(
     () => phaseChoicesForCase(caseTasks, casePhases, workflowTemplate?.steps, visaSubclass),
@@ -1170,6 +1178,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
 
   // ---- Render ----
   const needsOutcomePrompt = currentCase.stage === 'closed' && !currentCase.outcome;
+  // Most titles already end in the client's name ("... - brad bird"); don't repeat it after the comma.
+  const titleNamesClient = !!client.name.trim() && currentCase.title.toLowerCase().includes(client.name.trim().toLowerCase());
 
   const tabToolBtnCls = 'inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2.5 py-1.5 rounded-lg border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame transition-colors';
   const menuItemCls = 'w-full text-left px-3 py-2 rounded-lg text-[12.5px] font-semibold text-ink-soft dark:text-plate-ink-soft hover:bg-paper-2 dark:hover:bg-plate transition-colors';
@@ -1192,21 +1202,23 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
         </button>
         <div className="flex-1 min-w-0 flex items-center gap-3">
           <h1
-            title={`${currentCase.title}, ${client.name}`}
+            title={titleNamesClient ? currentCase.title : `${currentCase.title}, ${client.name}`}
             className="text-[17px] font-bold text-ink dark:text-plate-ink tracking-tight min-w-0 truncate"
           >
             {currentCase.title}
-            <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">
-              ,{' '}
-              <Link
-                to="/clients"
-                state={{ focusClientId: client.id }}
-                title={`Open ${client.name} in Clients`}
-                className="hover:text-edamame-700 dark:hover:text-edamame-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-edamame-700 rounded-sm"
-              >
-                {client.name}
-              </Link>
-            </span>
+            {!titleNamesClient && (
+              <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">
+                ,{' '}
+                <Link
+                  to="/clients"
+                  state={{ focusClientId: client.id }}
+                  title={`Open ${client.name} in Clients`}
+                  className="hover:text-edamame-700 dark:hover:text-edamame-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-edamame-700 rounded-sm"
+                >
+                  {client.name}
+                </Link>
+              </span>
+            )}
           </h1>
           <span className="flex-shrink-0 font-mono text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{displayCaseNumber(currentCase)}</span>
           {visaSubclass && (
@@ -1386,28 +1398,18 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               applicant={applicant}
               visaSubclass={visaSubclass}
               visaSubstream={currentCase.visaSubstream}
-              phaseView={phaseView}
+              pathStages={progressStages}
+              closed={currentCase.stage === 'closed'}
+              outcome={currentCase.outcome}
+              onCompleteStage={(stageName, updates) => onCompleteStage(currentCase.id, stageName, updates)}
               templateTitle={workflowTemplate?.title}
               ownerName={ownerName}
               openedAt={currentCase.startDate || currentCase.createdAt}
-              nextDeadline={nextDeadline}
               description={currentCase.description}
               onEditCase={openEditCase}
-              onOpenDeadlines={() => openOrFocusTab('tasks')}
               checklistRows={checklistRows}
-              checklistTotal={checklist.length}
-              checklistDone={uploadedCount}
               onOpenChecklist={() => openOrFocusTab('checklist')}
               onGenerateChecklist={() => openOrFocusTab('checklist-generator')}
-              documents={documents}
-              caseId={currentCase.id}
-              onOpenDocument={handleChecklistPreview}
-              onViewAllFiles={() => openOrFocusTab('documents')}
-              onDocumentUploaded={(doc) => {
-                setDocuments(prev => [...prev, doc]);
-                setDocRefreshKey(k => k + 1);
-              }}
-              onRequestCompress={handleRequestCompress}
             />
           )}
 

@@ -4,10 +4,37 @@
 
 Opening a case lands you on the **Overview** tab — a one-screen summary of where the case is up to:
 
-- **You are here** — the current task (the earliest task that isn't done yet), how many of the
-  case's tasks are done, its due date and status. Click **Open task** to edit it.
-- **Case info** — client (and applicant, if different), visa subclass (with substream, if set) and work plan, case owner,
-  stage, next deadline (click it to jump to the Deadlines panel), and the date the case was opened.
+- **Top row: two rings and Case info.** The **Task progress** ring shows how many of the case's
+  tasks are done. Next to it is **Next up**, the case's next task, with its stage (for example
+  "Ready to lodge, stage 3 of 5", counted the same way as the Stage chip under the case title) and
+  its date, and **Open task**. With no open tasks it says so and links to the Tasks tab instead.
+  The **Document checklist** ring shows how many documents are in and how many are still to
+  collect, and once any are in, how many are verified and how many are linked but not yet verified.
+  **Open Document Checklist** opens the Document Checklist tab (or **Generate checklist** if the
+  case has none yet).
+- **Progress path** — under the rings, one chevron per **stage** of the case's journey
+  (Consultation, Prerequisites, Preparing for lodgement, …; see Configuration → Stages), in stage
+  order. Finished stages are pale green with a tick, the **current stage** (the stage of the current
+  task) is solid green, stages still to come are grey, and stages with no tasks yet are faded but
+  still shown, so you can see the whole journey. Each chevron shows how many of its tasks are done.
+  A case on hold shows a pause sign on the current stage; a closed case shows its outcome (Granted,
+  Refused, …) at the end.
+  **Click a stage to see its tasks** in the panel underneath: the stage name and its date range
+  ("(estimated)" if the dates are estimates), then the tasks themselves (finished ones struck
+  through, waiting ones in amber). Clicking a stage never changes anything. Use the left and right arrow keys to move
+  between stages. On a narrow window the chevrons become a **Stage** picker.
+  For the current stage the next task is highlighted in the list, and the panel has a
+  **Mark stage complete** button. It asks you to confirm first, listing the open tasks it will
+  mark done. Tasks waiting on the client or a third party stay open unless you tick **Mark these
+  done too**; tasks already done or not applicable aren't touched. After **Mark N tasks done**, the
+  next stage becomes current and any estimated dates after it are recalculated. **Undo** on the
+  confirmation message (for about 10 seconds) puts the tasks back as they were.
+  Older cases whose tasks have no stage at all show the case lifecycle stages instead (display only)
+  with the case's task list underneath.
+- **Case info** (top right) — client (and applicant, if different), visa subclass (with substream,
+  if set), case owner, and the date the case was opened. Click the client's (or applicant's) name
+  to open them on the **Clients** page. The stage and the next deadline aren't
+  repeated here; they're in the summary strip under the case title.
   **Edit** opens the Edit case form, where you can change the title, description, **Visa Subclass**
   and **Substream** (or set the subclass to **Not Confirmed** while the visa is still undecided).
   Changing the subclass to a real one — from blank, Not Confirmed, or a different subclass — opens
@@ -17,24 +44,13 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
   are added (dated from today, each in its stage) and the new subclass is saved; the plan becomes
   the case's work plan. **Cancel** changes nothing. Changing the subclass back to blank or Not
   Confirmed just saves, with no window.
-  The **Stage** here is read-only: it's the stage of the current task (see below), the same as the
-  Stage chip in the summary strip under the case title. To close or reopen a case, use **Case actions**.
-- **Progress** — the case's tasks grouped by **stage** (Consultation, Prerequisites, Preparing for
-  lodgement, …; see Configuration → Stages), in stage order. Only the **current stage** — the stage
-  of the current task — is open and highlighted: in it the current task is bold and finished tasks
-  are struck through. Finished stages are folded with a green tick and a struck-through name;
-  stages still to come are folded and grey. Click any stage to open or fold it, click a task to
-  open it, or **View all** to open the Tasks tab. Stages with no tasks are hidden. Older cases whose
-  tasks have no stage at all show the previous simple list (last done, current, next few).
-- **Stage** (in Case info) — read-only; the stage of the current task, so it always matches the
-  groups on the Tasks tab and the Stage chip in the summary strip. It moves on its own as tasks are
-  done. A closed case shows **Closed**.
-- **Document checklist** — a donut showing how many of the case's documents are in overall, then
-  one progress bar per checklist category showing how many items are verified, linked, pending, or
-  waived. Click a category (or **Open**) to open the Document Checklist tab. If the case has no
-  checklist yet, use **Generate one**.
-- **Recent case files** — the five most recently uploaded files, plus an upload area. Click a file
-  to preview it, or **View all files** to open the Case Files tab.
+  To close or reopen a case, use **Case actions**.
+- **Checklist by category** — across the bottom, one bar per checklist category showing how many
+  items are verified (dark green), linked (lighter green), pending, or waived (grey). The counts
+  under a bar appear once something in that category is in. Click a category to open the Document
+  Checklist tab. This card only appears once the case has a checklist.
+
+Case files aren't listed on the Overview; they're all on the **Case files** tab.
 
 The tabs and the layout around them stay the same on every tab; switching tabs only changes the
 content below the tab row. To drag files onto checklist items, use the **Case Files** button on the
@@ -67,7 +83,7 @@ The panel has three parts:
 ## Tabs
 
 A row of tabs under the case header is always visible: **Overview**, **Tasks**, **Case files**,
-**Checklist**, and **Notes**. Tasks, Case files, and Checklist show a count. Click a tab to switch to
+**Document Checklist**, and **Notes**. Tasks, Case files, and Document Checklist show a count. Click a tab to switch to
 it.
 
 Document tools sit on the tab whose documents they work on, and open in their own window over the
@@ -75,13 +91,13 @@ case:
 
 - **Case files** tab: **Compress documents** (the Document Compressor), **Run Crusher** (supported
   subclasses only) and **820 Bundle Builder** (subclass 820 only).
-- **Checklist** tab: **Generate** (the Document Checklist Generator).
+- **Document Checklist** tab: **Generate** (the Document Checklist Generator).
  When you come back to a case, it reopens on the tab you
 were last using.
 
 ## Tasks by stage
 
-When a case's tasks have stages, the **Tasks** tab groups them the same way as Overview → Progress:
+When a case's tasks have stages, the **Tasks** tab groups them by the same stages as the Overview's progress path:
 one section per stage in stage order, only the current stage open, the current task highlighted
 and bold, finished tasks struck through, finished stages ticked and folded. Every row keeps its
 usual actions (mark done, change status, edit the date, the **⋮** menu).
