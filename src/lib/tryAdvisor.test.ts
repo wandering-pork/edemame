@@ -98,22 +98,33 @@ describe('buildTrialResponse', () => {
     expect(JSON.stringify(body)).not.toMatch(/why|what|reasons|gaps/);
   });
 
-  it("never sends an applicant the best match's subclass or name", () => {
-    const body = buildTrialResponse('self', three, 1, 'tok');
+  it('shows applicants all three while the best match is not hidden', () => {
+    expect(buildTrialResponse('self', three, 2)).toEqual({
+      audience: 'self',
+      best: three[0],
+      hidden: false,
+      others: [three[1], three[2]],
+      remainingToday: 2,
+    });
+  });
+
+  it("never sends an applicant a hidden best match's subclass or name", () => {
+    const body = buildTrialResponse('self', three, 1, 'tok', true);
     const json = JSON.stringify(body);
     expect(json).not.toContain('"500"');
     expect(json).not.toContain('Student"');
     expect(body).toEqual({
       audience: 'self',
       best: { verdict: 'qualifies' },
+      hidden: true,
       others: [three[1], three[2]],
       rankingToken: 'tok',
       remainingToday: 1,
     });
   });
 
-  it('requires a ranking token for applicants', () => {
-    expect(() => buildTrialResponse('self', three, 1)).toThrow();
+  it('requires a ranking token when the best match is hidden', () => {
+    expect(() => buildTrialResponse('self', three, 1, undefined, true)).toThrow();
   });
 });
 

@@ -23,6 +23,7 @@ import { buildEligibilitySummary } from '../lib/eligibilitySummary';
 import { aiErrorMessage, throwForAiResponse } from '../lib/aiErrors';
 import { authJsonHeaders } from '../lib/authHeaders';
 import { buildEligibilityRequest } from '../lib/eligibilityRequest';
+import { clearTrialScenario, peekTrialScenario, type TrialScenario } from '../lib/trialCarryOver';
 
 interface WizardState {
   step: 'input' | 'report';
@@ -94,7 +95,20 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
     ? clients.find((c) => c.id === clientId)
     : undefined;
 
-  const [wizardState, setWizardState] = useState<WizardState>(() => ({
+  // A scenario tried in the homepage's free trial (docs/plans/public-visa-advisor-trial.md, VA.2b,
+  // Decision 8): prefill everything but the name, which the agent adds on step 1. Peeked, not taken,
+  // so a remount doesn't lose it; cleared once a full check runs or the agent starts fresh. A
+  // ?clientId= visit is about that client, so it ignores the trial.
+  const [trialScenario, setTrialScenario] = useState<TrialScenario | null>(() => (clientId ? null : peekTrialScenario()));
+
+  const [wizardState, setWizardState] = useState<WizardState>(() => trialScenario ? ({
+    step: 'input',
+    currentStep: 1,
+    clientInfo: { ...trialScenario.answers.clientInfo, fullName: '', dob: '' },
+    goals: trialScenario.answers.goals as WizardState['goals'],
+    details: trialScenario.answers.details,
+    supportingFactors: trialScenario.answers.supportingFactors,
+  }) : ({
     step: 'input',
     currentStep: 1,
     clientInfo: {
@@ -189,6 +203,10 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
       const data: { result: EligibilityReport; usage: EligibilityUsage | null } = await response.json();
       setReport(data.result);
       setShowAllPathways(false);
+      if (trialScenario) {
+        clearTrialScenario();
+        setTrialScenario(null);
+      }
       setWizardState((prev) => ({ ...prev, step: 'report' }));
       if (data.usage) onEligibilityChecked?.(data.usage);
 
@@ -309,6 +327,32 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
                 Three steps, then a report you can walk a client through
               </p>
             </div>
+
+            {trialScenario && wizardState.currentStep === 1 && (
+              <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-edamame-500/30 bg-edamame-500/10 px-4 py-3">
+                <div>
+                  <p className="text-[13.5px] font-semibold text-edamame-700 dark:text-edamame-300">Your scenario from the homepage is filled in.</p>
+                  <p className="text-[13px] text-ink dark:text-plate-ink mt-0.5">Add your client’s name to see the full report: every visa, with reasons and gaps.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearTrialScenario();
+                    setTrialScenario(null);
+                    setWizardState((prev) => ({
+                      ...prev,
+                      clientInfo: { fullName: '', dob: '', nationality: '', inAustralia: false, currentVisaStatus: '' },
+                      goals: { primaryPurpose: '', intendedDuration: '' },
+                      details: {},
+                      supportingFactors: { englishProficiency: '', healthConcerns: false, criminalHistory: false },
+                    }));
+                  }}
+                  className="text-[13px] font-semibold text-ink-soft dark:text-plate-ink-soft underline underline-offset-2"
+                >
+                  Start fresh instead
+                </button>
+              </div>
+            )}
 
             {/* Visual progress indicator */}
             <div className="mb-8 space-y-4">

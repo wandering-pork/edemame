@@ -45,6 +45,7 @@ import { InviteAccept } from './pages/InviteAccept';
 import { ResetPassword } from './pages/ResetPassword';
 import { LinkFolderGate } from './components/LinkFolderGate';
 import { PendingInvitationsBanner } from './components/team/PendingInvitationsBanner';
+import { TrialScenarioBanner } from './components/TrialScenarioBanner';
 import { isSupabaseConfigured, supabase } from './lib/supabaseClient';
 import { shouldNotifyAssignment } from './lib/assignmentNotify';
 import { describePlanSource, buildTaskPlanSummary } from './lib/planActivity';
@@ -896,6 +897,7 @@ const AppShell: React.FC = () => {
             onMoveTaskDate={handleMoveTaskDate}
           />
           <PendingInvitationsBanner />
+          <TrialScenarioBanner />
           {lostAccessNotice && (
             <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-xl border border-ink/15 bg-paper-2 px-4 py-3 text-sm text-ink-soft dark:border-plate-ink/20 dark:bg-plate-card dark:text-plate-ink-soft">
               <span>{lostAccessNotice}</span>
@@ -1328,6 +1330,8 @@ const AppRoutes: React.FC = () => {
           redirects (ProtectedRoute, sign-out) and shared links still work. */}
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
       <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+      {/* The homepage's free Visa Advisor trial, opened in its sheet (VA.2b); signed in, the full advisor. */}
+      <Route path="/try/visa-advisor" element={user ? <Navigate to="/visa-advisor" replace /> : <LandingPage />} />
       {/* Fully public, and deliberately outside ProtectedRoute/ProfileProvider: the
           Supabase recovery link signs the visitor in via a short-lived recovery
           session (see pages/ResetPassword.tsx), which would otherwise get bounced

@@ -5,8 +5,10 @@
 // The two rules everything here protects:
 // - the server only ever returns the teaser fields (Decision 3), built field by field, never by
 //   spreading Gemini's object, so reasons/gaps/other pathways can't leak into a response;
-// - for applicants ('self') the best match's subclass and name never leave the server: only its
-//   verdict does. The full ranking is stored under a random token for the paid report (VA.5).
+// - for applicants ('self'), once the paid report exists (TRY_ADVISOR_HIDE_BEST=true), the best
+//   match's subclass and name never leave the server: only its verdict does. The full ranking is
+//   stored under a random token for the paid report (VA.5). Until then applicants see all three,
+//   since hiding the answer with no way to unlock it would only frustrate them.
 import { createHash, randomBytes } from "crypto";
 
 export const TRIAL_SUBCLASSES = ["189", "190", "482", "186", "500", "820", "485", "600", "417", "491"] as const;
@@ -136,9 +138,11 @@ export type TrialResponse =
   | { audience: "client"; result: TrialMatch; remainingToday: number }
   | {
       audience: "self";
-      best: { verdict: TrialVerdict };
+      /** Hidden: verdict only. Not hidden: the full match. */
+      best: { verdict: TrialVerdict } | TrialMatch;
+      hidden: boolean;
       others: TrialMatch[];
-      rankingToken: string;
+      rankingToken?: string;
       remainingToday: number;
     };
 
@@ -148,15 +152,20 @@ export function buildTrialResponse(
   matches: TrialMatch[],
   remainingToday: number,
   rankingToken?: string,
+  hideBest = false,
 ): TrialResponse {
   const pick = (m: TrialMatch): TrialMatch => ({ visaSubclass: m.visaSubclass, visaName: m.visaName, verdict: m.verdict });
   if (audience === "client") {
     return { audience, result: pick(matches[0]), remainingToday };
   }
-  if (!rankingToken) throw new Error("A ranking token is required for the applicant teaser");
+  if (!hideBest) {
+    return { audience, best: pick(matches[0]), hidden: false, others: matches.slice(1).map(pick), remainingToday };
+  }
+  if (!rankingToken) throw new Error("A ranking token is required when the best match is hidden");
   return {
     audience,
     best: { verdict: matches[0].verdict },
+    hidden: true,
     others: matches.slice(1).map(pick),
     rankingToken,
     remainingToday,

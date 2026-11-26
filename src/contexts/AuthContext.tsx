@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { clearTrialScenario } from '../lib/trialCarryOver';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import { readValidatedJson, writeLocalJson } from '@/lib/devLocalStorage';
@@ -174,6 +175,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // The homepage trial's carried-over scenario belongs to whoever was using this browser.
+    clearTrialScenario();
     if (DEV_OFFLINE_AUTH) {
       localStorage.removeItem(DEV_OFFLINE_USER_KEY);
       setSession(null);

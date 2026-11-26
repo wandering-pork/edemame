@@ -22,8 +22,9 @@ import { turnstileConfigured, verifyTurnstile } from "./_lib/turnstile";
 // A separate endpoint from check-eligibility on purpose: smaller, locked down, and unable to leak
 // the full report even by mistake. It returns only the teaser (api/_lib/tryAdvisor.ts):
 //   - agents ('client'): the single best match's subclass, name and verdict;
-//   - applicants ('self'): the best match's verdict only, plus matches 2 and 3. The best match's
-//     subclass/name stay on the server, in try_advisor_rankings, for the paid report (VA.5).
+//   - applicants ('self'): the top three. With TRY_ADVISOR_HIDE_BEST=true (once the paid report,
+//     VA.5, exists) the best match's subclass/name stay on the server, in try_advisor_rankings,
+//     and only its verdict is sent.
 //
 // Order of checks: kill switch, input, config, Turnstile, limits, and only then Gemini. A check is
 // counted only after a usable answer, so a Gemini failure never uses up one of a visitor's checks.
@@ -141,8 +142,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(502).json({ error: "The AI returned an unusable answer. Please try again.", code: "ai_error" });
     }
 
+    const hideBest = audience === "self" && process.env.TRY_ADVISOR_HIDE_BEST === "true";
     let rankingToken: string | undefined;
-    if (audience === "self") {
+    if (hideBest) {
       rankingToken = newRankingToken();
       const stored = await serviceRoleRest("try_advisor_rankings", {
         method: "POST",
@@ -165,7 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const remainingToday = Math.max(0, limits.perIp - (ipCount + 1));
-    return res.status(200).json(buildTrialResponse(audience, matches, remainingToday, rankingToken));
+    return res.status(200).json(buildTrialResponse(audience, matches, remainingToday, rankingToken, hideBest));
   } catch (error) {
     console.error("try-eligibility: error:", error);
     return res.status(500).json({ error: "Failed to check eligibility" });
