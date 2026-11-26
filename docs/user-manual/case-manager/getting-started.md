@@ -24,6 +24,10 @@ already-owned case, and so does **Assign…** in a row's **⋯** menu (see below
 
 ## Managing cases from the list
 
+Click the client's name under a case's title to open that client on the **Clients** page (their
+row expanded, showing their details and case history). Clicking anywhere else on the row opens the
+case.
+
 Each row in the case list has a **⋯** menu at the right (it appears when you hover over or tab to
 the row) with:
 - **Open case**.
@@ -77,6 +81,7 @@ has one primary button, **Add Task**, a small **Case actions** menu (see below),
 which opens the AI assistant. On screens narrower than a large desktop, **Case actions** shows as a
 **⋯** button and a long case title is shortened (hover over it to see the full title), so the header
 stays on one line.
+The client's name after the case title is a link to that client on the **Clients** page.
 
 ### Case stage, on hold, and At Risk
 
