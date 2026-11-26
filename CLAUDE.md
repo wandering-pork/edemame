@@ -41,9 +41,10 @@ Auth requires `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `src/.env.loca
 
 - **Frontend:** React 19 + TypeScript SPA, built with Vite 6. Tailwind CSS via CDN (config inline in `src/index.html`).
 - **Backend:** Vercel serverless functions in root `api/` directory (not `src/api/`):
-  - `/api/generate-tasks.ts` — generates task schedules from case descriptions using Gemini 3.8 Flash (model IDs, retry and 3.6 fallback live in `api/_lib/gemini.ts`; override with `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` env vars; 3.8 rejects temperature/top_p/top_k, so never send them)
+  - `/api/generate-tasks.ts` — generates task schedules from case descriptions using Gemini 3.8 Flash (model IDs, retry and 3.6 fallback live in `api/_lib/gemini.ts`; override with `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` env vars; 3.8 rejects temperature/top_p/top_k, so never send them). `callGemini()` also sends `thinkingConfig.thinkingLevel: "low"` by default (Gemini 3.x defaults to `high`, which made calls take ~70s; override with `GEMINI_THINKING_LEVEL`, `off` sends none, and a 400 naming thinking resends without it), cuts each attempt off after `GEMINI_TIMEOUT_MS` (45s) and the whole call after `GEMINI_BUDGET_MS` (100s) — a timeout skips straight to the fallback model — and never throws. Endpoints turn a failure into a response via `geminiFailure()`: overload/timeout becomes `503 { code: "ai_busy" }`, which the frontend shows as-is via `src/lib/aiErrors.ts`
   - `/api/scan-passport-gemini.ts` — extracts passport data from images using Gemini Vision API
-  - `/api/check-eligibility.ts` — assesses visa eligibility using Gemini 3.8 Flash with structured JSON schema
+  - `/api/check-eligibility.ts` — assesses visa eligibility using Gemini 3.8 Flash with structured JSON schema (`responseSchema`; a malformed/empty reply is a 502 "try again", never an empty report)
+  - All three, like `focus-chat`, require a signed-in user (`api/_lib/auth.ts`'s `verifySupabaseUser()`, else 401) — the frontend sends the token via `src/lib/authHeaders.ts`'s `authJsonHeaders()`. They used to be open to anyone (docs/plans/public-visa-advisor-trial.md, VA.0).
 
 ### State Management
 
@@ -558,8 +559,8 @@ A firm/account-level **Document Type** reference list is the shared vocabulary b
 
 1. User navigates to Visa Advisor page (sidebar or "Check Eligibility" button on client card)
 2. 4-step wizard collects: personal info → immigration goal → conditional details → supporting factors
-3. On submit, POSTs collected data to `/api/check-eligibility` via `VisaAdvisor.tsx`
-4. Vercel function calls Gemini 3.8 Flash with visa assessment prompt
+3. On submit, POSTs the answers to `/api/check-eligibility` via `VisaAdvisor.tsx` — built by `lib/eligibilityRequest.ts`'s `buildEligibilityRequest()`, which sends an `age` instead of the date of birth and no name (both stay in the browser and in the saved assessment's `inputs`)
+4. The Vercel function validates the answers (`api/_lib/eligibilityInput.ts`: known fields only, wizard choice values, free text capped at 200 chars with newlines stripped), then calls Gemini 3.8 Flash with the answers in a delimited block it's told to treat as data, not instructions
 5. Returns JSON with visa verdict cards: 10 Australian visa subclasses (189, 190, 482, 186, 500, 820, 485, 600, 417, 491). Every subclass the Advisor can return has a matching system workflow template (`src/lib/seedData.ts`) and document checklist (`CHECKLIST_CATEGORIES` in `src/lib/checklistTemplates.ts`), so "Open Case" always gets a real template and generated checklist rather than falling back to a bare/empty one.
 6. Each card shows verdict (qualifies/possibly/unlikely/needs_more_info), reasons, and gaps, rendered by the shared `components/visa-advisor/PathwayCard.tsx` (styling dictionaries in `components/visa-advisor/verdictStyles.ts`)
 7. As soon as a report comes back, `VisaAdvisor.tsx` saves it as an `EligibilityAssessment` via `repos.eligibility.create()` — see "Eligibility Assessments" under "Local-First Storage" above — whether or not a case is ever opened from it.

@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { getUserManualContext } from "./_lib/userManual";
 import { searchGithubIssues } from "./_lib/github";
 import { verifySupabaseUser } from "./_lib/auth";
-import { callGemini as postToGemini } from "./_lib/gemini";
+import { callGemini as postToGemini, geminiDeadline, geminiFailure } from "./_lib/gemini";
 
 interface VercelRequest extends IncomingMessage {
   method: string;
@@ -113,18 +113,27 @@ If you classify the turn as Defect or Feature Request:
 Keep responses concise but complete. Use markdown formatting for lists and headings. When referencing specific policy, cite the relevant legislative instrument or policy guidance.`;
 }
 
-async function callGemini(apiKey: string, systemPrompt: string, contents: any[]) {
+/** Thrown when Gemini didn't succeed, carrying its status so the handler can answer properly. */
+class GeminiCallError extends Error {
+  constructor(public status: number) {
+    super(`Gemini API request failed (${status})`);
+  }
+}
+
+async function callGemini(apiKey: string, systemPrompt: string, contents: any[], deadline: number) {
   const response = await postToGemini(apiKey, {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
     tools,
     generationConfig: {
-      maxOutputTokens: 2048,
+      // Gemini counts thinking tokens against this cap, so it's set high enough that a long think
+      // can't leave the visible reply cut short or empty.
+      maxOutputTokens: 8192,
     },
-  });
+  }, { deadline });
 
   if (!response.ok) {
-    throw new Error("Gemini API request failed");
+    throw new GeminiCallError(response.status);
   }
 
   return response.json();
@@ -165,6 +174,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     parts: [{ text: m.content }],
   }));
 
+  // One deadline across every turn of the tool loop below, so a slow multi-step reply still
+  // finishes well inside Vercel's function limit instead of being killed mid-way.
+  const deadline = geminiDeadline();
+
   try {
     let turn = 0;
     let finalReply: string | null = null;
@@ -172,7 +185,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     while (turn < MAX_TOOL_TURNS) {
       turn++;
-      const data = await callGemini(apiKey, systemPrompt, contents);
+      const data = await callGemini(apiKey, systemPrompt, contents, deadline);
       const candidate = data.candidates?.[0];
       const parts: any[] = candidate?.content?.parts || [];
       const functionCallPart = parts.find((p: any) => p.functionCall);
@@ -186,7 +199,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { name, args } = functionCallPart.functionCall;
       // Record the model's function-call turn so the follow-up function
       // response is grounded in the same conversation.
-      contents.push({ role: "model", parts: [{ functionCall: { name, args } }] });
+      // Pass the model's own part back unchanged: on Gemini 3 it carries a `thoughtSignature`
+      // that function-calling turns must return, and rebuilding it from name/args dropped that.
+      contents.push({ role: "model", parts: [functionCallPart] });
 
       if (name === "draft_github_issue" && typeof args?.title === "string" && typeof args?.body === "string") {
         if (filedCount >= MAX_ISSUES_PER_SESSION) {
@@ -228,6 +243,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error) {
     console.error("Focus chat error:", error);
+    if (error instanceof GeminiCallError) {
+      const failure = geminiFailure(error.status);
+      return res.status(failure.status).json(failure.body);
+    }
     return res.status(500).json({ error: "Failed to generate response" });
   }
 }

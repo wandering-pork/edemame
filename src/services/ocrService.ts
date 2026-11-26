@@ -5,6 +5,8 @@
  * More reliable than client-side OCR for real-world passport photos.
  */
 
+import { authJsonHeaders } from '../lib/authHeaders';
+
 export interface PassportOcrResult {
   success: boolean;
   rawText?: string;
@@ -45,7 +47,7 @@ export async function scanPassport(
     // Call backend API which uses Gemini Vision
     const response = await fetch('/api/scan-passport-gemini', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authJsonHeaders(),
       body: JSON.stringify({
         imageBase64: base64,
         mimeType: file.type,

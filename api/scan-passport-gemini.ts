@@ -1,9 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { callGemini } from "./_lib/gemini";
+import { verifySupabaseUser } from "./_lib/auth";
+import { callGemini, geminiFailure } from "./_lib/gemini";
 
 interface VercelRequest extends IncomingMessage {
   method: string;
   body: any;
+  headers: Record<string, string | string[] | undefined>;
 }
 
 interface VercelResponse extends ServerResponse {
@@ -14,6 +16,13 @@ interface VercelResponse extends ServerResponse {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Signed-in users only (docs/plans/public-visa-advisor-trial.md, VA.0): this endpoint used to be
+  // open to anyone on the internet, unlimited, at our Gemini cost.
+  const auth = await verifySupabaseUser(req.headers);
+  if (!auth) {
+    return res.status(401).json({ error: "You must be signed in to scan a passport" });
   }
 
   const { imageBase64, mimeType } = req.body;
@@ -62,9 +71,12 @@ Use empty string for fields you cannot read. Return ONLY the JSON object.`;
     const response = await callGemini(apiKey, requestBody);
 
     if (!response.ok) {
+      // This endpoint reports failures as 200 + success:false (ocrService reads `error`), so keep
+      // that shape and only swap in the plain-words "busy" message when Gemini was overloaded.
+      const failure = geminiFailure(response.status);
       return res.status(200).json({
         success: false,
-        error: "Failed to process image. Please try again.",
+        error: failure.body.code === "ai_busy" ? failure.body.error : "Failed to process image. Please try again.",
       });
     }
 
