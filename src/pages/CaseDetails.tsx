@@ -39,7 +39,7 @@ import { toLocalISODate, addDaysISO } from '../lib/dates';
 import { countLabel } from '../lib/pluralize';
 import { buildTemplateTaskDrafts, knownAnchorsFromDeadlines, templateHasTiming } from '../lib/tasksFromTemplate';
 import { suggestAdditions, TaskSuggestion } from '../services/geminiService';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Calendar,
@@ -1196,7 +1196,17 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
             className="text-[17px] font-bold text-ink dark:text-plate-ink tracking-tight min-w-0 truncate"
           >
             {currentCase.title}
-            <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">, {client.name}</span>
+            <span className="text-ink-faint dark:text-plate-ink-faint font-semibold">
+              ,{' '}
+              <Link
+                to="/clients"
+                state={{ focusClientId: client.id }}
+                title={`Open ${client.name} in Clients`}
+                className="hover:text-edamame-700 dark:hover:text-edamame-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-edamame-700 rounded-sm"
+              >
+                {client.name}
+              </Link>
+            </span>
           </h1>
           <span className="flex-shrink-0 font-mono text-[10.5px] text-ink-faint dark:text-plate-ink-faint">{displayCaseNumber(currentCase)}</span>
           {visaSubclass && (
