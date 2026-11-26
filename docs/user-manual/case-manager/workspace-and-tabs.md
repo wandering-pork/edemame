@@ -4,8 +4,25 @@
 
 Opening a case lands you on the **Overview** tab — a one-screen summary of where the case is up to:
 
-- **You are here** — the current task (the earliest task that isn't done yet), how many of the
-  case's tasks are done, its due date and status. Click **Open task** to edit it.
+- **Progress path** — across the top, one chevron per **stage** of the case's journey
+  (Consultation, Prerequisites, Preparing for lodgement, …; see Configuration → Stages), in stage
+  order. Finished stages are pale green with a tick, the **current stage** (the stage of the current
+  task) is solid green, stages still to come are grey, and stages with no tasks yet are faded but
+  still shown, so you can see the whole journey. Each chevron shows how many of its tasks are done.
+  A case on hold shows a pause sign on the current stage; a closed case shows its outcome (Granted,
+  Refused, …) at the end.
+  **Click a stage to see its tasks** in the panel underneath: the stage name, how many tasks are
+  done and their date range, then the tasks themselves (finished ones struck through, waiting ones
+  in amber). Clicking a stage never changes anything. Use the left and right arrow keys to move
+  between stages. On a narrow window the chevrons become a **Stage** picker.
+  For the current stage the panel also shows **Next up** — the current task, with **Open task** —
+  and a **Mark stage complete** button. It asks you to confirm first, listing the open tasks it will
+  mark done. Tasks waiting on the client or a third party stay open unless you tick **Mark these
+  done too**; tasks already done or not applicable aren't touched. After **Mark N tasks done**, the
+  next stage becomes current and any estimated dates after it are recalculated. **Undo** on the
+  confirmation message (for about 10 seconds) puts the tasks back as they were.
+  Older cases whose tasks have no stage at all show the case lifecycle stages instead (display only)
+  with the case's task list underneath.
 - **Case info** — client (and applicant, if different), visa subclass (with substream, if set) and work plan, case owner,
   stage, next deadline (click it to jump to the Deadlines panel), and the date the case was opened.
   **Edit** opens the Edit case form, where you can change the title, description, **Visa Subclass**
@@ -19,15 +36,8 @@ Opening a case lands you on the **Overview** tab — a one-screen summary of whe
   Confirmed just saves, with no window.
   The **Stage** here is read-only: it's the stage of the current task (see below), the same as the
   Stage chip in the summary strip under the case title. To close or reopen a case, use **Case actions**.
-- **Progress** — the case's tasks grouped by **stage** (Consultation, Prerequisites, Preparing for
-  lodgement, …; see Configuration → Stages), in stage order. Only the **current stage** — the stage
-  of the current task — is open and highlighted: in it the current task is bold and finished tasks
-  are struck through. Finished stages are folded with a green tick and a struck-through name;
-  stages still to come are folded and grey. Click any stage to open or fold it, click a task to
-  open it, or **View all** to open the Tasks tab. Stages with no tasks are hidden. Older cases whose
-  tasks have no stage at all show the previous simple list (last done, current, next few).
 - **Stage** (in Case info) — read-only; the stage of the current task, so it always matches the
-  groups on the Tasks tab and the Stage chip in the summary strip. It moves on its own as tasks are
+  progress path, the groups on the Tasks tab and the Stage chip in the summary strip. It moves on its own as tasks are
   done. A closed case shows **Closed**.
 - **Document checklist** — a donut showing how many of the case's documents are in overall, then
   one progress bar per checklist category showing how many items are verified, linked, pending, or
@@ -81,7 +91,7 @@ were last using.
 
 ## Tasks by stage
 
-When a case's tasks have stages, the **Tasks** tab groups them the same way as Overview → Progress:
+When a case's tasks have stages, the **Tasks** tab groups them by the same stages as the Overview's progress path:
 one section per stage in stage order, only the current stage open, the current task highlighted
 and bold, finished tasks struck through, finished stages ticked and folded. Every row keeps its
 usual actions (mark done, change status, edit the date, the **⋮** menu).

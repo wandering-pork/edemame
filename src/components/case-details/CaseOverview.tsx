@@ -1,16 +1,16 @@
 import React from 'react';
-import { Check, FileText, Image as ImageIcon, File as FileIcon, ArrowRight, Pause } from 'lucide-react';
+import { FileText, Image as ImageIcon, File as FileIcon, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
-import type { CaseStage, Client, Deadline, Document, Task } from '../../types';
+import type { CaseOutcome, CaseStage, Client, Deadline, Document, Task } from '../../types';
 import { STAGE_META } from '../../lib/caseStage';
 import { caseStageName } from '../../lib/caseStageSync';
 import { DEADLINE_KIND_LABELS, daysLeft } from '../../lib/deadlines';
-import { TASK_STATUS_LABELS, isWaiting } from '../../lib/taskStatus';
 import type { ChecklistCategorySummary, TimelineEntry } from '../../lib/caseOverview';
 import { DocumentUpload } from '../DocumentUpload';
 import { subclassShortLabel } from '../../lib/visaTypes';
 import type { CasePhaseView } from '../../lib/phaseGrouping';
-import { PhaseTaskGroups } from './PhaseTaskGroups';
+import type { PathStage } from '../../lib/progressPath';
+import { ProgressPath } from './ProgressPath';
 
 function fileIconFor(fileType: string) {
   if (fileType.startsWith('image/')) return ImageIcon;
@@ -104,8 +104,13 @@ interface CaseOverviewProps {
   timeline: TimelineEntry[];
   hiddenTaskCount: number;
   onViewAllTasks: () => void;
-  /** Tasks grouped by phase; when set and `hasPhases`, Progress shows phases instead of the flat timeline. */
+  /** Tasks grouped by phase; names the case's Stage in Case info. */
   phaseView?: CasePhaseView;
+  /** Every stage of the journey for the progress path, or null for an older case with no stage information. */
+  pathStages: PathStage[] | null;
+  closed: boolean;
+  outcome?: CaseOutcome;
+  onCompleteStage: (stageName: string, updates: Task[]) => Promise<void>;
 
   client: Client;
   applicant?: Client;
@@ -134,17 +139,18 @@ interface CaseOverviewProps {
 }
 
 /**
- * Case Details landing view (design option D, option C's overview): a "You
- * are here" current-task hero, then case info + progress on the left and the
- * document checklist (overall donut + per-category bars) + recent case files
- * on the right. The floating Workspace bar is rendered separately by
+ * Case Details landing view: the progress path across the top (every stage of
+ * the case, the selected stage's tasks underneath, and "Mark stage complete"
+ * for the current one; see ProgressPath.tsx), then case info + recent case
+ * files on the left and the document checklist (overall donut + per-category
+ * bars) on the right. The floating Workspace bar is rendered separately by
  * `CaseDetails.tsx` (see `WorkspaceDock.tsx`).
  */
 export const CaseOverview: React.FC<CaseOverviewProps> = props => {
   const {
     stage, onHold,
     currentTask, openTaskCount, totalTaskCount, onOpenTask,
-    timeline, hiddenTaskCount, onViewAllTasks, phaseView,
+    timeline, hiddenTaskCount, onViewAllTasks, phaseView, pathStages, closed, outcome, onCompleteStage,
     client, applicant, visaSubclass, visaSubstream, templateTitle, ownerName, openedAt, nextDeadline, description, onEditCase, onOpenDeadlines,
     checklistRows, checklistTotal, checklistDone, onOpenChecklist, onGenerateChecklist,
     documents, caseId, onOpenDocument, onViewAllFiles, onDocumentUploaded, onRequestCompress,
@@ -155,55 +161,24 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
 
   return (
     <div className="mt-4 space-y-3.5">
-      {/* ── You are here: current task ── */}
-      <section className="flex items-center gap-4 flex-wrap rounded-xl border border-ink/15 dark:border-plate-ink/20 border-l-4 border-l-edamame bg-paper-2 dark:bg-plate-card shadow-sm px-[18px] py-3.5">
-          {currentTask ? (
-            <>
-              <div className="min-w-0">
-                <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
-                  You are here{phaseView?.hasPhases ? ` · ${phaseView.currentPhaseName}` : ''} · {totalTaskCount - openTaskCount} of {totalTaskCount} tasks done
-                </div>
-                <div className="text-[18px] font-bold text-ink dark:text-plate-ink tracking-tight truncate">{currentTask.title}</div>
-                <div className="text-[11.5px] text-ink-soft dark:text-plate-ink-soft">
-                  Due {fmtDate(currentTask.date)}
-                  {currentTask.datePending && ' (estimated)'}
-                  {currentTask.status !== 'not_started' && ` · ${TASK_STATUS_LABELS[currentTask.status]}`}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => onOpenTask(currentTask)}
-                className="btn-press ml-auto px-3.5 py-1.5 bg-edamame hover:bg-edamame-600 text-white font-bold rounded-lg text-xs transition-colors"
-              >
-                Open task
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="min-w-0">
-                <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">Current task</div>
-                <div className="text-[14px] font-bold text-ink dark:text-plate-ink">
-                  {totalTaskCount === 0 ? 'No tasks yet' : 'All tasks are done'}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onViewAllTasks}
-                className="btn-press ml-auto px-3.5 py-1.5 border border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft hover:border-edamame hover:text-edamame font-bold rounded-lg text-xs transition-colors"
-              >
-                {totalTaskCount === 0 ? 'Plan tasks' : 'View tasks'}
-              </button>
-            </>
-          )}
-          {onHold && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
-              <Pause size={12} /> On hold
-            </span>
-          )}
-      </section>
+      <ProgressPath
+        stages={pathStages}
+        currentTask={currentTask}
+        onOpenTask={onOpenTask}
+        onViewAllTasks={onViewAllTasks}
+        onHold={onHold}
+        closed={closed}
+        outcome={outcome}
+        onCompleteStage={onCompleteStage}
+        lifecycleStage={stage}
+        timeline={timeline}
+        hiddenTaskCount={hiddenTaskCount}
+        openTaskCount={openTaskCount}
+        totalTaskCount={totalTaskCount}
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-3.5 items-start">
-        {/* ── Left: case info + timeline ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
+        {/* ── Left: case info + recent files ── */}
         <div className="space-y-3.5 min-w-0">
           <section className={cardCls}>
             <CardTitle action={<LinkButton onClick={onEditCase}>Edit</LinkButton>}>Case info</CardTitle>
@@ -268,67 +243,50 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
             )}
           </section>
 
+
           <section className={cardCls}>
             <CardTitle
-              badge={totalTaskCount > 0 ? (
+              badge={documents.length > 0 ? (
                 <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-paper dark:bg-plate text-ink-soft dark:text-plate-ink-soft">
-                  {totalTaskCount - openTaskCount} of {totalTaskCount} done
+                  {documents.length} total
                 </span>
               ) : undefined}
-              action={<LinkButton onClick={onViewAllTasks}>{hiddenTaskCount > 0 ? `View all ${totalTaskCount}` : 'Open tasks'} <ArrowRight size={11} /></LinkButton>}
+              action={documents.length > 0 ? <LinkButton onClick={onViewAllFiles}>View all files <ArrowRight size={11} /></LinkButton> : undefined}
             >
-              Progress
+              Recent case files
             </CardTitle>
-            {phaseView?.hasPhases ? (
-              <PhaseTaskGroups view={phaseView} onOpenTask={onOpenTask} compact />
-            ) : timeline.length === 0 ? (
-              <p className="text-[12px] text-ink-faint dark:text-plate-ink-faint">No tasks on this case yet.</p>
+            <DocumentUpload caseId={caseId} visaSubclass={visaSubclass} onUpload={onDocumentUploaded} onRequestCompress={onRequestCompress} compact />
+            {recentDocs.length === 0 ? (
+              <p className="mt-2 text-[12px] text-ink-faint dark:text-plate-ink-faint">No files in this case yet.</p>
             ) : (
-              <ol>
-                {timeline.map(({ task, state }, i) => {
-                  const last = i === timeline.length - 1;
+              <ul className="mt-2 divide-y divide-ink/10 dark:divide-plate-ink/15">
+                {recentDocs.map(doc => {
+                  const Icon = fileIconFor(doc.fileType);
                   return (
-                    <li key={task.id} className="relative flex gap-3 pb-3 last:pb-0">
-                      {!last && <span aria-hidden className="absolute left-[9px] top-6 bottom-0 w-0.5 bg-ink/10 dark:bg-plate-ink/15" />}
-                      <span
-                        className={`relative mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center border-2 ${
-                          state === 'done'
-                            ? 'bg-edamame border-edamame text-white'
-                            : state === 'current'
-                              ? 'bg-paper-2 dark:bg-plate-card border-edamame ring-4 ring-edamame/15'
-                              : 'bg-paper-2 dark:bg-plate-card border-ink/15 dark:border-plate-ink/20'
-                        }`}
-                      >
-                        {state === 'done' && <Check size={11} strokeWidth={3} />}
-                        {state === 'current' && <span className="w-2 h-2 rounded-full bg-edamame" />}
-                      </span>
-                      <button type="button" onClick={() => onOpenTask(task)} className="min-w-0 text-left group">
-                        <div
-                          className={`text-[13px] truncate group-hover:text-edamame ${
-                            state === 'current'
-                              ? 'font-bold text-ink dark:text-plate-ink'
-                              : state === 'done'
-                                ? 'text-ink-soft dark:text-plate-ink-soft'
-                                : 'text-ink-faint dark:text-plate-ink-faint'
-                          }`}
-                        >
-                          {task.title}
-                        </div>
-                        <div className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
-                          {state === 'done'
-                            ? `${TASK_STATUS_LABELS[task.status]} · ${fmtDate(task.date)}`
-                            : `${task.datePending ? 'Est.' : 'Due'} ${fmtDate(task.date)}${isWaiting(task) ? ` · ${TASK_STATUS_LABELS[task.status]}` : ''}`}
-                        </div>
+                    <li key={doc.id}>
+                      <button type="button" onClick={() => onOpenDocument(doc)} className="w-full flex items-center gap-2.5 py-2 text-left group">
+                        <span className="w-8 h-8 rounded-lg bg-paper dark:bg-plate flex items-center justify-center flex-shrink-0">
+                          <Icon size={14} className="text-ink-soft dark:text-plate-ink-soft" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[12.5px] text-ink dark:text-plate-ink truncate group-hover:text-edamame">{doc.fileName}</span>
+                          <span className="block text-[11px] text-ink-faint dark:text-plate-ink-faint">{fmtDate(doc.uploadedAt, 'd MMM yyyy')}</span>
+                        </span>
+                        {doc.documentTypeCode && (
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-paper dark:bg-plate text-ink-soft dark:text-plate-ink-soft flex-shrink-0">
+                            {doc.documentTypeCode}
+                          </span>
+                        )}
                       </button>
                     </li>
                   );
                 })}
-              </ol>
+              </ul>
             )}
           </section>
         </div>
 
-        {/* ── Right: checklist + recent files ── */}
+        {/* ── Right: document checklist ── */}
         <div className="space-y-3.5 min-w-0">
           <section className={cardCls}>
             <CardTitle
@@ -385,46 +343,6 @@ export const CaseOverview: React.FC<CaseOverviewProps> = props => {
             )}
           </section>
 
-          <section className={cardCls}>
-            <CardTitle
-              badge={documents.length > 0 ? (
-                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-paper dark:bg-plate text-ink-soft dark:text-plate-ink-soft">
-                  {documents.length} total
-                </span>
-              ) : undefined}
-              action={documents.length > 0 ? <LinkButton onClick={onViewAllFiles}>View all files <ArrowRight size={11} /></LinkButton> : undefined}
-            >
-              Recent case files
-            </CardTitle>
-            <DocumentUpload caseId={caseId} visaSubclass={visaSubclass} onUpload={onDocumentUploaded} onRequestCompress={onRequestCompress} compact />
-            {recentDocs.length === 0 ? (
-              <p className="mt-2 text-[12px] text-ink-faint dark:text-plate-ink-faint">No files in this case yet.</p>
-            ) : (
-              <ul className="mt-2 divide-y divide-ink/10 dark:divide-plate-ink/15">
-                {recentDocs.map(doc => {
-                  const Icon = fileIconFor(doc.fileType);
-                  return (
-                    <li key={doc.id}>
-                      <button type="button" onClick={() => onOpenDocument(doc)} className="w-full flex items-center gap-2.5 py-2 text-left group">
-                        <span className="w-8 h-8 rounded-lg bg-paper dark:bg-plate flex items-center justify-center flex-shrink-0">
-                          <Icon size={14} className="text-ink-soft dark:text-plate-ink-soft" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[12.5px] text-ink dark:text-plate-ink truncate group-hover:text-edamame">{doc.fileName}</span>
-                          <span className="block text-[11px] text-ink-faint dark:text-plate-ink-faint">{fmtDate(doc.uploadedAt, 'd MMM yyyy')}</span>
-                        </span>
-                        {doc.documentTypeCode && (
-                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-paper dark:bg-plate text-ink-soft dark:text-plate-ink-soft flex-shrink-0">
-                            {doc.documentTypeCode}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
         </div>
       </div>
     </div>

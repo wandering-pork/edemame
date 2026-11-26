@@ -19,6 +19,7 @@ import { useEdieChat } from '../components/edie/useEdieChat';
 import { useEdie } from '../contexts/EdieContext';
 import { EdieButton } from '../components/edie/EdieButton';
 import { CaseOverview } from '../components/case-details/CaseOverview';
+import { pathStages } from '../lib/progressPath';
 import { currentFocusTask, taskTimeline, checklistBreakdown, suggestQuickActions } from '../lib/caseOverview';
 import { DocumentChecklistGenerator, ADDITIONAL_DOCUMENTS_CATEGORY } from '../components/case-details/DocumentChecklistGenerator';
 import { DocumentTypePicker, DocumentTypeBadge } from '../components/DocumentTypePicker';
@@ -108,6 +109,8 @@ interface CaseDetailsProps {
   onUpdateCase: (caseItem: Case) => void;
   /** Applies a confirmed subclass / Work Plan change in one batch (Work Plans step 4). */
   onChangeCasePlan: (change: PlanChangeResult) => Promise<void>;
+  /** Overview → Mark stage complete: saves the stage's tasks in one batch. */
+  onCompleteStage: (caseId: string, stageName: string, updates: Task[]) => Promise<void>;
   /** Deletes the case with its tasks and deadlines, and updates app state. */
   onDeleteCase: (caseId: string) => Promise<void>;
   /** Every Work Plan — offered in the subclass-change window. */
@@ -176,6 +179,7 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
   onUpdateDeadline,
   onUpdateCase,
   onChangeCasePlan,
+  onCompleteStage,
   onDeleteCase,
   templates,
   onBack
@@ -319,12 +323,16 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
     return allDeadlines(relevant, [client]).sort((a, b) => daysLeft(a, new Date()) - daysLeft(b, new Date()));
   }, [deadlines, caseItem.id, client]);
 
-  // Tasks grouped by phase (Work Plans step 3) — drives Overview → Progress,
+  // Tasks grouped by phase (Work Plans step 3) — drives the Overview progress path,
   // the Tasks tab, the current task and the read-only Phase in Case info.
   const { casePhases } = useVisaConfig();
   const phaseView = useMemo(
     () => buildCasePhaseView(caseTasks, casePhases, workflowTemplate?.steps, visaSubclass),
     [caseTasks, casePhases, workflowTemplate, visaSubclass],
+  );
+  const progressStages = useMemo(
+    () => pathStages(phaseView, casePhases, { visaSubclass, closed: currentCase.stage === 'closed' }),
+    [phaseView, casePhases, visaSubclass, currentCase.stage],
   );
   const phaseChoices = useMemo(
     () => phaseChoicesForCase(caseTasks, casePhases, workflowTemplate?.steps, visaSubclass),
@@ -1377,6 +1385,10 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
               visaSubclass={visaSubclass}
               visaSubstream={currentCase.visaSubstream}
               phaseView={phaseView}
+              pathStages={progressStages}
+              closed={currentCase.stage === 'closed'}
+              outcome={currentCase.outcome}
+              onCompleteStage={(stageName, updates) => onCompleteStage(currentCase.id, stageName, updates)}
               templateTitle={workflowTemplate?.title}
               ownerName={ownerName}
               openedAt={currentCase.startDate || currentCase.createdAt}

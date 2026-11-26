@@ -29,7 +29,7 @@ export function phaseName(phases: CasePhase[], ref: string | undefined | null): 
 }
 
 /** Sort rank of a phase ref in the firm's phase order. Unknown refs (a deleted phase) sort last. */
-function phaseRank(phases: CasePhase[], ref: string): number {
+export function phaseRank(phases: CasePhase[], ref: string): number {
   const sorted = sortCasePhases(phases);
   const i = sorted.findIndex(p => phaseRef(p) === ref || p.id === ref);
   if (i >= 0) return i;
@@ -143,7 +143,7 @@ export function caseHasPhaseInfo(tasks: Task[], steps: WorkflowStep[] = []): boo
 }
 
 /**
- * Groups a case's tasks by phase for Case Details (Overview → Progress and
+ * Groups a case's tasks by phase for Case Details (the Overview progress path and
  * the Tasks tab). Only the current phase is meant to be unfolded.
  */
 export function buildCasePhaseView(

@@ -166,9 +166,10 @@ Everything that used to be in this menu now has one home elsewhere:
 
 ## Landing on the Overview tab
 
-Every time you open a case, you land on the **Overview** tab: a "You are here" card with the
-current task across the top, then case info and the case's progress on the left and the document
-checklist (an overall donut plus a bar per category) and recent case files on the right. Click **Ask Edie** in the case
+Every time you open a case, you land on the **Overview** tab: the progress path across the top
+(every stage of the case, with the selected stage's tasks and **Mark stage complete** for the
+current one underneath), then case info and recent case files on the left and the document
+checklist (an overall donut plus a bar per category) on the right. Click **Ask Edie** in the case
 header (or press **Ctrl+J**) for suggested next steps, AI skills and the case chat. See
 [Overview, Edie, and tabs](./workspace-and-tabs.md) for how the Overview, Edie and the case's tabs
 work, and [Document Checklist](./document-checklist.md) for the renamed/upgraded

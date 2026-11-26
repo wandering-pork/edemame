@@ -313,6 +313,13 @@
         to { transform: translateY(0); opacity: 1; }
       }
       @media (prefers-reduced-motion: reduce) { .ed-edie, .edie-count-in, .edie-tip-in { animation: none; } }
+      /* Overview progress path: the stage panel eases in when another stage is selected. */
+      .path-panel-in { animation: pathPanelIn 0.18s ease-out; }
+      @keyframes pathPanelIn {
+        from { opacity: 0; transform: translateY(3px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @media (prefers-reduced-motion: reduce) { .path-panel-in { animation: none; } }
 
       /* Badge pulse for notifications */
       @keyframes badgePulse {
