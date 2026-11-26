@@ -851,6 +851,10 @@ const AppShell: React.FC = () => {
     });
   }, [pushUsageEvent]);
 
+  const handleTrialConverted = useCallback((audience: 'client' | 'self') => {
+    pushUsageEvent({ type: 'trial_converted', metadata: { trialAudience: audience } });
+  }, [pushUsageEvent]);
+
   const handleUpdateClient = useCallback(async (updatedClient: Client) => {
     await repos.clients.update(updatedClient);
     setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
@@ -982,6 +986,7 @@ const AppShell: React.FC = () => {
                 templates={templates}
                 cases={cases}
                 onEligibilityChecked={handleEligibilityChecked}
+                onTrialConverted={handleTrialConverted}
                 onAddClient={handleAddClient}
                 onDeleteClient={handleDeleteClient}
                 onTasksConfirmed={handleTasksConfirmed}
@@ -1128,6 +1133,7 @@ interface VisaAdvisorRouteProps {
   templates: WorkflowTemplate[];
   cases: Case[];
   onEligibilityChecked: (usage: { promptTokens: number; candidatesTokens: number; totalTokens: number; estimatedCostUsd: number }) => void;
+  onTrialConverted: (audience: 'client' | 'self') => void;
   onAddClient: (client: Client) => Promise<void>;
   onDeleteClient: (id: string) => Promise<void>;
   onTasksConfirmed: (tasks: Task[], newCase: Case) => Promise<void>;
@@ -1181,6 +1187,7 @@ const VisaAdvisorRoute: React.FC<VisaAdvisorRouteProps> = (props) => {
       cases={props.cases}
       onOpenNewCase={handleOpenNewCase}
       onEligibilityChecked={props.onEligibilityChecked}
+      onTrialConverted={props.onTrialConverted}
     />
   );
 };

@@ -13,6 +13,7 @@ import { saveTrialScenario, type TrialAudience } from '@/lib/trialCarryOver';
 import { useTurnstile } from '@/lib/useTurnstile';
 import {
   isFullMatch,
+  recordTrialEvent,
   runTrialCheck,
   TrialError,
   type TrialErrorCode,
@@ -315,7 +316,7 @@ export const TryAdvisorSheet: React.FC<TryAdvisorSheetProps> = ({ open, onClose 
               </div>
               <div className="fl-try__bar">
                 <span />
-                <button type="button" className="fl-btn" onClick={() => { setStep(1); setScreen('questions'); }}>Continue</button>
+                <button type="button" className="fl-btn" onClick={() => { recordTrialEvent('started', audience); setStep(1); setScreen('questions'); }}>Continue</button>
               </div>
             </>
           )}
@@ -408,7 +409,7 @@ export const TryAdvisorSheet: React.FC<TryAdvisorSheetProps> = ({ open, onClose 
               <div className="fl-try__actions">
                 {problem === 'trial_limit' || problem === 'trial_paused' ? (
                   audience === 'self' ? (
-                    <a className="fl-btn" href={AGENT_REGISTER_URL} target="_blank" rel="noopener noreferrer">Find a registered agent</a>
+                    <a className="fl-btn" href={AGENT_REGISTER_URL} target="_blank" rel="noopener noreferrer" onClick={() => recordTrialEvent('register_click', 'self')}>Find a registered agent</a>
                   ) : (
                     <>
                       <button type="button" className="fl-btn" onClick={() => setScreen('signup')}>Create account</button>
@@ -537,7 +538,7 @@ const SelfResult: React.FC<{ result: Extract<TrialResult, { audience: 'self' }>;
           Only a registered migration agent or an immigration lawyer can advise you on your situation. You can
           search the government’s register of registered agents.
         </p>
-        <a className="fl-btn" href={AGENT_REGISTER_URL} target="_blank" rel="noopener noreferrer">Find a registered agent</a>
+        <a className="fl-btn" href={AGENT_REGISTER_URL} target="_blank" rel="noopener noreferrer" onClick={() => recordTrialEvent('register_click', 'self')}>Find a registered agent</a>
       </div>
       <p className="fl-try__foot">
         {result.remainingToday === 1 ? '1 free check left today.' : `${result.remainingToday} free checks left today.`}{' '}

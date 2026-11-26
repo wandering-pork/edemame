@@ -16,6 +16,7 @@ import {
   utcDay,
 } from "./_lib/tryAdvisor";
 import { turnstileConfigured, verifyTurnstile } from "./_lib/turnstile";
+import { bumpTrialEvent } from "./_lib/tryAdvisorEvents";
 
 // The public, signed-out Visa Advisor trial (docs/plans/public-visa-advisor-trial.md, VA.1).
 //
@@ -99,6 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const counts = await rpc<{ ip_count: number; global_count: number }>("try_advisor_check", { p_ip_hash: ipHash, p_day: day });
     ipCount = counts?.ip_count ?? 0;
     if (ipCount >= limits.perIp || (counts?.global_count ?? 0) >= limits.global) {
+      await bumpTrialEvent(day, audience, "limited");
       return res.status(429).json({
         error: "You've used today's free checks. Create a free account to keep going.",
         code: "trial_limit",
@@ -166,6 +168,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error("try-eligibility: recording the check failed:", error);
     });
 
+    await bumpTrialEvent(day, audience, "completed");
     const remainingToday = Math.max(0, limits.perIp - (ipCount + 1));
     return res.status(200).json(buildTrialResponse(audience, matches, remainingToday, rankingToken, hideBest));
   } catch (error) {

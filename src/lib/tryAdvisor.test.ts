@@ -133,3 +133,14 @@ describe('hashToken', () => {
     expect(hashToken('abc')).toMatch(/^[0-9a-f]{64}$/);
   });
 });
+
+describe('parsePageEventKind', () => {
+  it('lets the page report only started and register_click', async () => {
+    const { parsePageEventKind } = await import('../../api/_lib/tryAdvisor');
+    expect(parsePageEventKind('started')).toBe('started');
+    expect(parsePageEventKind('register_click')).toBe('register_click');
+    expect(parsePageEventKind('completed')).toBeNull();
+    expect(parsePageEventKind('limited')).toBeNull();
+    expect(parsePageEventKind(7)).toBeNull();
+  });
+});

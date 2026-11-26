@@ -13,10 +13,10 @@ account. It's meant as a top-of-funnel conversion lever.
 | # | Work | Size (rough) | Migration | Status |
 |---|------|--------------|-----------|--------|
 | VA.0 | Require sign-in on the three AI endpoints | S | No | **Done** (#94, merged 2026-11-26) |
-| VA.1 | Public trial endpoint `api/try-eligibility.ts` with abuse protection | M · 2 days | **Yes** | Not started |
-| VA.2a | Extract the wizard out of `VisaAdvisor.tsx`, styleable (pure refactor) | S · 1 day | No | Not started |
-| VA.2b | "Try out our Visa Advisor" on the homepage: sheet, teaser, sign-up, carry-over | M · 3 days | No | Not started |
-| VA.3 | Measure it: starts, completions, limit hits, conversions, referrals, by audience | S · ½ day | Yes (columns) | Not started |
+| VA.1 | Public trial endpoint `api/try-eligibility.ts` with abuse protection | M · 2 days | **Yes** | **Built** (#99), migration applied |
+| VA.2a | Extract the wizard out of `VisaAdvisor.tsx`, styleable (pure refactor) | S · 1 day | No | **Built** (#99) |
+| VA.2b | "Try out our Visa Advisor" on the homepage: sheet, teaser, sign-up, carry-over | M · 3 days | No | **Built** (#99) |
+| VA.3 | Measure it: starts, completions, limit hits, conversions, register clicks, by audience | S · ½ day | Yes | **Built** (#99), migration applied |
 | VA.4 | Agency directory for applicants (opt-in firm listings) | M · 3 days | **Yes** | Needs decisions (see VA.4) |
 | VA.5 | Applicant full report behind a one-time payment | L · 1 week+ | **Yes** | Needs decisions + legal review (see VA.5) |
 
@@ -218,18 +218,47 @@ all four error states render in the sheet; the polish checklist passes on deskto
 
 ---
 
-## VA.3 · Measure it
+## VA.3 · Measure it (built)
 
-- Per day, **split by audience**: **started** (sheet opened), **completed** (teaser shown),
-  **limit reached**, **converted** (full check run from a carried-over scenario), and for
-  "Myself" **agent-register link clicks**.
-- Anonymous counts: extra columns on `try_advisor_daily`, bumped by `api/try-eligibility.ts` and
-  a tiny `POST /api/try-event` for started/link-click (same IP-hash limit, no other data). Drop that
-  endpoint if Vercel Web Analytics custom events are enough.
-- **Converted** is a `UsageEvent` (`trial_converted`) via `pushUsageEvent`.
-- Owner-facing only: a documented SQL query in this file.
+Per day and audience (`client` / `self`):
 
----
+| Count | Means | Recorded by |
+|---|---|---|
+| started | chose who the check is for | `api/try-event.ts` (page beacon) |
+| completed | saw a teaser result | `api/try-eligibility.ts` |
+| limited | hit a daily limit | `api/try-eligibility.ts` |
+| register_click | an applicant opened the register of migration agents | `api/try-event.ts` (page beacon) |
+| converted | ran a full check from a carried-over scenario, after signing up | `usage_events` row, type `trial_converted` |
+
+The first four live in `try_advisor_events` (one row per day + audience + kind, a count and nothing
+else; migration `20261126000100_try_advisor_events.sql`, service role only). Known gap: `try-event`
+has no Turnstile or IP limit, so `started`/`register_click` could be inflated; they cost nothing.
+
+**The query** (Supabase SQL editor):
+
+```sql
+with counters as (
+  select day, audience,
+    sum(count) filter (where kind = 'started') as started,
+    sum(count) filter (where kind = 'completed') as completed,
+    sum(count) filter (where kind = 'limited') as limited,
+    sum(count) filter (where kind = 'register_click') as register_clicks
+  from public.try_advisor_events group by day, audience
+), conversions as (
+  select (created_at::timestamptz at time zone 'UTC')::date as day,
+         coalesce(metadata->>'trialAudience', 'client') as audience, count(*) as converted
+  from public.usage_events where type = 'trial_converted' group by 1, 2
+)
+select coalesce(c.day, v.day) as day, coalesce(c.audience, v.audience) as audience,
+  coalesce(c.started, 0) as started, coalesce(c.completed, 0) as completed,
+  coalesce(c.limited, 0) as limited, coalesce(c.register_clicks, 0) as register_clicks,
+  coalesce(v.converted, 0) as converted
+from counters c full join conversions v on v.day = c.day and v.audience = c.audience
+order by day desc, audience;
+```
+
+Days are UTC. `converted` counts only cloud-mode accounts (local-mode usage events live in the
+user's folder).
 
 ## VA.4 · Agency directory for applicants
 

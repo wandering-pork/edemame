@@ -67,3 +67,18 @@ export async function runTrialCheck(params: {
 
 /** True when the applicant teaser includes the best match itself rather than only its verdict. */
 export const isFullMatch = (m: TrialMatch | { verdict: TrialVerdict }): m is TrialMatch => 'visaSubclass' in m;
+
+/**
+ * Counts a trial moment only the page can see (VA.3): "started" or "register_click". Fire and
+ * forget: sendBeacon survives the page navigating away (an outbound register link), and nothing
+ * is ever shown to the visitor if it fails.
+ */
+export function recordTrialEvent(kind: 'started' | 'register_click', audience: TrialAudience): void {
+  const body = JSON.stringify({ kind, audience });
+  try {
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon?.('/api/try-event', body)) return;
+    void fetch('/api/try-event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+  } catch {
+    // counting is best-effort
+  }
+}

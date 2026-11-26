@@ -35,6 +35,15 @@ export function trialLimits(env: Record<string, string | undefined> = process.en
   };
 }
 
+/** Daily counters (VA.3). The page may only report the two it can see; the endpoint counts the rest. */
+export const TRIAL_EVENT_KINDS = ["started", "completed", "limited", "register_click"] as const;
+export type TrialEventKind = (typeof TRIAL_EVENT_KINDS)[number];
+export const PAGE_EVENT_KINDS: readonly TrialEventKind[] = ["started", "register_click"];
+
+export function parsePageEventKind(v: unknown): TrialEventKind | null {
+  return typeof v === "string" && (PAGE_EVENT_KINDS as readonly string[]).includes(v) ? (v as TrialEventKind) : null;
+}
+
 export function parseAudience(v: unknown): TrialAudience | null {
   return v === "client" || v === "self" ? v : null;
 }

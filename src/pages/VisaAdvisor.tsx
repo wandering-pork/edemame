@@ -71,6 +71,8 @@ interface VisaAdvisorProps {
   cases: Case[];
   onOpenNewCase: (params: OpenCaseParams) => Promise<OpenCaseOutcome>;
   onEligibilityChecked?: (usage: EligibilityUsage) => void;
+  /** A full check ran from a scenario carried over from the homepage trial (VA.3). */
+  onTrialConverted?: (audience: 'client' | 'self') => void;
 }
 
 const stepLabels = ['Prospect', 'Intent', 'Background'];
@@ -87,6 +89,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   cases,
   onOpenNewCase,
   onEligibilityChecked,
+  onTrialConverted,
 }) => {
   const repos = useRepositories();
   const [searchParams] = useSearchParams();
@@ -204,6 +207,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
       setReport(data.result);
       setShowAllPathways(false);
       if (trialScenario) {
+        onTrialConverted?.(trialScenario.audience);
         clearTrialScenario();
         setTrialScenario(null);
       }
