@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Case, Client, Task, WorkflowTemplate, TeamMember, DocumentChecklistItem, Deadline } from '../types';
-import { Search, Plus, FileText, ChevronRight, Calendar, UserPlus, AlertTriangle, Users, MoreHorizontal, Copy, Trash2, Check, X, ArrowUpRight, Minus } from 'lucide-react';
+import { Search, Plus, FileText, ChevronRight, UserPlus, AlertTriangle, Users, MoreHorizontal, Copy, Trash2, Check, X, ArrowUpRight, Minus } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 import { NewCase } from './NewCase';
 import { isTaskClosed } from '../lib/taskStatus';
-import { CASE_STAGE_GROUP_LABELS, caseStageGroup, CaseStageGroup } from '../lib/caseStage';
+import { CASE_STAGE_GROUP_LABELS, OUTCOME_LABELS, caseStageGroup, CaseStageGroup } from '../lib/caseStage';
+import { displayCaseNumber } from '../lib/caseNumber';
+import { titleNamesSubclass, titleWithoutClient } from '../lib/caseTitle';
 import { caseStageName } from '../lib/caseStageSync';
 import { computeCaseRisk } from '../lib/risk';
 import { useRepositories } from '../contexts/RepositoryContext';
@@ -53,22 +55,33 @@ const GROUP_FILTERS: { key: GroupFilter; label: string }[] = [
   { key: 'closed', label: CASE_STAGE_GROUP_LABELS.closed },
 ];
 
+// Stage chip colours. Red is kept for At Risk alone, so stages never look
+// like warnings: pre-lodgement is neutral, with the department is the brand
+// green, closed is quiet.
 const GROUP_STYLES: Record<CaseStageGroup, { dot: string; bg: string; text: string }> = {
   pre_lodgement: {
-    dot: '#F59E0B',
-    bg: 'bg-amber-50 dark:bg-amber-900/20',
-    text: 'text-[#B45309] dark:text-[#FBBF24]',
+    dot: 'bg-ink-soft dark:bg-plate-ink-soft',
+    bg: 'bg-ink/[0.06] dark:bg-plate-ink/10',
+    text: 'text-ink dark:text-plate-ink',
   },
   with_department: {
-    dot: '#8B5CF6',
-    bg: 'bg-purple-50 dark:bg-purple-900/20',
-    text: 'text-[#6D28D9] dark:text-[#C4B5FD]',
+    dot: 'bg-edamame-600 dark:bg-edamame-400',
+    bg: 'bg-edamame-50 dark:bg-edamame-900/30',
+    text: 'text-edamame-800 dark:text-edamame-300',
   },
   closed: {
-    dot: '#94A3B8',
-    bg: 'bg-slate-100 dark:bg-slate-800',
-    text: 'text-slate-600 dark:text-slate-300',
+    dot: 'bg-ink-faint dark:bg-plate-ink-faint',
+    bg: 'bg-transparent',
+    text: 'text-ink-soft dark:text-plate-ink-soft',
   },
+};
+
+// Columns, shared by the heading row and every case row so they line up.
+const COL = {
+  next: 'hidden min-[1021px]:block flex-1 min-w-[160px]',
+  progress: 'hidden sm:block w-[130px] flex-shrink-0',
+  stage: 'hidden sm:block w-[176px] flex-shrink-0',
+  risk: 'hidden sm:flex w-[76px] flex-shrink-0',
 };
 
 /** Deterministic 0-360 hue from a string id, for pastel avatar backgrounds. */
@@ -240,7 +253,11 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
       const risk = computeCaseRisk(c, tasks, deadlines, checklistsByCase[c.id], new Date(), template?.steps);
       const subclass = effectiveSubclass(c, template?.visaSubclass);
       const phaseView = buildCasePhaseView(caseTasks, casePhases, template?.steps, subclass);
-      return { case: c, client, applicant, template, owner, ownerName, group, risk, subclass, phaseView, ...rowStatus };
+      // Same next task as the case's own Overview: first open task in stage order
+      // (falls back to the earliest-dated open task for cases with no stages).
+      const nextTask = phaseView.hasPhases ? phaseView.currentTask ?? undefined : rowStatus.nextTask;
+      const isNextOverdue = !!nextTask && !nextTask.datePending && nextTask.date < toLocalISODate();
+      return { case: c, client, applicant, template, owner, ownerName, group, risk, subclass, phaseView, ...rowStatus, nextTask, isNextOverdue };
     });
   }, [searchedCases, clients, tasks, templates, teamMembers, deadlines, checklistsByCase, memberNameFor, casePhases]);
 
@@ -336,12 +353,9 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <h1 className="font-serif text-[28px] md:text-[29px] font-semibold tracking-[-0.02em] text-ink dark:text-plate-ink">
+            <h1 className="text-[26px] font-extrabold text-ink dark:text-plate-ink tracking-[-0.035em]">
               Case Manager
             </h1>
-            <p className="text-[13px] text-ink-soft dark:text-plate-ink-soft mt-1">
-              Track and manage all immigration cases at a glance
-            </p>
           </div>
           <div className="flex items-center gap-2">
             {storageMode === 'cloud' && (
@@ -425,7 +439,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
             id="cm-visa-filter"
             value={visaFilter.subclass}
             onChange={e => setVisaFilter({ subclass: e.target.value, substream: '' })}
-            className={`focus-ring px-3 py-1.5 rounded-full border text-[12px] font-semibold bg-paper dark:bg-plate-card outline-none ${
+            className={`focus-ring max-w-full px-3 py-1.5 rounded-full border text-[12px] font-semibold bg-paper dark:bg-plate-card outline-none ${
               visaFilter.subclass ? 'border-edamame-500 text-edamame-700 dark:text-edamame-400' : 'border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft'
             }`}
           >
@@ -441,7 +455,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                 id="cm-substream-filter"
                 value={visaFilter.substream}
                 onChange={e => setVisaFilter({ ...visaFilter, substream: e.target.value })}
-                className={`focus-ring px-3 py-1.5 rounded-full border text-[12px] font-semibold bg-paper dark:bg-plate-card outline-none ${
+                className={`focus-ring max-w-full px-3 py-1.5 rounded-full border text-[12px] font-semibold bg-paper dark:bg-plate-card outline-none ${
                   visaFilter.substream ? 'border-edamame-500 text-edamame-700 dark:text-edamame-400' : 'border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft'
                 }`}
               >
@@ -455,7 +469,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
             id="cm-phase-filter"
             value={phaseFilter}
             onChange={e => setPhaseFilter(e.target.value)}
-            className={`focus-ring px-3 py-1.5 rounded-full border text-[12px] font-semibold bg-paper dark:bg-plate-card outline-none ${
+            className={`focus-ring max-w-full px-3 py-1.5 rounded-full border text-[12px] font-semibold bg-paper dark:bg-plate-card outline-none ${
               phaseFilter ? 'border-edamame-500 text-edamame-700 dark:text-edamame-400' : 'border-ink/15 dark:border-plate-ink/20 text-ink-soft dark:text-plate-ink-soft'
             }`}
           >
@@ -496,18 +510,38 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
           /* No overflow-hidden here: it would clip each row's ⋯ menu and the At Risk
              tooltip. The first/last rows round their own corners instead. */
           <div className="bg-paper-2/70 dark:bg-plate-card border border-ink/10 dark:border-plate-ink/15 rounded-xl mt-4">
+            {/* Column headings, once, instead of a label inside every row */}
+            <div aria-hidden="true" className="hidden sm:flex items-center gap-4 px-5 pl-6 pt-3 pb-2 text-[11.5px] font-semibold text-ink-faint dark:text-plate-ink-faint border-b border-ink/10 dark:border-plate-ink/15">
+              <span className="w-[34px] flex-shrink-0" />
+              <span className="flex-[1.6] min-w-0">Case</span>
+              <span className={COL.next}>Next task</span>
+              <span className={COL.progress}>Progress</span>
+              <span className={COL.stage}>Stage</span>
+              <span className={COL.risk} />
+              <span className="w-6 flex-shrink-0 text-center">Owner</span>
+              <span className="w-7 flex-shrink-0" />
+              <span className="w-[18px] flex-shrink-0" />
+            </div>
             {filteredRows.map((r) => {
               const c = r.case;
               const client = r.client;
               const hue = hueFromId(client?.id || c.clientId || c.id);
               const groupStyle = GROUP_STYLES[r.group];
-              const ref = `#${c.id.slice(0, 8).toUpperCase()}`;
               // The case's Stage follows its tasks (lib/caseStageSync.ts): the
               // current task's phase, same as Case Details. Cases with no phase
               // info, and closed cases, show the stored stage instead.
               const stageName = caseStageName(c.stage, r.phaseView);
               const stageGroups = r.phaseView.groups;
-              const stageIndex = stageGroups.findIndex(g => g.ref === r.phaseView.currentPhaseRef);
+              const ref = displayCaseNumber(c);
+              const shownTitle = titleWithoutClient(c.title, client?.name);
+              const showSubclassChip = !!r.subclass && !titleNamesSubclass(c.title, r.subclass);
+              const stageLabel = c.stage === 'closed' && c.outcome ? `${stageName} · ${OUTCOME_LABELS[c.outcome]}` : stageName;
+              const stageChip = (
+                <span className={`inline-flex max-w-full items-center gap-1.5 text-[11px] font-bold px-2.5 py-[3px] rounded-md ${groupStyle.bg} ${groupStyle.text}`}>
+                  <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${groupStyle.dot}`} />
+                  <span title={stageLabel} className="truncate">{stageLabel}</span>
+                </span>
+              );
               const isSelected = selected.has(c.id);
 
               return (
@@ -520,7 +554,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                     else handleViewDetails(c.id);
                   }}
                   aria-selected={selecting ? isSelected : undefined}
-                  className={`group table-row-hover relative flex items-center gap-4 px-5 pl-6 py-[15px] border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0 first:rounded-t-xl last:rounded-b-xl ${
+                  className={`group table-row-hover relative flex items-center gap-3 sm:gap-4 px-4 pl-5 sm:px-5 sm:pl-6 py-[14px] border-b border-ink/10 dark:border-plate-ink/15 last:border-b-0 first:rounded-t-xl last:rounded-b-xl ${
                     isSelected ? 'bg-edamame-500/[0.07] dark:bg-edamame-500/10' : 'hover:bg-paper-2 dark:hover:bg-plate/60'
                   }`}
                 >
@@ -567,13 +601,13 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                   {/* Case type + client info */}
                   <div className="flex-[1.6] min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold tracking-[-0.015em] text-ink dark:text-plate-ink whitespace-nowrap overflow-hidden text-ellipsis">
-                        {c.title}
+                      <span title={c.title} className="text-sm font-bold tracking-[-0.015em] text-ink dark:text-plate-ink whitespace-nowrap overflow-hidden text-ellipsis">
+                        {shownTitle}
                       </span>
-                      {r.subclass && (
+                      {showSubclassChip && r.subclass && (
                         <span
                           title={c.visaSubstream || undefined}
-                          className="font-mono text-[9.5px] font-medium px-[7px] py-0.5 rounded-md bg-edamame-500/10 text-edamame-700 dark:text-edamame-400 flex-shrink-0"
+                          className="text-[10px] font-bold px-[7px] py-0.5 rounded-md bg-edamame-500/10 text-edamame-700 dark:text-edamame-400 flex-shrink-0"
                         >
                           {subclassChip(r.subclass)}
                         </span>
@@ -591,90 +625,86 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                         >
                           {client.name}
                         </button>
-                      ) : (client?.name || 'Unknown')} &middot; DOB {client?.dob || 'N/A'} &middot; <span className="font-mono">{ref}</span>
+                      ) : (client?.name || 'Unknown')} &middot; {ref}
+                    </div>
+                    {/* Phones: stage and risk sit under the title instead of in their own columns */}
+                    <div className="sm:hidden mt-1.5 flex items-center gap-1.5 min-w-0">
+                      {stageChip}
+                      {r.risk.atRisk && (
+                        <span className="inline-flex flex-shrink-0 items-center gap-1 text-[11px] font-bold px-2 py-[3px] rounded-md bg-red-50 dark:bg-red-900/20 text-[#B91C1C] dark:text-[#F87171]">
+                          <AlertTriangle size={11} strokeWidth={2.2} aria-hidden /> At Risk
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* Next task */}
-                  <div className="hidden min-[1021px]:block flex-1 min-w-[160px]">
+                  <div className={COL.next}>
                     {r.nextTask ? (
                       <>
-                        <div className="text-[9px] font-bold tracking-[0.11em] uppercase text-ink-faint dark:text-plate-ink-faint">
-                          Next task
-                        </div>
-                        <div className="text-xs font-semibold mt-1 text-ink dark:text-plate-ink whitespace-nowrap overflow-hidden text-ellipsis">
+                        <div className="text-[12.5px] font-semibold text-ink dark:text-plate-ink whitespace-nowrap overflow-hidden text-ellipsis">
                           {r.nextTask.title}
                         </div>
                         <div
-                          className={`font-mono text-[11px] font-medium mt-0.5 ${
-                            r.isNextOverdue ? 'text-red-600 dark:text-red-400' : 'text-ink-soft dark:text-plate-ink-soft'
+                          className={`text-[11.5px] mt-0.5 ${
+                            r.isNextOverdue ? 'font-semibold text-red-600 dark:text-red-400' : 'text-ink-soft dark:text-plate-ink-soft'
                           }`}
                         >
-                          Due {format(new Date(r.nextTask.date), 'MMM d')}
+                          {r.nextTask.datePending ? 'Est.' : 'Due'} {format(new Date(`${r.nextTask.date}T00:00:00`), 'd MMM')}
+                          {r.isNextOverdue && ' · overdue'}
                         </div>
                       </>
                     ) : (
-                      <div className="flex items-center gap-1.5 text-xs text-ink-soft/40 dark:text-plate-ink-soft/40">
-                        <Calendar size={13} strokeWidth={1.8} />
-                        No pending tasks
+                      <div className="text-[12px] text-ink-faint dark:text-plate-ink-faint">
+                        {r.totalTasks === 0 ? 'No tasks yet' : 'All tasks done'}
                       </div>
                     )}
                   </div>
 
-                  {/* Stage progress — one segment per stage this case has tasks in (the
-                      same groups as Case Details' Tasks tab), sized by task count and
-                      filled by how many are done; the current stage is ringed. */}
-                  <div className="hidden sm:flex flex-col gap-1.5 w-[150px] flex-shrink-0">
-                    {r.phaseView.hasPhases && stageGroups.length > 0 ? (
-                      <>
-                        <div
-                          className="flex items-center gap-[2px]"
-                          role="img"
-                          tabIndex={0}
-                          aria-label={`Stages: ${phaseProgressSegments(r.phaseView).map(s => `${s.name} ${s.done} of ${s.total} tasks done`).join(', ')}`}
-                          title={phaseProgressSegments(r.phaseView).map(s => `${s.name}: ${s.done}/${s.total}${s.current ? ' (current)' : ''}`).join('\n')}
-                        >
-                          {phaseProgressSegments(r.phaseView).map(s => (
-                            <span
-                              key={s.ref}
-                              style={{ flexGrow: s.total }}
-                              className={`relative h-1.5 basis-0 rounded-full overflow-hidden bg-ink/10 dark:bg-plate-ink/15 ${s.current ? 'ring-2 ring-edamame-500/30' : ''}`}
-                            >
-                              <span className="absolute inset-y-0 left-0 bg-edamame-500" style={{ width: `${s.total ? (s.done / s.total) * 100 : 0}%` }} />
-                            </span>
-                          ))}
-                        </div>
-                        <span className="text-[10px] text-ink-faint dark:text-plate-ink-faint truncate">
-                          {stageIndex >= 0 && <>Stage {stageIndex + 1} of {stageGroups.length} · </>}
-                          <span className="font-mono">{r.completedTasks}/{r.totalTasks}</span> tasks
-                        </span>
-                      </>
+                  {/* Progress: one segment per stage this case has tasks in (the same
+                      groups as Case Details' Tasks tab), sized by task count and filled by
+                      how many are done; the current stage is ringed. The stage itself is
+                      named in the Stage column, so only the task count is written here. */}
+                  <div className={COL.progress}>
+                    {r.totalTasks === 0 ? (
+                      <span className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint">No tasks yet</span>
                     ) : (
-                      <span className="text-[10px] text-ink-faint dark:text-plate-ink-faint font-mono">
-                        Tasks {r.completedTasks}/{r.totalTasks}
-                      </span>
+                      <div className="flex flex-col gap-1.5">
+                        {r.phaseView.hasPhases && stageGroups.length > 0 && (
+                          <div
+                            className="flex items-center gap-[2px]"
+                            role="img"
+                            tabIndex={0}
+                            aria-label={`Stages: ${phaseProgressSegments(r.phaseView).map(s => `${s.name} ${s.done} of ${s.total} tasks done`).join(', ')}`}
+                            title={phaseProgressSegments(r.phaseView).map(s => `${s.name}: ${s.done}/${s.total}${s.current ? ' (current)' : ''}`).join('\n')}
+                          >
+                            {phaseProgressSegments(r.phaseView).map(s => (
+                              <span
+                                key={s.ref}
+                                style={{ flexGrow: s.total }}
+                                className={`relative h-1.5 basis-0 rounded-full overflow-hidden bg-ink/10 dark:bg-plate-ink/15 ${s.current ? 'ring-2 ring-edamame-500/30' : ''}`}
+                              >
+                                <span className="absolute inset-y-0 left-0 bg-edamame-500" style={{ width: `${s.total ? (s.done / s.total) * 100 : 0}%` }} />
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <span className="text-[11px] text-ink-faint dark:text-plate-ink-faint">
+                          {r.completedTasks} of {r.totalTasks} tasks done
+                        </span>
+                      </div>
                     )}
                   </div>
 
-                  {/* Stage chip — fixed-width slot so rows align regardless of label length */}
-                  <div className="w-[130px] flex-shrink-0">
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-[10.5px] font-bold px-2.5 py-[3px] rounded-md ${groupStyle.bg} ${groupStyle.text}`}
-                    >
-                      <span
-                        className="badge-pulse w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        style={{ background: groupStyle.dot }}
-                      />
-                      <span title={stageName} className="whitespace-nowrap overflow-hidden text-ellipsis">{stageName}</span>
-                    </span>
-                  </div>
+                  {/* Stage chip, wide enough for "Preparing for lodgement" */}
+                  <div className={COL.stage}>{stageChip}</div>
 
                   {/* At Risk badge — fixed-width slot (always rendered, empty when not at
                       risk) so the owner/chevron columns after it never shift row to row.
                       Reasons are visible on hover AND keyboard focus, not only a title
                       attribute, and the tooltip opens leftward/right-aligned to the badge
                       so it stays inside the card instead of being clipped by the right edge. */}
-                  <div className="w-[80px] flex-shrink-0 flex justify-start">
+                  <div className={`${COL.risk} justify-start`}>
                     {r.risk.atRisk && (
                       <span
                         tabIndex={0}
@@ -697,7 +727,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                   {/* Owner / assign */}
                   {r.owner ? (
                     <div
-                      className="w-6 h-6 rounded-full bg-gradient-to-br from-edamame-400 to-edamame-600 text-white flex items-center justify-center text-[9.5px] font-bold flex-shrink-0"
+                      className="w-6 h-6 rounded-full bg-edamame-700 text-white flex items-center justify-center text-[9.5px] font-bold flex-shrink-0"
                       title={`Owned by ${r.owner.name}`}
                     >
                       {r.owner.avatar || initialsOf(r.owner.name)}
@@ -738,7 +768,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                         setMenuCaseId(id => (id === c.id ? null : c.id));
                       }}
                       className={`focus-ring w-7 h-7 rounded-lg flex items-center justify-center text-ink-faint dark:text-plate-ink-faint hover:bg-ink/[0.06] dark:hover:bg-plate-ink/10 hover:text-ink dark:hover:text-plate-ink transition-opacity ${
-                        menuCaseId === c.id ? 'opacity-100 bg-ink/[0.06] dark:bg-plate-ink/10' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                        menuCaseId === c.id ? 'opacity-100 bg-ink/[0.06] dark:bg-plate-ink/10' : 'max-sm:opacity-100 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
                       }`}
                     >
                       <MoreHorizontal size={16} />
@@ -790,7 +820,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                     aria-label={`Open ${c.title}`}
                     tabIndex={-1}
                     onClick={(e) => { e.stopPropagation(); handleViewDetails(c.id); }}
-                    className="flex-shrink-0 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-edamame-600"
+                    className="hidden sm:block flex-shrink-0 text-ink-soft/40 dark:text-plate-ink-soft/40 hover:text-edamame-600"
                   >
                     <ChevronRight size={18} strokeWidth={1.8} />
                   </button>

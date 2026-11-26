@@ -24,6 +24,23 @@ already-owned case, and so does **Assign…** in a row's **⋯** menu (see below
 
 ## Managing cases from the list
 
+The list has one heading row (**Case**, **Next task**, **Progress**, **Stage**, **Owner**). Each
+row shows:
+- the case title, with the client's name and the case number (for example EDM-2026-0004)
+  underneath. When the title already ends with the client's name, or already names the subclass,
+  the row doesn't repeat it (the full title shows when you hover over it);
+- the **next task**: the same task the case's Overview shows as Next up (the first open task in
+  stage order), with its date. "Est." marks an estimated date; a missed firm date shows in red
+  with "overdue". A case with no tasks says **No tasks yet**; one with every task done says
+  **All tasks done**;
+- **progress**, the stage bar described below, with "N of M tasks done";
+- the **Stage** chip and, if the case is at risk, an **At Risk** badge (the row also has a red
+  edge);
+- the case owner, the **⋯** menu, and an arrow to open the case.
+
+On a phone the row shows just the title, client and case number, with the stage and At Risk
+underneath, plus the owner and the **⋯** menu.
+
 Click the client's name under a case's title to open that client on the **Clients** page (their
 row expanded, showing their details and case history). Clicking anywhere else on the row opens the
 case.
@@ -81,7 +98,8 @@ has one primary button, **Add Task**, a small **Case actions** menu (see below),
 which opens the AI assistant. On screens narrower than a large desktop, **Case actions** shows as a
 **⋯** button and a long case title is shortened (hover over it to see the full title), so the header
 stays on one line.
-The client's name after the case title is a link to that client on the **Clients** page.
+The client's name after the case title is a link to that client on the **Clients** page (when
+the title already ends with the client's name, the name isn't repeated; use Case info instead).
 
 ### Case stage, on hold, and At Risk
 
@@ -127,13 +145,14 @@ instead of) the Pre-lodgement/With Department/Closed board filters.
 
 Each case row shows its **Stage** the same way Case Details does:
 
-- the **Stage** chip — the case's current stage name (e.g. "Prerequisites"), coloured by its board
-  (Pre-lodgement, With Department, Closed). A closed case shows **Closed**; an older case whose tasks
-  have no stages shows the stage it was already at.
+- the **Stage** chip — the case's current stage name (e.g. "Prerequisites"). Pre-lodgement stages
+  are grey, stages with the Department are green, and closed cases are plain text with their
+  outcome (for example **Closed · Granted**). Red is used only for **At Risk**. An older case whose
+  tasks have no stages shows the stage it was already at.
 - a **progress bar** — one segment per stage the case has tasks in (the same groups as the case's
   Tasks tab), each filled by how many of its tasks are done, with the current stage ringed. Under it,
-  "Stage 2 of 4 · 5/12 tasks". Hover or focus the bar to see each stage's count. Cases whose tasks
-  have no stages just show the task count.
+  "5 of 12 tasks done". Hover or focus the bar to see each stage's count. Cases whose tasks have no
+  stages just show the task count.
 
 ### Visa and stage filters
 
