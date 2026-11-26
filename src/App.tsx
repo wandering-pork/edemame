@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Toaster, toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -51,13 +51,24 @@ import { describePlanSource, buildTaskPlanSummary } from './lib/planActivity';
 import type { PlanChangeResult } from './lib/visaPlanChange';
 import { buildCasePhaseView } from './lib/phaseGrouping';
 import { syncedCaseStage } from './lib/caseStageSync';
+import { canApplyRefetch, createWriteTracker, trackRepositoryWrites } from './lib/writeTracker';
 
 // ---------------------------------------------------------------------------
 // Inner app — has access to repositories and router
 // ---------------------------------------------------------------------------
 
 const AppShell: React.FC = () => {
-  const repos = useRepositories();
+  const rawRepos = useRepositories();
+  // Writes to the entities the refetch-on-focus below replaces (cases/tasks/deadlines) are
+  // tracked, so a refetch never overwrites an edit whose save is still in flight — see
+  // lib/writeTracker.ts. Reads and every other repository pass through untouched.
+  const writeTracker = useMemo(() => createWriteTracker(), []);
+  const repos = useMemo(() => ({
+    ...rawRepos,
+    cases: trackRepositoryWrites(rawRepos.cases, writeTracker),
+    tasks: trackRepositoryWrites(rawRepos.tasks, writeTracker),
+    deadlines: trackRepositoryWrites(rawRepos.deadlines, writeTracker),
+  }), [rawRepos, writeTracker]);
   const storageMode = useStorageMode();
   const { collapsed } = useSidebar();
   const { open: edieOpen } = useEdie();
@@ -215,22 +226,33 @@ const AppShell: React.FC = () => {
     const onFocus = () => {
       const now = Date.now();
       if (now - lastFocusRefetch.current < REFETCH_MIN_INTERVAL_MS) return;
+      // A save is still in progress: skip this round rather than risk pulling back the old row.
+      // The next focus will try again (the debounce isn't consumed).
+      if (writeTracker.pending() > 0) return;
       lastFocusRefetch.current = now;
+      const startGeneration = writeTracker.generation();
       // notifications is included here (Step 1 · 1G.7) so an "assigned to
       // you" notification another firm member's save triggered actually
       // shows up when this tab regains focus, not just on the next full load.
       Promise.all([repos.cases.getAll(), repos.tasks.getAll(), repos.deadlines.getAll(), repos.notifications.getAll()])
         .then(([cs, t, d, notifs]) => {
+          // Notifications are per-user and never written from here, so they're always safe.
+          setNotifications(notifs);
+          // A save started while we were fetching: this result may predate it, so drop it and
+          // let the next focus refetch pick up the settled state.
+          if (!canApplyRefetch(writeTracker, startGeneration)) {
+            lastFocusRefetch.current = 0;
+            return;
+          }
           setCases(cs);
           setTasks(t);
           setDeadlines(d);
-          setNotifications(notifs);
         })
         .catch(err => console.error('Refetch-on-focus failed:', err));
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [storageMode, repos]);
+  }, [storageMode, repos, writeTracker]);
 
   // Dashboard's "Docs outstanding" stat needs real checklist data, but
   // there's no `repos.checklist.getAll()` (checklists are stored per case) —

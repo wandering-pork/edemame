@@ -18,6 +18,9 @@ import type { OpenCaseParams, OpenCaseOutcome, OpenCaseStage } from '../lib/open
 import { PathwayCard } from '../components/visa-advisor/PathwayCard';
 import { verdictColors, verdictLabels, verdictRank, verdictIcon } from '../components/visa-advisor/verdictStyles';
 import { buildEligibilitySummary } from '../lib/eligibilitySummary';
+import { aiErrorMessage, throwForAiResponse } from '../lib/aiErrors';
+import { authJsonHeaders } from '../lib/authHeaders';
+import { buildEligibilityRequest } from '../lib/eligibilityRequest';
 
 interface WizardState {
   step: 'input' | 'report';
@@ -180,18 +183,20 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
+      // Age instead of date of birth, and no name: the AI doesn't need either (VA.0). The full
+      // answers are still saved locally in the assessment's `inputs` below.
       const response = await fetch('/api/check-eligibility', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        headers: await authJsonHeaders(),
+        body: JSON.stringify(buildEligibilityRequest({
           clientInfo: wizardState.clientInfo,
           goals: wizardState.goals,
           details: wizardState.details,
           supportingFactors: wizardState.supportingFactors,
-        }),
+        })),
       });
 
-      if (!response.ok) throw new Error('Failed to check eligibility');
+      if (!response.ok) await throwForAiResponse(response, 'Failed to check eligibility');
       const data: { result: EligibilityReport; usage: EligibilityUsage | null } = await response.json();
       setReport(data.result);
       setShowAllPathways(false);
@@ -220,7 +225,7 @@ export const VisaAdvisor: React.FC<VisaAdvisorProps> = ({
         console.error('Failed to save eligibility assessment:', saveError);
       }
     } catch (error) {
-      toast.error('Could not assess eligibility. Please try again.');
+      toast.error(aiErrorMessage(error, 'Could not assess eligibility. Please try again.'));
     } finally {
       setIsLoading(false);
     }

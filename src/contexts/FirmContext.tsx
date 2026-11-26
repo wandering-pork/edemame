@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import type { Firm, FirmFormerMember, FirmMemberRow, FirmRole } from '../types';
 import { mapFirmDirectoryToTeamMembers } from '../lib/firmDirectory';
@@ -86,6 +86,12 @@ export function FirmProvider({ children }: { children: React.ReactNode }) {
   const [memberships, setMemberships] = useState<ActiveMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [lostAccessNotice, setLostAccessNotice] = useState<string | null>(null);
+  const userId = user?.id ?? null;
+  // Which user the firm was last loaded for. Only the first load for a user shows `loading`:
+  // CloudAppGate swaps the whole app shell for a spinner while `loading` is true, so flipping it on
+  // a later refresh (self-heal, a refetch, a profile tweak) unmounted every page and threw away
+  // unsaved work. Later loads update in place instead.
+  const loadedForUser = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (DEV_OFFLINE_AUTH || !user || profile?.storageMode !== 'cloud') {
@@ -94,9 +100,11 @@ export function FirmProvider({ children }: { children: React.ReactNode }) {
       setFormerMembers([]);
       setMemberships([]);
       setLoading(false);
+      loadedForUser.current = null;
       return;
     }
-    setLoading(true);
+    const isFirstLoad = loadedForUser.current !== user.id;
+    if (isFirstLoad) setLoading(true);
     try {
       // Every firm this user is an active member of, most-recently-joined
       // first — the fallback resolveCurrentFirm() below uses when
@@ -149,6 +157,7 @@ export function FirmProvider({ children }: { children: React.ReactNode }) {
         setFirm(null);
         setMembers([]);
         setFormerMembers([]);
+        loadedForUser.current = user.id;
         return;
       }
 
@@ -161,21 +170,33 @@ export function FirmProvider({ children }: { children: React.ReactNode }) {
       if (dirErr) throw dirErr;
       if (formerErr) throw formerErr;
 
-      setFirm(firmRow ? { id: firmRow.id, name: firmRow.name } : null);
+      // Keep the same object when nothing changed, so effects keyed on `firm` don't re-run.
+      setFirm(prev => {
+        if (!firmRow) return null;
+        if (prev && prev.id === firmRow.id && prev.name === firmRow.name) return prev;
+        return { id: firmRow.id, name: firmRow.name };
+      });
       setMembers((dirRows ?? []).map(rowFromRpc));
       setFormerMembers((formerRows ?? []).map((r: any) => ({
         userId: r.user_id, fullName: r.full_name, email: r.email, removedAt: r.removed_at,
       })));
+      loadedForUser.current = user.id;
     } catch (err) {
       console.error('Failed to load firm context:', err);
-      setFirm(null);
-      setMembers([]);
-      setFormerMembers([]);
+      // A failed background refresh (e.g. a network blip on tab refocus) keeps what's already on
+      // screen. Clearing `firm` here would send CloudAppGate to "Create your firm" for someone who
+      // already has one. Only a failed first load falls back to the empty state.
+      if (isFirstLoad) {
+        setFirm(null);
+        setMembers([]);
+        setFormerMembers([]);
+      }
     } finally {
       setLoading(false);
     }
+    // Keyed on the user's id, not the `user` object: see loadedForUser above and lib/authUser.ts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, profile?.storageMode, profile?.currentFirmId]);
+  }, [userId, profile?.storageMode, profile?.currentFirmId]);
 
   useEffect(() => {
     load();
@@ -206,9 +227,9 @@ export function FirmProvider({ children }: { children: React.ReactNode }) {
   const dismissLostAccessNotice = useCallback(() => setLostAccessNotice(null), []);
 
   const role = useMemo<FirmRole | null>(() => {
-    if (!user) return null;
-    return members.find(m => m.userId === user.id)?.role ?? null;
-  }, [members, user]);
+    if (!userId) return null;
+    return members.find(m => m.userId === userId)?.role ?? null;
+  }, [members, userId]);
 
   const teamMembers = useMemo(() => mapFirmDirectoryToTeamMembers(members), [members]);
 

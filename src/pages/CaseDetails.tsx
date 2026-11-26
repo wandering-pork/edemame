@@ -77,6 +77,7 @@ import { buildCasePhaseView, phaseChoicesForCase, phaseName } from '../lib/phase
 import { PhaseTaskGroups } from '../components/case-details/PhaseTaskGroups';
 import { ChangeVisaPlanDialog } from '../components/case-details/ChangeVisaPlanDialog';
 import { buildPlanChange, needsPlanPrompt, type ExistingTasksChoice, type PlanChangeResult } from '../lib/visaPlanChange';
+import { aiErrorMessage } from '../lib/aiErrors';
 
 interface CaseDetailsProps {
   caseItem: Case;
@@ -817,8 +818,8 @@ export const CaseDetails: React.FC<CaseDetailsProps> = ({
       if (results.length === 0) {
         toast.info('No additional tasks suggested for this case');
       }
-    } catch {
-      setSuggestError('Failed to fetch task suggestions. Please try again.');
+    } catch (err) {
+      setSuggestError(aiErrorMessage(err, 'Failed to fetch task suggestions. Please try again.'));
     } finally {
       setSuggesting(false);
     }

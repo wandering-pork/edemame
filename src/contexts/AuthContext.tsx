@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import { readValidatedJson, writeLocalJson } from '@/lib/devLocalStorage';
 import { mapAuthError } from '@/lib/authErrors';
+import { isSameAuthUser } from '@/lib/authUser';
 
 type AuthUser = Pick<User, 'id' | 'email' | 'user_metadata'>;
 
@@ -80,15 +81,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Keep the previous user object when nothing the app reads has changed — see lib/authUser.ts.
+    // Token refreshes and tab-refocus SIGNED_IN events otherwise hand every consumer a new object,
+    // which re-ran FirmContext's load and remounted the whole app shell. `session` still updates
+    // every time, since callers need the fresh access token.
+    const applyUser = (next: AuthUser | null) =>
+      setUser(prev => (isSameAuthUser(prev, next) ? prev : next));
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      setUser(data.session?.user ?? null);
+      applyUser(data.session?.user ?? null);
       setLoading(false);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
-      setUser(newSession?.user ?? null);
+      applyUser(newSession?.user ?? null);
       setLoading(false);
     });
 

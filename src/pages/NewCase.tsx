@@ -8,6 +8,7 @@ import { toLocalISODate } from '../lib/dates';
 import { buildTemplateTaskDrafts, templateHasTiming } from '../lib/tasksFromTemplate';
 import { SubclassSubstreamFields, type SubclassSubstreamValue } from '../components/SubclassSubstreamFields';
 import { isConfirmedSubclass } from '../lib/visaTypes';
+import { aiErrorMessage } from '../lib/aiErrors';
 
 interface NewCaseProps {
   templates: WorkflowTemplate[];
@@ -253,7 +254,7 @@ export const NewCase: React.FC<NewCaseProps> = ({ templates, clients, suggestedT
       setGeneratedTasks(tasks);
       streamInTasks(tasks);
     } catch (e) {
-      setErrorMessage("Failed to generate tasks. Please check your connection or try again.");
+      setErrorMessage(aiErrorMessage(e, "Failed to generate tasks. Please check your connection or try again."));
       setStep('input');
     } finally {
       setIsLoading(false);

@@ -1,9 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { callGemini } from "./_lib/gemini";
+import { verifySupabaseUser } from "./_lib/auth";
+import { callGemini, geminiFailure } from "./_lib/gemini";
 
 interface VercelRequest extends IncomingMessage {
   method: string;
   body: any;
+  headers: Record<string, string | string[] | undefined>;
 }
 
 interface VercelResponse extends ServerResponse {
@@ -15,6 +17,13 @@ interface VercelResponse extends ServerResponse {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Signed-in users only (docs/plans/public-visa-advisor-trial.md, VA.0): this endpoint used to be
+  // open to anyone on the internet, unlimited, at our Gemini cost.
+  const auth = await verifySupabaseUser(req.headers);
+  if (!auth) {
+    return res.status(401).json({ error: "You must be signed in to generate tasks" });
   }
 
   const {
@@ -124,7 +133,8 @@ Tailor the tasks to the client's specific background and circumstances noted abo
     });
 
     if (!response.ok) {
-      return res.status(502).json({ error: "Gemini API request failed" });
+      const failure = geminiFailure(response.status);
+      return res.status(failure.status).json(failure.body);
     }
 
     const data = await response.json();
@@ -222,7 +232,8 @@ For each suggestion, give:
     });
 
     if (!response.ok) {
-      return res.status(502).json({ error: "Gemini API request failed" });
+      const failure = geminiFailure(response.status);
+      return res.status(failure.status).json(failure.body);
     }
 
     const data = await response.json();

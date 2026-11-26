@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../../contexts/AuthContext';
 import type { FocusChatMessage, FocusConversation } from '../../types';
+import { readAiBusyMessage } from '../../lib/aiErrors';
 
 interface UseEdieChatOptions {
   /** Conversations are reloaded whenever this changes (e.g. the case id). */
@@ -145,6 +146,17 @@ export function useEdieChat({ scopeKey, caseId, load, save, getCaseContext }: Us
           issuesFiledInSession,
         }),
       });
+      if (!response.ok) {
+        const busy = await readAiBusyMessage(response);
+        appendMessage(targetId, {
+          id: uuidv4(),
+          role: 'assistant',
+          content: busy ?? 'Sorry, I could not generate a response. Please try again.',
+          createdAt: new Date().toISOString(),
+          kind: 'text',
+        });
+        return;
+      }
       const data = await response.json();
       const assistantMsg: FocusChatMessage =
         data.kind === 'issue-draft' && data.draft
@@ -168,7 +180,7 @@ export function useEdieChat({ scopeKey, caseId, load, save, getCaseContext }: Us
       appendMessage(targetId, {
         id: uuidv4(),
         role: 'assistant',
-        content: 'Connection error. Please check your API key and try again.',
+        content: 'Connection error. Please check your internet connection and try again.',
         createdAt: new Date().toISOString(),
       });
     } finally {

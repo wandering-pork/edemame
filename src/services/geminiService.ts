@@ -1,5 +1,7 @@
 import { Task, WorkflowStep } from "../types";
 import { addDaysISO } from "../lib/dates";
+import { throwForAiResponse } from '../lib/aiErrors';
+import { authJsonHeaders } from '../lib/authHeaders';
 
 export const generateTasksFromCase = async (
   caseDescription: string,
@@ -13,7 +15,7 @@ export const generateTasksFromCase = async (
 ): Promise<Partial<Task>[]> => {
   const response = await fetch("/api/generate-tasks", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authJsonHeaders(),
     body: JSON.stringify({
       caseDescription,
       workflowDescription,
@@ -26,7 +28,7 @@ export const generateTasksFromCase = async (
   });
 
   if (!response.ok) {
-    throw new Error("Failed to generate tasks. Please try again.");
+    await throwForAiResponse(response, "Failed to generate tasks. Please try again.");
   }
 
   const generatedData = await response.json();
@@ -78,7 +80,7 @@ export const suggestAdditions = async (
 ): Promise<TaskSuggestion[]> => {
   const response = await fetch("/api/generate-tasks", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authJsonHeaders(),
     body: JSON.stringify({
       mode: 'additions',
       caseDescription,
@@ -91,7 +93,7 @@ export const suggestAdditions = async (
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch task suggestions. Please try again.");
+    await throwForAiResponse(response, "Failed to fetch task suggestions. Please try again.");
   }
 
   const data = await response.json();
