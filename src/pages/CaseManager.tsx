@@ -580,7 +580,18 @@ export const CaseManager: React.FC<CaseManagerProps> = ({
                       )}
                     </div>
                     <div className="text-[11.5px] text-ink-faint dark:text-plate-ink-faint mt-[3px] whitespace-nowrap overflow-hidden text-ellipsis">
-                      {client?.name || 'Unknown'} &middot; DOB {client?.dob || 'N/A'} &middot; <span className="font-mono">{ref}</span>
+                      {client && !selecting ? (
+                        // Opens the client on the Clients page (expanded, scrolled to). While
+                        // selecting rows, the click falls through to the row and toggles it.
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); navigate('/clients', { state: { focusClientId: client.id } }); }}
+                          title={`Open ${client.name} in Clients`}
+                          className="hover:text-edamame-700 dark:hover:text-edamame-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-edamame-700 rounded-sm"
+                        >
+                          {client.name}
+                        </button>
+                      ) : (client?.name || 'Unknown')} &middot; DOB {client?.dob || 'N/A'} &middot; <span className="font-mono">{ref}</span>
                     </div>
                   </div>
 
